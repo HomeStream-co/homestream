@@ -20,7 +20,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import {
   Play, Pause, SkipForward, SkipBack, Volume2, VolumeX,
   Wifi, WifiOff, Film, FastForward, ChevronRight, Zap,
-  RotateCcw,
+  RotateCcw, QrCode, X, ExternalLink,
 } from 'lucide-react';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -65,6 +65,17 @@ export default function RemotePage() {
   const [scrubValue, setScrubValue] = useState(0);
   const [showSpeedPicker, setShowSpeedPicker] = useState(false);
   const [screenCount, setScreenCount] = useState(0);
+
+  // QR code for sharing the remote URL
+  const [showQr, setShowQr] = useState(false);
+  const [qrData, setQrData] = useState<{ url: string; qr: string } | null>(null);
+
+  useEffect(() => {
+    fetch('/api/remote/qr')
+      .then(r => r.json())
+      .then((d: { url: string; qr: string }) => setQrData(d))
+      .catch(() => {});
+  }, []);
 
   // Tick local time forward while playing (reduces WS traffic)
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -153,22 +164,83 @@ export default function RemotePage() {
           <span className="font-heading text-foreground font-bold tracking-wide">Remote</span>
         </div>
 
-        {/* Connection status */}
-        <div className={`flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full border ${
-          status === 'connected'     ? 'bg-green-500/10 border-green-500/30 text-green-400' :
-          status === 'connecting'    ? 'bg-yellow-500/10 border-yellow-500/30 text-yellow-400' :
-          status === 'no_screen'     ? 'bg-blue-500/10 border-blue-500/30 text-blue-400' :
-                                       'bg-red-500/10 border-red-500/30 text-red-400'
-        }`}>
-          {status === 'connected'  ? <Wifi className="w-3 h-3" /> :
-           status === 'connecting' ? <Wifi className="w-3 h-3 animate-pulse" /> :
-                                     <WifiOff className="w-3 h-3" />}
-          {status === 'connected'  ? `${screenCount} screen${screenCount !== 1 ? 's' : ''}` :
-           status === 'connecting' ? 'Connecting…' :
-           status === 'no_screen'  ? 'No screen' :
-                                     'Disconnected'}
+        <div className="flex items-center gap-2">
+          {/* QR code button */}
+          {qrData && (
+            <button
+              onClick={() => setShowQr(v => !v)}
+              title="Show QR code to open remote on another device"
+              className="w-8 h-8 rounded-full bg-card border border-border flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <QrCode className="w-4 h-4" />
+            </button>
+          )}
+
+          {/* Connection status */}
+          <div className={`flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full border ${
+            status === 'connected'     ? 'bg-green-500/10 border-green-500/30 text-green-400' :
+            status === 'connecting'    ? 'bg-yellow-500/10 border-yellow-500/30 text-yellow-400' :
+            status === 'no_screen'     ? 'bg-blue-500/10 border-blue-500/30 text-blue-400' :
+                                         'bg-red-500/10 border-red-500/30 text-red-400'
+          }`}>
+            {status === 'connected'  ? <Wifi className="w-3 h-3" /> :
+             status === 'connecting' ? <Wifi className="w-3 h-3 animate-pulse" /> :
+                                       <WifiOff className="w-3 h-3" />}
+            {status === 'connected'  ? `${screenCount} screen${screenCount !== 1 ? 's' : ''}` :
+             status === 'connecting' ? 'Connecting…' :
+             status === 'no_screen'  ? 'No screen' :
+                                       'Disconnected'}
+          </div>
         </div>
       </div>
+
+      {/* QR code modal */}
+      <AnimatePresence>
+        {showQr && qrData && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: -8 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: -8 }}
+            transition={{ duration: 0.15 }}
+            className="w-full max-w-sm mb-6 bg-card border border-border rounded-2xl p-5 shadow-xl"
+          >
+            <div className="flex items-start justify-between mb-3">
+              <div>
+                <p className="text-sm font-semibold text-foreground">Open on another device</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Scan to open this remote on your phone</p>
+              </div>
+              <button
+                onClick={() => setShowQr(false)}
+                className="w-7 h-7 rounded-full bg-muted flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            {/* SVG QR code */}
+            <div
+              className="w-48 h-48 mx-auto rounded-xl overflow-hidden bg-background p-2 border border-border"
+              dangerouslySetInnerHTML={{ __html: qrData.qr }}
+            />
+
+            {/* URL */}
+            <div className="mt-3 flex items-center gap-2 bg-muted/50 rounded-lg px-3 py-2">
+              <code className="text-[11px] text-muted-foreground flex-1 truncate">{qrData.url}</code>
+              <a
+                href={qrData.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary hover:text-primary/80 transition-colors flex-shrink-0"
+              >
+                <ExternalLink className="w-3.5 h-3.5" />
+              </a>
+            </div>
+            <p className="text-[10px] text-muted-foreground text-center mt-2">
+              Both devices must be on the same Wi-Fi network
+            </p>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* No screen state */}
       <AnimatePresence>

@@ -19,6 +19,8 @@ interface AuthState {
   requiresPassword: boolean;
   login: (password: string) => Promise<{ ok: boolean; error?: string }>;
   logout: () => Promise<void>;
+  /** Invalidates ALL sessions on the server — security escape hatch */
+  logoutAll: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthState | null>(null);
@@ -65,8 +67,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setAuthenticated(false);
   }, []);
 
+  const logoutAll = useCallback(async () => {
+    await fetch('/api/auth/logout-all', { method: 'POST' });
+    setAuthenticated(false);
+  }, []);
+
   return (
-    <AuthContext.Provider value={{ authenticated, requiresPassword, login, logout }}>
+    <AuthContext.Provider value={{ authenticated, requiresPassword, login, logout, logoutAll }}>
       {children}
     </AuthContext.Provider>
   );

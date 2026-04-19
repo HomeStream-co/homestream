@@ -4,7 +4,7 @@ import {
   ArrowLeft, Play, Pause, Volume2, VolumeX, Maximize, Minimize,
   Info, Star, RotateCcw, Sparkles, MessageCircle, SkipForward,
   CheckCircle2, FastForward, Rewind, Wand2, Loader2, Captions,
-  PictureInPicture2, Keyboard, X as XIcon,
+  PictureInPicture2, Keyboard, X as XIcon, Cpu,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useMedia } from '@/context/MediaContext';
@@ -83,6 +83,76 @@ export default function PlayerPage() {
     onFullscreen:  () => { if (!document.fullscreenElement) containerRef.current?.requestFullscreen(); else document.exitFullscreen(); },
     onSpeed:       (rate) => { if (videoRef.current) { videoRef.current.playbackRate = rate; setPlaybackRate(rate); } },
   });
+
+  // ── HLS transcoding — for HEVC/H.265 and other non-browser-native codecs ──
+  const [hlsUrl, setHlsUrl] = useState<string | null>(null);
+  const [hlsCodec, setHlsCodec] = useState<string | null>(null);
+  const hlsInstanceRef = useRef<import('hls.js').default | null>(null);
+
+  useEffect(() => {
+    if (!id) return;
+    setHlsUrl(null);
+    setHlsCodec(null);
+
+    fetch(`/api/hls/${id}/probe`)
+      .then(r => r.json())
+      .then((data: { codec: string; needsTranscode: boolean; hlsUrl: string | null }) => {
+        if (data.needsTranscode && data.hlsUrl) {
+          setHlsUrl(data.hlsUrl);
+          setHlsCodec(data.codec);
+        }
+      })
+      .catch(() => {});
+  }, [id]);
+
+  // Attach HLS.js when hlsUrl is set
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !hlsUrl) return;
+
+    // Destroy previous instance
+    if (hlsInstanceRef.current) {
+      hlsInstanceRef.current.destroy();
+      hlsInstanceRef.current = null;
+    }
+
+    import('hls.js').then(({ default: Hls }) => {
+      if (!Hls.isSupported()) {
+        // Safari supports HLS natively — set src directly
+        video.src = hlsUrl;
+        return;
+      }
+
+      const hls = new Hls({
+        maxBufferLength: 60,
+        maxMaxBufferLength: 120,
+        enableWorker: true,
+      });
+
+      hls.loadSource(hlsUrl);
+      hls.attachMedia(video);
+      hlsInstanceRef.current = hls;
+
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        video.play().catch(() => {});
+      });
+
+      hls.on(Hls.Events.ERROR, (_event, data) => {
+        if (data.fatal) {
+          console.error('[hls.js] Fatal error:', data);
+        }
+      });
+    }).catch(err => {
+      console.error('[hls.js] Failed to load:', err);
+    });
+
+    return () => {
+      if (hlsInstanceRef.current) {
+        hlsInstanceRef.current.destroy();
+        hlsInstanceRef.current = null;
+      }
+    };
+  }, [hlsUrl]);
 
   // ── Kids profile block — redirect if content not allowed ──
   useEffect(() => {
@@ -1019,7 +1089,8 @@ export default function PlayerPage() {
       >
         <video
           ref={videoRef}
-          src={`/api/stream/${item.filename}`}
+          // When HLS.js is active it manages the src directly — don't set it here
+          {...(!hlsUrl ? { src: `/api/stream/${item.filename}` } : {})}
           className="w-full h-full"
           // preload=auto tells the browser to start filling its decode buffer
           // immediately on page load — by the time the user hits Play the first
@@ -1117,6 +1188,14 @@ export default function PlayerPage() {
         {/* ── Transcode Progress Overlay — replaces spinner during active jobs ── */}
         {isTranscoding && transcodeJob && (
           <TranscodeProgressOverlay job={transcodeJob} />
+        )}
+
+        {/* ── HLS Live Transcode Badge — shown when streaming HEVC/H.265 via HLS ── */}
+        {hlsUrl && hlsCodec && (
+          <div className="absolute top-3 right-3 z-20 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/60 border border-white/20 text-white text-[11px] font-semibold backdrop-blur-sm pointer-events-none">
+            <Cpu className="w-3 h-3 text-yellow-400 animate-pulse" />
+            Live transcoding {hlsCodec.toUpperCase()} → H.264
+          </div>
         )}
 
         {/* ── Loading Spinner — only shown while buffering (not transcoding) ── */}
