@@ -266,3 +266,9 @@ export function stopAllHlsJobs(): void {
 // ── Ensure base dir exists ────────────────────────────────────────────────────
 
 fs.mkdirSync(HLS_BASE_DIR, { recursive: true });
+
+/**
+ * Exported so startupCleanup can reference the same path without duplicating
+ * the constant. Never changes at runtime.
+ */
+export { HLS_BASE_DIR };

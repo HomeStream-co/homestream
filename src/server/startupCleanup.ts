@@ -24,13 +24,29 @@
  * if the server restarts between the FFmpeg finish and the callback write,
  * the library can point to a non-existent `_tc.mp4`. The transcode cleanup
  * above handles this by falling through to the "original file" check.
+ *
+ * Problem 4: HLS segments written to /tmp/homestream-hls/<mediaId>/ are
+ * never cleaned up if the server restarts — the in-memory jobs map is wiped
+ * but the directories remain on disk and accumulate indefinitely.
+ *
+ * Fix: On startup, delete every subdirectory inside HLS_BASE_DIR. The
+ * directories are cheap to recreate (FFmpeg regenerates them on next play)
+ * and there is no value in keeping stale segments from a previous run.
  */
 
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
 
 const LIBRARY_PATH = path.resolve('./media-library.json');
 const UPLOADS_DIR  = path.resolve('./uploads');
+
+// Mirrors the constant in hlsTranscoder.ts — kept in sync via the exported
+// HLS_BASE_DIR value, but we also need it synchronously here before the
+// module is imported, so we derive it the same way.
+const HLS_BASE_DIR = path.join(os.tmpdir(), 'homestream-hls');
+
+// ── Types ─────────────────────────────────────────────────────────────────────
 
 interface MediaRecord {
   id: string;
@@ -54,7 +70,92 @@ function writeLibrary(data: MediaRecord[]): void {
   fs.writeFileSync(LIBRARY_PATH, JSON.stringify(data, null, 2));
 }
 
+// ── HLS orphan cleanup ────────────────────────────────────────────────────────
+
+/**
+ * Delete all subdirectories inside HLS_BASE_DIR left over from a previous run.
+ *
+ * Why it's safe to delete everything unconditionally:
+ *  - The in-memory `jobs` map in hlsTranscoder is wiped on every restart, so
+ *    there are no live references to any of these directories.
+ *  - HLS segments are purely a streaming cache — the source file is always
+ *    intact. FFmpeg regenerates the segments on the next play request.
+ *  - Keeping stale segments wastes disk space (each job can produce hundreds
+ *    of .ts files) and can confuse the player if a playlist references
+ *    segments that belong to a different encode run.
+ *
+ * What gets removed: every direct child directory of HLS_BASE_DIR.
+ * What is NOT touched: the base directory itself, or any non-directory entries.
+ *
+ * Disk impact: each 4-second segment is ~500 KB–2 MB depending on bitrate.
+ * A 2-hour movie at 4s segments = ~1 800 segments = up to ~3.6 GB per item.
+ * With multiple items this adds up fast, so cleanup on restart is important.
+ */
+function cleanupHlsOrphans(): void {
+  if (!fs.existsSync(HLS_BASE_DIR)) {
+    // Base dir doesn't exist yet — nothing to clean, and hlsTranscoder will
+    // create it when the first HLS request comes in.
+    return;
+  }
+
+  let entries: fs.Dirent[];
+  try {
+    entries = fs.readdirSync(HLS_BASE_DIR, { withFileTypes: true });
+  } catch (err) {
+    console.warn(`[startup] Could not read HLS base dir (${HLS_BASE_DIR}): ${err}`);
+    return;
+  }
+
+  const dirs = entries.filter(e => e.isDirectory());
+
+  if (dirs.length === 0) {
+    console.log('[startup] HLS orphan cleanup: no leftover segment directories found.');
+    return;
+  }
+
+  let removed = 0;
+  let totalBytes = 0;
+  const errors: string[] = [];
+
+  for (const dir of dirs) {
+    const dirPath = path.join(HLS_BASE_DIR, dir.name);
+
+    // Tally disk usage before deleting so we can log how much was reclaimed
+    try {
+      const files = fs.readdirSync(dirPath);
+      for (const file of files) {
+        try {
+          const stat = fs.statSync(path.join(dirPath, file));
+          if (stat.isFile()) totalBytes += stat.size;
+        } catch { /* ignore stat errors */ }
+      }
+    } catch { /* ignore read errors — we'll still try to delete */ }
+
+    try {
+      fs.rmSync(dirPath, { recursive: true, force: true });
+      removed++;
+    } catch (err) {
+      errors.push(`${dir.name}: ${err}`);
+    }
+  }
+
+  const mb = (totalBytes / 1024 / 1024).toFixed(1);
+  if (errors.length === 0) {
+    console.log(`[startup] HLS orphan cleanup: removed ${removed} segment director${removed === 1 ? 'y' : 'ies'} (${mb} MB reclaimed).`);
+  } else {
+    console.warn(`[startup] HLS orphan cleanup: removed ${removed}/${dirs.length} directories (${mb} MB). Errors: ${errors.join('; ')}`);
+  }
+}
+
+// ── Main export ───────────────────────────────────────────────────────────────
+
 export function runStartupCleanup(): void {
+  // ── HLS orphan cleanup ───────────────────────────────────────────────────────
+  // Runs first so disk space is reclaimed before anything else.
+  // HLS_BASE_DIR is derived the same way hlsTranscoder.ts does it, so the
+  // path is always consistent without needing a dynamic import.
+  cleanupHlsOrphans();
+
   const library = readLibrary();
 
   const stuckTranscoding = library.filter(m => m.transcoding === true);
