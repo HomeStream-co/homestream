@@ -8,7 +8,6 @@
  */
 
 import { useState, useEffect, useCallback, useRef, type ReactNode } from 'react';
-import type { TMDBMovie } from '@/server/tmdbCache';
 import { TMDBContext, type TMDBState } from './TMDBContextCore';
 
 // Bump SESSION_VERSION whenever the session shape changes to bust stale caches.
