@@ -112,6 +112,17 @@ export default defineConfig(({ mode }) => ({
 
 	optimizeDeps: {
 		include: ["react", "react-dom", "react-router-dom"],
+		// html-to-image is dev-tools only and incompatible with Vite's dep optimizer.
+		// Excluding it prevents the "file does not exist in optimize deps directory"
+		// crash that disconnects the SSR transport and causes the recurring white-screen.
+		exclude: ["html-to-image"],
+	},
+
+	ssr: {
+		// Keep html-to-image as an external in SSR so the module runner never
+		// tries to inline/transform it — same root cause as the optimizeDeps crash.
+		noExternal: [],
+		external: ["html-to-image"],
 	},
 
 	server: {
