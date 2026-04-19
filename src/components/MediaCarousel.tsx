@@ -7,9 +7,10 @@ interface MediaCarouselProps {
   title: string;
   items: MediaItem[];
   showProgress?: boolean;
+  titleIcon?: React.ReactNode;
 }
 
-export default function MediaCarousel({ title, items, showProgress }: MediaCarouselProps) {
+export default function MediaCarousel({ title, items, showProgress, titleIcon }: MediaCarouselProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   if (items.length === 0) return null;
@@ -22,7 +23,8 @@ export default function MediaCarousel({ title, items, showProgress }: MediaCarou
 
   return (
     <section className="mb-8">
-      <h2 className="text-lg font-heading tracking-wide text-foreground mb-3 px-4 sm:px-6 lg:px-8">
+      <h2 className="text-lg font-heading tracking-wide text-foreground mb-3 px-4 sm:px-6 lg:px-8 flex items-center gap-2">
+        {titleIcon}
         {title}
       </h2>
       <div className="relative group/carousel">

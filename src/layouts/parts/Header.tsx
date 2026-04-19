@@ -79,6 +79,7 @@ export default function Header({ onChatOpen: _onChatOpen }: HeaderProps) {
     { to: '/', label: 'Home' },
     { to: '/browse', label: 'Browse' },
     { to: '/shows', label: 'TV Shows' },
+    { to: '/discover', label: 'Discover' },
     { to: '/watchlist', label: 'Watchlist' },
     { to: '/library', label: 'My Library' },
   ];
