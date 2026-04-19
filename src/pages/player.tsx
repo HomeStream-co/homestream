@@ -15,6 +15,7 @@ import CastButton from '@/components/CastButton';
 import ChromecastButton from '@/components/ChromecastButton';
 import TranscodeProgressOverlay from '@/components/TranscodeProgressOverlay';
 import { useTranscodeProgress } from '@/hooks/useTranscodeProgress';
+import { useRemoteControl } from '@/hooks/useRemoteControl';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -69,6 +70,19 @@ export default function PlayerPage() {
   const isTranscoding = transcodeJob !== null
     && transcodeJob.status !== 'done'
     && transcodeJob.status !== 'skipped';
+
+  // ── Remote control — WebSocket phone remote ──
+  const { sendState } = useRemoteControl(id, {
+    onPlay:        () => videoRef.current?.play(),
+    onPause:       () => videoRef.current?.pause(),
+    onSeek:        (pos) => { if (videoRef.current) { videoRef.current.currentTime = pos; setCurrentTime(pos); } },
+    onVolume:      (lvl) => { if (videoRef.current) { videoRef.current.volume = lvl; setVolume(lvl); setMuted(lvl === 0); } },
+    onSkipForward: (secs) => { if (videoRef.current) videoRef.current.currentTime = Math.min(videoRef.current.currentTime + secs, duration); },
+    onSkipBack:    (secs) => { if (videoRef.current) videoRef.current.currentTime = Math.max(videoRef.current.currentTime - secs, 0); },
+    onSkipIntro:   () => { if (videoRef.current) videoRef.current.currentTime = SKIP_INTRO_END; },
+    onFullscreen:  () => { if (!document.fullscreenElement) containerRef.current?.requestFullscreen(); else document.exitFullscreen(); },
+    onSpeed:       (rate) => { if (videoRef.current) { videoRef.current.playbackRate = rate; setPlaybackRate(rate); } },
+  });
 
   // ── Kids profile block — redirect if content not allowed ──
   useEffect(() => {
@@ -1022,6 +1036,19 @@ export default function PlayerPage() {
               setCurrentTime(videoRef.current.currentTime);
               const buf = videoRef.current.buffered;
               if (buf.length > 0) setBuffered(buf.end(buf.length - 1));
+              // Broadcast state to phone remotes every ~2s (throttled by integer seconds)
+              if (Math.floor(videoRef.current.currentTime) % 2 === 0) {
+                sendState({
+                  mediaId: id ?? '',
+                  title: item?.title ?? '',
+                  currentTime: videoRef.current.currentTime,
+                  duration: videoRef.current.duration || 0,
+                  paused: videoRef.current.paused,
+                  volume: videoRef.current.volume,
+                  speed: videoRef.current.playbackRate,
+                  hasNextEpisode: !!nextEpisode,
+                });
+              }
             }
           }}
           onLoadedMetadata={() => {

@@ -1,6 +1,9 @@
 import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Search, Upload, Menu, X, Film, Bookmark, ChevronDown, Clock, Lock } from 'lucide-react';
+import {
+  Search, Upload, Menu, X, Film, Bookmark, ChevronDown, Clock, Lock,
+  Home, Compass, Download, Library, History, Settings2, Wifi,
+} from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'sonner';
 import { useMedia } from '@/context/MediaContext';
@@ -344,80 +347,113 @@ export default function Header({ onChatOpen: _onChatOpen }: HeaderProps) {
         </div>
       </div>
 
-      {/* Mobile Menu */}
+      {/* ── Mobile Menu Drawer ── */}
       <AnimatePresence>
         {mobileOpen && (
           <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            className="md:hidden bg-background/95 backdrop-blur-sm border-t border-border"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.2, ease: 'easeInOut' as const }}
+            className="md:hidden overflow-hidden bg-background/98 backdrop-blur-md border-t border-border shadow-xl"
           >
-            <nav className="px-4 py-3 flex flex-col gap-3">
-              {navLinks.map(link => (
+            <div className="px-4 py-4 flex flex-col gap-1">
+
+              {/* Nav links with icons */}
+              {[
+                { to: '/',          label: 'Home',       Icon: Home },
+                { to: '/discover',  label: 'Discover',   Icon: Compass },
+                { to: '/downloads', label: 'Downloads',  Icon: Download, badge: activeDownloads },
+                { to: '/library',   label: 'My Library', Icon: Library },
+                { to: '/history',   label: 'History',    Icon: History },
+                { to: '/watchlist', label: 'Watchlist',  Icon: Bookmark, badge: watchlist.length },
+                { to: '/remote',    label: 'Phone Remote', Icon: Wifi },
+              ].map(({ to, label, Icon, badge }) => (
                 <Link
-                  key={link.to}
-                  to={link.to}
+                  key={to}
+                  to={to}
                   onClick={() => setMobileOpen(false)}
-                  className={`text-sm font-medium py-1 ${
-                    location.pathname === link.to ? 'text-foreground' : 'text-muted-foreground'
+                  className={`flex items-center gap-3 px-3 py-3 rounded-xl transition-colors ${
+                    location.pathname === to
+                      ? 'bg-primary/10 text-primary'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-accent/10'
                   }`}
                 >
-                  {link.label}
+                  <Icon className="w-4 h-4 flex-shrink-0" />
+                  <span className="text-sm font-medium flex-1">{label}</span>
+                  {badge != null && badge > 0 && (
+                    <span className="min-w-[20px] h-5 bg-primary text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1">
+                      {badge > 99 ? '99+' : badge}
+                    </span>
+                  )}
                 </Link>
               ))}
+
+              {/* Divider */}
+              <div className="border-t border-border my-2" />
+
+              {/* Upload shortcut */}
               <Link
                 to="/library"
                 onClick={() => setMobileOpen(false)}
-                className="flex items-center gap-1.5 text-sm font-medium text-primary"
+                className="flex items-center gap-3 px-3 py-3 rounded-xl bg-primary/10 border border-primary/20 text-primary hover:bg-primary/20 transition-colors"
               >
-                <Upload className="w-4 h-4" />
-                Upload Media
+                <Upload className="w-4 h-4 flex-shrink-0" />
+                <span className="text-sm font-semibold">Upload Media</span>
               </Link>
-              <Link
-                to="/watchlist"
-                onClick={() => setMobileOpen(false)}
-                className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground"
-              >
-                <Bookmark className="w-4 h-4" />
-                Watchlist {watchlist.length > 0 && `(${watchlist.length})`}
-              </Link>
-              <Link
-                to="/history"
-                onClick={() => setMobileOpen(false)}
-                className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground"
-              >
-                <Clock className="w-4 h-4" />
-                Watch History
-              </Link>
-              {/* Mobile profile switcher */}
-              <div className="border-t border-border pt-3 flex flex-col gap-2">
-                <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Profile</p>
-                {PROFILES.map(profile => (
-                  <button
-                    key={profile.id}
-                    onClick={() => {
-                      if (profile.id === 'adult' && adultPinEnabled && activeProfile?.id !== 'adult') {
-                        setPinPendingId('adult');
+
+              {/* Divider */}
+              <div className="border-t border-border my-2" />
+
+              {/* Profile switcher */}
+              <div className="px-1">
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium px-2 mb-2">Profile</p>
+                <div className="flex flex-col gap-0.5">
+                  {PROFILES.map(profile => (
+                    <button
+                      key={profile.id}
+                      onClick={() => {
+                        if (profile.id === 'adult' && adultPinEnabled && activeProfile?.id !== 'adult') {
+                          setPinPendingId('adult');
+                          setMobileOpen(false);
+                          return;
+                        }
+                        setActiveProfile(profile.id);
                         setMobileOpen(false);
-                        return;
-                      }
-                      setActiveProfile(profile.id);
-                      setMobileOpen(false);
-                    }}
-                    className={`flex items-center gap-2.5 py-1 text-left ${activeProfile?.id === profile.id ? 'text-foreground' : 'text-muted-foreground'}`}
-                  >
-                    <span>{profile.avatar}</span>
-                    <span className="text-sm font-medium">{profile.name}</span>
-                    {profile.restricted && <span className="text-[10px] text-yellow-500 ml-1">G &amp; PG only</span>}
-                    {profile.id === 'adult' && adultPinEnabled && activeProfile?.id !== 'adult' && (
-                      <Lock className="w-3 h-3 ml-1 text-primary/60" />
-                    )}
-                    {activeProfile?.id === profile.id && <div className="w-1.5 h-1.5 rounded-full bg-primary ml-auto" />}
-                  </button>
-                ))}
+                      }}
+                      className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors text-left ${
+                        activeProfile?.id === profile.id
+                          ? 'bg-accent/10 text-foreground'
+                          : 'text-muted-foreground hover:text-foreground hover:bg-accent/10'
+                      }`}
+                    >
+                      <span className="text-lg leading-none">{profile.avatar}</span>
+                      <div className="flex-1 min-w-0">
+                        <span className="text-sm font-medium block">{profile.name}</span>
+                        {profile.restricted && (
+                          <span className="text-[10px] text-yellow-500">G &amp; PG only</span>
+                        )}
+                        {profile.id === 'adult' && adultPinEnabled && (
+                          <span className="text-[10px] text-primary/70 flex items-center gap-0.5">
+                            <Lock className="w-2.5 h-2.5" /> PIN protected
+                          </span>
+                        )}
+                      </div>
+                      {activeProfile?.id === profile.id && (
+                        <div className="w-2 h-2 rounded-full bg-primary flex-shrink-0" />
+                      )}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  onClick={() => { setMobileOpen(false); navigate('/profiles'); }}
+                  className="w-full mt-1 flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <Settings2 className="w-3.5 h-3.5" />
+                  Manage profiles
+                </button>
               </div>
-            </nav>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

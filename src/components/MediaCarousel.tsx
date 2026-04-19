@@ -37,12 +37,15 @@ export default function MediaCarousel({
         {title}
       </h2>
       <div className="relative group/carousel">
-        {/* Left Arrow */}
+        {/* Left Arrow — centered over the card images, not the full section height */}
         <button
           onClick={() => scroll('left')}
-          className="absolute left-0 top-0 bottom-6 z-10 w-10 bg-gradient-to-r from-background to-transparent flex items-center justify-center opacity-0 group-hover/carousel:opacity-100 transition-opacity"
+          aria-label="Scroll left"
+          className="absolute left-0 top-0 bottom-6 z-10 w-12 bg-gradient-to-r from-background/90 to-transparent flex items-center justify-start pl-1 opacity-0 group-hover/carousel:opacity-100 transition-opacity"
         >
-          <ChevronLeft className="w-6 h-6 text-white" />
+          <div className="w-8 h-8 rounded-full bg-background/80 border border-border flex items-center justify-center shadow-md">
+            <ChevronLeft className="w-5 h-5 text-foreground" />
+          </div>
         </button>
 
         {/* Scroll container */}
@@ -62,12 +65,15 @@ export default function MediaCarousel({
           ))}
         </div>
 
-        {/* Right Arrow */}
+        {/* Right Arrow — centered over the card images */}
         <button
           onClick={() => scroll('right')}
-          className="absolute right-0 top-0 bottom-6 z-10 w-10 bg-gradient-to-l from-background to-transparent flex items-center justify-center opacity-0 group-hover/carousel:opacity-100 transition-opacity"
+          aria-label="Scroll right"
+          className="absolute right-0 top-0 bottom-6 z-10 w-12 bg-gradient-to-l from-background/90 to-transparent flex items-center justify-end pr-1 opacity-0 group-hover/carousel:opacity-100 transition-opacity"
         >
-          <ChevronRight className="w-6 h-6 text-white" />
+          <div className="w-8 h-8 rounded-full bg-background/80 border border-border flex items-center justify-center shadow-md">
+            <ChevronRight className="w-5 h-5 text-foreground" />
+          </div>
         </button>
       </div>
     </section>
