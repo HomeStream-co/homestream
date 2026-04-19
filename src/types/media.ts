@@ -30,7 +30,11 @@ export interface MediaItem {
   runtime?: string;
   rated?: string;
   addedAt: string;
-  watchProgress: number;
+  watchProgress: number;         // 0–100 percentage
+  watchedSeconds?: number;       // raw seconds for precision resume
+  totalSeconds?: number;         // total duration in seconds
+  lastWatchedAt?: string;        // ISO — used to sort Continue Watching row
+  watchedAt?: string;            // ISO — set when progress reaches 95%+
   fileSize?: number;
   transcoding?: boolean;
   transcodeWarning?: string;

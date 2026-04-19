@@ -15,7 +15,7 @@ interface MediaContextType {
   refreshLibrary: () => Promise<void>;
   addToWatchlist: (id: string) => void;
   removeFromWatchlist: (id: string) => void;
-  updateProgress: (id: string, progress: number) => void;
+  updateProgress: (id: string, progress: number, currentTime?: number, duration?: number) => void;
   deleteMedia: (id: string) => Promise<void>;
   updateMedia: (id: string, updates: Partial<MediaItem>) => Promise<void>;
   triggerPostWatchRecommendation: (id: string) => void;
@@ -44,8 +44,22 @@ export function MediaProvider({ children }: { children: ReactNode }) {
       setLoading(true);
       const res = await fetch('/api/media');
       if (res.ok) {
-        const data = await res.json();
+        const data = await res.json() as MediaItem[];
         setLibrary(data);
+        // Reconcile continueWatching from server — server is source of truth after restart.
+        // Build a merged list: server watchProgress wins over stale localStorage values.
+        const serverProgress: ContinueWatchingItem[] = data
+          .filter(m => m.watchProgress && m.watchProgress > 2 && m.watchProgress < 95)
+          .sort((a, b) => {
+            const ta = a.lastWatchedAt ? new Date(a.lastWatchedAt).getTime() : 0;
+            const tb = b.lastWatchedAt ? new Date(b.lastWatchedAt).getTime() : 0;
+            return tb - ta;
+          })
+          .map(m => ({ id: m.id, progress: m.watchProgress! }));
+        if (serverProgress.length > 0) {
+          setContinueWatching(serverProgress);
+          localStorage.setItem('homestream-progress', JSON.stringify(serverProgress));
+        }
       }
     } catch (err) {
       console.error('Failed to fetch library:', err);
@@ -74,24 +88,30 @@ export function MediaProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  const updateProgress = useCallback((id: string, progress: number) => {
+  const updateProgress = useCallback((id: string, progress: number, currentTime?: number, duration?: number) => {
+    // If complete (≥95%), remove from Continue Watching
+    const isComplete = progress >= 95;
     setContinueWatching(prev => {
-      const existing = prev.findIndex(c => c.id === id);
       let next: ContinueWatchingItem[];
-      if (existing >= 0) {
-        next = [...prev];
-        next[existing] = { id, progress };
+      if (isComplete) {
+        next = prev.filter(c => c.id !== id);
       } else {
-        next = [...prev, { id, progress }];
+        const existing = prev.findIndex(c => c.id === id);
+        if (existing >= 0) {
+          next = [...prev];
+          next[existing] = { id, progress };
+        } else {
+          next = [...prev, { id, progress }];
+        }
       }
       localStorage.setItem('homestream-progress', JSON.stringify(next));
       return next;
     });
-    // Also update on server
+    // Persist to server — survives restarts, device switches
     fetch(`/api/media/${id}/progress`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ progress }),
+      body: JSON.stringify({ progress, currentTime, duration }),
     }).catch(console.error);
   }, []);
 

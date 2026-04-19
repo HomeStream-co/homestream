@@ -110,6 +110,9 @@ export default function PlayerPage() {
   // Loading state — true until canplaythrough fires (enough buffered to play without stall)
   const [videoLoading, setVideoLoading] = useState(true);
   const resumeApplied = useRef(false);
+  // Resume banner
+  const [showResumeBanner, setShowResumeBanner] = useState(false);
+  const resumeBannerTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   // ── AI Enrichment (on-demand from player page) ──
   const [enrichRunning, setEnrichRunning] = useState(false);
@@ -211,14 +214,61 @@ export default function PlayerPage() {
 
   const nextItem = similarItems[0] ?? null;
 
+  // ── Save progress helper — call this any time we want to persist ──
+  const saveProgress = useCallback(() => {
+    if (!id || duration <= 0 || currentTime <= 0) return;
+    const pct = (currentTime / duration) * 100;
+    updateProgress(id, pct, currentTime, duration);
+  }, [id, currentTime, duration, updateProgress]);
+
   // ── Save progress every 10s ──
   useEffect(() => {
     if (!id || currentTime === 0) return;
     const interval = setInterval(() => {
-      if (duration > 0) updateProgress(id, (currentTime / duration) * 100);
+      if (duration > 0) updateProgress(id, (currentTime / duration) * 100, currentTime, duration);
     }, 10000);
     return () => clearInterval(interval);
   }, [id, currentTime, duration, updateProgress]);
+
+  // ── Save on tab hide / window blur (user switches away) ──
+  useEffect(() => {
+    if (!id) return;
+    const onVisibilityChange = () => {
+      if (document.hidden) saveProgress();
+    };
+    const onBeforeUnload = () => saveProgress();
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      window.removeEventListener('beforeunload', onBeforeUnload);
+    };
+  }, [id, saveProgress]);
+
+  // ── Save on navigate away (React Router unmount) ──
+  useEffect(() => {
+    return () => {
+      // Flush progress when leaving the player page
+      if (id && videoRef.current && videoRef.current.duration > 0) {
+        const ct = videoRef.current.currentTime;
+        const dur = videoRef.current.duration;
+        const pct = (ct / dur) * 100;
+        // Fire-and-forget — use sendBeacon for reliability on unload
+        const payload = JSON.stringify({ progress: pct, currentTime: ct, duration: dur });
+        if (navigator.sendBeacon) {
+          const blob = new Blob([payload], { type: 'application/json' });
+          navigator.sendBeacon(`/api/media/${id}/progress`, blob);
+        } else {
+          fetch(`/api/media/${id}/progress`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: payload,
+            keepalive: true,
+          }).catch(() => {});
+        }
+      }
+    };
+  }, [id]);
 
   // ── Watch-complete trigger at 85% ──
   useEffect(() => {
@@ -524,7 +574,11 @@ export default function PlayerPage() {
           // several seconds are already decoded and ready to render instantly.
           preload="auto"
           onPlay={() => setPlaying(true)}
-          onPause={() => setPlaying(false)}
+          onPause={() => {
+            setPlaying(false);
+            // Save immediately when user pauses — catches stop/close scenarios
+            saveProgress();
+          }}
           onTimeUpdate={() => {
             if (videoRef.current) {
               setCurrentTime(videoRef.current.currentTime);
@@ -536,11 +590,20 @@ export default function PlayerPage() {
             const video = videoRef.current;
             if (!video) return;
             setDuration(video.duration);
-            // Restore resume position exactly once, as soon as we know duration
-            if (appSettings.autoResume && !resumeApplied.current && item.watchProgress && item.watchProgress > 2 && item.watchProgress < 95) {
-              const resumeAt = (item.watchProgress / 100) * video.duration;
-              video.currentTime = resumeAt;
+            // Restore resume position exactly once, as soon as we know duration.
+            // Prefer watchedSeconds (raw seconds) for precision; fall back to watchProgress %.
+            const resumeSeconds = item.watchedSeconds && item.watchedSeconds > 0
+              ? item.watchedSeconds
+              : item.watchProgress && item.watchProgress > 2 && item.watchProgress < 95
+                ? (item.watchProgress / 100) * video.duration
+                : 0;
+            if (appSettings.autoResume && !resumeApplied.current && resumeSeconds > 5) {
+              video.currentTime = resumeSeconds;
               resumeApplied.current = true;
+              // Show resume banner for 4 seconds
+              setShowResumeBanner(true);
+              clearTimeout(resumeBannerTimer.current);
+              resumeBannerTimer.current = setTimeout(() => setShowResumeBanner(false), 4000);
             }
           }}
           onCanPlayThrough={() => {
@@ -629,6 +692,22 @@ export default function PlayerPage() {
               <SkipForward className="w-4 h-4" />
               Skip Intro
             </motion.button>
+          )}
+        </AnimatePresence>
+
+        {/* ── Resume Banner ── */}
+        <AnimatePresence>
+          {showResumeBanner && (
+            <motion.div
+              initial={{ opacity: 0, y: -12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -12 }}
+              transition={{ duration: 0.25 }}
+              className="absolute top-16 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-black/80 backdrop-blur-sm border border-white/20 text-white px-4 py-2 rounded-full text-sm font-medium z-20 pointer-events-none"
+            >
+              <RotateCcw className="w-3.5 h-3.5 text-primary" />
+              Resuming from {formatTime(item?.watchedSeconds ?? ((item?.watchProgress ?? 0) / 100) * duration)}
+            </motion.div>
           )}
         </AnimatePresence>
 
