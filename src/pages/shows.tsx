@@ -1,240 +1,193 @@
-import { useState } from 'react';
+/**
+ * TV Shows Page — /shows
+ *
+ * Grid of all TV series in the library. Each card navigates to /show/:id
+ * for the full detail + episode tracker view.
+ */
+
+import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Play, Tv2, ChevronLeft, Star } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
+import { Tv2, Search, SlidersHorizontal } from 'lucide-react';
+import { motion } from 'motion/react';
 import { useMedia } from '@/context/MediaContext';
 import { useProfile } from '@/context/ProfileContext';
-import EpisodeTracker from '@/components/EpisodeTracker';
-import type { MediaItem, Episode } from '@/types/media';
+import ShowCard from '@/components/ShowCard';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Progress } from '@/components/ui/progress';
+
+const GENRES = ['All', 'Drama', 'Comedy', 'Action', 'Sci-Fi', 'Thriller', 'Crime', 'Animation', 'Documentary', 'Fantasy', 'Horror', 'Romance', 'Family'];
+const SORT_OPTIONS = [
+  { value: 'added',    label: 'Date Added' },
+  { value: 'rating',   label: 'Top Rated' },
+  { value: 'title',    label: 'Title A-Z' },
+  { value: 'progress', label: 'In Progress' },
+  { value: 'year',     label: 'Year' },
+];
+
+function getProgress(show: { episodes?: { watched: boolean }[] }) {
+  const eps = show.episodes || [];
+  if (eps.length === 0) return null;
+  const watched = eps.filter(e => e.watched).length;
+  return { watched, total: eps.length, pct: (watched / eps.length) * 100 };
+}
 
 export default function ShowsPage() {
-  const { library, loading, updateMedia } = useMedia();
-  const { isAllowed } = useProfile();
+  const { library, loading } = useMedia();
+  const { isAllowed, activeProfile } = useProfile();
   const navigate = useNavigate();
-  const [selectedShow, setSelectedShow] = useState<MediaItem | null>(null);
+  const [query, setQuery] = useState('');
+  const [selectedGenre, setSelectedGenre] = useState('All');
+  const [sortBy, setSortBy] = useState('added');
 
-  // Apply Kids filter
-  const shows = library.filter(m => m.type === 'series' && isAllowed(m.rated));
+  const filtered = useMemo(() => {
+    let items = library.filter(m => m.type === 'series' && isAllowed(m.rated));
 
-  const getShowProgress = (show: MediaItem) => {
-    const eps = show.episodes || [];
-    if (eps.length === 0) return null;
-    const watched = eps.filter(e => e.watched).length;
-    return { watched, total: eps.length, pct: (watched / eps.length) * 100 };
-  };
+    if (query.trim()) {
+      const q = query.toLowerCase();
+      items = items.filter(m =>
+        m.title.toLowerCase().includes(q) ||
+        m.plot?.toLowerCase().includes(q) ||
+        m.actors?.toLowerCase().includes(q) ||
+        m.genre.some(g => g.toLowerCase().includes(q))
+      );
+    }
 
-  const handleEpisodeUpdate = async (show: MediaItem, episodes: Episode[]) => {
-    await updateMedia(show.id, { episodes } as Partial<MediaItem>);
-  };
+    if (selectedGenre !== 'All') {
+      items = items.filter(m => m.genre.some(g => g.toLowerCase().includes(selectedGenre.toLowerCase())));
+    }
+
+    switch (sortBy) {
+      case 'rating':
+        items.sort((a, b) => (parseFloat(b.imdbRating) || 0) - (parseFloat(a.imdbRating) || 0));
+        break;
+      case 'title':
+        items.sort((a, b) => a.title.localeCompare(b.title));
+        break;
+      case 'year':
+        items.sort((a, b) => parseInt(b.year) - parseInt(a.year));
+        break;
+      case 'progress':
+        // Sort by in-progress first (0 < pct < 100), then unwatched, then complete
+        items.sort((a, b) => {
+          const pa = getProgress(a);
+          const pb = getProgress(b);
+          const scoreA = pa && pa.pct > 0 && pa.pct < 100 ? 2 : pa && pa.pct === 0 ? 1 : 0;
+          const scoreB = pb && pb.pct > 0 && pb.pct < 100 ? 2 : pb && pb.pct === 0 ? 1 : 0;
+          return scoreB - scoreA;
+        });
+        break;
+      default:
+        items.sort((a, b) => new Date(b.addedAt).getTime() - new Date(a.addedAt).getTime());
+    }
+
+    return items;
+  }, [library, query, selectedGenre, sortBy, isAllowed]);
 
   return (
     <div className="min-h-screen bg-background pt-20 pb-16">
       <title>TV Shows — HomeStream</title>
+      <meta name="description" content="Browse your TV show collection on HomeStream." />
+
       <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8">
 
         {/* Header */}
-        <div className="flex items-center gap-3 mb-8">
-          {selectedShow && (
-            <button
-              onClick={() => setSelectedShow(null)}
-              className="p-2 hover:bg-card rounded-lg transition-colors text-muted-foreground hover:text-foreground"
+        <div className="flex items-center gap-3 mb-4">
+          <Tv2 className="w-7 h-7 text-primary" />
+          <h1 className="text-4xl font-heading text-foreground">TV Shows</h1>
+        </div>
+
+        {activeProfile?.restricted && (
+          <div className="mb-6 flex items-center gap-2.5 bg-yellow-500/10 border border-yellow-500/25 rounded-xl px-4 py-2.5 w-fit">
+            <span className="text-base">🧒</span>
+            <p className="text-xs text-yellow-400 font-medium">Kids mode — G &amp; PG only</p>
+          </div>
+        )}
+
+        {/* Search */}
+        <div className="relative mb-6">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <input
+            type="text"
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            placeholder="Search shows by title, actor, genre..."
+            className="w-full bg-card border border-border rounded-lg pl-10 pr-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary"
+          />
+        </div>
+
+        {/* Filters */}
+        <div className="flex flex-wrap gap-3 mb-6 items-center">
+          <SlidersHorizontal className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+          <div className="flex flex-wrap gap-1">
+            {GENRES.map(genre => (
+              <button
+                key={genre}
+                onClick={() => setSelectedGenre(genre)}
+                className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                  selectedGenre === genre ? 'bg-primary text-white' : 'bg-card text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                {genre}
+              </button>
+            ))}
+          </div>
+          <div className="ml-auto">
+            <select
+              value={sortBy}
+              onChange={e => setSortBy(e.target.value)}
+              className="bg-card border border-border rounded px-3 py-1.5 text-xs text-foreground focus:outline-none focus:border-primary"
             >
-              <ChevronLeft className="w-5 h-5" />
-            </button>
-          )}
-          <div>
-            <h1 className="text-4xl font-heading text-foreground">
-              {selectedShow ? selectedShow.title : 'TV Shows'}
-            </h1>
-            {!selectedShow && (
-              <p className="text-muted-foreground mt-1">
-                {shows.length} show{shows.length !== 1 ? 's' : ''} in your library
-              </p>
-            )}
+              {SORT_OPTIONS.map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
           </div>
         </div>
 
-        {/* Show Detail View */}
-        <AnimatePresence mode="wait">
-          {selectedShow ? (
-            <motion.div
-              key="detail"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              transition={{ duration: 0.2 }}
-            >
-              <div className="flex flex-col lg:flex-row gap-8">
-                {/* Left: Show Info */}
-                <div className="lg:w-64 flex-shrink-0">
-                  <div className="sticky top-24">
-                    <img
-                      src={selectedShow.poster}
-                      alt={selectedShow.title}
-                      className="w-full aspect-[2/3] object-cover rounded-xl shadow-2xl mb-4"
-                      onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                    />
-                    <button
-                      onClick={() => navigate(`/player/${selectedShow.id}`)}
-                      className="w-full flex items-center justify-center gap-2 bg-primary hover:bg-primary/80 text-white py-2.5 rounded-lg font-medium text-sm transition-colors mb-3"
-                    >
-                      <Play className="w-4 h-4 fill-white" />
-                      Play
-                    </button>
+        {/* Results count */}
+        <p className="text-sm text-muted-foreground mb-4">
+          {loading ? 'Loading...' : `${filtered.length} show${filtered.length !== 1 ? 's' : ''}`}
+        </p>
 
-                    {/* Show meta */}
-                    <div className="space-y-2 text-sm">
-                      <div className="flex items-center justify-between">
-                        <span className="text-muted-foreground">Year</span>
-                        <span className="text-foreground">{selectedShow.year}</span>
-                      </div>
-                      {selectedShow.imdbRating !== 'N/A' && (
-                        <div className="flex items-center justify-between">
-                          <span className="text-muted-foreground">Rating</span>
-                          <span className="text-accent flex items-center gap-1">
-                            <Star className="w-3.5 h-3.5 fill-accent" />
-                            {selectedShow.imdbRating}
-                          </span>
-                        </div>
-                      )}
-                      {selectedShow.rated && selectedShow.rated !== 'N/A' && (
-                        <div className="flex items-center justify-between">
-                          <span className="text-muted-foreground">Rated</span>
-                          <span className="text-foreground border border-border px-1.5 py-0.5 rounded text-xs">{selectedShow.rated}</span>
-                        </div>
-                      )}
-                      {(() => {
-                        const prog = getShowProgress(selectedShow);
-                        if (!prog) return null;
-                        return (
-                          <div>
-                            <div className="flex items-center justify-between mb-1">
-                              <span className="text-muted-foreground">Progress</span>
-                              <span className="text-foreground">{prog.watched}/{prog.total}</span>
-                            </div>
-                            <Progress value={prog.pct} className="h-1.5" />
-                          </div>
-                        );
-                      })()}
-                    </div>
-
-                    <div className="flex flex-wrap gap-1 mt-3">
-                      {selectedShow.genre.map(g => (
-                        <span key={g} className="bg-secondary text-foreground text-xs px-2 py-0.5 rounded-full">{g}</span>
-                      ))}
-                    </div>
-
-                    {selectedShow.plot && (
-                      <p className="text-xs text-muted-foreground mt-3 leading-relaxed">{selectedShow.plot}</p>
-                    )}
-                  </div>
-                </div>
-
-                {/* Right: Episode Tracker */}
-                <div className="flex-1 min-w-0">
-                  <h2 className="text-xl font-heading text-foreground mb-4">Episode Tracker</h2>
-                  <EpisodeTracker
-                    show={selectedShow}
-                    onUpdate={eps => handleEpisodeUpdate(selectedShow, eps)}
-                  />
-                </div>
+        {/* Grid */}
+        {loading ? (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-5">
+            {Array.from({ length: 12 }).map((_, i) => (
+              <div key={i}>
+                <Skeleton className="aspect-[2/3] rounded-xl" />
+                <Skeleton className="h-3 mt-2 rounded" />
+                <Skeleton className="h-2 mt-1 rounded w-2/3" />
               </div>
-            </motion.div>
-          ) : (
-            /* Show Grid */
-            <motion.div
-              key="grid"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
-            >
-              {loading ? (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-5">
-                  {Array.from({ length: 8 }).map((_, i) => (
-                    <div key={i}>
-                      <Skeleton className="aspect-[2/3] rounded-xl" />
-                      <Skeleton className="h-3 mt-2 rounded" />
-                    </div>
-                  ))}
-                </div>
-              ) : shows.length === 0 ? (
-                <div className="text-center py-20">
-                  <Tv2 className="w-16 h-16 mx-auto mb-4 text-muted-foreground opacity-30" />
-                  <p className="text-lg text-muted-foreground mb-2">No TV shows yet</p>
-                  <p className="text-sm text-muted-foreground mb-6">
-                    Upload a TV show file — HomeStream will detect it as a series automatically.
-                  </p>
-                  <button
-                    onClick={() => navigate('/library')}
-                    className="bg-primary hover:bg-primary/80 text-white px-5 py-2.5 rounded-lg text-sm font-medium transition-colors"
-                  >
-                    Go to Library
-                  </button>
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-5">
-                  {shows.map(show => {
-                    const prog = getShowProgress(show);
-                    return (
-                      <motion.div
-                        key={show.id}
-                        whileHover={{ scale: 1.03 }}
-                        transition={{ duration: 0.15 }}
-                        className="cursor-pointer group"
-                        onClick={() => setSelectedShow(show)}
-                      >
-                        <div className="relative aspect-[2/3] rounded-xl overflow-hidden bg-card shadow-lg">
-                          <img
-                            src={show.poster}
-                            alt={show.title}
-                            className="w-full h-full object-cover"
-                            onError={e => { (e.target as HTMLImageElement).src = `https://via.placeholder.com/300x450/141420/e50914?text=${encodeURIComponent(show.title)}`; }}
-                          />
-                          {/* Hover overlay */}
-                          <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                            <div className="text-center">
-                              <Tv2 className="w-8 h-8 text-white mx-auto mb-1" />
-                              <p className="text-white text-xs font-medium">Track Episodes</p>
-                            </div>
-                          </div>
-                          {/* Progress bar at bottom */}
-                          {prog && prog.total > 0 && (
-                            <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/40">
-                              <div
-                                className="h-full bg-primary transition-all"
-                                style={{ width: `${prog.pct}%` }}
-                              />
-                            </div>
-                          )}
-                          {/* Watched badge */}
-                          {prog && prog.watched === prog.total && prog.total > 0 && (
-                            <div className="absolute top-2 right-2 bg-primary text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
-                              ✓ Done
-                            </div>
-                          )}
-                        </div>
-                        <div className="mt-2">
-                          <p className="text-sm font-medium text-foreground truncate">{show.title}</p>
-                          <div className="flex items-center justify-between">
-                            <p className="text-xs text-muted-foreground">{show.year}</p>
-                            {prog ? (
-                              <p className="text-xs text-muted-foreground">{prog.watched}/{prog.total} ep</p>
-                            ) : (
-                              <p className="text-xs text-muted-foreground">No episodes</p>
-                            )}
-                          </div>
-                        </div>
-                      </motion.div>
-                    );
-                  })}
-                </div>
-              )}
-            </motion.div>
-          )}
-        </AnimatePresence>
+            ))}
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="text-center py-20">
+            <Tv2 className="w-16 h-16 mx-auto mb-4 text-muted-foreground opacity-30" />
+            <p className="text-lg text-muted-foreground mb-2">No TV shows found.</p>
+            <p className="text-sm text-muted-foreground mb-6">
+              {query || selectedGenre !== 'All'
+                ? 'Try adjusting your filters.'
+                : 'Upload a TV show file — HomeStream will detect it as a series automatically.'}
+            </p>
+            {!query && selectedGenre === 'All' && (
+              <button
+                onClick={() => navigate('/library')}
+                className="bg-primary hover:bg-primary/80 text-white px-5 py-2.5 rounded-lg text-sm font-medium transition-colors"
+              >
+                Go to Library
+              </button>
+            )}
+          </div>
+        ) : (
+          <motion.div
+            className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-5"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+          >
+            {filtered.map(show => (
+              <ShowCard key={show.id} show={show} />
+            ))}
+          </motion.div>
+        )}
       </div>
     </div>
   );

@@ -5,6 +5,7 @@ import HomePage from './pages/index';
 const BrowsePage = lazy(() => import('./pages/browse'));
 const MoviePage = lazy(() => import('./pages/movie'));
 const MoviesPage = lazy(() => import('./pages/movies'));
+const ShowPage = lazy(() => import('./pages/show'));
 const LibraryPage = lazy(() => import('./pages/library'));
 const PlayerPage = lazy(() => import('./pages/player'));
 const ShowsPage = lazy(() => import('./pages/shows'));
@@ -26,6 +27,7 @@ export const routes: RouteObject[] = [
   { path: '/movie/:id', element: <MoviePage /> },
   { path: '/library', element: <LibraryPage /> },
   { path: '/shows', element: <ShowsPage /> },
+  { path: '/show/:id', element: <ShowPage /> },
   { path: '/watchlist', element: <WatchlistPage /> },
   { path: '/player/:id', element: <PlayerPage /> },
   { path: '/profiles', element: <ProfilesPage /> },
