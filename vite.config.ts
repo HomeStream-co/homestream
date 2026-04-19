@@ -39,22 +39,19 @@ function serverBundlePlugin(): Plugin {
 				outfile: path.resolve(__dirname, "dist", "server.bundle.mjs"),
 				packages: "bundle",
 				sourcemap: true,
-				// webtorrent pulls in webrtc-polyfill which uses await inside __esm
-				// wrappers — not valid in a non-async context. Keep these as externals
-				// so they're loaded at runtime rather than inlined by esbuild.
-				external: [
-					"webtorrent",
-					"webrtc-polyfill",
-					"bittorrent-tracker",
-					"ut-metadata",
-					"ut-pex",
-					"create-torrent",
-					"parse-torrent",
-					"torrent-discovery",
-					"bittorrent-dht",
-					"bittorrent-lsd",
-					"node-datachannel",
-				],
+				// webrtc-polyfill/lib/Blob.js uses top-level await which esbuild cannot
+				// inline into its synchronous __esm() wrappers. We replace it with a
+				// synchronous stub — on Node 18+ globalThis.Blob is always defined so
+				// the polyfill is a no-op anyway.
+				alias: {
+					"webrtc-polyfill/lib/Blob.js": path.resolve(
+						__dirname,
+						"src/server/stubs/webrtc-blob-stub.js"
+					),
+				},
+				// node-datachannel is a native addon (glibc) — cannot run on Alpine (musl).
+				// Keep it external so it fails gracefully at runtime rather than at bundle time.
+				external: ["node-datachannel"],
 				banner: {
 					js: `import { createRequire } from 'module';
 const require = createRequire(import.meta.url);`,
