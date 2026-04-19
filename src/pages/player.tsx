@@ -121,6 +121,8 @@ export default function PlayerPage() {
   const [ccBgOpacity, setCcBgOpacity] = useState<'none' | 'low' | 'high'>('low');
   // Loading state — true until canplaythrough fires (enough buffered to play without stall)
   const [videoLoading, setVideoLoading] = useState(true);
+  // Error state — set when the video element fires an error event
+  const [videoError, setVideoError] = useState<string | null>(null);
   const resumeApplied = useRef(false);
   // Resume banner
   const [showResumeBanner, setShowResumeBanner] = useState(false);
@@ -454,6 +456,7 @@ export default function PlayerPage() {
       const tv = document.createElement('video');
       tv.muted = true;
       tv.preload = 'metadata';
+      tv.crossOrigin = 'anonymous';
       tv.style.display = 'none';
       document.body.appendChild(tv);
       thumbVideoRef.current = tv;
@@ -1005,6 +1008,18 @@ export default function PlayerPage() {
               setMuted(videoRef.current.muted);
             }
           }}
+          onError={() => {
+            const video = videoRef.current;
+            const code = video?.error?.code;
+            const msgs: Record<number, string> = {
+              1: 'Playback aborted',
+              2: 'Network error — check your connection to the HomeStream server',
+              3: 'Decoding error — this file format may not be supported by your browser',
+              4: 'File not found or unsupported format',
+            };
+            setVideoError(msgs[code ?? 4] ?? 'Unable to play this file');
+            setVideoLoading(false);
+          }}
         >
           {/* WebVTT caption tracks — served from /api/captions/:id/:lang if present */}
           <track
@@ -1025,7 +1040,7 @@ export default function PlayerPage() {
 
         {/* ── Loading Spinner — only shown while buffering ── */}
         <AnimatePresence>
-          {videoLoading && (
+          {videoLoading && !videoError && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -1034,6 +1049,35 @@ export default function PlayerPage() {
               className="absolute inset-0 flex items-center justify-center pointer-events-none"
             >
               <div className="w-14 h-14 rounded-full border-4 border-white/20 border-t-white animate-spin" />
+            </motion.div>
+          )}
+
+          {/* ── Video Error State ── */}
+          {videoError && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="absolute inset-0 flex flex-col items-center justify-center bg-black/90 gap-4 px-8 text-center"
+            >
+              <div className="w-16 h-16 rounded-full bg-red-500/20 border border-red-500/40 flex items-center justify-center mb-2">
+                <span className="text-3xl">⚠️</span>
+              </div>
+              <h2 className="text-white text-lg font-semibold">Unable to Play</h2>
+              <p className="text-white/60 text-sm max-w-sm leading-relaxed">{videoError}</p>
+              <div className="flex gap-3 mt-2">
+                <button
+                  onClick={() => { setVideoError(null); setVideoLoading(true); if (videoRef.current) { videoRef.current.load(); videoRef.current.play().catch(() => {}); } }}
+                  className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white text-sm rounded-lg transition-colors"
+                >
+                  Try Again
+                </button>
+                <button
+                  onClick={() => navigate(-1)}
+                  className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white text-sm rounded-lg transition-colors"
+                >
+                  Go Back
+                </button>
+              </div>
             </motion.div>
           )}
         </AnimatePresence>

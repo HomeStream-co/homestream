@@ -1,10 +1,20 @@
 # electron-builder configuration for HomeStream
-# Run: npx electron-builder --win --publish never
-# Output: dist-electron/HomeStream-Setup-x.x.x.exe
+#
+# Build commands:
+#   Windows:  npx electron-builder --win   --publish never
+#   macOS:    npx electron-builder --mac   --publish never
+#   Linux:    npx electron-builder --linux --publish never
+#
+# Output: dist-electron/
+#   Windows → HomeStream-Setup-x.x.x.exe  (NSIS installer)
+#   macOS   → HomeStream-x.x.x.dmg
+#   Linux   → HomeStream-x.x.x.AppImage
 
 appId: com.homestream.app
 productName: HomeStream
 copyright: Copyright © 2025 HomeStream
+
+# No auto-updater — users download new versions manually
 
 # Directories
 directories:
@@ -13,22 +23,25 @@ directories:
 
 # Files to include in the package
 files:
-  - dist/**/*          # Vite frontend build
-  - server/**/*        # Bundled Express server
+  - dist/**/*
   - electron/main.js
+  - electron/preload.js
   - electron/tray-icon.png
   - package.json
 
-# Extra resources (server bundle)
+# Server bundle shipped as an extra resource
 extraResources:
-  - from: server-bundle
-    to: server
+  - from: dist/server.bundle.mjs
+    to: server/server.bundle.mjs
+  - from: dist/server.bundle.mjs.map
+    to: server/server.bundle.mjs.map
+    filter: ["**/*"]
 
-# Windows NSIS installer
+# ── Windows ───────────────────────────────────────────────────────────────────
 win:
   target:
     - target: nsis
-      arch: [x64]
+      arch: [x64, ia32]
   icon: electron/assets/icon.ico
 
 nsis:
@@ -36,26 +49,38 @@ nsis:
   allowToChangeInstallationDirectory: true
   installerIcon: electron/assets/icon.ico
   uninstallerIcon: electron/assets/icon.ico
-  installerHeaderIcon: electron/assets/icon.ico
   createDesktopShortcut: true
   createStartMenuShortcut: true
   shortcutName: HomeStream
-  license: LICENSE
+  runAfterFinish: true
 
-# macOS (optional)
+# ── macOS ─────────────────────────────────────────────────────────────────────
 mac:
-  target: dmg
+  target:
+    - target: dmg
+      arch: [x64, arm64]
   icon: electron/assets/icon.icns
   category: public.app-category.entertainment
+  darkModeSupport: true
 
-# Linux (optional)
+dmg:
+  title: HomeStream
+  background: electron/assets/dmg-background.png
+  window:
+    width: 540
+    height: 380
+
+# ── Linux ─────────────────────────────────────────────────────────────────────
 linux:
-  target: AppImage
+  target:
+    - target: AppImage
+      arch: [x64, arm64]
+    - target: deb
+      arch: [x64]
   icon: electron/assets/icon.png
   category: AudioVideo
-
-# Auto-updater (GitHub Releases)
-publish:
-  provider: github
-  owner: your-github-username
-  repo: homestream
+  description: Self-hosted media streaming server
+  desktop:
+    Name: HomeStream
+    Comment: Stream your personal media collection
+    Categories: AudioVideo;Video;Player;

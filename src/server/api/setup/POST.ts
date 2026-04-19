@@ -1,5 +1,6 @@
 import type { Request, Response } from 'express';
 import fs from 'fs';
+import bcrypt from 'bcryptjs';
 import { writeConfig, readConfig } from '../../configStore.js';
 import { testConnection as testQbit } from '../../qbittorrentClient.js';
 import { startWatcher, stopWatcher } from '../../folderWatcher.js';
@@ -54,6 +55,10 @@ export default async function handler(req: Request, res: Response) {
         const updates: Record<string, unknown> = {};
         for (const key of allowed) {
           if (fields[key] !== undefined) updates[key] = fields[key];
+        }
+        // Hash admin password with bcrypt before saving
+        if (fields.adminPassword) {
+          updates.adminPassword = await bcrypt.hash(fields.adminPassword, 12);
         }
         // Boolean coercion
         if (fields.watchFolderEnabled !== undefined) updates.watchFolderEnabled = fields.watchFolderEnabled === 'true';

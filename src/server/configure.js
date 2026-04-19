@@ -74,6 +74,22 @@ export const serverBefore = (server) => {
     console.error('[startup] Cleanup failed:', err.message);
   });
 
+  // Start Jellyfin UDP discovery so TV apps can find HomeStream automatically
+  import('./jellyfinDiscovery.js').then(({ startJellyfinDiscovery }) => {
+    const port = parseInt(process.env.PORT || '3000');
+    startJellyfinDiscovery(port);
+  }).catch(err => {
+    console.warn('[jellyfin-discovery] Failed to start (non-fatal):', err.message);
+  });
+
+  // Start mDNS so users can access HomeStream at homestream.local
+  import('./mdnsService.js').then(({ startMDNS }) => {
+    const port = parseInt(process.env.PORT || '3000');
+    startMDNS(port);
+  }).catch(err => {
+    console.warn('[mdns] Failed to start (non-fatal):', err.message);
+  });
+
   const shutdown = async (signal) => {
     console.log(`Got ${signal}, shutting down gracefully...`);
     try {

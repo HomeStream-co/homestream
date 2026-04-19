@@ -28,6 +28,7 @@ import { useTMDBContext } from '@/context/TMDBContext';
 import MediaCarousel from '@/components/MediaCarousel';
 import MediaCard from '@/components/MediaCard';
 import HeroBanner from '@/components/HeroBanner';
+import OfflineBanner from '@/components/OfflineBanner';
 import { Skeleton } from '@/components/ui/skeleton';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -50,7 +51,7 @@ const SORT_OPTIONS = [
 export default function HomePage() {
   const { library, loading, watchlist, addToWatchlist, removeFromWatchlist, continueWatching } = useMedia();
   const { isAllowed, activeProfile } = useProfile();
-  const { upcoming, loading: tmdbLoading } = useTMDBContext();
+  const { upcoming, loading: tmdbLoading, stale: tmdbStale, error: tmdbError } = useTMDBContext();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -164,6 +165,9 @@ export default function HomePage() {
     <div className="bg-background">
       <title>HomeStream — Your Personal Cinema</title>
       <meta name="description" content="Stream your personal media library. Movies, TV shows, and more." />
+
+      {/* Offline / stale data notice */}
+      <OfflineBanner stale={tmdbStale} error={tmdbError} />
 
       {/* ── Hero ── */}
       {showHeroSkeleton ? (

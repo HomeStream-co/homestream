@@ -308,24 +308,27 @@ export default function ShowPage() {
                 {/* Action buttons */}
                 <div className="flex flex-wrap items-center gap-3 mb-6">
                   <button
-                    onClick={() => navigate(`/player/${item.id}`)}
+                    onClick={() => navigate(
+                      resumeEpisode
+                        ? `/player/${resumeEpisode.id}`
+                        : `/player/${item.id}`
+                    )}
                     className="flex items-center gap-2 px-6 py-3 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20"
+                    title={resumeEpisode
+                      ? `Play S${String(resumeEpisode.season).padStart(2,'0')}E${String(resumeEpisode.episode).padStart(2,'0')}: ${resumeEpisode.title}`
+                      : 'Play from beginning'
+                    }
                   >
                     <Play className="w-4 h-4 fill-current" />
-                    Play
+                    {resumeEpisode && resumeEpisode.season === 1 && resumeEpisode.episode === 1
+                      ? 'Play'
+                      : resumeEpisode
+                        ? `Continue S${String(resumeEpisode.season).padStart(2,'0')}E${String(resumeEpisode.episode).padStart(2,'0')}`
+                        : 'Play Again'
+                    }
                   </button>
 
-                  {/* Resume / Continue button — shows next unwatched episode */}
-                  {resumeEpisode && (
-                    <button
-                      onClick={() => navigate(`/player/${item.id}`)}
-                      className="flex items-center gap-2 px-5 py-3 rounded-xl bg-card border border-primary/30 text-primary font-semibold text-sm hover:bg-primary/10 transition-colors"
-                      title={`Resume S${String(resumeEpisode.season).padStart(2,'0')}E${String(resumeEpisode.episode).padStart(2,'0')}: ${resumeEpisode.title}`}
-                    >
-                      <ChevronRight className="w-4 h-4" />
-                      Resume S{String(resumeEpisode.season).padStart(2,'0')}E{String(resumeEpisode.episode).padStart(2,'0')}
-                    </button>
-                  )}
+                  {/* Resume / Continue button — now merged into Play button above */}
 
                   <button
                     onClick={() => inWatchlist ? removeFromWatchlist(item.id) : addToWatchlist(item.id)}
