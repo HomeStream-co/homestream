@@ -130,7 +130,26 @@ export default async function handler(req: Request, res: Response) {
     const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
     const prompt = buildEnrichmentPrompt(item);
-    const result = await model.generateContent(prompt);
+    let result;
+    try {
+      result = await model.generateContent(prompt);
+    } catch (aiErr: unknown) {
+      const isOffline =
+        aiErr instanceof TypeError ||
+        (aiErr instanceof Error && (
+          aiErr.message.includes('fetch') ||
+          aiErr.message.includes('ENOTFOUND') ||
+          aiErr.message.includes('ECONNREFUSED') ||
+          aiErr.message.includes('network') ||
+          aiErr.message.includes('Failed to fetch')
+        ));
+      const detail = isOffline
+        ? 'No internet connection — AI enrichment skipped'
+        : `AI request failed: ${aiErr instanceof Error ? aiErr.message : String(aiErr)}`;
+      send('ai', 'error', detail);
+      updateItem(id, { enriching: false });
+      return res.end();
+    }
     const rawText = result.response.text().trim();
 
     send('ai', 'done', 'AI analysis complete');

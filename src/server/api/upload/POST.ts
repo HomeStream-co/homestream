@@ -43,16 +43,50 @@ function extractTitleFromFilename(filename: string): { title: string; year?: str
   return { title: name, year };
 }
 
-async function fetchOMDBMetadata(title: string, year?: string) {
-  const apiKey = process.env.OMDB_API_KEY || 'DEMO_KEY';
+interface OMDBResult {
+  omdb: Record<string, string> | null;
+  /** true = internet was reachable but title not found; false = offline or fetch error */
+  online: boolean;
+}
+
+async function fetchOMDBMetadata(title: string, year?: string): Promise<OMDBResult> {
+  const apiKey = process.env.OMDB_API_KEY;
+  if (!apiKey) {
+    console.warn('[omdb] OMDB_API_KEY not set — skipping metadata fetch');
+    return { omdb: null, online: false };
+  }
+
   const yearParam = year ? `&y=${year}` : '';
   const url = `http://www.omdbapi.com/?t=${encodeURIComponent(title)}${yearParam}&apikey=${apiKey}`;
+
   try {
-    const res = await fetch(url);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+    const res = await fetch(url, { signal: controller.signal });
+    clearTimeout(timeout);
     const data = await res.json() as Record<string, string>;
-    return data.Response === 'True' ? data : null;
-  } catch {
-    return null;
+    return {
+      omdb: data.Response === 'True' ? data : null,
+      online: true,
+    };
+  } catch (err: unknown) {
+    // Network error (offline, DNS failure, timeout)
+    const isNetworkError =
+      err instanceof TypeError ||
+      (err instanceof Error && (
+        err.name === 'AbortError' ||
+        err.message.includes('fetch') ||
+        err.message.includes('network') ||
+        err.message.includes('ENOTFOUND') ||
+        err.message.includes('ECONNREFUSED') ||
+        err.message.includes('ETIMEDOUT')
+      ));
+    if (isNetworkError) {
+      console.warn('[omdb] Network unreachable — running in offline mode');
+    } else {
+      console.error('[omdb] Unexpected error:', err);
+    }
+    return { omdb: null, online: false };
   }
 }
 
@@ -113,40 +147,42 @@ export default function handler(req: Request, res: Response) {
     const searchTitle = manualTitle || extractedTitle;
     const searchYear = manualYear || extractedYear;
 
-    // ── 2. Fetch OMDB metadata in parallel with transcode start ──
-    const omdbPromise = fetchOMDBMetadata(searchTitle, searchYear);
+    // ── 2. Fetch OMDB metadata (graceful — works offline) ──
+    const omdbResult = await fetchOMDBMetadata(searchTitle, searchYear);
+    const omdb = omdbResult.omdb;
+    const metadataAvailable = omdbResult.online; // false = offline or no API key
 
     // ── 3. Register transcode job immediately ──
     createJob(mediaId, inputFilename, outputFilename);
 
-    // ── 4. Build initial media item (placeholder poster until OMDB resolves) ──
-    const omdb = await omdbPromise;
+    // ── 4. Build media item — use OMDB data if available, sensible defaults if not ──
     const genres = omdb?.Genre
       ? omdb.Genre.split(',').map((g: string) => g.trim())
       : ['Unknown'];
 
     const mediaItem = {
       id: mediaId,
-      filename: outputFilename,          // Always point to the transcoded output
+      filename: outputFilename,
       originalFilename: req.file.originalname,
       filepath: `/uploads/${outputFilename}`,
       title: omdb?.Title || searchTitle,
       year: omdb?.Year || searchYear || 'Unknown',
       genre: genres,
-      plot: omdb?.Plot || 'No description available.',
-      director: omdb?.Director || 'Unknown',
-      actors: omdb?.Actors || 'Unknown',
+      plot: omdb?.Plot || '',
+      director: omdb?.Director || '',
+      actors: omdb?.Actors || '',
       imdbRating: omdb?.imdbRating || 'N/A',
-      poster: (omdb?.Poster && omdb.Poster !== 'N/A')
-        ? omdb.Poster
-        : `https://via.placeholder.com/300x450/141420/e50914?text=${encodeURIComponent(searchTitle)}`,
+      poster: (omdb?.Poster && omdb.Poster !== 'N/A') ? omdb.Poster : '',
       type: omdb?.Type === 'series' ? 'series' : 'movie',
       runtime: omdb?.Runtime || 'Unknown',
       rated: omdb?.Rated || 'NR',
       addedAt: new Date().toISOString(),
       watchProgress: 0,
       fileSize: req.file.size,
-      transcoding: true,   // Flag so UI can show "transcoding" state on card
+      transcoding: true,
+      // Let the UI know whether it should show a manual metadata form
+      metadataAvailable,
+      needsMetadata: !omdb, // true = user should fill in title/poster manually
     };
 
     // Write to library immediately — item is visible right away
@@ -154,12 +190,15 @@ export default function handler(req: Request, res: Response) {
     library.unshift(mediaItem);
     writeLibrary(library);
 
-    // Respond to client — UI starts polling /api/transcode/:id
+    // Respond to client — includes metadataAvailable so UI can react
     res.status(201).json({ ...mediaItem, transcodeId: mediaId });
 
-    // ── 5. Kick off AI enrichment wizard in background (non-blocking) ──
-    // Runs in parallel with transcode — enrichment is independent of video processing
-    runEnrichmentInBackground(mediaId);
+    // ── 5. Kick off AI enrichment in background — skip if offline ──
+    if (metadataAvailable && process.env.GOOGLE_AI_API_KEY) {
+      runEnrichmentInBackground(mediaId);
+    } else {
+      console.log(`[enrich] Skipping enrichment for ${mediaId} — ${!metadataAvailable ? 'offline' : 'no GOOGLE_AI_API_KEY'}`);
+    }
 
     // ── 6. Run transcode in background (non-blocking) ──
     transcodeFile(mediaId, inputFilename, outputFilename)

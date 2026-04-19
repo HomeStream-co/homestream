@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import {
   Film, Trash2, Edit2, Check, X, Star, AlertCircle,
-  Upload, Clapperboard, Cpu, CheckCircle2, Clock, Zap,
+  Upload, Clapperboard, Cpu, CheckCircle2, Clock, Zap, WifiOff, PenLine,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'sonner';
@@ -21,6 +21,113 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+
+// ─── Offline Metadata Notice ─────────────────────────────────────────────────
+
+interface OfflineMetadataNoticeProps {
+  mediaId: string;
+  currentTitle: string;
+  onSaved: (title: string) => void;
+}
+
+function OfflineMetadataNotice({ mediaId, currentTitle, onSaved }: OfflineMetadataNoticeProps) {
+  const [editing, setEditing] = useState(false);
+  const [title, setTitle] = useState(currentTitle);
+  const [year, setYear] = useState('');
+  const [genre, setGenre] = useState('');
+  const [plot, setPlot] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  async function handleSave() {
+    setSaving(true);
+    try {
+      await fetch(`/api/media/${mediaId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: title.trim() || currentTitle,
+          year: year.trim() || 'Unknown',
+          genre: genre ? genre.split(',').map(g => g.trim()).filter(Boolean) : ['Unknown'],
+          plot: plot.trim() || '',
+        }),
+      });
+      onSaved(title.trim() || currentTitle);
+      setEditing(false);
+    } catch {
+      toast.error('Failed to save metadata');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (!editing) {
+    return (
+      <div className="mt-3 pt-3 border-t border-border flex items-center gap-2.5">
+        <WifiOff className="w-3.5 h-3.5 text-yellow-500 flex-shrink-0" />
+        <p className="text-xs text-yellow-500 flex-1">
+          Uploaded offline — no movie info fetched automatically.
+        </p>
+        <button
+          onClick={() => setEditing(true)}
+          className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 transition-colors flex-shrink-0"
+        >
+          <PenLine className="w-3 h-3" />
+          Add details
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-3 pt-3 border-t border-border space-y-2">
+      <p className="text-xs text-muted-foreground font-medium flex items-center gap-1.5">
+        <PenLine className="w-3 h-3" /> Add movie details manually
+      </p>
+      <input
+        value={title}
+        onChange={e => setTitle(e.target.value)}
+        placeholder="Title"
+        className="w-full bg-background border border-border rounded px-2.5 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary"
+      />
+      <div className="flex gap-2">
+        <input
+          value={year}
+          onChange={e => setYear(e.target.value)}
+          placeholder="Year (e.g. 2023)"
+          className="flex-1 bg-background border border-border rounded px-2.5 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary"
+        />
+        <input
+          value={genre}
+          onChange={e => setGenre(e.target.value)}
+          placeholder="Genres (comma-separated)"
+          className="flex-1 bg-background border border-border rounded px-2.5 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary"
+        />
+      </div>
+      <textarea
+        value={plot}
+        onChange={e => setPlot(e.target.value)}
+        placeholder="Description (optional)"
+        rows={2}
+        className="w-full bg-background border border-border rounded px-2.5 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary resize-none"
+      />
+      <div className="flex gap-2 justify-end">
+        <button
+          onClick={() => setEditing(false)}
+          className="text-xs text-muted-foreground hover:text-foreground px-3 py-1.5 rounded transition-colors"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="text-xs bg-primary hover:bg-primary/80 text-white px-3 py-1.5 rounded transition-colors disabled:opacity-50"
+        >
+          {saving ? 'Saving…' : 'Save'}
+        </button>
+      </div>
+    </div>
+  );
+}
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -45,6 +152,8 @@ interface UploadingFile {
   error?: string;
   showEnrichment: boolean;   // show the wizard panel after transcode done
   enrichmentDone: boolean;   // wizard finished
+  needsMetadata?: boolean;   // true = offline upload, user should fill in details
+  offlineMode?: boolean;     // true = server had no internet during upload
 }
 
 interface EditState {
@@ -244,9 +353,18 @@ export default function LibraryPage() {
       });
 
       // Upload done — move to metadata phase briefly, then transcode
+      const uploadResult = result as typeof result & { needsMetadata?: boolean; metadataAvailable?: boolean };
       setUploading(prev => prev.map(u =>
         u.id === uiId
-          ? { ...u, phase: 'metadata', uploadProgress: 100, transcodeId: result.transcodeId, result }
+          ? {
+              ...u,
+              phase: 'metadata',
+              uploadProgress: 100,
+              transcodeId: result.transcodeId,
+              result,
+              needsMetadata: uploadResult.needsMetadata ?? false,
+              offlineMode: !(uploadResult.metadataAvailable ?? true),
+            }
           : u
       ));
 
@@ -430,7 +548,13 @@ export default function LibraryPage() {
                   {/* Done — show result card */}
                   {u.phase === 'done' && u.result && (
                     <div className="flex items-center gap-3 mt-3 pt-3 border-t border-border">
-                      <img src={u.result.poster} alt={u.result.title} className="w-10 h-14 object-cover rounded" />
+                      {u.result.poster ? (
+                        <img src={u.result.poster} alt={u.result.title} className="w-10 h-14 object-cover rounded" />
+                      ) : (
+                        <div className="w-10 h-14 rounded bg-secondary flex items-center justify-center flex-shrink-0">
+                          <Film className="w-4 h-4 text-muted-foreground" />
+                        </div>
+                      )}
                       <div>
                         <p className="text-sm font-medium text-foreground">{u.result.title}</p>
                         <p className="text-xs text-muted-foreground">{u.result.year} · {u.result.genre.slice(0, 2).join(', ')}</p>
@@ -448,8 +572,25 @@ export default function LibraryPage() {
                     </div>
                   )}
 
-                  {/* AI Enrichment Wizard — appears after transcode completes */}
-                  {u.showEnrichment && u.transcodeId && u.result && (
+                  {/* Offline notice — shown when OMDB was unreachable */}
+                  {u.offlineMode && u.phase === 'done' && (
+                    <OfflineMetadataNotice
+                      mediaId={u.transcodeId!}
+                      currentTitle={u.result?.title || u.name}
+                      onSaved={(title) => {
+                        setUploading(prev => prev.map(f =>
+                          f.id === u.id
+                            ? { ...f, offlineMode: false, result: f.result ? { ...f.result, title } : f.result }
+                            : f
+                        ));
+                        refreshLibrary();
+                        toast.success('Metadata saved!');
+                      }}
+                    />
+                  )}
+
+                  {/* AI Enrichment Wizard — appears after transcode completes (skipped in offline mode) */}
+                  {u.showEnrichment && u.transcodeId && u.result && !u.offlineMode && (
                     <div className="mt-3">
                       <EnrichmentWizard
                         mediaId={u.transcodeId}
