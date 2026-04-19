@@ -9,6 +9,8 @@ import { useMedia } from '@/context/MediaContext';
 import type { MediaItem } from '@/types/media';
 import { Skeleton } from '@/components/ui/skeleton';
 import EnrichmentWizard from '@/components/EnrichmentWizard';
+import EnrichmentRevealModal from '@/components/EnrichmentRevealModal';
+import type { MediaEnrichment } from '@/types/media';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -108,6 +110,11 @@ function totalProgress(u: UploadingFile): number {
 export default function LibraryPage() {
   const { library, loading, refreshLibrary, deleteMedia, updateMedia } = useMedia();
   const [uploading, setUploading] = useState<UploadingFile[]>([]);
+  // Netflix-style reveal modal — pops up when AI enrichment finishes
+  const [revealModal, setRevealModal] = useState<{
+    item: MediaItem;
+    enrichment: MediaEnrichment;
+  } | null>(null);
   const [dragging, setDragging] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [editState, setEditState] = useState<EditState | null>(null);
@@ -447,17 +454,21 @@ export default function LibraryPage() {
                       <EnrichmentWizard
                         mediaId={u.transcodeId}
                         title={u.result.title}
-                        onComplete={() => {
+                        onComplete={(enrichment) => {
                           setUploading(prev => prev.map(f =>
                             f.id === u.id ? { ...f, enrichmentDone: true } : f
                           ));
                           refreshLibrary();
-                          toast.success(`"${u.result!.title}" fully categorized by AI`);
+                          // Pop the Netflix-style reveal modal
+                          if (u.result) {
+                            setRevealModal({ item: u.result, enrichment });
+                          }
                         }}
                         onError={() => {
                           setUploading(prev => prev.map(f =>
                             f.id === u.id ? { ...f, enrichmentDone: true } : f
                           ));
+                          toast.error(`Enrichment failed for "${u.result?.title}" — using basic genre matching`);
                         }}
                       />
                     </div>
@@ -639,6 +650,17 @@ export default function LibraryPage() {
               </div>
             </motion.div>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Netflix-style Enrichment Reveal Modal ── */}
+      <AnimatePresence>
+        {revealModal && (
+          <EnrichmentRevealModal
+            item={revealModal.item}
+            enrichment={revealModal.enrichment}
+            onClose={() => setRevealModal(null)}
+          />
         )}
       </AnimatePresence>
     </div>
