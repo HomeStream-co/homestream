@@ -15,12 +15,12 @@
  * Offline: shows last cached data with a "Showing cached data" notice.
  */
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Compass, Star, Calendar, Download, Bookmark, BookmarkCheck,
   Loader2, WifiOff, RefreshCw, Film, TrendingUp, Sparkles,
-  ChevronDown, Search, X, Tv2, Clapperboard,
+  ChevronDown, Search, X, Tv2, Clapperboard, Play, Volume2, VolumeX,
 } from 'lucide-react';
 import { useMedia } from '@/context/MediaContext';
 import { useTMDBContext } from '@/context/TMDBContext';
@@ -39,6 +39,214 @@ function formatRating(r: number) {
   return r.toFixed(1);
 }
 
+// ── Trailer key cache (in-memory, survives re-renders) ────────────────────────
+
+const trailerKeyCache = new Map<number, string | null>();
+
+async function fetchTrailerKey(movie: TMDBMovie): Promise<string | null> {
+  if (trailerKeyCache.has(movie.id)) return trailerKeyCache.get(movie.id)!;
+  try {
+    const year = movie.release_date ? movie.release_date.slice(0, 4) : '';
+    const params = new URLSearchParams({
+      title: movie.title,
+      type: 'movie',
+      ...(year ? { year } : {}),
+    });
+    const res = await fetch(`/api/tmdb/trailer?${params}`);
+    const data = await res.json() as { trailerKey?: string | null };
+    const key = data.trailerKey ?? null;
+    trailerKeyCache.set(movie.id, key);
+    return key;
+  } catch {
+    trailerKeyCache.set(movie.id, null);
+    return null;
+  }
+}
+
+// ── Trailer Modal ─────────────────────────────────────────────────────────────
+
+interface TrailerModalProps {
+  movie: TMDBMovie;
+  inWatchlist: boolean;
+  alreadyInLibrary: boolean;
+  onClose: () => void;
+  onDownload: (movie: TMDBMovie) => void;
+  onAddToWatchlist: () => void;
+  onRemoveFromWatchlist: () => void;
+}
+
+function TrailerModal({
+  movie, inWatchlist, alreadyInLibrary,
+  onClose, onDownload, onAddToWatchlist, onRemoveFromWatchlist,
+}: TrailerModalProps) {
+  const [trailerKey, setTrailerKey] = useState<string | null | 'loading'>('loading');
+  const [muted, setMuted] = useState(false); // start unmuted — user explicitly opened trailer
+  const overlayRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    fetchTrailerKey(movie).then(key => setTrailerKey(key));
+  }, [movie]);
+
+  // Close on Escape
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [onClose]);
+
+  // Prevent body scroll while open
+  useEffect(() => {
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = ''; };
+  }, []);
+
+  const year = movie.release_date ? movie.release_date.slice(0, 4) : '';
+
+  return (
+    <AnimatePresence>
+      <motion.div
+        ref={overlayRef}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+        onClick={e => { if (e.target === overlayRef.current) onClose(); }}
+      >
+        <motion.div
+          initial={{ opacity: 0, scale: 0.94, y: 16 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.94, y: 16 }}
+          transition={{ duration: 0.2, ease: 'easeOut' }}
+          className="relative w-full max-w-2xl bg-card border border-border rounded-2xl overflow-hidden shadow-2xl"
+        >
+          {/* Close button */}
+          <button
+            onClick={onClose}
+            className="absolute top-3 right-3 z-20 w-8 h-8 rounded-full bg-black/60 border border-white/10 flex items-center justify-center text-white hover:bg-black/80 transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </button>
+
+          {/* Video area */}
+          <div className="relative w-full aspect-video bg-black">
+            {trailerKey === 'loading' && (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <Loader2 className="w-8 h-8 text-white/40 animate-spin" />
+              </div>
+            )}
+
+            {trailerKey === null && (
+              /* No trailer found — show backdrop/poster */
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-muted/20">
+                {movie.posterUrl ? (
+                  <img
+                    src={movie.posterUrl}
+                    alt={movie.title}
+                    className="h-full w-full object-contain opacity-30"
+                  />
+                ) : (
+                  <Film className="w-16 h-16 text-muted-foreground/30" />
+                )}
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="text-center px-6">
+                    <p className="text-white/60 text-sm font-medium">No trailer available</p>
+                    <p className="text-white/30 text-xs mt-1">TMDB doesn't have a trailer for this title yet</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {trailerKey && trailerKey !== 'loading' && (
+              <>
+                {/*
+                  youtube-nocookie.com = YouTube's privacy-enhanced mode.
+                  This is the same domain Stremio uses — it strips tracking cookies
+                  and suppresses most pre-roll ads because no user profile is attached.
+                  Not 100% ad-free but significantly cleaner than youtube.com.
+                */}
+                <iframe
+                  src={`https://www.youtube-nocookie.com/embed/${trailerKey}?autoplay=1&mute=${muted ? 1 : 0}&rel=0&modestbranding=1&iv_load_policy=3&color=white`}
+                  allow="autoplay; encrypted-media; fullscreen"
+                  allowFullScreen
+                  className="absolute inset-0 w-full h-full"
+                  title={`${movie.title} — Official Trailer`}
+                />
+                {/* Mute toggle overlay */}
+                <button
+                  onClick={() => setMuted(m => !m)}
+                  className="absolute bottom-3 right-3 z-10 w-8 h-8 rounded-full bg-black/60 border border-white/20 flex items-center justify-center text-white hover:bg-black/80 transition-colors"
+                  title={muted ? 'Unmute' : 'Mute'}
+                >
+                  {muted ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
+                </button>
+              </>
+            )}
+          </div>
+
+          {/* Info + actions */}
+          <div className="p-4 flex flex-col gap-3">
+            {/* Title row */}
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-base font-bold text-foreground leading-tight">{movie.title}</h2>
+                <div className="flex items-center gap-2 mt-1 flex-wrap">
+                  {year && <span className="text-xs text-muted-foreground">{year}</span>}
+                  {movie.vote_average > 0 && (
+                    <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                      <Star className="w-3 h-3 text-yellow-400 fill-yellow-400" />
+                      {formatRating(movie.vote_average)}
+                    </span>
+                  )}
+                  {movie.genres && movie.genres.slice(0, 3).map(g => (
+                    <span key={g} className="text-[10px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">{g}</span>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Overview */}
+            {movie.overview && (
+              <p className="text-xs text-muted-foreground leading-relaxed line-clamp-3">
+                {movie.overview}
+              </p>
+            )}
+
+            {/* Action buttons */}
+            <div className="flex items-center gap-2 pt-1">
+              <button
+                onClick={() => { onDownload(movie); onClose(); }}
+                disabled={alreadyInLibrary}
+                className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors ${
+                  alreadyInLibrary
+                    ? 'bg-muted text-muted-foreground cursor-not-allowed'
+                    : 'bg-primary hover:bg-primary/90 text-primary-foreground'
+                }`}
+              >
+                <Download className="w-4 h-4" />
+                {alreadyInLibrary ? 'Already in Library' : 'Download'}
+              </button>
+
+              <button
+                onClick={() => inWatchlist ? onRemoveFromWatchlist() : onAddToWatchlist()}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border transition-colors ${
+                  inWatchlist
+                    ? 'border-primary bg-primary/10 text-primary hover:bg-primary/20'
+                    : 'border-border text-muted-foreground hover:text-foreground hover:border-foreground/40'
+                }`}
+              >
+                {inWatchlist
+                  ? <><BookmarkCheck className="w-4 h-4" /> Saved</>
+                  : <><Bookmark className="w-4 h-4" /> My List</>
+                }
+              </button>
+            </div>
+          </div>
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
+  );
+}
+
 // ── Movie card ────────────────────────────────────────────────────────────────
 
 interface MovieCardProps {
@@ -55,122 +263,162 @@ function MovieCard({
   onAddToWatchlist, onRemoveFromWatchlist, onDownload,
 }: MovieCardProps) {
   const [expanded, setExpanded] = useState(false);
+  const [showTrailer, setShowTrailer] = useState(false);
 
   return (
-    <motion.div
-      layout
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="bg-card border border-border rounded-xl overflow-hidden flex flex-col group hover:border-primary/40 transition-colors"
-    >
-      {/* Poster */}
-      <div className="relative aspect-[2/3] overflow-hidden bg-muted flex-shrink-0">
-        {movie.posterUrl ? (
-          <img
-            src={movie.posterUrl}
-            alt={movie.title}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-            loading="lazy"
-            onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center">
-            <Film className="w-10 h-10 text-muted-foreground/40" />
-          </div>
-        )}
-        {/* Rating badge */}
-        {movie.vote_average > 0 && (
-          <div className="absolute top-2 left-2 flex items-center gap-1 bg-black/70 backdrop-blur-sm rounded-full px-2 py-0.5">
-            <Star className="w-2.5 h-2.5 text-yellow-400 fill-yellow-400" />
-            <span className="text-[10px] text-white font-semibold">{formatRating(movie.vote_average)}</span>
-          </div>
-        )}
-        {/* Already in library badge */}
-        {alreadyInLibrary && (
-          <div className="absolute top-2 right-2 bg-green-500/90 backdrop-blur-sm rounded-full px-2 py-0.5">
-            <span className="text-[9px] text-white font-bold uppercase tracking-wide">In Library</span>
-          </div>
-        )}
-      </div>
+    <>
+      <motion.div
+        layout
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="bg-card border border-border rounded-xl overflow-hidden flex flex-col group hover:border-primary/40 transition-colors"
+      >
+        {/* Poster */}
+        <div className="relative aspect-[2/3] overflow-hidden bg-muted flex-shrink-0">
+          {movie.posterUrl ? (
+            <img
+              src={movie.posterUrl}
+              alt={movie.title}
+              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+              loading="lazy"
+              onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center">
+              <Film className="w-10 h-10 text-muted-foreground/40" />
+            </div>
+          )}
 
-      {/* Info */}
-      <div className="p-3 flex flex-col flex-1">
-        <h3 className="text-sm font-semibold text-foreground leading-tight mb-1 line-clamp-2">
-          {movie.title}
-        </h3>
+          {/* Trailer play button — appears on hover */}
+          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/30">
+            <button
+              onClick={() => setShowTrailer(true)}
+              className="w-12 h-12 rounded-full bg-white/20 backdrop-blur-sm border border-white/30 flex items-center justify-center hover:bg-white/30 transition-colors"
+              title="Watch trailer"
+            >
+              <Play className="w-5 h-5 text-white fill-white ml-0.5" />
+            </button>
+          </div>
 
-        <div className="flex items-center gap-2 mb-2 flex-wrap">
-          {movie.release_date && (
-            <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
-              <Calendar className="w-2.5 h-2.5" />
-              {formatDate(movie.release_date)}
-            </span>
+          {/* Rating badge */}
+          {movie.vote_average > 0 && (
+            <div className="absolute top-2 left-2 flex items-center gap-1 bg-black/70 backdrop-blur-sm rounded-full px-2 py-0.5">
+              <Star className="w-2.5 h-2.5 text-yellow-400 fill-yellow-400" />
+              <span className="text-[10px] text-white font-semibold">{formatRating(movie.vote_average)}</span>
+            </div>
+          )}
+          {/* Already in library badge */}
+          {alreadyInLibrary && (
+            <div className="absolute top-2 right-2 bg-green-500/90 backdrop-blur-sm rounded-full px-2 py-0.5">
+              <span className="text-[9px] text-white font-bold uppercase tracking-wide">In Library</span>
+            </div>
           )}
         </div>
 
-        {/* Genres */}
-        {movie.genres && movie.genres.length > 0 && (
-          <div className="flex flex-wrap gap-1 mb-2">
-            {movie.genres.slice(0, 3).map(g => (
-              <span key={g} className="text-[9px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">
-                {g}
-              </span>
-            ))}
-          </div>
-        )}
+        {/* Info */}
+        <div className="p-3 flex flex-col flex-1">
+          <h3 className="text-sm font-semibold text-foreground leading-tight mb-1 line-clamp-2">
+            {movie.title}
+          </h3>
 
-        {/* Overview (expandable) */}
-        {movie.overview && (
-          <div className="mb-2">
-            <p className={`text-[11px] text-muted-foreground leading-relaxed ${expanded ? '' : 'line-clamp-2'}`}>
-              {movie.overview}
-            </p>
-            {movie.overview.length > 100 && (
-              <button
-                onClick={() => setExpanded(v => !v)}
-                className="text-[10px] text-primary hover:text-primary/80 mt-0.5 flex items-center gap-0.5"
-              >
-                {expanded ? 'Less' : 'More'}
-                <ChevronDown className={`w-2.5 h-2.5 transition-transform ${expanded ? 'rotate-180' : ''}`} />
-              </button>
+          <div className="flex items-center gap-2 mb-2 flex-wrap">
+            {movie.release_date && (
+              <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                <Calendar className="w-2.5 h-2.5" />
+                {formatDate(movie.release_date)}
+              </span>
             )}
           </div>
-        )}
 
-        {/* Spacer */}
-        <div className="flex-1" />
+          {/* Genres */}
+          {movie.genres && movie.genres.length > 0 && (
+            <div className="flex flex-wrap gap-1 mb-2">
+              {movie.genres.slice(0, 3).map(g => (
+                <span key={g} className="text-[9px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">
+                  {g}
+                </span>
+              ))}
+            </div>
+          )}
 
-        {/* Actions */}
-        <div className="flex items-center gap-2 mt-2">
-          <button
-            onClick={() => onDownload(movie)}
-            disabled={alreadyInLibrary}
-            className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-colors ${
-              alreadyInLibrary
-                ? 'bg-muted text-muted-foreground cursor-not-allowed'
-                : 'bg-primary hover:bg-primary/80 text-primary-foreground'
-            }`}
-          >
-            <Download className="w-3 h-3" />
-            {alreadyInLibrary ? 'In Library' : 'Download'}
-          </button>
-          <button
-            onClick={() => inWatchlist ? onRemoveFromWatchlist() : onAddToWatchlist()}
-            className={`p-2 rounded-lg border transition-colors ${
-              inWatchlist
-                ? 'border-primary bg-primary/10 text-primary'
-                : 'border-border hover:border-primary/40 text-muted-foreground hover:text-foreground'
-            }`}
-            title={inWatchlist ? 'Remove from watchlist' : 'Add to watchlist'}
-          >
-            {inWatchlist
-              ? <BookmarkCheck className="w-3.5 h-3.5" />
-              : <Bookmark className="w-3.5 h-3.5" />
-            }
-          </button>
+          {/* Overview (expandable) */}
+          {movie.overview && (
+            <div className="mb-2">
+              <p className={`text-[11px] text-muted-foreground leading-relaxed ${expanded ? '' : 'line-clamp-2'}`}>
+                {movie.overview}
+              </p>
+              {movie.overview.length > 100 && (
+                <button
+                  onClick={() => setExpanded(v => !v)}
+                  className="text-[10px] text-primary hover:text-primary/80 mt-0.5 flex items-center gap-0.5"
+                >
+                  {expanded ? 'Less' : 'More'}
+                  <ChevronDown className={`w-2.5 h-2.5 transition-transform ${expanded ? 'rotate-180' : ''}`} />
+                </button>
+              )}
+            </div>
+          )}
+
+          <div className="flex-1" />
+
+          {/* Actions: Trailer + Download + Watchlist */}
+          <div className="flex items-center gap-1.5 mt-2">
+            {/* Trailer button */}
+            <button
+              onClick={() => setShowTrailer(true)}
+              className="flex items-center justify-center gap-1 px-2.5 py-2 rounded-lg border border-border hover:border-primary/40 text-muted-foreground hover:text-foreground text-xs font-semibold transition-colors"
+              title="Watch trailer"
+            >
+              <Play className="w-3 h-3" />
+              Trailer
+            </button>
+
+            {/* Download button */}
+            <button
+              onClick={() => onDownload(movie)}
+              disabled={alreadyInLibrary}
+              className={`flex-1 flex items-center justify-center gap-1.5 px-2.5 py-2 rounded-lg text-xs font-semibold transition-colors ${
+                alreadyInLibrary
+                  ? 'bg-muted text-muted-foreground cursor-not-allowed'
+                  : 'bg-primary hover:bg-primary/80 text-primary-foreground'
+              }`}
+            >
+              <Download className="w-3 h-3" />
+              {alreadyInLibrary ? 'In Library' : 'Download'}
+            </button>
+
+            {/* Watchlist */}
+            <button
+              onClick={() => inWatchlist ? onRemoveFromWatchlist() : onAddToWatchlist()}
+              className={`p-2 rounded-lg border transition-colors ${
+                inWatchlist
+                  ? 'border-primary bg-primary/10 text-primary'
+                  : 'border-border hover:border-primary/40 text-muted-foreground hover:text-foreground'
+              }`}
+              title={inWatchlist ? 'Remove from watchlist' : 'Add to watchlist'}
+            >
+              {inWatchlist
+                ? <BookmarkCheck className="w-3.5 h-3.5" />
+                : <Bookmark className="w-3.5 h-3.5" />
+              }
+            </button>
+          </div>
         </div>
-      </div>
-    </motion.div>
+      </motion.div>
+
+      {/* Trailer modal — rendered outside the card so it's not clipped */}
+      {showTrailer && (
+        <TrailerModal
+          movie={movie}
+          inWatchlist={inWatchlist}
+          alreadyInLibrary={alreadyInLibrary}
+          onClose={() => setShowTrailer(false)}
+          onDownload={onDownload}
+          onAddToWatchlist={onAddToWatchlist}
+          onRemoveFromWatchlist={onRemoveFromWatchlist}
+        />
+      )}
+    </>
   );
 }
 
