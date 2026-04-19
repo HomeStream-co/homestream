@@ -13,6 +13,8 @@ import { useTheme } from '@/context/ThemeContext';
 import MediaCard from '@/components/MediaCard';
 import CastButton from '@/components/CastButton';
 import ChromecastButton from '@/components/ChromecastButton';
+import TranscodeProgressOverlay from '@/components/TranscodeProgressOverlay';
+import { useTranscodeProgress } from '@/hooks/useTranscodeProgress';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -61,6 +63,12 @@ export default function PlayerPage() {
   const { settings: appSettings } = useTheme();
   const playerAccent = appSettings.syncPlayerColor ? 'hsl(var(--primary))' : 'rgba(255,255,255,0.9)';
   const item = library.find(m => m.id === id);
+
+  // ── Transcode progress — connects to SSE if a job is active for this item ──
+  const transcodeJob = useTranscodeProgress(id);
+  const isTranscoding = transcodeJob !== null
+    && transcodeJob.status !== 'done'
+    && transcodeJob.status !== 'skipped';
 
   // ── Kids profile block — redirect if content not allowed ──
   useEffect(() => {
@@ -1079,9 +1087,14 @@ export default function PlayerPage() {
           />
         </video>
 
-        {/* ── Loading Spinner — only shown while buffering ── */}
+        {/* ── Transcode Progress Overlay — replaces spinner during active jobs ── */}
+        {isTranscoding && transcodeJob && (
+          <TranscodeProgressOverlay job={transcodeJob} />
+        )}
+
+        {/* ── Loading Spinner — only shown while buffering (not transcoding) ── */}
         <AnimatePresence>
-          {videoLoading && !videoError && (
+          {videoLoading && !videoError && !isTranscoding && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
