@@ -12,7 +12,7 @@ import {
   Settings, Check, Palette, Play, Library,
   Monitor, Zap, SkipForward, RotateCcw, Tag, HardDrive,
   Compass, RefreshCw, Clock, WifiOff, KeyRound, Eye, EyeOff,
-  Loader2, CheckCircle2, XCircle, ScanLine, Database, ShieldCheck, LogOut,
+  Loader2, CheckCircle2, XCircle, ScanLine, Database, ShieldCheck, LogOut, Wrench,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTheme, THEMES, type AppSettings } from '@/context/ThemeContext';
@@ -165,7 +165,12 @@ function ApiKeyField({
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
-export default function SettingsPanel() {
+interface SettingsPanelProps {
+  onOpenSecurity?: () => void;
+  onOpenDebug?: () => void;
+}
+
+export default function SettingsPanel({ onOpenSecurity, onOpenDebug }: SettingsPanelProps) {
   const { settings, activeTheme, setTheme, updateSetting } = useTheme();
   const { adultPinEnabled, setAdultPin, clearAdultPin } = useProfile();
   const { requiresPassword, logout } = useAuth();
@@ -760,7 +765,44 @@ export default function SettingsPanel() {
                 </div>
               </div>
 
-              {/* ── 9. Session ── */}
+              {/* ── 9. Tools ── */}
+              <div className="border-t border-border/50 px-4 py-3 flex flex-col gap-2">
+                <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-semibold mb-1">Tools</p>
+
+                {/* Security Center */}
+                <button
+                  onClick={() => { setOpen(false); onOpenSecurity?.(); }}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border border-border hover:border-primary/40 hover:bg-primary/5 transition-colors text-left group"
+                >
+                  <div className="w-7 h-7 rounded-lg bg-green-500/10 flex items-center justify-center flex-shrink-0 group-hover:bg-green-500/20 transition-colors">
+                    <ShieldCheck className="w-4 h-4 text-green-400" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-foreground leading-tight">Security Center</p>
+                    <p className="text-[11px] text-muted-foreground">Quarantine, scan &amp; threat log</p>
+                  </div>
+                  <Database className="w-3.5 h-3.5 text-muted-foreground group-hover:text-foreground transition-colors" />
+                </button>
+
+                {/* Debug Panel — dev only */}
+                {import.meta.env.DEV && onOpenDebug && (
+                  <button
+                    onClick={() => { setOpen(false); onOpenDebug(); }}
+                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border border-border hover:border-yellow-500/40 hover:bg-yellow-500/5 transition-colors text-left group"
+                  >
+                    <div className="w-7 h-7 rounded-lg bg-yellow-500/10 flex items-center justify-center flex-shrink-0 group-hover:bg-yellow-500/20 transition-colors">
+                      <Wrench className="w-4 h-4 text-yellow-400" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-foreground leading-tight">Debug Panel</p>
+                      <p className="text-[11px] text-muted-foreground">Dev tools &amp; diagnostics</p>
+                    </div>
+                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-yellow-500/20 text-yellow-400 uppercase tracking-wider">DEV</span>
+                  </button>
+                )}
+              </div>
+
+              {/* ── 10. Session ── */}
               {requiresPassword && (
                 <div className="border-t border-border/50 px-4 py-4">
                   <button

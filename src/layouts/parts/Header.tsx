@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Search, Upload, Menu, X, Film, Bookmark, ChevronDown, Wrench, ShieldCheck, Clock, Lock } from 'lucide-react';
+import { Search, Upload, Menu, X, Film, Bookmark, ChevronDown, Clock, Lock } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'sonner';
 import { useMedia } from '@/context/MediaContext';
@@ -234,26 +234,11 @@ export default function Header({ onChatOpen: _onChatOpen }: HeaderProps) {
               )}
             </Link>
 
-            {/* ── Debug wrench ── */}
-            <button
-              onClick={() => setDebugOpen(true)}
-              className="p-2 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-              title="Debug Panel"
-            >
-              <Wrench className="w-4 h-4" />
-            </button>
-
-            {/* ── Security shield ── */}
-            <button
-              onClick={() => setSecurityOpen(true)}
-              className="p-2 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-              title="Security Center"
-            >
-              <ShieldCheck className="w-4 h-4" />
-            </button>
-
-            {/* ── Settings cog ── */}
-            <SettingsPanel />
+            {/* ── Settings cog (Security Center + Debug Panel live inside) ── */}
+            <SettingsPanel
+              onOpenSecurity={() => setSecurityOpen(true)}
+              onOpenDebug={import.meta.env.DEV ? () => setDebugOpen(true) : undefined}
+            />
 
             {import.meta.env.DEV && DebugPanel && (
               <Suspense fallback={null}>
