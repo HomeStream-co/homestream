@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import {
   Film, Trash2, Edit2, Check, X, Star, AlertCircle,
-  Upload, Clapperboard, Cpu, CheckCircle2, Clock, Zap, WifiOff, PenLine, Captions,
+  Upload, Clapperboard, Cpu, CheckCircle2, Clock, Zap, WifiOff, PenLine, Captions, Play,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'sonner';
@@ -12,6 +12,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import EnrichmentWizard from '@/components/EnrichmentWizard';
 import EnrichmentRevealModal from '@/components/EnrichmentRevealModal';
 import CaptionManager from '@/components/CaptionManager';
+import TrailerButton from '@/components/TrailerButton';
+import MediaContextMenu from '@/components/MediaContextMenu';
 import type { MediaEnrichment } from '@/types/media';
 import {
   AlertDialog,
@@ -979,8 +981,8 @@ export default function LibraryPage() {
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
             {library.map((item: MediaItem & { transcoding?: boolean; transcodeWarning?: string; transcodeError?: string }) => (
+              <MediaContextMenu key={item.id} item={item} disabled={selectMode}>
               <div
-                key={item.id}
                 className={`group relative ${selectMode ? 'cursor-pointer' : ''}`}
                 onClick={selectMode ? () => toggleSelect(item.id) : undefined}
               >
@@ -1029,21 +1031,42 @@ export default function LibraryPage() {
 
                   {/* Actions overlay — shown when not transcoding/errored */}
                   {!item.transcoding && !item.transcodeError && (
-                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                      <button
-                        onClick={() => startEdit(item)}
-                        className="p-2 bg-white/20 hover:bg-white/30 rounded-full transition-colors"
-                        title="Edit"
-                      >
-                        <Edit2 className="w-4 h-4 text-white" />
-                      </button>
-                      <button
-                        onClick={() => setDeleteId(item.id)}
-                        className="p-2 bg-destructive/80 hover:bg-destructive rounded-full transition-colors"
-                        title="Delete"
-                      >
-                        <Trash2 className="w-4 h-4 text-white" />
-                      </button>
+                    <div className="absolute inset-0 bg-black/70 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2 p-2">
+                      {/* Top row: Play + Trailer */}
+                      <div className="flex items-center gap-2">
+                        {/* Play */}
+                        <button
+                          onClick={e => { e.stopPropagation(); window.location.href = `/player/${item.id}`; }}
+                          className="w-10 h-10 rounded-full bg-primary flex items-center justify-center hover:bg-primary/80 transition-colors"
+                          title="Play"
+                        >
+                          <Play className="w-4 h-4 text-white fill-white ml-0.5" />
+                        </button>
+                        {/* Trailer */}
+                        <TrailerButton
+                          title={item.title}
+                          year={item.year}
+                          type={item.type === 'series' ? 'series' : 'movie'}
+                          className="w-10 h-10 rounded-full bg-red-600/80 hover:bg-red-600 flex items-center justify-center transition-colors disabled:opacity-40"
+                        />
+                      </div>
+                      {/* Bottom row: Edit + Delete */}
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={e => { e.stopPropagation(); startEdit(item); }}
+                          className="p-1.5 bg-white/20 hover:bg-white/30 rounded-full transition-colors"
+                          title="Edit"
+                        >
+                          <Edit2 className="w-3.5 h-3.5 text-white" />
+                        </button>
+                        <button
+                          onClick={e => { e.stopPropagation(); setDeleteId(item.id); }}
+                          className="p-1.5 bg-destructive/80 hover:bg-destructive rounded-full transition-colors"
+                          title="Delete"
+                        >
+                          <Trash2 className="w-3.5 h-3.5 text-white" />
+                        </button>
+                      </div>
                     </div>
                   )}
 
@@ -1112,6 +1135,7 @@ export default function LibraryPage() {
                   )}
                 </div>
               </div>
+              </MediaContextMenu>
             ))}
           </div>
         )}

@@ -21,6 +21,7 @@ import type { MediaItem } from '@/types/media';
 import { useMedia } from '@/context/MediaContext';
 import { useTheme } from '@/context/ThemeContext';
 import { Progress } from '@/components/ui/progress';
+import MediaContextMenu from '@/components/MediaContextMenu';
 
 interface MediaCardProps {
   item: MediaItem;
@@ -84,14 +85,15 @@ export default function MediaCard({ item, showProgress = false, size = 'sm' }: M
   const widthClass = size === 'md' ? 'w-full' : 'w-36 sm:w-44 flex-shrink-0';
 
   return (
-    <motion.div
-      className={`relative cursor-pointer group ${widthClass}`}
-      whileHover={{ scale: 1.05, zIndex: 10 }}
-      transition={{ duration: 0.2 }}
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
-      onClick={() => navigate(detailPath)}
-    >
+    <MediaContextMenu item={item}>
+      <motion.div
+        className={`relative cursor-pointer group ${widthClass}`}
+        whileHover={{ scale: 1.05, zIndex: 10 }}
+        transition={{ duration: 0.2 }}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+        onClick={() => navigate(detailPath)}
+      >
       {/* ── Poster ── */}
       <div className="relative aspect-[2/3] rounded-lg overflow-hidden bg-card">
         {!imgError && item.poster ? (
@@ -207,6 +209,7 @@ export default function MediaCard({ item, showProgress = false, size = 'sm' }: M
           </div>
         )}
       </div>
-    </motion.div>
+      </motion.div>
+    </MediaContextMenu>
   );
 }
