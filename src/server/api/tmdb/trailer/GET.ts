@@ -18,18 +18,17 @@ export default async function handler(req: Request, res: Response) {
 
   try {
     const mediaType = type === 'series' ? 'tv' : 'movie';
-    const searchUrl = `https://api.themoviedb.org/3/search/${mediaType}?query=${encodeURIComponent(title)}${year ? `&year=${year}` : ''}&page=1`;
-    const searchRes = await fetch(searchUrl, {
-      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-    });
+    const key = String(apiKey);
+
+    // Use api_key query param (TMDB v3 — same as the rest of the app)
+    const searchUrl = `https://api.themoviedb.org/3/search/${mediaType}?api_key=${encodeURIComponent(key)}&query=${encodeURIComponent(title)}${year ? `&year=${year}` : ''}&page=1`;
+    const searchRes = await fetch(searchUrl);
     const searchData = await searchRes.json() as { results?: { id: number }[] };
     const tmdbId = searchData.results?.[0]?.id;
     if (!tmdbId) return res.json({ trailerKey: null });
 
-    const videosUrl = `https://api.themoviedb.org/3/${mediaType}/${tmdbId}/videos`;
-    const videosRes = await fetch(videosUrl, {
-      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-    });
+    const videosUrl = `https://api.themoviedb.org/3/${mediaType}/${tmdbId}/videos?api_key=${encodeURIComponent(key)}`;
+    const videosRes = await fetch(videosUrl);
     const videosData = await videosRes.json() as {
       results?: { key: string; site: string; type: string; official: boolean }[]
     };

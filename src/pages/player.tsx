@@ -162,6 +162,9 @@ export default function PlayerPage() {
   const [seekHover, setSeekHover] = useState<{ x: number; time: number; dataUrl: string } | null>(null);
   const seekBarRef = useRef<HTMLInputElement>(null);
   const thumbCanvasRef = useRef<HTMLCanvasElement>(null);
+  // Dedicated hidden video element for thumbnail capture — never interrupts main playback
+  const thumbVideoRef = useRef<HTMLVideoElement | null>(null);
+  const thumbVideoSrcRef = useRef<string>('');
 
   const runEnrichment = useCallback(async () => {
     if (!id || enrichRunning) return;
@@ -437,37 +440,46 @@ export default function PlayerPage() {
   }, []);
 
   // ── Seek bar hover thumbnail capture ──
+  // Uses a dedicated hidden <video> element so the main player is never interrupted.
   const handleSeekHover = useCallback((e: React.MouseEvent<HTMLInputElement>) => {
-    const video = videoRef.current;
     const canvas = thumbCanvasRef.current;
-    if (!video || !canvas || duration <= 0) return;
+    if (!canvas || duration <= 0) return;
     const rect = e.currentTarget.getBoundingClientRect();
     const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
     const hoverTime = pct * duration;
     const x = e.clientX - rect.left;
 
-    // Seek the video to the hover time temporarily to capture frame
-    const prevTime = video.currentTime;
-    video.currentTime = hoverTime;
+    // Lazily create the hidden thumb video element
+    if (!thumbVideoRef.current) {
+      const tv = document.createElement('video');
+      tv.muted = true;
+      tv.preload = 'metadata';
+      tv.style.display = 'none';
+      document.body.appendChild(tv);
+      thumbVideoRef.current = tv;
+    }
+    const tv = thumbVideoRef.current;
 
-    const captureFrame = () => {
+    // Only set src once per media item
+    const currentSrc = videoRef.current?.currentSrc ?? '';
+    if (thumbVideoSrcRef.current !== currentSrc) {
+      thumbVideoSrcRef.current = currentSrc;
+      tv.src = currentSrc;
+    }
+
+    tv.currentTime = hoverTime;
+
+    const onSeeked = () => {
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
       canvas.width = 160;
       canvas.height = 90;
-      ctx.drawImage(video, 0, 0, 160, 90);
+      ctx.drawImage(tv, 0, 0, 160, 90);
       const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
       setSeekHover({ x, time: hoverTime, dataUrl });
-      // Restore original time
-      video.currentTime = prevTime;
+      tv.removeEventListener('seeked', onSeeked);
     };
-
-    // Use seeked event to capture after seek completes
-    const onSeeked = () => {
-      captureFrame();
-      video.removeEventListener('seeked', onSeeked);
-    };
-    video.addEventListener('seeked', onSeeked);
+    tv.addEventListener('seeked', onSeeked);
   }, [duration]);
 
   // ── Sync CC language → native TextTrack mode ──
@@ -739,6 +751,17 @@ export default function PlayerPage() {
     return () => window.removeEventListener('keydown', onKey);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tvFocus, ccLang, showActionToast]);
+
+  // ── Cleanup hidden thumb video on unmount ──
+  useEffect(() => {
+    return () => {
+      if (thumbVideoRef.current) {
+        thumbVideoRef.current.src = '';
+        thumbVideoRef.current.remove();
+        thumbVideoRef.current = null;
+      }
+    };
+  }, []);
 
   // ── Volume fade helper ──
   const fadeAndNavigate = useCallback((to: string) => {

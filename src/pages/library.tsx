@@ -662,7 +662,7 @@ export default function LibraryPage() {
     let enriched = 0;
     for (const id of ids) {
       try {
-        const res = await fetch(`/api/media/${id}/enrich`, { method: 'POST' });
+        const res = await fetch(`/api/enrich/${id}`, { method: 'POST' });
         if (res.ok) enriched++;
       } catch { /* continue */ }
     }
