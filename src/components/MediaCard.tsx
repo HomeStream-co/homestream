@@ -143,14 +143,14 @@ export default function MediaCard({ item, showProgress = false }: MediaCardProps
         <p className="text-xs text-foreground font-medium truncate">{item.title}</p>
         <p className="text-[10px] text-muted-foreground">{item.year}</p>
         {/* Enrichment tag pills — shown only when setting is on and AI data exists */}
-        {appSettings.showEnrichmentTags && (item.mood?.length || item.tags?.length) ? (
+        {appSettings.showEnrichmentTags && (item.enrichment?.mood?.length || item.enrichment?.tags?.length) ? (
           <div className="flex flex-wrap gap-0.5 mt-1">
-            {item.mood?.slice(0, 1).map(m => (
+            {item.enrichment?.mood?.slice(0, 1).map((m: string) => (
               <span key={m} className="text-[9px] px-1 py-0.5 rounded bg-primary/20 text-primary font-medium leading-none truncate max-w-[60px]">
                 {m}
               </span>
             ))}
-            {item.tags?.slice(0, 2).map(t => (
+            {item.enrichment?.tags?.slice(0, 2).map((t: string) => (
               <span key={t} className="text-[9px] px-1 py-0.5 rounded bg-muted text-muted-foreground font-medium leading-none truncate max-w-[60px]">
                 {t}
               </span>

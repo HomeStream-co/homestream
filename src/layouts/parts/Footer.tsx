@@ -1,4 +1,4 @@
-import { Film, Github, Heart, Library, Tv2, BookMarked, Home } from 'lucide-react';
+import { Film, Heart, Library, Tv2, BookMarked, Home } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 const NAV_LINKS = [
