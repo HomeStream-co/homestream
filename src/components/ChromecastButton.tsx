@@ -195,26 +195,27 @@ export default function ChromecastButton({
   const initCast = useCallback(() => {
     if (!window.cast || !window.chrome?.cast) return;
 
-    const ctx = window.cast.framework.CastContext.getInstance();
-    ctx.setOptions({
-      receiverApplicationId: DEFAULT_RECEIVER_APP_ID,
-      autoJoinPolicy: window.chrome.cast.AutoJoinPolicy.ORIGIN_SCOPED,
-    });
+    try {
+      const ctx = window.cast.framework.CastContext.getInstance();
+      ctx.setOptions({
+        receiverApplicationId: DEFAULT_RECEIVER_APP_ID,
+        autoJoinPolicy: window.chrome.cast.AutoJoinPolicy.ORIGIN_SCOPED,
+      });
 
-    const player = new window.cast.framework.RemotePlayer();
-    const controller = new window.cast.framework.RemotePlayerController(player);
-    playerRef.current = player;
-    controllerRef.current = controller;
+      const player = new window.cast.framework.RemotePlayer();
+      const controller = new window.cast.framework.RemotePlayerController(player);
+      playerRef.current = player;
+      controllerRef.current = controller;
 
-    // Connection state
-    controller.addEventListener(
-      window.cast.framework.RemotePlayerEventType.IS_CONNECTED_CHANGED,
-      () => {
-        const connected = player.isConnected;
-        setCastState(connected ? 'connected' : 'available');
-        if (!connected) setShowPanel(false);
-      }
-    );
+      // Connection state
+      controller.addEventListener(
+        window.cast.framework.RemotePlayerEventType.IS_CONNECTED_CHANGED,
+        () => {
+          const connected = player.isConnected;
+          setCastState(connected ? 'connected' : 'available');
+          if (!connected) setShowPanel(false);
+        }
+      );
 
     // Playback state
     controller.addEventListener(
@@ -271,6 +272,11 @@ export default function ChromecastButton({
       setCastState('connected');
     } else {
       setCastState('available');
+    }
+    } catch (err) {
+      // Chromecast SDK unavailable in sandboxed/non-HTTPS environments — fail silently.
+      // The button simply stays hidden (castState remains 'unavailable').
+      console.debug('[Chromecast] SDK init skipped (sandboxed context):', err);
     }
   }, [seeking]);
 
