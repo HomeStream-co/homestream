@@ -63,7 +63,7 @@ export default function handler(req: Request, res: Response) {
     const mediaItem = buildMediaItem({
       filename: outputFilename,
       originalFilename: req.file.originalname,
-      filePath: `/uploads/${outputFilename}`,
+      filePath: outputPath,   // absolute path — stream endpoint uses this directly
       fileSize: req.file.size,
       omdb,
       extractedTitle: searchTitle,
@@ -90,14 +90,16 @@ export default function handler(req: Request, res: Response) {
     // ── 7. Transcode in background ──
     transcodeFile(mediaItem.id, inputPath, outputPath)
       .then(result => {
+        // Determine the final absolute path (may revert to input if output was larger)
+        const finalPath = result.outputFilename === outputFilename ? outputPath : inputPath;
         writeLibrary(lib => {
           const idx = lib.findIndex(m => (m as { id: string }).id === mediaItem.id);
           if (idx !== -1) {
             const item = lib[idx] as Record<string, unknown>;
             item.transcoding      = false;
             item.filename         = result.outputFilename;
-            item.filepath         = `/uploads/${result.outputFilename}`;
-            item.filePath         = `/uploads/${result.outputFilename}`;
+            item.filepath         = finalPath;
+            item.filePath         = finalPath;
             item.fileSize         = result.finalSize;
             item.originalSize     = result.originalSize;
             item.savedBytes       = result.savedBytes;

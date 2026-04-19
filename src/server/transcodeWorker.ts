@@ -227,26 +227,34 @@ function runFFmpeg(args: string[], mediaId: string, durationSecs: number): Promi
 
 // ─── Main export ──────────────────────────────────────────────────────────────
 
+/**
+ * Transcode a video file to H.264 MP4.
+ *
+ * @param mediaId       Library item ID (for progress tracking)
+ * @param inputPath     ABSOLUTE path to the source file
+ * @param outputPath    ABSOLUTE path for the transcoded output
+ */
 export async function transcodeFile(
   mediaId: string,
-  inputFilename: string,
-  outputFilename: string,
+  inputPath: string,
+  outputPath: string,
 ): Promise<TranscodeResult> {
-  const inputPath  = path.join(UPLOADS_DIR, inputFilename);
-  const outputPath = path.join(UPLOADS_DIR, outputFilename);
+  // Resolve to absolute paths — support both absolute and uploads-relative inputs
+  const resolvedInput  = path.isAbsolute(inputPath)  ? inputPath  : path.join(UPLOADS_DIR, inputPath);
+  const resolvedOutput = path.isAbsolute(outputPath) ? outputPath : path.join(UPLOADS_DIR, outputPath);
 
   updateJob(mediaId, { status: 'transcoding', startedAt: Date.now() });
   broadcast(mediaId, getJob(mediaId)!);
 
   // ── 1. Probe the input file ──────────────────────────────────────────────
-  const info = await probeFile(inputPath);
-  const originalSize = info.fileSizeBytes || fs.statSync(inputPath).size;
+  const info = await probeFile(resolvedInput);
+  const originalSize = info.fileSizeBytes || fs.statSync(resolvedInput).size;
 
   // ── 2. Decide strategy ───────────────────────────────────────────────────
-  const strategy = transcodeStrategy(info, inputFilename);
+  const strategy = transcodeStrategy(info, path.basename(resolvedInput));
 
   console.log(
-    `[transcode] ${inputFilename} → strategy=${strategy} ` +
+    `[transcode] ${path.basename(resolvedInput)} → strategy=${strategy} ` +
     `codec=${info.codec} res=${info.width}x${info.height} ` +
     `bitrate=${(info.bitrateBps / 1_000_000).toFixed(1)}Mbps ` +
     `size=${(originalSize / 1_048_576).toFixed(1)}MB`
@@ -263,12 +271,12 @@ export async function transcodeFile(
   if (strategy === 'skip_remux_only' || strategy === 'remux') {
     // Copy video stream — just fix container and audio codec
     ffmpegArgs = [
-      '-i', inputPath,
+      '-i', resolvedInput,
       '-c:v', 'copy',
       ...audioArgs,
       '-movflags', '+faststart',
       '-y',
-      outputPath,
+      resolvedOutput,
     ];
   } else {
     // Full H.264 re-encode with CRF quality targeting
@@ -276,7 +284,7 @@ export async function transcodeFile(
     console.log(`[transcode] CRF=${crf} for ${info.height}p content`);
 
     ffmpegArgs = [
-      '-i', inputPath,
+      '-i', resolvedInput,
       '-c:v', 'libx264',
       '-crf', String(crf),
       '-preset', 'medium',       // Better compression than 'fast'; still reasonable speed
@@ -286,7 +294,7 @@ export async function transcodeFile(
       ...audioArgs,
       '-movflags', '+faststart',
       '-y',
-      outputPath,
+      resolvedOutput,
     ];
   }
 
@@ -302,11 +310,11 @@ export async function transcodeFile(
   // ── 6. Post-encode size check ────────────────────────────────────────────
   // If the output is larger than the input (can happen with already-compressed
   // sources), discard the output and keep the original. Never make files bigger.
-  const outputSize = fs.existsSync(outputPath) ? fs.statSync(outputPath).size : 0;
+  const outputSize = fs.existsSync(resolvedOutput) ? fs.statSync(resolvedOutput).size : 0;
   const savedBytes = originalSize - outputSize;
   const outputIsLarger = outputSize > 0 && outputSize >= originalSize;
 
-  let finalFilename = outputFilename;
+  let finalFilename = path.basename(resolvedOutput);
   let finalSize = outputSize;
 
   if (outputIsLarger) {
@@ -315,13 +323,13 @@ export async function transcodeFile(
       `(${(originalSize / 1_048_576).toFixed(1)}MB) — reverting to original`
     );
     // Delete the larger output, keep original
-    try { fs.unlinkSync(outputPath); } catch { /* ignore */ }
-    finalFilename = inputFilename;
+    try { fs.unlinkSync(resolvedOutput); } catch { /* ignore */ }
+    finalFilename = path.basename(resolvedInput);
     finalSize = originalSize;
   } else {
-    // Output is smaller — delete original to free space
-    if (inputFilename !== outputFilename && fs.existsSync(inputPath)) {
-      try { fs.unlinkSync(inputPath); } catch { /* ignore */ }
+    // Output is smaller — delete original to free space (only if different file)
+    if (resolvedInput !== resolvedOutput && fs.existsSync(resolvedInput)) {
+      try { fs.unlinkSync(resolvedInput); } catch { /* ignore */ }
     }
     const pct = originalSize > 0 ? Math.round((savedBytes / originalSize) * 100) : 0;
     console.log(

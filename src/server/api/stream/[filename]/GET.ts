@@ -7,12 +7,18 @@
  *  - ETag + Last-Modified so the browser caches chunks and never re-fetches
  *  - Cache-Control: no-transform prevents any proxy from re-encoding
  *  - Connection: keep-alive reuses the TCP socket between chunk requests
- *  - Prefers transcoded _tc.mp4; falls back to original if still transcoding
+ *
+ * File resolution order:
+ *  1. Look up the library for an item whose filename matches — use its filePath
+ *     (handles files in downloads folder, not just uploads/)
+ *  2. Fall back to uploads/ directory search
+ *  3. Fall back to original file (pre-transcode) in uploads/
  */
 import type { Request, Response } from 'express';
 import fs from 'fs';
 import path from 'path';
 import { requireAuth } from '../../../authMiddleware.js';
+import { readLibrary } from '../../../libraryStore.js';
 
 const UPLOADS_DIR = path.resolve('./uploads');
 
@@ -28,24 +34,50 @@ const MIME_TYPES: Record<string, string> = {
   '.wmv':  'video/x-ms-wmv',
   '.m4v':  'video/mp4',
   '.webm': 'video/webm',
-  // Additional containers accepted by the upload endpoint
   '.ts':   'video/mp2t',
   '.flv':  'video/x-flv',
   '.3gp':  'video/3gpp',
   '.ogv':  'video/ogg',
 };
 
+/**
+ * Resolve the actual file path for a given filename.
+ *
+ * Priority:
+ *  1. Library lookup by filename → use stored filePath (supports downloads folder)
+ *  2. Direct path in uploads/
+ *  3. Original file fallback (strip _tc.mp4 suffix)
+ */
 function resolveFilePath(filename: string): string | null {
   const safe = path.basename(filename);
+
+  // 1. Library lookup — find item whose filename matches and use its stored filePath
+  try {
+    const library = readLibrary<{
+      filename?: string;
+      filePath?: string;
+      filepath?: string;
+    }>();
+    const item = library.find(m => m.filename === safe);
+    if (item) {
+      const storedPath = item.filePath ?? item.filepath;
+      if (storedPath && fs.existsSync(storedPath)) {
+        return storedPath;
+      }
+    }
+  } catch { /* fall through to filesystem search */ }
+
+  // 2. Direct path in uploads/
   const primary = path.join(UPLOADS_DIR, safe);
   if (fs.existsSync(primary)) return primary;
 
-  // Transcoded file not ready yet — fall back to original
+  // 3. Original file fallback — transcoded file not ready yet
   const base = safe.replace(/_tc\.mp4$/, '');
   for (const ext of ['.mkv', '.avi', '.mov', '.wmv', '.m4v', '.mp4']) {
     const candidate = path.join(UPLOADS_DIR, base + ext);
     if (fs.existsSync(candidate)) return candidate;
   }
+
   return null;
 }
 
@@ -56,7 +88,7 @@ export default function handler(req: Request, res: Response) {
     const filePath = resolveFilePath(filename);
 
     if (!filePath) {
-      return res.status(404).json({ error: 'File not found' });
+      return res.status(404).json({ error: 'File not found', filename });
     }
 
     const stat = fs.statSync(filePath);
@@ -100,6 +132,8 @@ export default function handler(req: Request, res: Response) {
         'ETag':             etag,
         'Last-Modified':    lastModified,
         'Connection':       'keep-alive',
+        // Hint total duration so seek bar is accurate before full download
+        'X-Content-Duration': String(stat.size),
       });
 
       fs.createReadStream(filePath, { start, end, highWaterMark: CHUNK_SIZE }).pipe(res);

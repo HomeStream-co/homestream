@@ -124,14 +124,19 @@ async function importFile(filePath: string): Promise<void> {
   // Transcode in background
   try {
     const result = await transcodeFile(mediaItem.id, filePath, outputPath);
+    // result.outputFilename is the basename of whichever file won (output or original)
+    const finalPath = result.outputFilename === path.basename(outputPath)
+      ? outputPath
+      : filePath; // reverted to original
+
     await writeLibrary(lib => {
       const idx = lib.findIndex(m => (m as { id: string }).id === mediaItem.id);
       if (idx !== -1) {
         const item = lib[idx] as Record<string, unknown>;
         item.transcoding = false;
         item.filename = result.outputFilename;
-        item.filepath = outputPath;
-        item.filePath = outputPath;
+        item.filepath = finalPath;
+        item.filePath = finalPath;
         item.fileSize = result.finalSize;
         item.originalSize = result.originalSize;
         item.savedBytes = result.savedBytes;
