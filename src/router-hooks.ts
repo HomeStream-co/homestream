@@ -6,7 +6,7 @@
  */
 
 import { useNavigate as useRouterNavigate, useParams as useRouterParams } from 'react-router-dom';
-import { Path, Params } from './routes';
+import { Path, Params } from './routeConfig';
 
 // Export hooks with type safety
 export const useNavigate = () => {

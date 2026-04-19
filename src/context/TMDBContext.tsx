@@ -114,6 +114,4 @@ export function TMDBProvider({ children, libraryGenres = [] }: TMDBProviderProps
   );
 }
 
-// Re-export for consumers that previously imported from this file
-export { TMDBContext, useTMDBContext } from './TMDBContextCore';
-export type { TMDBState } from './TMDBContextCore';
+

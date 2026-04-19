@@ -3,7 +3,7 @@ import { createBrowserRouter, Outlet, RouterProvider } from 'react-router-dom';
 
 import RootLayout from './layouts/RootLayout';
 import Spinner from './components/Spinner';
-import { routes } from './routes';
+import { routes } from './routeDefinitions';
 
 // ── Production error boundary ─────────────────────────────────────────────────
 

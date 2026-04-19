@@ -23,7 +23,7 @@ import {
   ChevronDown, Search, X, Tv2, Clapperboard, Play, Volume2, VolumeX,
 } from 'lucide-react';
 import { useMedia } from '@/context/MediaContext';
-import { useTMDBContext } from '@/context/TMDBContext';
+import { useTMDBContext } from '@/context/TMDBContextCore';
 import type { TMDBMovie } from '@/server/tmdbCache';
 import { fetchTrailerKey } from '@/lib/trailerCache';
 
