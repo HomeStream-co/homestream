@@ -317,6 +317,38 @@ export default function LibraryPage() {
 
   const genId = () => Math.random().toString(36).slice(2);
 
+  // ── On mount: reconnect SSE for any items still transcoding in the library ──
+  // This handles the case where the user refreshes the page mid-transcode.
+  useEffect(() => {
+    if (loading) return;
+    const stillTranscoding = library.filter(m => m.transcoding);
+    if (stillTranscoding.length === 0) return;
+
+    stillTranscoding.forEach(item => {
+      // Only reconnect if we don't already have a card for this item
+      setUploading(prev => {
+        const alreadyTracked = prev.some(u => u.transcodeId === item.id);
+        if (alreadyTracked) return prev;
+        const uiId = genId();
+        // Reconnect SSE after state update
+        setTimeout(() => listenToTranscode(uiId, item.id), 0);
+        return [...prev, {
+          id: uiId,
+          transcodeId: item.id,
+          name: item.originalFilename || item.filename,
+          uploadProgress: 100,
+          phase: 'transcoding' as const,
+          transcode: { progress: 0, status: 'transcoding' },
+          result: item,
+          showEnrichment: false,
+          enrichmentDone: false,
+          offlineMode: item.needsMetadata ?? false,
+        }];
+      });
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading]);
+
   // ── SSE listener for a transcode job ──
   const listenToTranscode = useCallback((uiId: string, transcodeId: string) => {
     // Close any existing SSE for this item

@@ -34,6 +34,10 @@ export interface MediaItem {
   fileSize?: number;
   transcoding?: boolean;
   transcodeWarning?: string;
+  transcodeError?: string;
+  // Offline upload flags
+  needsMetadata?: boolean;       // true = uploaded offline, no OMDB data yet
+  metadataAvailable?: boolean;   // false = server had no internet during upload
   // AI enrichment (populated after upload wizard runs)
   enrichment?: MediaEnrichment;
   enriching?: boolean;          // true while wizard is running

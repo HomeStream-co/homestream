@@ -63,6 +63,17 @@ export default function PlayerPage() {
     }
   }, [item, isAllowed, navigate]);
 
+  // ── Reset speed + watched flag when video id changes ──
+  useEffect(() => {
+    setPlaybackRate(1);
+    setShowSpeedMenu(false);
+    watchCompleteTriggered.current = false;
+    resumeApplied.current = false;
+    setShowEndOverlay(false);
+    setAutoplayCancelled(false);
+    setVideoLoading(true);
+  }, [id]);
+
   // ── Refs ──
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -86,6 +97,8 @@ export default function PlayerPage() {
   const [autoplayCancelled, setAutoplayCancelled] = useState(false);
   const [showSkipIntro, setShowSkipIntro] = useState(false);
   const [seekFlash, setSeekFlash] = useState<'forward' | 'back' | null>(null);
+  const [playbackRate, setPlaybackRate] = useState(1);
+  const [showSpeedMenu, setShowSpeedMenu] = useState(false);
   // Loading state — true until canplaythrough fires (enough buffered to play without stall)
   const [videoLoading, setVideoLoading] = useState(true);
   const resumeApplied = useRef(false);
@@ -276,7 +289,28 @@ export default function PlayerPage() {
         case 'Escape':
           setShowEndOverlay(false);
           setShowInfo(false);
+          setShowSpeedMenu(false);
           break;
+        case '>':
+        case '.': {
+          const speeds = [0.5, 0.75, 1, 1.25, 1.5, 2, 3];
+          const cur = videoRef.current?.playbackRate ?? 1;
+          const idx = speeds.indexOf(cur);
+          const next = speeds[Math.min(idx + 1, speeds.length - 1)];
+          if (videoRef.current) videoRef.current.playbackRate = next;
+          setPlaybackRate(next);
+          break;
+        }
+        case '<':
+        case ',': {
+          const speeds = [0.5, 0.75, 1, 1.25, 1.5, 2, 3];
+          const cur = videoRef.current?.playbackRate ?? 1;
+          const idx = speeds.indexOf(cur);
+          const prev = speeds[Math.max(idx - 1, 0)];
+          if (videoRef.current) videoRef.current.playbackRate = prev;
+          setPlaybackRate(prev);
+          break;
+        }
       }
     };
     window.addEventListener('keydown', onKey);
@@ -334,6 +368,14 @@ export default function PlayerPage() {
 
   const skipIntro = () => {
     if (videoRef.current) videoRef.current.currentTime = SKIP_INTRO_END;
+  };
+
+  const SPEED_OPTIONS = [0.5, 0.75, 1, 1.25, 1.5, 2, 3];
+
+  const changeSpeed = (rate: number) => {
+    if (videoRef.current) videoRef.current.playbackRate = rate;
+    setPlaybackRate(rate);
+    setShowSpeedMenu(false);
   };
 
   // ── Not found ──
@@ -488,6 +530,7 @@ export default function PlayerPage() {
                 <div className="hidden lg:flex items-center gap-1 text-white/30 text-[10px] mr-2">
                   <kbd className="bg-white/10 px-1 rounded">Space</kbd> play ·
                   <kbd className="bg-white/10 px-1 rounded">←→</kbd> seek ·
+                  <kbd className="bg-white/10 px-1 rounded">&lt; &gt;</kbd> speed ·
                   <kbd className="bg-white/10 px-1 rounded">F</kbd> fullscreen ·
                   <kbd className="bg-white/10 px-1 rounded">M</kbd> mute
                 </div>
@@ -554,9 +597,57 @@ export default function PlayerPage() {
                       {formatTime(currentTime)} / {formatTime(duration)}
                     </span>
                   </div>
-                  <button onClick={toggleFullscreen} className="text-white hover:text-white/80">
-                    {fullscreen ? <Minimize className="w-5 h-5" /> : <Maximize className="w-5 h-5" />}
-                  </button>
+                  <div className="flex items-center gap-2">
+                    {/* ── Playback Speed ── */}
+                    <div className="relative">
+                      <button
+                        onClick={e => { e.stopPropagation(); setShowSpeedMenu(prev => !prev); }}
+                        className={`text-xs font-medium px-2 py-1 rounded transition-colors ${
+                          playbackRate !== 1
+                            ? 'text-primary bg-primary/20 border border-primary/40'
+                            : 'text-white/70 hover:text-white bg-white/10 hover:bg-white/20'
+                        }`}
+                        title="Playback speed (< >)"
+                      >
+                        {playbackRate === 1 ? '1×' : `${playbackRate}×`}
+                      </button>
+                      <AnimatePresence>
+                        {showSpeedMenu && (
+                          <motion.div
+                            initial={{ opacity: 0, y: 6, scale: 0.95 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            exit={{ opacity: 0, y: 6, scale: 0.95 }}
+                            transition={{ duration: 0.12 }}
+                            className="absolute bottom-full right-0 mb-2 bg-black/90 border border-white/20 rounded-lg overflow-hidden shadow-xl backdrop-blur-sm z-20 min-w-[80px]"
+                            onClick={e => e.stopPropagation()}
+                          >
+                            <div className="px-3 py-1.5 border-b border-white/10">
+                              <p className="text-[10px] text-white/40 uppercase tracking-wider font-medium">Speed</p>
+                            </div>
+                            {SPEED_OPTIONS.map(rate => (
+                              <button
+                                key={rate}
+                                onClick={() => changeSpeed(rate)}
+                                className={`w-full text-left px-3 py-1.5 text-sm transition-colors flex items-center justify-between gap-3 ${
+                                  playbackRate === rate
+                                    ? 'text-primary bg-primary/20'
+                                    : 'text-white/80 hover:text-white hover:bg-white/10'
+                                }`}
+                              >
+                                <span>{rate === 1 ? 'Normal' : `${rate}×`}</span>
+                                {playbackRate === rate && (
+                                  <div className="w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0" />
+                                )}
+                              </button>
+                            ))}
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                    <button onClick={toggleFullscreen} className="text-white hover:text-white/80">
+                      {fullscreen ? <Minimize className="w-5 h-5" /> : <Maximize className="w-5 h-5" />}
+                    </button>
+                  </div>
                 </div>
               </div>
             </motion.div>
