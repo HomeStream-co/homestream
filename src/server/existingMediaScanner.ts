@@ -1,27 +1,40 @@
 /**
- * existingMediaScanner — finds and imports pre-existing media on the RAID/NAS
+ * existingMediaScanner — finds and imports pre-existing media on the RAID/NAS.
  *
  * Called once during setup wizard completion. Walks the entire mediaDir
- * (including library/ and any other subfolders) looking for video files
- * that aren't already in the HomeStream library.
+ * looking for video files not already in the HomeStream library.
  *
  * IMPORTANT: Never deletes, moves, or modifies existing files.
- * It only reads them and registers them in the library JSON.
- * Files stay exactly where they are on disk.
+ * Files stay exactly where they are on disk — only registered in the library.
+ *
+ * After import each item automatically gets:
+ *   ✓ OMDB metadata (poster, rating, genre, plot, cast, director)
+ *   ✓ AI enrichment (tags, mood, themes, recommendations) — if GOOGLE_AI_API_KEY set
+ *   ✓ Closed captions auto-downloaded (EN + ES) from OpenSubtitles
  */
 
 import fs from 'fs';
 import path from 'path';
-import { randomUUID } from 'crypto';
 import { readLibrary, writeLibrary } from './libraryStore.js';
+import {
+  extractTitle,
+  fetchOMDB,
+  buildMediaItem,
+  runEnrichmentInBackground,
+  runCaptionFetchInBackground,
+} from './mediaUtils.js';
 
 const VIDEO_EXTENSIONS = new Set([
   '.mp4', '.mkv', '.avi', '.mov', '.wmv', '.m4v',
   '.ts', '.webm', '.flv', '.3gp', '.ogv', '.mpg', '.mpeg',
 ]);
 
-// Folders to skip — these are managed by HomeStream itself
-const SKIP_DIRS = new Set(['downloads', 'uploads', '.trash', '@eaDir', '#recycle']);
+// Folders to skip — system/managed dirs that should never be scanned
+const SKIP_DIRS = new Set([
+  'downloads', 'uploads', '.trash', '@eaDir', '#recycle',
+  '.ds_store', 'system volume information', '$recycle.bin',
+  'lost+found', '.thumbnails', '.cache',
+]);
 
 export interface ScannedFile {
   path: string;
@@ -32,7 +45,7 @@ export interface ScannedFile {
 
 export interface ScanResult {
   found: number;
-  skipped: number;        // already in library
+  skipped: number;   // already in library
   files: ScannedFile[];
 }
 
@@ -58,14 +71,13 @@ function walkDir(dir: string, results: ScannedFile[] = []): ScannedFile[] {
     const fullPath = path.join(dir, entry.name);
 
     if (entry.isDirectory()) {
-      // Skip system/managed folders
       if (SKIP_DIRS.has(entry.name.toLowerCase())) continue;
       walkDir(fullPath, results);
     } else if (entry.isFile()) {
       const ext = path.extname(entry.name).toLowerCase();
       if (!VIDEO_EXTENSIONS.has(ext)) continue;
 
-      // Skip tiny files (likely samples, trailers < 50MB)
+      // Skip tiny files — likely samples or trailers (< 50 MB)
       let size = 0;
       try { size = fs.statSync(fullPath).size; } catch { continue; }
       if (size < 50 * 1024 * 1024) continue;
@@ -77,42 +89,6 @@ function walkDir(dir: string, results: ScannedFile[] = []): ScannedFile[] {
   return results;
 }
 
-// ─── Extract title from filename ─────────────────────────────────────────────
-
-function extractTitle(filename: string): { title: string; year?: string } {
-  let name = path.basename(filename, path.extname(filename));
-  // Replace dots/underscores/hyphens with spaces
-  name = name.replace(/[._]/g, ' ').replace(/-/g, ' ');
-  // Extract year
-  const yearMatch = name.match(/\b(19|20)\d{2}\b/);
-  const year = yearMatch ? yearMatch[0] : undefined;
-  // Strip year and quality tags
-  name = name
-    .replace(/\b(19|20)\d{2}\b/g, '')
-    .replace(/\b(720p|1080p|2160p|4k|uhd|bluray|bdrip|dvdrip|webrip|web[-.]?dl|x264|x265|hevc|aac|ac3|dts|hdr|sdr|remux|proper|repack|extended|theatrical|directors\.cut)\b/gi, '')
-    .replace(/\s+/g, ' ')
-    .trim();
-  return { title: name || path.basename(filename, path.extname(filename)), year };
-}
-
-// ─── OMDB fetch ───────────────────────────────────────────────────────────────
-
-async function fetchOMDB(title: string, year?: string): Promise<Record<string, string> | null> {
-  const apiKey = process.env.OMDB_API_KEY;
-  if (!apiKey) return null;
-  try {
-    const yearParam = year ? `&y=${year}` : '';
-    const res = await fetch(
-      `http://www.omdbapi.com/?t=${encodeURIComponent(title)}${yearParam}&apikey=${apiKey}`,
-      { signal: AbortSignal.timeout(6_000) }
-    );
-    const data = await res.json() as Record<string, string>;
-    return data.Response === 'True' ? data : null;
-  } catch {
-    return null;
-  }
-}
-
 // ─── Public API ───────────────────────────────────────────────────────────────
 
 /**
@@ -120,8 +96,11 @@ async function fetchOMDB(title: string, year?: string): Promise<Record<string, s
  * Returns a list of found files — does NOT import them yet.
  */
 export function scanExistingMedia(mediaDir: string): ScanResult {
-  const library = readLibrary<{ filePath?: string; originalFilename?: string }>();
-  const knownPaths = new Set(library.map(m => m.filePath ?? ''));
+  const library = readLibrary<{ filePath?: string; filepath?: string; originalFilename?: string }>();
+  const knownPaths = new Set([
+    ...library.map(m => m.filePath ?? ''),
+    ...library.map(m => m.filepath ?? ''),
+  ]);
   const knownNames = new Set(library.map(m => m.originalFilename ?? ''));
 
   const allFiles = walkDir(mediaDir);
@@ -141,8 +120,13 @@ export function scanExistingMedia(mediaDir: string): ScanResult {
 
 /**
  * Import a list of scanned files into the HomeStream library.
+ *
  * Files are registered in-place — nothing is moved or copied.
- * OMDB metadata is fetched for each file (rate-limited to avoid hammering).
+ * Each file gets:
+ *   1. OMDB metadata fetch (poster, rating, genre, plot, cast, director)
+ *   2. Library registration
+ *   3. AI enrichment triggered in background
+ *   4. Closed captions auto-downloaded in background
  */
 export async function importExistingMedia(
   files: ScannedFile[],
@@ -154,47 +138,32 @@ export async function importExistingMedia(
 
   for (let i = 0; i < files.length; i++) {
     const file = files[i];
-    const { title, year } = extractTitle(file.name);
 
     try {
-      // Fetch OMDB metadata (best-effort)
-      const omdb = await fetchOMDB(title, year);
+      const { title: extractedTitle, year: extractedYear } = extractTitle(file.name);
 
-      const mediaItem = {
-        id: randomUUID(),
-        title: omdb?.Title || title,
-        year: omdb?.Year || year || 'Unknown',
-        genre: omdb?.Genre ? omdb.Genre.split(',').map((g: string) => g.trim()) : ['Unknown'],
-        plot: omdb?.Plot || '',
-        director: omdb?.Director || '',
-        actors: omdb?.Actors || '',
-        imdbRating: omdb?.imdbRating || 'N/A',
-        poster: (omdb?.Poster && omdb.Poster !== 'N/A') ? omdb.Poster : '',
-        type: (omdb?.Type === 'series' ? 'series' : 'movie') as 'movie' | 'series',
-        runtime: omdb?.Runtime || 'Unknown',
-        rated: omdb?.Rated && omdb.Rated !== 'N/A' ? omdb.Rated.trim() : 'NR',
-        // Point directly at the file on disk — no copy, no move
-        filePath: file.path,
+      // 1. Fetch OMDB metadata (best-effort — null if offline or no key)
+      const omdb = await fetchOMDB(extractedTitle, extractedYear);
+
+      // 2. Build standardised library record
+      const mediaItem = buildMediaItem({
         filename: file.name,
         originalFilename: file.name,
-        filepath: file.path,
+        filePath: file.path,   // point directly at file on disk — no copy
         fileSize: file.size,
-        originalSize: file.size,
-        addedAt: new Date().toISOString(),
-        watchProgress: 0,
-        transcoding: false,
-        needsMetadata: !omdb,
-        metadataAvailable: !!omdb,
+        omdb,
+        extractedTitle,
+        extractedYear,
+        transcoding: false,    // existing files are already in their native format
         importedFrom: 'existing_scan',
-        ccStatus: 'none' as const,
-      };
+      });
 
+      // 3. Write to library (concurrent-safe via queue)
       await writeLibrary(lib => {
-        // Double-check not already added (concurrent safety)
-        const exists = lib.some(
-          m => (m as { filePath?: string }).filePath === file.path ||
-               (m as { originalFilename?: string }).originalFilename === file.name
-        );
+        const exists = lib.some(m => {
+          const r = m as { filePath?: string; filepath?: string; originalFilename?: string };
+          return r.filePath === file.path || r.filepath === file.path || r.originalFilename === file.name;
+        });
         if (!exists) lib.push(mediaItem as unknown as Record<string, unknown>);
         return lib;
       });
@@ -203,7 +172,15 @@ export async function importExistingMedia(
       imported++;
       onProgress?.(i + 1, files.length, mediaItem.title);
 
-      // Small delay between OMDB requests to avoid rate limiting
+      // 4. Trigger AI enrichment + CC in background (non-blocking)
+      //    Stagger slightly so we don't hammer the server on large libraries
+      const delay = Math.min(i * 200, 3000);
+      setTimeout(() => {
+        runEnrichmentInBackground(mediaItem.id).catch(() => {});
+        runCaptionFetchInBackground(mediaItem.id).catch(() => {});
+      }, delay);
+
+      // Rate-limit OMDB requests
       if (omdb && i < files.length - 1) {
         await new Promise(r => setTimeout(r, 300));
       }

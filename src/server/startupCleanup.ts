@@ -135,4 +135,16 @@ export function runStartupCleanup(): void {
     writeLibrary(cleaned);
     console.log('[startup] Library cleanup complete.');
   }
+
+  // ── Retry missing metadata in background ────────────────────────────────────
+  // Items imported while offline (needsMetadata: true) get a second chance
+  // now that the server is up and network may be available.
+  setTimeout(async () => {
+    try {
+      const { retryMissingMetadata } = await import('./mediaUtils.js');
+      await retryMissingMetadata();
+    } catch (err) {
+      console.error('[startup] Metadata retry error:', err);
+    }
+  }, 5_000); // 5s delay — let the server fully boot first
 }

@@ -1,159 +1,137 @@
 /**
- * folderWatcher — auto-import completed downloads into HomeStream
+ * folderWatcher — auto-import completed downloads into HomeStream.
  *
  * Watches the qBittorrent downloads folder for new video files.
- * When a file appears (and is fully written), it runs through the
- * same transcode + OMDB + CC pipeline as a manual upload.
+ * When a file appears and is fully written, it runs through the full pipeline:
+ *   1. OMDB metadata fetch (poster, rating, genre, plot, cast, director)
+ *   2. Library registration
+ *   3. Smart transcode (skip/remux/encode based on codec analysis)
+ *   4. AI enrichment in background (if GOOGLE_AI_API_KEY set)
+ *   5. Closed captions auto-downloaded in background (EN + ES)
  *
  * Two watch modes:
- *   1. FILE SYSTEM WATCH — uses fs.watch() for instant detection
- *   2. POLLING FALLBACK  — scans every 30s (for network drives / Docker volumes
- *      where inotify events don't propagate)
+ *   1. FILE SYSTEM WATCH — fs.watch() for instant detection
+ *   2. POLLING FALLBACK  — scans every 30s for network drives / Docker volumes
+ *      where inotify events don't propagate
  *
  * File stability check:
- *   Waits until the file size stops changing for 5 seconds before importing.
- *   This prevents importing partially-written files.
+ *   Waits until file size stops changing for 5s before importing.
+ *   Prevents importing partially-written files.
  *
  * Deduplication:
- *   Tracks imported file paths in a Set so the same file is never imported twice,
- *   even if the watcher fires multiple events.
+ *   Tracks imported file paths in a Set — same file never imported twice.
+ *
+ * NOTE: Downloaded files are imported IN-PLACE from the downloads folder.
+ * They are NOT copied to uploads/ — this saves disk space on RAID arrays.
+ * The file path stored in the library points directly to the downloads folder.
  */
 
 import fs from 'fs';
 import path from 'path';
-import { randomUUID } from 'crypto';
 import { readLibrary, writeLibrary } from './libraryStore.js';
 import { createJob } from './transcodeStore.js';
 import { transcodeFile } from './transcodeWorker.js';
+import {
+  extractTitle,
+  fetchOMDB,
+  buildMediaItem,
+  runEnrichmentInBackground,
+  runCaptionFetchInBackground,
+} from './mediaUtils.js';
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
-const VIDEO_EXTENSIONS = new Set(['.mp4', '.mkv', '.avi', '.mov', '.wmv', '.m4v', '.ts', '.webm', '.flv', '.3gp']);
+const VIDEO_EXTENSIONS = new Set([
+  '.mp4', '.mkv', '.avi', '.mov', '.wmv', '.m4v',
+  '.ts', '.webm', '.flv', '.3gp', '.ogv',
+]);
 const STABILITY_WAIT_MS = 5_000;   // wait 5s of no size change before importing
-const POLL_INTERVAL_MS = 30_000;   // fallback poll every 30s
-const UPLOADS_DIR = path.resolve('./uploads');
+const POLL_INTERVAL_MS  = 30_000;  // fallback poll every 30s
 
 // ─── State ────────────────────────────────────────────────────────────────────
 
-const imported = new Set<string>();   // absolute paths already imported
-const pending = new Map<string, ReturnType<typeof setTimeout>>();  // path → stability timer
+const importedPaths = new Set<string>();  // absolute paths already imported this session
+const pending = new Map<string, ReturnType<typeof setTimeout>>();
 
 let watcherActive = false;
 let pollTimer: ReturnType<typeof setInterval> | null = null;
 let fsWatcher: fs.FSWatcher | null = null;
-
-// ─── OMDB fetch ───────────────────────────────────────────────────────────────
-
-async function fetchOMDB(title: string, year?: string): Promise<Record<string, string> | null> {
-  const apiKey = process.env.OMDB_API_KEY;
-  if (!apiKey) return null;
-  try {
-    const yearParam = year ? `&y=${year}` : '';
-    const res = await fetch(
-      `http://www.omdbapi.com/?t=${encodeURIComponent(title)}${yearParam}&apikey=${apiKey}`,
-      { signal: AbortSignal.timeout(8_000) }
-    );
-    const data = await res.json() as Record<string, string>;
-    return data.Response === 'True' ? data : null;
-  } catch {
-    return null;
-  }
-}
-
-function extractTitle(filename: string): { title: string; year?: string } {
-  let name = path.basename(filename, path.extname(filename));
-  name = name.replace(/[._-]/g, ' ');
-  const yearMatch = name.match(/[\[(]?(\d{4})[\])]?/);
-  const year = yearMatch ? yearMatch[1] : undefined;
-  name = name.replace(/[\[(]?\d{4}[\])]?/g, '');
-  name = name.replace(/\b(720p|1080p|2160p|4k|bluray|bdrip|dvdrip|webrip|web-dl|x264|x265|hevc|aac|ac3|hdr|sdr|remux)\b/gi, '');
-  name = name.replace(/\s+/g, ' ').trim();
-  return { title: name, year };
-}
+let activeWatchDir = '';
 
 // ─── Import pipeline ──────────────────────────────────────────────────────────
 
 async function importFile(filePath: string): Promise<void> {
-  if (imported.has(filePath)) return;
-  imported.add(filePath);
+  if (importedPaths.has(filePath)) return;
+  importedPaths.add(filePath);
 
   const filename = path.basename(filePath);
   console.log(`[watcher] Importing: ${filename}`);
 
-  // Check if already in library (by original filename)
-  const library = readLibrary<{ originalFilename?: string }>();
-  if (library.some(item => item.originalFilename === filename)) {
+  // Check if already in library
+  const library = readLibrary<{ originalFilename?: string; filePath?: string; filepath?: string }>();
+  if (library.some(item =>
+    item.originalFilename === filename ||
+    item.filePath === filePath ||
+    item.filepath === filePath
+  )) {
     console.log(`[watcher] Already in library, skipping: ${filename}`);
     return;
   }
 
-  const mediaId = randomUUID();
-  const { title, year } = extractTitle(filename);
+  const { title: extractedTitle, year: extractedYear } = extractTitle(filename);
   const ext = path.extname(filename).toLowerCase();
 
-  // Copy to uploads dir with safe name
-  const safeName = `${Date.now()}-${filename.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
-  const destPath = path.join(UPLOADS_DIR, safeName);
+  // Fetch OMDB metadata
+  const omdb = await fetchOMDB(extractedTitle, extractedYear);
 
-  try {
-    fs.copyFileSync(filePath, destPath);
-  } catch (err) {
-    console.error(`[watcher] Failed to copy ${filename}:`, err);
-    imported.delete(filePath);
-    return;
-  }
+  // Determine output path for transcoded file
+  // Transcoded file lives alongside the source in the downloads folder
+  const outputFilename = filename.replace(/\.[^.]+$/, '') + '_tc.mp4';
+  const outputPath = path.join(path.dirname(filePath), outputFilename);
 
-  const outputFilename = safeName.replace(/\.[^.]+$/, '') + '_tc.mp4';
+  const fileSize = (() => {
+    try { return fs.statSync(filePath).size; } catch { return 0; }
+  })();
 
-  // Fetch metadata
-  const omdb = await fetchOMDB(title, year);
-  const genres = omdb?.Genre ? omdb.Genre.split(',').map(g => g.trim()) : ['Unknown'];
-
-  const mediaItem = {
-    id: mediaId,
-    filename: outputFilename,
+  // Build library record — initially points at source file
+  const mediaItem = buildMediaItem({
+    filename,
     originalFilename: filename,
-    filepath: `/uploads/${outputFilename}`,
-    title: omdb?.Title || title,
-    year: omdb?.Year || year || 'Unknown',
-    genre: genres,
-    plot: omdb?.Plot || '',
-    director: omdb?.Director || '',
-    actors: omdb?.Actors || '',
-    imdbRating: omdb?.imdbRating || 'N/A',
-    poster: (omdb?.Poster && omdb.Poster !== 'N/A') ? omdb.Poster : '',
-    type: omdb?.Type === 'series' ? 'series' : 'movie',
-    runtime: omdb?.Runtime || 'Unknown',
-    rated: omdb?.Rated && omdb.Rated !== 'N/A' ? omdb.Rated.trim() : 'NR',
-    addedAt: new Date().toISOString(),
-    watchProgress: 0,
-    fileSize: fs.statSync(destPath).size,
-    transcoding: true,
-    needsMetadata: !omdb,
-    metadataAvailable: !!omdb,
+    filePath,                    // stream from source until transcode completes
+    fileSize,
+    omdb,
+    extractedTitle,
+    extractedYear,
+    transcoding: ext !== '.mp4', // only flag as transcoding if not already mp4
     importedFrom: 'folder_watcher',
-    sourceExt: ext,
-  };
+  });
 
-  createJob(mediaId, safeName, outputFilename);
+  // Register transcode job
+  createJob(mediaItem.id, filename, outputFilename);
 
+  // Write to library immediately — item visible in UI right away
   await writeLibrary(lib => {
     lib.unshift(mediaItem as unknown as Record<string, unknown>);
     return lib;
   });
 
-  console.log(`[watcher] Added to library: "${mediaItem.title}" (${mediaId})`);
+  console.log(`[watcher] Added to library: "${mediaItem.title}" (${mediaItem.id})`);
 
-  // Transcode
+  // Trigger AI enrichment + CC in background immediately
+  runEnrichmentInBackground(mediaItem.id).catch(() => {});
+  runCaptionFetchInBackground(mediaItem.id).catch(() => {});
+
+  // Transcode in background
   try {
-    const result = await transcodeFile(mediaId, safeName, outputFilename);
+    const result = await transcodeFile(mediaItem.id, filePath, outputPath);
     await writeLibrary(lib => {
-      const idx = lib.findIndex(m => (m as { id: string }).id === mediaId);
+      const idx = lib.findIndex(m => (m as { id: string }).id === mediaItem.id);
       if (idx !== -1) {
         const item = lib[idx] as Record<string, unknown>;
         item.transcoding = false;
         item.filename = result.outputFilename;
-        item.filepath = `/uploads/${result.outputFilename}`;
+        item.filepath = outputPath;
+        item.filePath = outputPath;
         item.fileSize = result.finalSize;
         item.originalSize = result.originalSize;
         item.savedBytes = result.savedBytes;
@@ -161,13 +139,16 @@ async function importFile(filePath: string): Promise<void> {
       }
       return lib;
     });
-    console.log(`[watcher] Transcode complete: "${mediaItem.title}"`);
+    console.log(`[watcher] Transcode complete: "${mediaItem.title}" — saved ${Math.round((result.savedBytes ?? 0) / 1024 / 1024)}MB`);
   } catch (err) {
-    console.error(`[watcher] Transcode failed for ${mediaId}:`, err);
+    console.error(`[watcher] Transcode failed for ${mediaItem.id}:`, err);
+    // Keep original file — mark transcoding done so UI doesn't spin forever
     await writeLibrary(lib => {
-      const idx = lib.findIndex(m => (m as { id: string }).id === mediaId);
+      const idx = lib.findIndex(m => (m as { id: string }).id === mediaItem.id);
       if (idx !== -1) {
-        (lib[idx] as Record<string, unknown>).transcoding = false;
+        const item = lib[idx] as Record<string, unknown>;
+        item.transcoding = false;
+        item.transcodeError = String(err);
       }
       return lib;
     });
@@ -177,9 +158,8 @@ async function importFile(filePath: string): Promise<void> {
 // ─── Stability check ──────────────────────────────────────────────────────────
 
 function scheduleImport(filePath: string): void {
-  if (imported.has(filePath)) return;
+  if (importedPaths.has(filePath)) return;
 
-  // Cancel any existing timer for this file
   const existing = pending.get(filePath);
   if (existing) clearTimeout(existing);
 
@@ -224,7 +204,7 @@ function scanDirectory(dir: string): void {
           scan(fullPath);
         } else if (entry.isFile()) {
           const ext = path.extname(entry.name).toLowerCase();
-          if (VIDEO_EXTENSIONS.has(ext) && !imported.has(fullPath)) {
+          if (VIDEO_EXTENSIONS.has(ext) && !importedPaths.has(fullPath)) {
             scheduleImport(fullPath);
           }
         }
@@ -239,11 +219,12 @@ function scanDirectory(dir: string): void {
 
 /**
  * Start watching a directory for new video files.
- * Safe to call multiple times — only starts once.
+ * Safe to call multiple times — only starts once per session.
  */
 export function startWatcher(watchDir: string): void {
   if (watcherActive) return;
   watcherActive = true;
+  activeWatchDir = watchDir;
 
   if (!fs.existsSync(watchDir)) {
     try { fs.mkdirSync(watchDir, { recursive: true }); } catch { /* ignore */ }
@@ -251,7 +232,7 @@ export function startWatcher(watchDir: string): void {
 
   console.log(`[watcher] Watching: ${watchDir}`);
 
-  // Initial scan for any existing files
+  // Initial scan for any files already present
   scanDirectory(watchDir);
 
   // fs.watch for instant detection
@@ -270,12 +251,12 @@ export function startWatcher(watchDir: string): void {
     console.warn('[watcher] fs.watch failed (network drive?), using polling only:', err);
   }
 
-  // Polling fallback (catches network drives, Docker bind mounts)
+  // Polling fallback — catches network drives, Docker bind mounts, NFS
   pollTimer = setInterval(() => scanDirectory(watchDir), POLL_INTERVAL_MS);
 }
 
 /**
- * Stop the watcher.
+ * Stop the watcher and clear all pending timers.
  */
 export function stopWatcher(): void {
   watcherActive = false;
@@ -287,16 +268,13 @@ export function stopWatcher(): void {
 }
 
 /**
- * Get watcher status.
+ * Get current watcher status for health checks.
  */
-export function getWatcherStatus(): { active: boolean; watchDir: string; importedCount: number; pendingCount: number } {
-  const watchDir = process.env.MEDIA_DIR
-    ? path.join(process.env.MEDIA_DIR, 'downloads')
-    : path.resolve('./media/downloads');
+export function getWatcherStatus() {
   return {
     active: watcherActive,
-    watchDir,
-    importedCount: imported.size,
+    watchDir: activeWatchDir,
+    importedCount: importedPaths.size,
     pendingCount: pending.size,
   };
 }
