@@ -93,8 +93,6 @@ export default function handler(req: Request, res: Response) {
         'Accept-Ranges':    'bytes',
         'Content-Length':   chunkSize,
         'Content-Type':     contentType,
-        // Duration hint — browser can render the seek bar before buffering
-        'X-Content-Duration': '0',
         // LAN caching: reuse chunks for 1 hour, revalidate with ETag
         'Cache-Control':    'private, max-age=3600, no-transform',
         'ETag':             etag,

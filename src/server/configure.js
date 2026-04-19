@@ -56,8 +56,8 @@ export const viteServerBefore = (server, _viteServer) => {
   console.log("VITEJS SERVER");
   normalizeCommerceApiBaseUrlEnv();
   server.use(cookieParser());
-  server.use(express.json());
-  server.use(express.urlencoded({ extended: true }));
+  server.use(express.json({ limit: '50mb' }));
+  server.use(express.urlencoded({ extended: true, limit: '50mb' }));
 };
 
 export const viteServerAfter = (_server, _viteServer) => {};
@@ -73,6 +73,18 @@ export const serverBefore = (server) => {
   }).catch(err => {
     console.error('[startup] Cleanup failed:', err.message);
   });
+
+  // Resume folder watcher if setup was already completed before this restart
+  import('./configStore.js').then(({ isSetupComplete, readConfig }) => {
+    if (!isSetupComplete()) return;
+    const cfg = readConfig();
+    if (cfg.watchFolderEnabled && cfg.downloadsDir) {
+      import('./folderWatcher.js').then(({ startWatcher }) => {
+        startWatcher(cfg.downloadsDir);
+        console.log(`[startup] Folder watcher resumed → ${cfg.downloadsDir}`);
+      }).catch(err => console.warn('[startup] Folder watcher failed to resume:', err.message));
+    }
+  }).catch(err => console.warn('[startup] Config read failed:', err.message));
 
   // Start Jellyfin UDP discovery so TV apps can find HomeStream automatically
   import('./jellyfinDiscovery.js').then(({ startJellyfinDiscovery }) => {
@@ -92,16 +104,6 @@ export const serverBefore = (server) => {
 
   const shutdown = async (signal) => {
     console.log(`Got ${signal}, shutting down gracefully...`);
-    try {
-      const dbClient = "./db/client" + ".js";
-      const { closeConnection } = await import(dbClient);
-      await closeConnection();
-      console.log("Database connections closed");
-    } catch (error) {
-      if (error.code !== 'ERR_MODULE_NOT_FOUND') {
-        console.error("Error during database shutdown:", error.message);
-      }
-    }
     process.exit(0);
   };
 
@@ -110,8 +112,8 @@ export const serverBefore = (server) => {
   });
 
   server.use(cookieParser());
-  server.use(express.json());
-  server.use(express.urlencoded({ extended: true }));
+  server.use(express.json({ limit: '50mb' }));
+  server.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
   // Gzip compression for API JSON responses
   server.use(gzipMiddleware);

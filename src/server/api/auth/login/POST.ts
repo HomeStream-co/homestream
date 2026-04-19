@@ -87,6 +87,14 @@ setInterval(() => {
   }
 }, 30 * 60 * 1000);
 
+// Clean up expired sessions every hour
+setInterval(() => {
+  const now = Date.now();
+  for (const [token, expiry] of sessions) {
+    if (now > expiry) sessions.delete(token);
+  }
+}, 60 * 60 * 1000);
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function isBcryptHash(s: string): boolean {

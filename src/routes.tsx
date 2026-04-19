@@ -2,7 +2,6 @@ import { RouteObject } from 'react-router-dom';
 import { lazy } from 'react';
 import HomePage from './pages/index';
 
-const BrowsePage = lazy(() => import('./pages/browse'));
 const MoviePage = lazy(() => import('./pages/movie'));
 const MoviesPage = lazy(() => import('./pages/movies'));
 const ShowPage = lazy(() => import('./pages/show'));
@@ -23,7 +22,8 @@ const NotFoundPage = import.meta.env.DEV
 
 export const routes: RouteObject[] = [
   { path: '/', element: <HomePage /> },
-  { path: '/browse', element: <BrowsePage /> },
+  // /browse redirects to home — kept for backwards-compat with any saved links
+  { path: '/browse', element: <HomePage /> },
   { path: '/movies', element: <MoviesPage /> },
   { path: '/movie/:id', element: <MoviePage /> },
   { path: '/library', element: <LibraryPage /> },

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Search, Upload, Menu, X, Film, Bookmark, ChevronDown, Wrench, ShieldCheck, Clock, Lock } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -6,10 +6,14 @@ import { toast } from 'sonner';
 import { useMedia } from '@/context/MediaContext';
 import { useProfile, PROFILES, type ProfileId } from '@/context/ProfileContext';
 import SettingsPanel from '@/components/SettingsPanel';
-import DebugPanel from '@/components/DebugPanel';
 import StremioPanel from '@/components/StremioPanel';
 import SecurityPanel from '@/components/SecurityPanel';
 import PinLock from '@/components/PinLock';
+
+// DebugPanel is dev-only — excluded from production bundle
+const DebugPanel = import.meta.env.DEV
+  ? lazy(() => import('@/components/DebugPanel'))
+  : null;
 
 interface HeaderProps {
   onChatOpen?: () => void;
@@ -251,7 +255,11 @@ export default function Header({ onChatOpen: _onChatOpen }: HeaderProps) {
             {/* ── Settings cog ── */}
             <SettingsPanel />
 
-            <DebugPanel open={debugOpen} onClose={() => setDebugOpen(false)} />
+            {import.meta.env.DEV && DebugPanel && (
+              <Suspense fallback={null}>
+                <DebugPanel open={debugOpen} onClose={() => setDebugOpen(false)} />
+              </Suspense>
+            )}
             <SecurityPanel open={securityOpen} onClose={() => setSecurityOpen(false)} />
 
             {/* ── Stremio ── */}
