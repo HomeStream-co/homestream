@@ -1,3 +1,4 @@
+// @refresh reset
 import { RouteObject } from 'react-router-dom';
 import { lazy } from 'react';
 import HomePage from './pages/index';

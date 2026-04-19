@@ -1,3 +1,4 @@
+// @refresh reset
 /**
  * TMDBContext — fetches TMDB data once per app session.
  *
@@ -140,3 +141,6 @@ export function useTMDBContext(): TMDBState {
   if (!ctx) throw new Error('useTMDBContext must be used within TMDBProvider');
   return ctx;
 }
+
+// Re-export context for consumers that need raw access
+export { TMDBContext };
