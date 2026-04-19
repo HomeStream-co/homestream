@@ -4,26 +4,26 @@
 
 @layer base {
   :root {
-    /* HomeStream Dark Cinematic Theme */
-    --background: 240 20% 4%;
-    --foreground: 0 0% 100%;
-    --card: 240 18% 8%;
-    --card-foreground: 0 0% 100%;
-    --popover: 240 18% 8%;
-    --popover-foreground: 0 0% 100%;
-    --primary: 0 86% 47%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 240 10% 15%;
-    --secondary-foreground: 0 0% 100%;
-    --muted: 240 10% 15%;
-    --muted-foreground: 220 9% 46%;
-    --accent: 45 100% 54%;
-    --accent-foreground: 0 0% 0%;
+    /* HomeStream — Forest Green (default; overridden at runtime by ThemeContext) */
+    --background: 0 0% 3%;
+    --foreground: 140 8% 94%;
+    --card: 140 10% 6%;
+    --card-foreground: 140 8% 94%;
+    --popover: 140 10% 6%;
+    --popover-foreground: 140 8% 94%;
+    --primary: 145 60% 22%;
+    --primary-foreground: 140 8% 94%;
+    --secondary: 140 8% 11%;
+    --secondary-foreground: 140 8% 94%;
+    --muted: 140 8% 11%;
+    --muted-foreground: 140 5% 48%;
+    --accent: 145 45% 30%;
+    --accent-foreground: 140 8% 94%;
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
-    --border: 240 10% 18%;
-    --input: 240 10% 18%;
-    --ring: 0 86% 47%;
+    --border: 140 8% 14%;
+    --input: 140 8% 14%;
+    --ring: 145 60% 22%;
 
     /* Extended Colors */
     --chart-1: 0 86% 47%;
@@ -33,14 +33,14 @@
     --chart-5: 280 65% 60%;
 
     /* Sidebar Colors */
-    --sidebar: 240 18% 8%;
-    --sidebar-foreground: 0 0% 100%;
-    --sidebar-primary: 0 86% 47%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 10% 15%;
-    --sidebar-accent-foreground: 0 0% 100%;
-    --sidebar-border: 240 10% 18%;
-    --sidebar-ring: 0 86% 47%;
+    --sidebar: 140 10% 6%;
+    --sidebar-foreground: 140 8% 94%;
+    --sidebar-primary: 145 60% 22%;
+    --sidebar-primary-foreground: 140 8% 94%;
+    --sidebar-accent: 140 8% 11%;
+    --sidebar-accent-foreground: 140 8% 94%;
+    --sidebar-border: 140 8% 14%;
+    --sidebar-ring: 145 60% 22%;
 
     /* Typography */
     --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
