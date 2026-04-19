@@ -30,6 +30,7 @@ interface FormData {
   adminPasswordConfirm: string;
   omdbApiKey: string;
   googleAiApiKey: string;
+  tmdbApiKey: string;
   preferredQuality: '720p' | '1080p' | '4k' | 'best';
   watchFolderEnabled: boolean;
   autoTranscode: boolean;
@@ -73,6 +74,7 @@ export default function SetupPage() {
     adminPasswordConfirm: '',
     omdbApiKey: '',
     googleAiApiKey: '',
+    tmdbApiKey: '',
     preferredQuality: '1080p',
     watchFolderEnabled: true,
     autoTranscode: true,
@@ -232,6 +234,7 @@ export default function SetupPage() {
       adminPassword: form.adminPassword,
       omdbApiKey: form.omdbApiKey,
       googleAiApiKey: form.googleAiApiKey,
+      tmdbApiKey: form.tmdbApiKey,
     });
     setStatus(s => ({ ...s, apiKeys: 'done' }));
     setStep(5);
@@ -332,7 +335,7 @@ export default function SetupPage() {
                     { icon: HardDrive, label: 'Media folder', desc: 'Where your movies and shows live' },
                     { icon: Wifi, label: 'qBittorrent', desc: 'Download engine (optional but recommended)' },
                     { icon: Tv2, label: 'Jellyfin', desc: 'Stream to any device on your network' },
-                    { icon: KeyRound, label: 'API keys', desc: 'Metadata, AI enrichment (all optional)' },
+                    { icon: KeyRound, label: 'API keys', desc: 'TMDB, OMDB, Google AI — all free, all optional' },
                   ].map(({ icon: Icon, label, desc }) => (
                     <div key={label} className="flex items-center gap-3 p-3 rounded-xl bg-muted/40">
                       <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
@@ -635,6 +638,36 @@ export default function SetupPage() {
                     </div>
                   </div>
 
+                  {/* TMDB */}
+                  <div className="p-4 rounded-xl border border-border bg-muted/20">
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="flex items-center gap-2">
+                        <Film className="w-4 h-4 text-primary" />
+                        <p className="text-sm font-semibold text-foreground">TMDB API Key</p>
+                        <span className="text-[10px] bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded font-medium">Recommended</span>
+                      </div>
+                      <a href="https://www.themoviedb.org/settings/api" target="_blank" rel="noopener noreferrer"
+                        className="text-[10px] text-primary hover:underline flex items-center gap-0.5">
+                        Get free key <ExternalLink className="w-2.5 h-2.5" />
+                      </a>
+                    </div>
+                    <p className="text-xs text-muted-foreground mb-2">
+                      Powers the hero banner, Discover page (upcoming &amp; trending movies), and personalised recommendations. Free — just create a TMDB account.
+                    </p>
+                    <input type="text" value={form.tmdbApiKey} onChange={e => set('tmdbApiKey', e.target.value)}
+                      placeholder="eyJhbGciOiJSUzI1NiJ9…  (v4 read access token)"
+                      className="w-full bg-background border border-border rounded-lg px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary font-mono" />
+                    <div className="mt-2 flex flex-col gap-1 text-[10px] text-muted-foreground">
+                      <p className="font-medium text-foreground/70">How to get your key:</p>
+                      <ol className="list-decimal list-inside space-y-0.5 ml-1">
+                        <li>Go to <a href="https://www.themoviedb.org/signup" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">themoviedb.org/signup</a> and create a free account</li>
+                        <li>Visit <strong>Settings → API</strong> and click <strong>Create</strong></li>
+                        <li>Choose <strong>Developer</strong>, fill in the form (any app name/URL is fine)</li>
+                        <li>Copy the <strong>API Read Access Token (v4)</strong> — it starts with <code className="bg-muted px-1 rounded">eyJ…</code></li>
+                      </ol>
+                    </div>
+                  </div>
+
                   {/* OMDB */}
                   <div className="p-4 rounded-xl border border-border bg-muted/20">
                     <div className="flex items-center justify-between mb-1">
@@ -702,6 +735,7 @@ export default function SetupPage() {
                     { label: 'Media folder', value: form.mediaDir, ok: !!form.mediaDir },
                     { label: 'qBittorrent', value: status.qbit === 'ok' ? `Connected (${qbitVersion})` : 'Not configured', ok: status.qbit === 'ok' },
                     { label: 'Jellyfin', value: status.jellyfin === 'ok' ? `Connected (${jellyfinVersion})` : 'Not configured', ok: status.jellyfin === 'ok' },
+                    { label: 'TMDB (hero/discover)', value: form.tmdbApiKey ? 'API key set ✓' : 'Not configured — Discover page disabled', ok: !!form.tmdbApiKey },
                     { label: 'OMDB metadata', value: form.omdbApiKey ? 'API key set' : 'Not configured', ok: !!form.omdbApiKey },
                     { label: 'AI enrichment', value: form.googleAiApiKey ? 'API key set' : 'Not configured', ok: !!form.googleAiApiKey },
                     { label: 'Auto-import', value: form.watchFolderEnabled ? 'Enabled' : 'Disabled', ok: form.watchFolderEnabled },
