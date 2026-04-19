@@ -64,29 +64,10 @@ const require = createRequire(import.meta.url);`,
 	};
 }
 
-const allowedHosts: string[] = [];
-const corsOrigins: string[] = [];
-
-if (process.env.FRONTEND_DOMAIN) {
-	const frontendHost = extractHostname(process.env.FRONTEND_DOMAIN);
-	allowedHosts.push(frontendHost);
-	corsOrigins.push(`http://${frontendHost}`, `https://${frontendHost}`);
-}
-if (process.env.ALLOWED_ORIGINS) {
-	const origins = process.env.ALLOWED_ORIGINS.split(",");
-	allowedHosts.push(...origins.map(extractHostname));
-	corsOrigins.push(...origins);
-}
-if (process.env.VITE_PARENT_ORIGIN) {
-	allowedHosts.push(extractHostname(process.env.VITE_PARENT_ORIGIN));
-	corsOrigins.push(process.env.VITE_PARENT_ORIGIN);
-}
-if (allowedHosts.length === 0) {
-	allowedHosts.push("*");
-}
-if (corsOrigins.length === 0) {
-	corsOrigins.push("*");
-}
+// HomeStream is a local/desktop app — no cloud hosting env vars needed.
+// Allow all hosts so LAN devices (phone remote, TV) can reach the dev server.
+const allowedHosts = ["all"];
+const corsOrigins = ["*"];
 
 export default defineConfig(({ mode }) => ({
 	// Expose SITE_ID to import.meta.env (same as app id) for client deep links; keep VITE_ as default

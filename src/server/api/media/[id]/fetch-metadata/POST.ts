@@ -8,6 +8,7 @@
  */
 import type { Request, Response } from 'express';
 import { readLibrary, writeLibrary } from '../../../../libraryStore.js';
+import { fetchOMDB } from '../../../../mediaUtils.js';
 
 interface MediaItem {
   id: string;
@@ -32,25 +33,6 @@ function readLibraryLocal(): MediaItem[] {
 
 function writeLibraryLocal(data: MediaItem[]) {
   writeLibrary(() => data);
-}
-
-async function fetchOMDB(title: string, year?: string): Promise<Record<string, string> | null> {
-  const apiKey = process.env.OMDB_API_KEY;
-  if (!apiKey) return null;
-
-  const yearParam = year && year !== 'Unknown' ? `&y=${year}` : '';
-  const url = `http://www.omdbapi.com/?t=${encodeURIComponent(title)}${yearParam}&apikey=${apiKey}`;
-
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 8000);
-    const res = await fetch(url, { signal: controller.signal });
-    clearTimeout(timeout);
-    const data = await res.json() as Record<string, string>;
-    return data.Response === 'True' ? data : null;
-  } catch {
-    return null;
-  }
 }
 
 export default async function handler(req: Request, res: Response) {
