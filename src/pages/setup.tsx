@@ -498,6 +498,18 @@ export default function SetupPage() {
                   <strong className="text-foreground">Running with Docker?</strong> Check your <code className="bg-muted px-1 rounded">.env</code> file — most settings are pre-filled from environment variables.
                 </div>
 
+                <div className="flex items-center justify-center gap-4 text-[11px] text-muted-foreground">
+                  <a href="https://github.com/homestream-app/homestream#readme" target="_blank" rel="noopener noreferrer"
+                    className="flex items-center gap-1 text-primary hover:underline">
+                    <ExternalLink className="w-3 h-3" /> Full documentation
+                  </a>
+                  <span className="text-border">·</span>
+                  <a href="https://github.com/homestream-app/homestream/blob/main/docker-compose.yml" target="_blank" rel="noopener noreferrer"
+                    className="flex items-center gap-1 text-primary hover:underline">
+                    <ExternalLink className="w-3 h-3" /> Docker Compose quickstart
+                  </a>
+                </div>
+
                 <button onClick={() => setStep(1)}
                   className="flex items-center justify-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground py-3 rounded-xl font-semibold transition-colors">
                   Get Started <ChevronRight className="w-4 h-4" />
@@ -600,6 +612,18 @@ export default function SetupPage() {
                   <strong className="text-blue-400">Using Docker Compose?</strong> qBittorrent is already running at <code className="bg-muted px-1 rounded">http://qbittorrent:8080</code>. Default login: <code className="bg-muted px-1 rounded">admin / homestream</code>
                 </div>
 
+                {/* Install instructions */}
+                <div className="p-3 rounded-xl border border-border bg-muted/20 text-[11px] text-muted-foreground leading-relaxed">
+                  <p className="font-semibold text-foreground/80 mb-1.5">Don't have qBittorrent yet?</p>
+                  <ol className="list-decimal list-inside space-y-1 ml-1">
+                    <li>Download from <a href="https://www.qbittorrent.org/download" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">qbittorrent.org/download</a> and install</li>
+                    <li>Open qBittorrent → <strong>Tools → Preferences → Web UI</strong></li>
+                    <li>Check <strong>Enable the Web User Interface</strong>, set a port (default 8080)</li>
+                    <li>Set a username and password, click <strong>Apply</strong></li>
+                    <li>Enter that URL and credentials above</li>
+                  </ol>
+                </div>
+
                 <div className="flex flex-col gap-3">
                   <div>
                     <label className="text-xs font-medium text-muted-foreground mb-1.5 block">qBittorrent Web UI URL</label>
@@ -687,6 +711,18 @@ export default function SetupPage() {
 
                 <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-3 text-xs text-muted-foreground leading-relaxed">
                   <strong className="text-blue-400">Using Docker Compose?</strong> Jellyfin is at <code className="bg-muted px-1 rounded">http://jellyfin:8096</code>. Complete Jellyfin's first-run setup first, then get your API key from <strong>Dashboard → API Keys</strong>.
+                </div>
+
+                {/* Install + API key instructions */}
+                <div className="p-3 rounded-xl border border-border bg-muted/20 text-[11px] text-muted-foreground leading-relaxed">
+                  <p className="font-semibold text-foreground/80 mb-1.5">Don't have Jellyfin yet?</p>
+                  <ol className="list-decimal list-inside space-y-1 ml-1">
+                    <li>Download from <a href="https://jellyfin.org/downloads" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">jellyfin.org/downloads</a> and install</li>
+                    <li>Open <code className="bg-muted px-1 rounded">http://localhost:8096</code> and complete the first-run wizard</li>
+                    <li>Go to <strong>Dashboard → Advanced → API Keys</strong></li>
+                    <li>Click <strong>+</strong>, give it a name (e.g. "HomeStream"), copy the key</li>
+                    <li>Paste it in the API Key field above</li>
+                  </ol>
                 </div>
 
                 <div className="flex flex-col gap-3">
@@ -1211,6 +1247,15 @@ export default function SetupPage() {
                         <XCircle className="w-3.5 h-3.5 flex-shrink-0" />{omdbTestMsg}
                       </div>
                     )}
+                    <div className="mt-2 flex flex-col gap-1 text-[10px] text-muted-foreground">
+                      <p className="font-medium text-foreground/70">How to get your key:</p>
+                      <ol className="list-decimal list-inside space-y-0.5 ml-1">
+                        <li>Go to <a href="https://www.omdbapi.com/apikey.aspx" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">omdbapi.com/apikey.aspx</a></li>
+                        <li>Select <strong>FREE! (1,000 daily limit)</strong> and enter your email</li>
+                        <li>Check your email for the activation link and click it</li>
+                        <li>Your 8-character key will be shown — paste it above</li>
+                      </ol>
+                    </div>
                   </div>
 
                   {/* AI Chat Assistant — provider picker */}
