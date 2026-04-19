@@ -3,6 +3,8 @@ import { lazy } from 'react';
 import HomePage from './pages/index';
 
 const BrowsePage = lazy(() => import('./pages/browse'));
+const MoviePage = lazy(() => import('./pages/movie'));
+const MoviesPage = lazy(() => import('./pages/movies'));
 const LibraryPage = lazy(() => import('./pages/library'));
 const PlayerPage = lazy(() => import('./pages/player'));
 const ShowsPage = lazy(() => import('./pages/shows'));
@@ -20,6 +22,8 @@ const NotFoundPage = import.meta.env.DEV
 export const routes: RouteObject[] = [
   { path: '/', element: <HomePage /> },
   { path: '/browse', element: <BrowsePage /> },
+  { path: '/movies', element: <MoviesPage /> },
+  { path: '/movie/:id', element: <MoviePage /> },
   { path: '/library', element: <LibraryPage /> },
   { path: '/shows', element: <ShowsPage /> },
   { path: '/watchlist', element: <WatchlistPage /> },
@@ -31,5 +35,5 @@ export const routes: RouteObject[] = [
   { path: '*', element: <NotFoundPage /> },
 ];
 
-export type Path = '/' | '/browse' | '/library' | '/shows' | '/watchlist' | '/player/:id' | '/profiles';
+export type Path = '/' | '/browse' | '/movie/:id' | '/library' | '/shows' | '/watchlist' | '/player/:id' | '/profiles';
 export type Params = Record<string, string | undefined>;

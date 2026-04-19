@@ -78,6 +78,7 @@ export default function Header({ onChatOpen: _onChatOpen }: HeaderProps) {
   const navLinks = [
     { to: '/', label: 'Home' },
     { to: '/browse', label: 'Browse' },
+    { to: '/movies', label: 'Movies' },
     { to: '/shows', label: 'TV Shows' },
     { to: '/discover', label: 'Discover' },
     { to: '/watchlist', label: 'Watchlist' },
