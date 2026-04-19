@@ -5,6 +5,7 @@ import HomePage from './pages/index';
 const BrowsePage = lazy(() => import('./pages/browse'));
 const LibraryPage = lazy(() => import('./pages/library'));
 const PlayerPage = lazy(() => import('./pages/player'));
+const ShowsPage = lazy(() => import('./pages/shows'));
 
 // 404 routing by runtime:
 const NotFoundPage = import.meta.env.DEV
@@ -25,6 +26,10 @@ export const routes: RouteObject[] = [
     element: <LibraryPage />,
   },
   {
+    path: '/shows',
+    element: <ShowsPage />,
+  },
+  {
     path: '/player/:id',
     element: <PlayerPage />,
   },
@@ -34,5 +39,5 @@ export const routes: RouteObject[] = [
   },
 ];
 
-export type Path = '/' | '/browse' | '/library' | '/player/:id';
+export type Path = '/' | '/browse' | '/library' | '/shows' | '/player/:id';
 export type Params = Record<string, string | undefined>;

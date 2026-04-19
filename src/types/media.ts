@@ -17,6 +17,27 @@ export interface MediaItem {
   addedAt: string;
   watchProgress: number;
   fileSize?: number;
+  // TV show episode tracking
+  totalSeasons?: number;
+  episodes?: Episode[];
+}
+
+export interface Episode {
+  id: string;
+  season: number;
+  episode: number;
+  title: string;
+  watched: boolean;
+  watchedAt?: string;
+  runtime?: string;
+  plot?: string;
+}
+
+export interface Season {
+  number: number;
+  episodes: Episode[];
+  watchedCount: number;
+  totalCount: number;
 }
 
 export interface ChatMessage {
