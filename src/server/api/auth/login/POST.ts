@@ -30,6 +30,14 @@ export function isValidSession(token: string): boolean {
   return true;
 }
 
+export function clearAllSessions(): void {
+  sessions.clear();
+}
+
+export function getSessionCount(): number {
+  return sessions.size;
+}
+
 // ── Rate limiter ──────────────────────────────────────────────────────────────
 interface RateBucket {
   attempts: number;

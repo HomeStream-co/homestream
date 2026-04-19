@@ -149,3 +149,13 @@ export const serverAfter = (server) => {
   };
   server.use(errorHandler);
 };
+
+export const serverListening = (server) => {
+  // Attach WebSocket remote control server once HTTP server is listening
+  import('./remoteControl.js').then(({ attachRemoteControl }) => {
+    attachRemoteControl(server);
+    console.log('[remote] WebSocket remote control attached at /ws/remote');
+  }).catch(err => {
+    console.warn('[remote] Failed to attach remote control (non-fatal):', err.message);
+  });
+};
