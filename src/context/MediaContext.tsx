@@ -11,12 +11,15 @@ interface MediaContextType {
   loading: boolean;
   watchlist: string[];
   continueWatching: ContinueWatchingItem[];
+  pendingRecommendation: string | null; // id of just-finished item
   refreshLibrary: () => Promise<void>;
   addToWatchlist: (id: string) => void;
   removeFromWatchlist: (id: string) => void;
   updateProgress: (id: string, progress: number) => void;
   deleteMedia: (id: string) => Promise<void>;
   updateMedia: (id: string, updates: Partial<MediaItem>) => Promise<void>;
+  triggerPostWatchRecommendation: (id: string) => void;
+  clearPendingRecommendation: () => void;
 }
 
 const MediaContext = createContext<MediaContextType | null>(null);
@@ -24,6 +27,7 @@ const MediaContext = createContext<MediaContextType | null>(null);
 export function MediaProvider({ children }: { children: ReactNode }) {
   const [library, setLibrary] = useState<MediaItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [pendingRecommendation, setPendingRecommendation] = useState<string | null>(null);
   const [watchlist, setWatchlist] = useState<string[]>(() => {
     try {
       return JSON.parse(localStorage.getItem('homestream-watchlist') || '[]');
@@ -91,6 +95,14 @@ export function MediaProvider({ children }: { children: ReactNode }) {
     }).catch(console.error);
   }, []);
 
+  const triggerPostWatchRecommendation = useCallback((id: string) => {
+    setPendingRecommendation(id);
+  }, []);
+
+  const clearPendingRecommendation = useCallback(() => {
+    setPendingRecommendation(null);
+  }, []);
+
   const deleteMedia = useCallback(async (id: string) => {
     await fetch(`/api/media/${id}`, { method: 'DELETE' });
     setLibrary(prev => prev.filter(m => m.id !== id));
@@ -114,12 +126,15 @@ export function MediaProvider({ children }: { children: ReactNode }) {
       loading,
       watchlist,
       continueWatching,
+      pendingRecommendation,
       refreshLibrary,
       addToWatchlist,
       removeFromWatchlist,
       updateProgress,
       deleteMedia,
       updateMedia,
+      triggerPostWatchRecommendation,
+      clearPendingRecommendation,
     }}>
       {children}
     </MediaContext.Provider>

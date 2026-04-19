@@ -1,7 +1,7 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { MessageCircle, X, Send, Film } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import type { ChatMessage, MediaItem } from '@/types/media';
 import { useMedia } from '@/context/MediaContext';
 
@@ -28,8 +28,11 @@ export default function AIChatAssistant() {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const { library } = useMedia();
+  const { library, pendingRecommendation, clearPendingRecommendation } = useMedia();
   const navigate = useNavigate();
+  const location = useLocation();
+  const prevPathRef = useRef(location.pathname);
+  const postWatchFiredRef = useRef<string | null>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -41,7 +44,28 @@ export default function AIChatAssistant() {
     } catch {}
   }, [messages]);
 
-  const sendMessage = async (text: string) => {
+  // Detect leaving the player page and fire post-watch recommendation
+  useEffect(() => {
+    const prevPath = prevPathRef.current;
+    const currentPath = location.pathname;
+    prevPathRef.current = currentPath;
+
+    const leftPlayer = prevPath.startsWith('/player/') && !currentPath.startsWith('/player/');
+    if (leftPlayer && pendingRecommendation && postWatchFiredRef.current !== pendingRecommendation) {
+      const finishedItem = library.find(m => m.id === pendingRecommendation);
+      if (finishedItem) {
+        postWatchFiredRef.current = pendingRecommendation;
+        clearPendingRecommendation();
+        // Small delay so the page transition settles first
+        setTimeout(() => {
+          setOpen(true);
+          sendMessage(`I just finished watching "${finishedItem.title}". What should I watch next from my library?`);
+        }, 800);
+      }
+    }
+  }, [location.pathname, pendingRecommendation, library, clearPendingRecommendation]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const sendMessage = useCallback(async (text: string) => {
     if (!text.trim() || loading) return;
     const userMsg: ChatMessage = {
       id: genId(),
@@ -86,7 +110,18 @@ export default function AIChatAssistant() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [library, messages]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Listen for programmatic open+message events (e.g. from player "Ask AI" button)
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { message } = (e as CustomEvent<{ message: string }>).detail;
+      setOpen(true);
+      setTimeout(() => sendMessage(message), 300);
+    };
+    window.addEventListener('homestream:open-chat', handler);
+    return () => window.removeEventListener('homestream:open-chat', handler);
+  }, [sendMessage]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

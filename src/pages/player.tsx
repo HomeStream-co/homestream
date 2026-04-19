@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Play, Pause, Volume2, VolumeX, Maximize, Minimize, Info, Star } from 'lucide-react';
+import { ArrowLeft, Play, Pause, Volume2, VolumeX, Maximize, Minimize, Info, Star, RotateCcw, Sparkles, MessageCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useMedia } from '@/context/MediaContext';
 import MediaCard from '@/components/MediaCard';
@@ -16,12 +16,13 @@ function formatTime(seconds: number): string {
 export default function PlayerPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { library, updateProgress } = useMedia();
+  const { library, updateProgress, triggerPostWatchRecommendation } = useMedia();
   const item = library.find(m => m.id === id);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const controlsTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const watchCompleteTriggered = useRef(false);
 
   const [playing, setPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -32,6 +33,7 @@ export default function PlayerPage() {
   const [showControls, setShowControls] = useState(true);
   const [showInfo, setShowInfo] = useState(false);
   const [buffered, setBuffered] = useState(0);
+  const [showEndOverlay, setShowEndOverlay] = useState(false);
 
   // Save progress every 10 seconds
   useEffect(() => {
@@ -43,6 +45,17 @@ export default function PlayerPage() {
     }, 10000);
     return () => clearInterval(interval);
   }, [id, currentTime, duration, updateProgress]);
+
+  // Watch-complete trigger at 85%
+  useEffect(() => {
+    if (!id || duration === 0 || watchCompleteTriggered.current) return;
+    const pct = (currentTime / duration) * 100;
+    if (pct >= 85) {
+      watchCompleteTriggered.current = true;
+      triggerPostWatchRecommendation(id);
+      setShowEndOverlay(true);
+    }
+  }, [currentTime, duration, id, triggerPostWatchRecommendation]);
 
   // Auto-hide controls
   const resetControlsTimer = useCallback(() => {
@@ -77,8 +90,30 @@ export default function PlayerPage() {
   }
 
   const similarItems = library
-    .filter(m => m.id !== item.id && m.genre.some(g => item.genre.includes(g)))
-    .slice(0, 6);
+    .filter(m => m.id !== item.id)
+    .map(m => {
+      let score = 0;
+      // Genre overlap (most important)
+      const sharedGenres = m.genre.filter(g => item.genre.includes(g)).length;
+      score += sharedGenres * 3;
+      // Same director
+      if (m.director && item.director && m.director !== 'Unknown' && m.director === item.director) score += 4;
+      // Shared actors
+      const itemActors = item.actors.split(',').map(a => a.trim());
+      const mActors = m.actors.split(',').map(a => a.trim());
+      const sharedActors = mActors.filter(a => a !== 'Unknown' && itemActors.includes(a)).length;
+      score += sharedActors * 2;
+      // Same type (movie vs series)
+      if (m.type === item.type) score += 1;
+      // Similar rating (within 1.5 points)
+      const ratingDiff = Math.abs((parseFloat(m.imdbRating) || 0) - (parseFloat(item.imdbRating) || 0));
+      if (ratingDiff < 1.5) score += 1;
+      return { item: m, score };
+    })
+    .filter(({ score }) => score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 8)
+    .map(({ item }) => item);
 
   const togglePlay = () => {
     if (!videoRef.current) return;
@@ -247,6 +282,96 @@ export default function PlayerPage() {
           )}
         </AnimatePresence>
 
+        {/* Post-Watch End Overlay */}
+        <AnimatePresence>
+          {showEndOverlay && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.5 }}
+              className="absolute inset-0 bg-black/85 backdrop-blur-sm flex flex-col items-center justify-center gap-6 px-6"
+              onClick={e => e.stopPropagation()}
+            >
+              <motion.div
+                initial={{ y: 20, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                transition={{ delay: 0.2 }}
+                className="text-center"
+              >
+                <div className="flex items-center justify-center gap-2 mb-2">
+                  <Sparkles className="w-5 h-5 text-primary" />
+                  <p className="text-white/60 text-sm font-medium uppercase tracking-widest">You finished</p>
+                </div>
+                <h2 className="text-3xl font-heading text-white mb-1">{item.title}</h2>
+                <p className="text-white/50 text-sm">{item.year} · {item.genre.slice(0, 2).join(', ')}</p>
+              </motion.div>
+
+              {/* Up Next suggestions */}
+              {similarItems.slice(0, 3).length > 0 && (
+                <motion.div
+                  initial={{ y: 20, opacity: 0 }}
+                  animate={{ y: 0, opacity: 1 }}
+                  transition={{ delay: 0.35 }}
+                  className="w-full max-w-lg"
+                >
+                  <p className="text-white/50 text-xs uppercase tracking-widest text-center mb-3">Up Next</p>
+                  <div className="grid grid-cols-3 gap-3">
+                    {similarItems.slice(0, 3).map(m => (
+                      <button
+                        key={m.id}
+                        onClick={() => { setShowEndOverlay(false); navigate(`/player/${m.id}`); }}
+                        className="group text-left"
+                      >
+                        <div className="relative aspect-[2/3] rounded-lg overflow-hidden mb-1.5">
+                          <img
+                            src={m.poster}
+                            alt={m.title}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                            onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                          />
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <Play className="w-8 h-8 text-white fill-white" />
+                          </div>
+                        </div>
+                        <p className="text-white text-xs font-medium truncate">{m.title}</p>
+                        <p className="text-white/40 text-[10px]">{m.year}</p>
+                      </button>
+                    ))}
+                  </div>
+                </motion.div>
+              )}
+
+              <motion.div
+                initial={{ y: 10, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                transition={{ delay: 0.5 }}
+                className="flex items-center gap-3"
+              >
+                <button
+                  onClick={() => {
+                    setShowEndOverlay(false);
+                    if (videoRef.current) {
+                      videoRef.current.currentTime = 0;
+                      videoRef.current.play();
+                    }
+                    watchCompleteTriggered.current = false;
+                  }}
+                  className="flex items-center gap-2 px-4 py-2 rounded-full border border-white/30 text-white/70 hover:text-white hover:border-white/60 text-sm transition-colors"
+                >
+                  <RotateCcw className="w-4 h-4" /> Watch Again
+                </button>
+                <button
+                  onClick={() => navigate('/')}
+                  className="flex items-center gap-2 px-4 py-2 rounded-full bg-primary hover:bg-primary/80 text-white text-sm font-medium transition-colors"
+                >
+                  Back to Home
+                </button>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Info Panel */}
         <AnimatePresence>
           {showInfo && (
@@ -323,14 +448,43 @@ export default function PlayerPage() {
         {/* More Like This */}
         {similarItems.length > 0 && (
           <div>
-            <h2 className="text-xl font-heading text-foreground mb-4">More Like This</h2>
-            <div className="flex gap-3 flex-wrap">
+            <div className="flex items-center gap-2 mb-5">
+              <Sparkles className="w-5 h-5 text-primary" />
+              <h2 className="text-xl font-heading text-foreground">More Like This</h2>
+              <span className="text-xs text-muted-foreground ml-1">
+                matched by genre, director &amp; cast
+              </span>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
               {similarItems.map(m => (
                 <MediaCard key={m.id} item={m} />
               ))}
             </div>
           </div>
         )}
+
+        {/* AI Recommendation prompt */}
+        <div className="mt-8 flex items-center gap-4 p-4 bg-card border border-border rounded-xl">
+          <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
+            <Sparkles className="w-5 h-5 text-primary" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-foreground">Want a smarter recommendation?</p>
+            <p className="text-xs text-muted-foreground">Ask the AI assistant — it knows your whole library and can match by mood, tone, or theme.</p>
+          </div>
+          <button
+            onClick={() => {
+              // Dispatch a custom event the AI chat listens for
+              window.dispatchEvent(new CustomEvent('homestream:open-chat', {
+                detail: { message: `I'm watching "${item.title}". What else in my library would I enjoy?` }
+              }));
+            }}
+            className="flex-shrink-0 flex items-center gap-1.5 bg-primary hover:bg-primary/80 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+          >
+            <MessageCircle className="w-4 h-4" />
+            Ask AI
+          </button>
+        </div>
       </div>
     </div>
   );
