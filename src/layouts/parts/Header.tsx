@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Search, Upload, Menu, X, Film, Bookmark, ChevronDown } from 'lucide-react';
+import { Search, Upload, Menu, X, Film, Bookmark, ChevronDown, Wrench } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useMedia } from '@/context/MediaContext';
 import { useProfile, PROFILES } from '@/context/ProfileContext';
 import SettingsPanel from '@/components/SettingsPanel';
+import DebugPanel from '@/components/DebugPanel';
 import StremioPanel from '@/components/StremioPanel';
 
 interface HeaderProps {
@@ -46,6 +47,7 @@ export default function Header({ onChatOpen: _onChatOpen }: HeaderProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [mobileOpen, setMobileOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const [debugOpen, setDebugOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
   const { watchlist } = useMedia();
@@ -176,8 +178,19 @@ export default function Header({ onChatOpen: _onChatOpen }: HeaderProps) {
               )}
             </Link>
 
+            {/* ── Debug wrench ── */}
+            <button
+              onClick={() => setDebugOpen(true)}
+              className="p-2 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+              title="Debug Panel"
+            >
+              <Wrench className="w-4 h-4" />
+            </button>
+
             {/* ── Settings cog ── */}
             <SettingsPanel />
+
+            <DebugPanel open={debugOpen} onClose={() => setDebugOpen(false)} />
 
             {/* ── Stremio ── */}
             <StremioPanel />

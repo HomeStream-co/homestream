@@ -35,6 +35,24 @@ interface TorrentioResponse {
 const TORRENTIO = 'https://torrentio.strem.fun';
 const TIMEOUT_MS = 15_000;
 
+// ── 5-minute in-memory stream cache (avoids duplicate Torrentio fetches) ──────
+interface CacheEntry { streams: StreamResult[]; expiresAt: number }
+const streamCache = new Map<string, CacheEntry>();
+
+function getCached(key: string): StreamResult[] | null {
+  const entry = streamCache.get(key);
+  if (!entry || Date.now() > entry.expiresAt) { streamCache.delete(key); return null; }
+  return entry.streams;
+}
+function setCached(key: string, streams: StreamResult[]) {
+  streamCache.set(key, { streams, expiresAt: Date.now() + 5 * 60 * 1000 });
+  // Evict entries beyond 200 to prevent unbounded growth
+  if (streamCache.size > 200) {
+    const oldest = streamCache.keys().next().value;
+    if (oldest) streamCache.delete(oldest);
+  }
+}
+
 function parseStreamTitle(raw: string): { quality: string; size: string; seeds: string } {
   const lines = raw.split('\n').map(l => l.trim()).filter(Boolean);
   const quality = lines[0] ?? 'Unknown';
@@ -67,6 +85,10 @@ async function fetchStreamsForEpisode(
       ? `${imdbId}:${season}:${episode}`
       : imdbId;
 
+  const cacheKey = `${type}:${streamId}`;
+  const cached = getCached(cacheKey);
+  if (cached) return cached;
+
   const url = `${TORRENTIO}/stream/${type}/${streamId}.json`;
   const controller = new AbortController();
   const t = setTimeout(() => controller.abort(), TIMEOUT_MS);
@@ -79,7 +101,7 @@ async function fetchStreamsForEpisode(
     clearTimeout(t);
     if (!res.ok) return [];
     const data = await res.json() as TorrentioResponse;
-    return (data.streams ?? [])
+    const streams = (data.streams ?? [])
       .filter(s => s.infoHash)
       .map(s => {
         const { quality, size, seeds } = parseStreamTitle(s.title ?? s.name ?? '');
@@ -92,6 +114,8 @@ async function fetchStreamsForEpisode(
           magnet: buildMagnet(s.infoHash!, s.sources),
         };
       });
+    setCached(cacheKey, streams);
+    return streams;
   } catch {
     clearTimeout(t);
     return [];
