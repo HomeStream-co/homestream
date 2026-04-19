@@ -5,7 +5,7 @@ import {
   HardDrive, Wifi, KeyRound, CheckCircle2,
   ChevronRight, ChevronLeft, Loader2, AlertCircle,
   FolderOpen, Eye, EyeOff, ExternalLink, Zap,
-  Film, Tv2, Shield, RefreshCw, ScanSearch, PackageOpen,
+  Film, Tv2, Shield, RefreshCw, ScanSearch, PackageOpen, XCircle,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -91,6 +91,15 @@ export default function SetupPage() {
   const [qbitVersion, setQbitVersion] = useState('');
   const [jellyfinVersion, setJellyfinVersion] = useState('');
   const [testError, setTestError] = useState('');
+
+  // Per-key validation state
+  type KeyTestState = 'idle' | 'testing' | 'ok' | 'error';
+  const [tmdbTest, setTmdbTest]       = useState<KeyTestState>('idle');
+  const [omdbTest, setOmdbTest]       = useState<KeyTestState>('idle');
+  const [googleAiTest, setGoogleAiTest] = useState<KeyTestState>('idle');
+  const [tmdbTestMsg, setTmdbTestMsg]   = useState('');
+  const [omdbTestMsg, setOmdbTestMsg]   = useState('');
+  const [googleAiTestMsg, setGoogleAiTestMsg] = useState('');
 
   // Existing media scan state
   const [scanState, setScanState] = useState<'idle' | 'scanning' | 'done' | 'importing' | 'imported'>('idle');
@@ -226,6 +235,72 @@ export default function SetupPage() {
     });
     setStatus(s => ({ ...s, jellyfin: 'skip' }));
     setStep(4);
+  };
+
+  // ── API key testers ──
+
+  const testTmdbKey = async () => {
+    if (!form.tmdbApiKey.trim()) return;
+    setTmdbTest('testing');
+    setTmdbTestMsg('');
+    try {
+      const res = await fetch('https://api.themoviedb.org/3/configuration', {
+        headers: { Authorization: `Bearer ${form.tmdbApiKey.trim()}` },
+      });
+      if (res.ok) {
+        setTmdbTest('ok');
+        setTmdbTestMsg('Key is valid — TMDB connected!');
+      } else {
+        const body = await res.json() as { status_message?: string };
+        setTmdbTest('error');
+        setTmdbTestMsg(body.status_message ?? `HTTP ${res.status}`);
+      }
+    } catch {
+      setTmdbTest('error');
+      setTmdbTestMsg('Network error — check your connection');
+    }
+  };
+
+  const testOmdbKey = async () => {
+    if (!form.omdbApiKey.trim()) return;
+    setOmdbTest('testing');
+    setOmdbTestMsg('');
+    try {
+      const res = await fetch(`https://www.omdbapi.com/?apikey=${form.omdbApiKey.trim()}&t=inception`);
+      const body = await res.json() as { Response: string; Error?: string; Title?: string };
+      if (body.Response === 'True') {
+        setOmdbTest('ok');
+        setOmdbTestMsg(`Key is valid — fetched "${body.Title}" successfully`);
+      } else {
+        setOmdbTest('error');
+        setOmdbTestMsg(body.Error ?? 'Invalid key');
+      }
+    } catch {
+      setOmdbTest('error');
+      setOmdbTestMsg('Network error — check your connection');
+    }
+  };
+
+  const testGoogleAiKey = async () => {
+    if (!form.googleAiApiKey.trim()) return;
+    setGoogleAiTest('testing');
+    setGoogleAiTestMsg('');
+    try {
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models?key=${form.googleAiApiKey.trim()}`
+      );
+      if (res.ok) {
+        setGoogleAiTest('ok');
+        setGoogleAiTestMsg('Key is valid — Gemini API connected!');
+      } else {
+        const body = await res.json() as { error?: { message?: string } };
+        setGoogleAiTest('error');
+        setGoogleAiTestMsg(body.error?.message ?? `HTTP ${res.status}`);
+      }
+    } catch {
+      setGoogleAiTest('error');
+      setGoogleAiTestMsg('Network error — check your connection');
+    }
   };
 
   const saveApiKeys = async () => {
@@ -654,9 +729,29 @@ export default function SetupPage() {
                     <p className="text-xs text-muted-foreground mb-2">
                       Powers the hero banner, Discover page (upcoming &amp; trending movies), and personalised recommendations. Free — just create a TMDB account.
                     </p>
-                    <input type="text" value={form.tmdbApiKey} onChange={e => set('tmdbApiKey', e.target.value)}
-                      placeholder="eyJhbGciOiJSUzI1NiJ9…  (v4 read access token)"
-                      className="w-full bg-background border border-border rounded-lg px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary font-mono" />
+                    <div className="flex gap-2">
+                      <input type="text" value={form.tmdbApiKey} onChange={e => { set('tmdbApiKey', e.target.value); setTmdbTest('idle'); }}
+                        placeholder="eyJhbGciOiJSUzI1NiJ9…  (v4 read access token)"
+                        className="flex-1 bg-background border border-border rounded-lg px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary font-mono min-w-0" />
+                      <button
+                        onClick={testTmdbKey}
+                        disabled={!form.tmdbApiKey.trim() || tmdbTest === 'testing'}
+                        className="flex items-center gap-1.5 px-3 py-2.5 rounded-lg bg-muted hover:bg-muted/80 text-foreground text-xs font-medium transition-colors disabled:opacity-40 flex-shrink-0"
+                      >
+                        {tmdbTest === 'testing' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                        Test
+                      </button>
+                    </div>
+                    {tmdbTest === 'ok' && (
+                      <div className="mt-2 flex items-center gap-1.5 text-[11px] text-green-400 bg-green-500/10 border border-green-500/20 rounded-lg px-2.5 py-1.5">
+                        <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" />{tmdbTestMsg}
+                      </div>
+                    )}
+                    {tmdbTest === 'error' && (
+                      <div className="mt-2 flex items-center gap-1.5 text-[11px] text-destructive bg-destructive/10 border border-destructive/20 rounded-lg px-2.5 py-1.5">
+                        <XCircle className="w-3.5 h-3.5 flex-shrink-0" />{tmdbTestMsg}
+                      </div>
+                    )}
                     <div className="mt-2 flex flex-col gap-1 text-[10px] text-muted-foreground">
                       <p className="font-medium text-foreground/70">How to get your key:</p>
                       <ol className="list-decimal list-inside space-y-0.5 ml-1">
@@ -680,10 +775,30 @@ export default function SetupPage() {
                         Get free key <ExternalLink className="w-2.5 h-2.5" />
                       </a>
                     </div>
-                    <p className="text-xs text-muted-foreground mb-2">Movie posters, plot summaries, ratings</p>
-                    <input type="text" value={form.omdbApiKey} onChange={e => set('omdbApiKey', e.target.value)}
-                      placeholder="xxxxxxxx"
-                      className="w-full bg-background border border-border rounded-lg px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary font-mono" />
+                    <p className="text-xs text-muted-foreground mb-2">Movie posters, plot summaries, IMDb ratings</p>
+                    <div className="flex gap-2">
+                      <input type="text" value={form.omdbApiKey} onChange={e => { set('omdbApiKey', e.target.value); setOmdbTest('idle'); }}
+                        placeholder="xxxxxxxx"
+                        className="flex-1 bg-background border border-border rounded-lg px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary font-mono min-w-0" />
+                      <button
+                        onClick={testOmdbKey}
+                        disabled={!form.omdbApiKey.trim() || omdbTest === 'testing'}
+                        className="flex items-center gap-1.5 px-3 py-2.5 rounded-lg bg-muted hover:bg-muted/80 text-foreground text-xs font-medium transition-colors disabled:opacity-40 flex-shrink-0"
+                      >
+                        {omdbTest === 'testing' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                        Test
+                      </button>
+                    </div>
+                    {omdbTest === 'ok' && (
+                      <div className="mt-2 flex items-center gap-1.5 text-[11px] text-green-400 bg-green-500/10 border border-green-500/20 rounded-lg px-2.5 py-1.5">
+                        <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" />{omdbTestMsg}
+                      </div>
+                    )}
+                    {omdbTest === 'error' && (
+                      <div className="mt-2 flex items-center gap-1.5 text-[11px] text-destructive bg-destructive/10 border border-destructive/20 rounded-lg px-2.5 py-1.5">
+                        <XCircle className="w-3.5 h-3.5 flex-shrink-0" />{omdbTestMsg}
+                      </div>
+                    )}
                   </div>
 
                   {/* Google AI */}
@@ -699,9 +814,29 @@ export default function SetupPage() {
                       </a>
                     </div>
                     <p className="text-xs text-muted-foreground mb-2">AI tags, mood analysis, smart recommendations</p>
-                    <input type="text" value={form.googleAiApiKey} onChange={e => set('googleAiApiKey', e.target.value)}
-                      placeholder="AIzaSy…"
-                      className="w-full bg-background border border-border rounded-lg px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary font-mono" />
+                    <div className="flex gap-2">
+                      <input type="text" value={form.googleAiApiKey} onChange={e => { set('googleAiApiKey', e.target.value); setGoogleAiTest('idle'); }}
+                        placeholder="AIzaSy…"
+                        className="flex-1 bg-background border border-border rounded-lg px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary font-mono min-w-0" />
+                      <button
+                        onClick={testGoogleAiKey}
+                        disabled={!form.googleAiApiKey.trim() || googleAiTest === 'testing'}
+                        className="flex items-center gap-1.5 px-3 py-2.5 rounded-lg bg-muted hover:bg-muted/80 text-foreground text-xs font-medium transition-colors disabled:opacity-40 flex-shrink-0"
+                      >
+                        {googleAiTest === 'testing' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                        Test
+                      </button>
+                    </div>
+                    {googleAiTest === 'ok' && (
+                      <div className="mt-2 flex items-center gap-1.5 text-[11px] text-green-400 bg-green-500/10 border border-green-500/20 rounded-lg px-2.5 py-1.5">
+                        <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" />{googleAiTestMsg}
+                      </div>
+                    )}
+                    {googleAiTest === 'error' && (
+                      <div className="mt-2 flex items-center gap-1.5 text-[11px] text-destructive bg-destructive/10 border border-destructive/20 rounded-lg px-2.5 py-1.5">
+                        <XCircle className="w-3.5 h-3.5 flex-shrink-0" />{googleAiTestMsg}
+                      </div>
+                    )}
                   </div>
                 </div>
 
