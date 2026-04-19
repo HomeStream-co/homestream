@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { getSecret } from '#airo/secrets';
+import { readConfig } from '../../configStore.js';
 
 interface MediaItem {
   id: string;
@@ -173,6 +174,38 @@ function fallbackResponse(message: string, library: MediaItem[]): { reply: strin
   };
 }
 
+// ── Ollama chat ───────────────────────────────────────────────────────────────
+async function chatWithOllama(
+  ollamaUrl: string,
+  model: string,
+  systemPrompt: string,
+  history: ChatMessage[],
+  message: string,
+): Promise<string> {
+  // Build messages array in OpenAI-compatible format (Ollama supports this)
+  const messages: { role: string; content: string }[] = [
+    { role: 'system', content: systemPrompt },
+    ...history.map(m => ({ role: m.role, content: m.parts[0].text })),
+    { role: 'user', content: message },
+  ];
+
+  const res = await fetch(`${ollamaUrl}/api/chat`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model, messages, stream: false }),
+    signal: AbortSignal.timeout(60_000),
+  });
+
+  if (!res.ok) {
+    throw new Error(`Ollama HTTP ${res.status}`);
+  }
+
+  const data = await res.json() as { message?: { content?: string }; error?: string };
+  if (data.error) throw new Error(data.error);
+  return data.message?.content ?? '';
+}
+
+// ── Main handler ──────────────────────────────────────────────────────────────
 export default async function handler(req: Request, res: Response) {
   try {
     const { message, library, history = [] } = req.body as ChatRequest;
@@ -188,7 +221,31 @@ export default async function handler(req: Request, res: Response) {
       return res.json({ reply: OFF_TOPIC_REPLY, suggestions: [] });
     }
 
-    const apiKey = getSecret('GOOGLE_AI_API_KEY');
+    const config = readConfig();
+    const systemPrompt = buildSystemPrompt(lib);
+    const recentHistory = history.slice(-10);
+
+    // ── Route to selected AI provider ──
+    if (config.aiProvider === 'ollama' && config.ollamaUrl) {
+      try {
+        const rawText = await chatWithOllama(
+          config.ollamaUrl,
+          config.ollamaModel || 'llama3',
+          systemPrompt,
+          recentHistory,
+          message.trim(),
+        );
+        const { reply, suggestions } = extractSuggestions(rawText, lib);
+        return res.json({ reply, suggestions });
+      } catch (err) {
+        console.error('Ollama chat error:', err);
+        const fallback = fallbackResponse(message, lib);
+        return res.json(fallback);
+      }
+    }
+
+    // ── Gemini (default) ──
+    const apiKey = getSecret('GOOGLE_AI_API_KEY') || config.googleAiApiKey;
 
     if (!apiKey) {
       const fallback = fallbackResponse(message, lib);
@@ -198,11 +255,8 @@ export default async function handler(req: Request, res: Response) {
     const genAI = new GoogleGenerativeAI(String(apiKey));
     const model = genAI.getGenerativeModel({
       model: 'gemini-2.5-flash',
-      systemInstruction: buildSystemPrompt(lib),
+      systemInstruction: systemPrompt,
     });
-
-    // Build chat history (keep last 10 turns to stay within token limits)
-    const recentHistory = history.slice(-10);
 
     const chat = model.startChat({
       history: recentHistory,
@@ -219,8 +273,7 @@ export default async function handler(req: Request, res: Response) {
 
     return res.json({ reply, suggestions });
   } catch (error) {
-    console.error('Gemini chat error:', error);
-    // Graceful fallback if Gemini fails
+    console.error('Chat error:', error);
     const { library, message } = req.body as ChatRequest;
     const fallback = fallbackResponse(message || '', library || []);
     return res.json(fallback);

@@ -24,6 +24,11 @@ export interface AppConfig {
   adminPassword: string;
   omdbApiKey: string;
   googleAiApiKey: string;
+  tmdbApiKey: string;
+  // AI provider selection
+  aiProvider: 'gemini' | 'ollama';
+  ollamaUrl: string;          // e.g. http://localhost:11434
+  ollamaModel: string;        // e.g. llama3, mistral, phi3
   watchFolderEnabled: boolean;
   autoTranscode: boolean;
   preferredQuality: '720p' | '1080p' | '4k' | 'best';
@@ -43,6 +48,10 @@ const DEFAULTS: AppConfig = {
   adminPassword: process.env.ADMIN_PASSWORD || '',
   omdbApiKey: process.env.OMDB_API_KEY || '',
   googleAiApiKey: process.env.GOOGLE_AI_API_KEY || '',
+  tmdbApiKey: process.env.TMDB_API_KEY || '',
+  aiProvider: 'gemini',
+  ollamaUrl: process.env.OLLAMA_URL || 'http://localhost:11434',
+  ollamaModel: process.env.OLLAMA_MODEL || 'llama3',
   watchFolderEnabled: true,
   autoTranscode: true,
   preferredQuality: '1080p',

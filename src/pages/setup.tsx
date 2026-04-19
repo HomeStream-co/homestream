@@ -31,6 +31,9 @@ interface FormData {
   omdbApiKey: string;
   googleAiApiKey: string;
   tmdbApiKey: string;
+  aiProvider: 'gemini' | 'ollama';
+  ollamaUrl: string;
+  ollamaModel: string;
   preferredQuality: '720p' | '1080p' | '4k' | 'best';
   watchFolderEnabled: boolean;
   autoTranscode: boolean;
@@ -75,6 +78,9 @@ export default function SetupPage() {
     omdbApiKey: '',
     googleAiApiKey: '',
     tmdbApiKey: '',
+    aiProvider: 'gemini',
+    ollamaUrl: 'http://localhost:11434',
+    ollamaModel: 'llama3',
     preferredQuality: '1080p',
     watchFolderEnabled: true,
     autoTranscode: true,
@@ -97,9 +103,11 @@ export default function SetupPage() {
   const [tmdbTest, setTmdbTest]       = useState<KeyTestState>('idle');
   const [omdbTest, setOmdbTest]       = useState<KeyTestState>('idle');
   const [googleAiTest, setGoogleAiTest] = useState<KeyTestState>('idle');
+  const [ollamaTest, setOllamaTest]   = useState<KeyTestState>('idle');
   const [tmdbTestMsg, setTmdbTestMsg]   = useState('');
   const [omdbTestMsg, setOmdbTestMsg]   = useState('');
   const [googleAiTestMsg, setGoogleAiTestMsg] = useState('');
+  const [ollamaTestMsg, setOllamaTestMsg] = useState('');
 
   // Existing media scan state
   const [scanState, setScanState] = useState<'idle' | 'scanning' | 'done' | 'importing' | 'imported'>('idle');
@@ -303,6 +311,39 @@ export default function SetupPage() {
     }
   };
 
+  const testOllamaConnection = async () => {
+    if (!form.ollamaUrl.trim()) return;
+    setOllamaTest('testing');
+    setOllamaTestMsg('');
+    try {
+      // Ollama exposes GET /api/tags — lists locally available models
+      const res = await fetch(`${form.ollamaUrl.trim()}/api/tags`, {
+        signal: AbortSignal.timeout(6_000),
+      });
+      if (res.ok) {
+        const data = await res.json() as { models?: { name: string }[] };
+        const models = data.models?.map(m => m.name) ?? [];
+        const modelInstalled = models.some(n => n.startsWith(form.ollamaModel.trim()));
+        if (models.length === 0) {
+          setOllamaTest('error');
+          setOllamaTestMsg('Ollama is running but no models are installed. Run: ollama pull ' + (form.ollamaModel || 'llama3'));
+        } else if (!modelInstalled) {
+          setOllamaTest('error');
+          setOllamaTestMsg(`Connected! But "${form.ollamaModel}" not found. Available: ${models.slice(0, 3).join(', ')}`);
+        } else {
+          setOllamaTest('ok');
+          setOllamaTestMsg(`Connected! "${form.ollamaModel}" is ready.`);
+        }
+      } else {
+        setOllamaTest('error');
+        setOllamaTestMsg(`HTTP ${res.status} — is Ollama running?`);
+      }
+    } catch {
+      setOllamaTest('error');
+      setOllamaTestMsg(`Cannot reach ${form.ollamaUrl} — make sure Ollama is running`);
+    }
+  };
+
   const saveApiKeys = async () => {
     setStatus(s => ({ ...s, apiKeys: 'saving' }));
     await apiPost('save', {
@@ -310,6 +351,9 @@ export default function SetupPage() {
       omdbApiKey: form.omdbApiKey,
       googleAiApiKey: form.googleAiApiKey,
       tmdbApiKey: form.tmdbApiKey,
+      aiProvider: form.aiProvider,
+      ollamaUrl: form.ollamaUrl,
+      ollamaModel: form.ollamaModel,
     });
     setStatus(s => ({ ...s, apiKeys: 'done' }));
     setStep(5);
@@ -801,40 +845,136 @@ export default function SetupPage() {
                     )}
                   </div>
 
-                  {/* Google AI */}
+                  {/* AI Chat Assistant — provider picker */}
                   <div className="p-4 rounded-xl border border-border bg-muted/20">
-                    <div className="flex items-center justify-between mb-1">
-                      <div className="flex items-center gap-2">
-                        <Zap className="w-4 h-4 text-primary" />
-                        <p className="text-sm font-semibold text-foreground">Google AI API Key</p>
-                      </div>
-                      <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer"
-                        className="text-[10px] text-primary hover:underline flex items-center gap-0.5">
-                        Get free key <ExternalLink className="w-2.5 h-2.5" />
-                      </a>
+                    <div className="flex items-center gap-2 mb-3">
+                      <Zap className="w-4 h-4 text-primary" />
+                      <p className="text-sm font-semibold text-foreground">AI Chat Assistant</p>
+                      <span className="text-[10px] bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded font-medium">100% Free</span>
                     </div>
-                    <p className="text-xs text-muted-foreground mb-2">AI tags, mood analysis, smart recommendations</p>
-                    <div className="flex gap-2">
-                      <input type="text" value={form.googleAiApiKey} onChange={e => { set('googleAiApiKey', e.target.value); setGoogleAiTest('idle'); }}
-                        placeholder="AIzaSy…"
-                        className="flex-1 bg-background border border-border rounded-lg px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary font-mono min-w-0" />
-                      <button
-                        onClick={testGoogleAiKey}
-                        disabled={!form.googleAiApiKey.trim() || googleAiTest === 'testing'}
-                        className="flex items-center gap-1.5 px-3 py-2.5 rounded-lg bg-muted hover:bg-muted/80 text-foreground text-xs font-medium transition-colors disabled:opacity-40 flex-shrink-0"
-                      >
-                        {googleAiTest === 'testing' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
-                        Test
-                      </button>
+                    <p className="text-xs text-muted-foreground mb-3">
+                      Powers the "Ask AI" chat — movie recommendations, mood matching, and watch suggestions. Choose your preferred provider below.
+                    </p>
+
+                    {/* Provider toggle */}
+                    <div className="grid grid-cols-2 gap-2 mb-4">
+                      {(['gemini', 'ollama'] as const).map(provider => (
+                        <button
+                          key={provider}
+                          onClick={() => { set('aiProvider', provider); setGoogleAiTest('idle'); setOllamaTest('idle'); }}
+                          className={`flex flex-col items-start gap-1 p-3 rounded-xl border text-left transition-all ${
+                            form.aiProvider === provider
+                              ? 'border-primary bg-primary/10 text-foreground'
+                              : 'border-border bg-background text-muted-foreground hover:border-muted-foreground'
+                          }`}
+                        >
+                          <div className="flex items-center gap-1.5 w-full">
+                            {provider === 'gemini'
+                              ? <Film className="w-3.5 h-3.5 flex-shrink-0" />
+                              : <ScanSearch className="w-3.5 h-3.5 flex-shrink-0" />
+                            }
+                            <span className="text-xs font-semibold capitalize">{provider === 'gemini' ? 'Google Gemini' : 'Ollama (Local)'}</span>
+                            {form.aiProvider === provider && <CheckCircle2 className="w-3 h-3 text-primary ml-auto" />}
+                          </div>
+                          <span className="text-[10px] leading-tight">
+                            {provider === 'gemini'
+                              ? 'Cloud API — free tier, no install needed'
+                              : 'Runs on your machine — fully private, no API key'}
+                          </span>
+                        </button>
+                      ))}
                     </div>
-                    {googleAiTest === 'ok' && (
-                      <div className="mt-2 flex items-center gap-1.5 text-[11px] text-green-400 bg-green-500/10 border border-green-500/20 rounded-lg px-2.5 py-1.5">
-                        <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" />{googleAiTestMsg}
+
+                    {/* Gemini fields */}
+                    {form.aiProvider === 'gemini' && (
+                      <div className="flex flex-col gap-2">
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs font-medium text-foreground/80">Google AI API Key</p>
+                          <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer"
+                            className="text-[10px] text-primary hover:underline flex items-center gap-0.5">
+                            Get free key <ExternalLink className="w-2.5 h-2.5" />
+                          </a>
+                        </div>
+                        <div className="flex gap-2">
+                          <input type="text" value={form.googleAiApiKey} onChange={e => { set('googleAiApiKey', e.target.value); setGoogleAiTest('idle'); }}
+                            placeholder="AIzaSy…"
+                            className="flex-1 bg-background border border-border rounded-lg px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary font-mono min-w-0" />
+                          <button
+                            onClick={testGoogleAiKey}
+                            disabled={!form.googleAiApiKey.trim() || googleAiTest === 'testing'}
+                            className="flex items-center gap-1.5 px-3 py-2.5 rounded-lg bg-muted hover:bg-muted/80 text-foreground text-xs font-medium transition-colors disabled:opacity-40 flex-shrink-0"
+                          >
+                            {googleAiTest === 'testing' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                            Test
+                          </button>
+                        </div>
+                        {googleAiTest === 'ok' && (
+                          <div className="flex items-center gap-1.5 text-[11px] text-green-400 bg-green-500/10 border border-green-500/20 rounded-lg px-2.5 py-1.5">
+                            <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" />{googleAiTestMsg}
+                          </div>
+                        )}
+                        {googleAiTest === 'error' && (
+                          <div className="flex items-center gap-1.5 text-[11px] text-destructive bg-destructive/10 border border-destructive/20 rounded-lg px-2.5 py-1.5">
+                            <XCircle className="w-3.5 h-3.5 flex-shrink-0" />{googleAiTestMsg}
+                          </div>
+                        )}
+                        <div className="flex flex-col gap-1 text-[10px] text-muted-foreground mt-1">
+                          <p className="font-medium text-foreground/70">How to get your key:</p>
+                          <ol className="list-decimal list-inside space-y-0.5 ml-1">
+                            <li>Go to <a href="https://aistudio.google.com" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">aistudio.google.com</a> and sign in with a Google account</li>
+                            <li>Click <strong>Get API key</strong> → <strong>Create API key</strong></li>
+                            <li>Copy the key — it starts with <code className="bg-muted px-1 rounded">AIzaSy…</code></li>
+                            <li>Free tier: 1,500 requests/day, no credit card required</li>
+                          </ol>
+                        </div>
                       </div>
                     )}
-                    {googleAiTest === 'error' && (
-                      <div className="mt-2 flex items-center gap-1.5 text-[11px] text-destructive bg-destructive/10 border border-destructive/20 rounded-lg px-2.5 py-1.5">
-                        <XCircle className="w-3.5 h-3.5 flex-shrink-0" />{googleAiTestMsg}
+
+                    {/* Ollama fields */}
+                    {form.aiProvider === 'ollama' && (
+                      <div className="flex flex-col gap-3">
+                        <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20 text-[11px] text-blue-300 leading-relaxed">
+                          <strong>Ollama</strong> runs AI models locally on your machine — completely free, no API key, no data leaves your home.
+                          Install from <a href="https://ollama.com" target="_blank" rel="noopener noreferrer" className="underline">ollama.com</a>, then run <code className="bg-black/30 px-1 rounded">ollama pull llama3</code> (or any model you prefer).
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="flex flex-col gap-1">
+                            <label className="text-[10px] font-medium text-foreground/70">Ollama URL</label>
+                            <input type="text" value={form.ollamaUrl} onChange={e => { set('ollamaUrl', e.target.value); setOllamaTest('idle'); }}
+                              placeholder="http://localhost:11434"
+                              className="bg-background border border-border rounded-lg px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary font-mono" />
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            <label className="text-[10px] font-medium text-foreground/70">Model name</label>
+                            <input type="text" value={form.ollamaModel} onChange={e => { set('ollamaModel', e.target.value); setOllamaTest('idle'); }}
+                              placeholder="llama3"
+                              className="bg-background border border-border rounded-lg px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary font-mono" />
+                          </div>
+                        </div>
+                        <button
+                          onClick={testOllamaConnection}
+                          disabled={!form.ollamaUrl.trim() || ollamaTest === 'testing'}
+                          className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg bg-muted hover:bg-muted/80 text-foreground text-xs font-medium transition-colors disabled:opacity-40"
+                        >
+                          {ollamaTest === 'testing' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                          Test Ollama Connection
+                        </button>
+                        {ollamaTest === 'ok' && (
+                          <div className="flex items-center gap-1.5 text-[11px] text-green-400 bg-green-500/10 border border-green-500/20 rounded-lg px-2.5 py-1.5">
+                            <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" />{ollamaTestMsg}
+                          </div>
+                        )}
+                        {ollamaTest === 'error' && (
+                          <div className="flex items-center gap-1.5 text-[11px] text-destructive bg-destructive/10 border border-destructive/20 rounded-lg px-2.5 py-1.5">
+                            <XCircle className="w-3.5 h-3.5 flex-shrink-0" />{ollamaTestMsg}
+                          </div>
+                        )}
+                        <div className="text-[10px] text-muted-foreground">
+                          <strong className="text-foreground/70">Recommended models:</strong>{' '}
+                          <code className="bg-muted px-1 rounded">llama3</code> (best quality),{' '}
+                          <code className="bg-muted px-1 rounded">mistral</code> (fast),{' '}
+                          <code className="bg-muted px-1 rounded">phi3</code> (lightweight, low RAM)
+                        </div>
                       </div>
                     )}
                   </div>
@@ -872,7 +1012,10 @@ export default function SetupPage() {
                     { label: 'Jellyfin', value: status.jellyfin === 'ok' ? `Connected (${jellyfinVersion})` : 'Not configured', ok: status.jellyfin === 'ok' },
                     { label: 'TMDB (hero/discover)', value: form.tmdbApiKey ? 'API key set ✓' : 'Not configured — Discover page disabled', ok: !!form.tmdbApiKey },
                     { label: 'OMDB metadata', value: form.omdbApiKey ? 'API key set' : 'Not configured', ok: !!form.omdbApiKey },
-                    { label: 'AI enrichment', value: form.googleAiApiKey ? 'API key set' : 'Not configured', ok: !!form.googleAiApiKey },
+                    { label: 'AI assistant', value: form.aiProvider === 'gemini'
+                        ? (form.googleAiApiKey ? 'Google Gemini — API key set ✓' : 'Google Gemini — API key missing')
+                        : `Ollama (${form.ollamaModel || 'llama3'}) @ ${form.ollamaUrl}`,
+                      ok: form.aiProvider === 'ollama' || !!form.googleAiApiKey },
                     { label: 'Auto-import', value: form.watchFolderEnabled ? 'Enabled' : 'Disabled', ok: form.watchFolderEnabled },
                     { label: 'Preferred quality', value: form.preferredQuality, ok: true },
                   ].map(({ label, value, ok }) => (

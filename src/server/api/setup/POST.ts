@@ -47,8 +47,9 @@ export default async function handler(req: Request, res: Response) {
         const allowed = [
           'mediaDir', 'qbitUrl', 'qbitUsername', 'qbitPassword',
           'jellyfinUrl', 'jellyfinApiKey', 'adminPassword',
-          'omdbApiKey', 'googleAiApiKey', 'preferredQuality',
-          'watchFolderEnabled', 'autoTranscode',
+          'omdbApiKey', 'googleAiApiKey', 'tmdbApiKey',
+          'aiProvider', 'ollamaUrl', 'ollamaModel',
+          'preferredQuality', 'watchFolderEnabled', 'autoTranscode',
         ];
         const updates: Record<string, unknown> = {};
         for (const key of allowed) {
