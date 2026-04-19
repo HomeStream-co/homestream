@@ -1,19 +1,33 @@
 /**
  * Profile Selector — /profiles
  *
- * Netflix-style "Who's watching?" screen shown on first load
- * and whenever the user switches profiles from the header.
+ * Netflix-style "Who's watching?" screen.
+ * Adult profile shows a PIN entry overlay if a PIN has been configured.
  */
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import { useProfile, PROFILES, type Profile } from '@/context/ProfileContext';
+import PinLock from '@/components/PinLock';
 
 export default function ProfilesPage() {
-  const { setActiveProfile } = useProfile();
+  const { setActiveProfile, adultPinEnabled } = useProfile();
   const navigate = useNavigate();
+  const [pinTarget, setPinTarget] = useState<Profile | null>(null);
 
   function handleSelect(profile: Profile) {
-    setActiveProfile(profile.id);
+    if (profile.id === 'adult' && adultPinEnabled) {
+      setPinTarget(profile);
+    } else {
+      setActiveProfile(profile.id);
+      navigate('/');
+    }
+  }
+
+  function handlePinSuccess() {
+    if (!pinTarget) return;
+    setActiveProfile(pinTarget.id);
+    setPinTarget(null);
     navigate('/');
   }
 
@@ -55,15 +69,23 @@ export default function ProfilesPage() {
             className="flex flex-col items-center gap-4 group"
           >
             {/* Avatar circle */}
-            <div
-              className={`
-                w-28 h-28 sm:w-36 sm:h-36 rounded-xl flex items-center justify-center text-5xl sm:text-6xl
-                bg-card border-2 border-transparent
-                group-hover:border-white transition-all duration-200
-                ${profile.id === 'kids' ? 'bg-yellow-950/40' : 'bg-card'}
-              `}
-            >
-              {profile.avatar}
+            <div className="relative">
+              <div
+                className={`
+                  w-28 h-28 sm:w-36 sm:h-36 rounded-xl flex items-center justify-center text-5xl sm:text-6xl
+                  bg-card border-2 border-transparent
+                  group-hover:border-white transition-all duration-200
+                  ${profile.id === 'kids' ? 'bg-yellow-950/40' : 'bg-card'}
+                `}
+              >
+                {profile.avatar}
+              </div>
+              {/* PIN lock badge */}
+              {profile.id === 'adult' && adultPinEnabled && (
+                <div className="absolute -top-1.5 -right-1.5 w-6 h-6 rounded-full bg-primary flex items-center justify-center shadow-lg">
+                  <span className="text-[10px]">🔒</span>
+                </div>
+              )}
             </div>
 
             {/* Name */}
@@ -84,6 +106,17 @@ export default function ProfilesPage() {
         Kids profile only shows G and PG rated content.
         Switch profiles anytime from the top menu.
       </motion.p>
+
+      {/* PIN overlay */}
+      <AnimatePresence>
+        {pinTarget && (
+          <PinLock
+            profileName={pinTarget.name}
+            onSuccess={handlePinSuccess}
+            onCancel={() => setPinTarget(null)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

@@ -12,10 +12,11 @@ import {
   Settings, Check, Palette, Play, Library,
   Monitor, Zap, SkipForward, RotateCcw, Tag, HardDrive,
   Compass, RefreshCw, Clock, WifiOff, KeyRound, Eye, EyeOff,
-  Loader2, CheckCircle2, XCircle, ScanLine, Database,
+  Loader2, CheckCircle2, XCircle, ScanLine, Database, ShieldCheck,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTheme, THEMES, type AppSettings } from '@/context/ThemeContext';
+import { useProfile } from '@/context/ProfileContext';
 
 // ── Format bytes helper ───────────────────────────────────────────────────────
 function fmtBytes(bytes: number): string {
@@ -165,8 +166,15 @@ function ApiKeyField({
 // ── Main component ────────────────────────────────────────────────────────────
 export default function SettingsPanel() {
   const { settings, activeTheme, setTheme, updateSetting } = useTheme();
+  const { adultPinEnabled, setAdultPin, clearAdultPin } = useProfile();
   const [open, setOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
+
+  // PIN management state
+  const [pinMode, setPinMode] = useState<'idle' | 'set' | 'change' | 'confirm'>('idle');
+  const [pinInput, setPinInput] = useState('');
+  const [pinConfirm, setPinConfirm] = useState('');
+  const [pinError, setPinError] = useState<string | null>(null);
 
   // TMDB refresh state
   const [tmdbRefreshing, setTmdbRefreshing] = useState(false);
@@ -607,7 +615,96 @@ export default function SettingsPanel() {
                 </div>
               </div>
 
-              {/* ── 6. API Keys ── */}
+              {/* ── 7. Adult Profile PIN ── */}
+              <div className="border-t border-border/50">
+                <SectionHeader icon={ShieldCheck} label="Adult Profile PIN" />
+                <div className="px-4 pb-4 space-y-3">
+                  <p className="text-[11px] text-muted-foreground">
+                    Require a 4-digit PIN to access the Adult profile from the profile selector.
+                  </p>
+
+                  {/* Status + toggle */}
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-foreground">
+                      PIN lock: <span className={adultPinEnabled ? 'text-green-400' : 'text-muted-foreground'}>
+                        {adultPinEnabled ? 'Enabled' : 'Disabled'}
+                      </span>
+                    </span>
+                    {adultPinEnabled ? (
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => { setPinMode('change'); setPinInput(''); setPinConfirm(''); setPinError(null); }}
+                          className="text-[11px] text-primary hover:text-primary/80 transition-colors"
+                        >
+                          Change PIN
+                        </button>
+                        <button
+                          onClick={() => { clearAdultPin(); setPinMode('idle'); toast.success('Adult PIN removed'); }}
+                          className="text-[11px] text-destructive hover:text-destructive/80 transition-colors"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => { setPinMode('set'); setPinInput(''); setPinConfirm(''); setPinError(null); }}
+                        className="text-[11px] text-primary hover:text-primary/80 transition-colors"
+                      >
+                        Set PIN
+                      </button>
+                    )}
+                  </div>
+
+                  {/* PIN entry form */}
+                  {(pinMode === 'set' || pinMode === 'change') && (
+                    <div className="space-y-2 pt-1">
+                      <input
+                        type="password"
+                        inputMode="numeric"
+                        maxLength={4}
+                        value={pinInput}
+                        onChange={e => { if (/^\d{0,4}$/.test(e.target.value)) { setPinInput(e.target.value); setPinError(null); } }}
+                        placeholder="New PIN (4 digits)"
+                        className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 tracking-widest text-center"
+                      />
+                      <input
+                        type="password"
+                        inputMode="numeric"
+                        maxLength={4}
+                        value={pinConfirm}
+                        onChange={e => { if (/^\d{0,4}$/.test(e.target.value)) { setPinConfirm(e.target.value); setPinError(null); } }}
+                        placeholder="Confirm PIN"
+                        className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 tracking-widest text-center"
+                      />
+                      {pinError && <p className="text-[11px] text-destructive text-center">{pinError}</p>}
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => {
+                            if (pinInput.length !== 4) { setPinError('PIN must be exactly 4 digits'); return; }
+                            if (pinInput !== pinConfirm) { setPinError('PINs do not match'); return; }
+                            setAdultPin(pinInput);
+                            setPinMode('idle');
+                            setPinInput('');
+                            setPinConfirm('');
+                            toast.success('Adult PIN saved');
+                          }}
+                          className="flex-1 bg-primary/10 hover:bg-primary/20 border border-primary/20 text-primary text-xs font-semibold py-2 rounded-lg transition-colors"
+                        >
+                          Save PIN
+                        </button>
+                        <button
+                          onClick={() => { setPinMode('idle'); setPinInput(''); setPinConfirm(''); setPinError(null); }}
+                          className="flex-1 bg-muted hover:bg-muted/70 text-muted-foreground text-xs font-semibold py-2 rounded-lg transition-colors"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* ── 8. API Keys ── */}
               <div className="border-t border-border/50">
                 <SectionHeader icon={KeyRound} label="API Keys" />
                 <div className="px-4 pb-4 divide-y divide-border/30">

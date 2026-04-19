@@ -6,10 +6,12 @@ import Footer from '@/layouts/parts/Footer';
 import Header from '@/layouts/parts/Header';
 import Website from '@/layouts/Website';
 import AIChatAssistant from '@/components/AIChatAssistant';
+import LoginGate from '@/components/LoginGate';
 import { MediaProvider, useMedia } from '@/context/MediaContext';
 import { ProfileProvider, useProfile } from '@/context/ProfileContext';
 import { ThemeProvider } from '@/context/ThemeContext';
 import { TMDBProvider } from '@/context/TMDBContext';
+import { AuthProvider, useAuth } from '@/context/AuthContext';
 
 interface RootLayoutProps {
   children: ReactElement;
@@ -37,6 +39,19 @@ function TMDBWrapper({ children }: { children: ReactElement }) {
   return <TMDBProvider libraryGenres={genres}>{children}</TMDBProvider>;
 }
 
+/** Shows LoginGate if admin password is set and session is not valid */
+function AuthGate({ children }: { children: ReactElement }) {
+  const { authenticated } = useAuth();
+
+  // Still checking — render nothing to avoid flash
+  if (authenticated === null) return null;
+
+  // Not authenticated — show login wall
+  if (authenticated === false) return <LoginGate />;
+
+  return children;
+}
+
 export default function RootLayout({ children }: RootLayoutProps) {
   const location = useLocation();
   const isPlayer = location.pathname.startsWith('/player/');
@@ -44,31 +59,37 @@ export default function RootLayout({ children }: RootLayoutProps) {
 
   return (
     <ThemeProvider>
-      <ProfileProvider>
-        <MediaProvider>
-          <TMDBWrapper>
-            <Website>
-              {!isPlayer && !isProfiles && <Header />}
-              <ProfileGuard>
-                {children}
-              </ProfileGuard>
-              {!isPlayer && !isProfiles && <Footer />}
-              {!isProfiles && <AIChatAssistant />}
-              <Toaster
-                theme="dark"
-                position="bottom-left"
-                toastOptions={{
-                  style: {
-                    background: 'hsl(var(--card))',
-                    border: '1px solid hsl(var(--border))',
-                    color: 'hsl(var(--foreground))',
-                  },
-                }}
-              />
-            </Website>
-          </TMDBWrapper>
-        </MediaProvider>
-      </ProfileProvider>
+      <AuthProvider>
+        <ProfileProvider>
+          <MediaProvider>
+            <TMDBWrapper>
+              <Website>
+                <AuthGate>
+                  <>
+                    {!isPlayer && !isProfiles && <Header />}
+                    <ProfileGuard>
+                      {children}
+                    </ProfileGuard>
+                    {!isPlayer && !isProfiles && <Footer />}
+                    {!isProfiles && <AIChatAssistant />}
+                  </>
+                </AuthGate>
+                <Toaster
+                  theme="dark"
+                  position="bottom-left"
+                  toastOptions={{
+                    style: {
+                      background: 'hsl(var(--card))',
+                      border: '1px solid hsl(var(--border))',
+                      color: 'hsl(var(--foreground))',
+                    },
+                  }}
+                />
+              </Website>
+            </TMDBWrapper>
+          </MediaProvider>
+        </ProfileProvider>
+      </AuthProvider>
     </ThemeProvider>
   );
 }

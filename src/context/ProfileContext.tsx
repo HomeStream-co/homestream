@@ -2,11 +2,16 @@
  * ProfileContext
  *
  * Manages the two built-in profiles:
- *   - Adult  — sees everything, no restrictions
+ *   - Adult  — sees everything; optionally PIN-locked
  *   - Kids   — only G and PG rated content is shown across all pages
  *
  * Active profile is persisted to localStorage so it survives page refresh.
  * On first load (no profile chosen yet) the app shows the profile selector screen.
+ *
+ * PIN lock (Adult profile):
+ *   - PIN stored in localStorage under 'homestream-adult-pin'
+ *   - If set, selecting Adult profile shows PinLock overlay
+ *   - PIN management (set / change / clear) exposed via context
  */
 import {
   createContext, useContext, useState, useCallback,
@@ -46,12 +51,19 @@ export const PROFILES: Profile[] = [
   },
 ];
 
+const PIN_STORAGE_KEY = 'homestream-adult-pin';
+
 interface ProfileContextType {
   activeProfile: Profile | null;
   setActiveProfile: (id: ProfileId) => void;
   clearProfile: () => void;
   /** Returns true if the given MPAA rating is allowed for the active profile */
   isAllowed: (rated?: string) => boolean;
+  /** PIN management for Adult profile */
+  adultPinEnabled: boolean;
+  setAdultPin: (pin: string) => void;
+  clearAdultPin: () => void;
+  verifyAdultPin: (pin: string) => boolean;
 }
 
 const ProfileContext = createContext<ProfileContextType | null>(null);
@@ -64,6 +76,10 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
       const stored = localStorage.getItem(STORAGE_KEY) as ProfileId | null;
       return stored && PROFILES.find(p => p.id === stored) ? stored : null;
     } catch { return null; }
+  });
+
+  const [adultPinEnabled, setAdultPinEnabled] = useState(() => {
+    try { return !!localStorage.getItem(PIN_STORAGE_KEY); } catch { return false; }
   });
 
   const activeProfile = activeProfileId
@@ -80,23 +96,33 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem(STORAGE_KEY);
   }, []);
 
-  /**
-   * Returns true if the media item's rating is allowed for the current profile.
-   * Adult profile always returns true.
-   * Kids profile only allows G, PG, and equivalent TV ratings.
-   * Items with no rating (N/A, Unknown, undefined) are blocked on Kids profile
-   * to be safe — better to hide than show something inappropriate.
-   */
   const isAllowed = useCallback((rated?: string): boolean => {
     if (!activeProfile || !activeProfile.restricted) return true;
-    // Empty string, undefined, N/A, NR, Unknown — all treated as unrated → blocked for Kids
     const normalized = (rated ?? '').trim().toUpperCase();
     if (!normalized || normalized === 'N/A' || normalized === 'UNKNOWN' || normalized === 'NR') return false;
     return activeProfile.allowedRatings.includes(normalized);
   }, [activeProfile]);
 
+  const setAdultPin = useCallback((pin: string) => {
+    localStorage.setItem(PIN_STORAGE_KEY, pin);
+    setAdultPinEnabled(true);
+  }, []);
+
+  const clearAdultPin = useCallback(() => {
+    localStorage.removeItem(PIN_STORAGE_KEY);
+    setAdultPinEnabled(false);
+  }, []);
+
+  const verifyAdultPin = useCallback((pin: string): boolean => {
+    const stored = localStorage.getItem(PIN_STORAGE_KEY) ?? '';
+    return !stored || pin === stored;
+  }, []);
+
   return (
-    <ProfileContext.Provider value={{ activeProfile, setActiveProfile, clearProfile, isAllowed }}>
+    <ProfileContext.Provider value={{
+      activeProfile, setActiveProfile, clearProfile, isAllowed,
+      adultPinEnabled, setAdultPin, clearAdultPin, verifyAdultPin,
+    }}>
       {children}
     </ProfileContext.Provider>
   );
