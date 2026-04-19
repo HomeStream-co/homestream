@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import {
-  Search, Upload, Menu, X, Film, Bookmark, ChevronDown, Clock, Lock,
+  Search, Upload, Menu, X, Film, Bookmark, ChevronDown, Lock,
   Home, Compass, Download, Library, History, Settings2, Wifi,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';

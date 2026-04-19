@@ -1046,7 +1046,7 @@ export default function PlayerPage() {
                   paused: videoRef.current.paused,
                   volume: videoRef.current.volume,
                   speed: videoRef.current.playbackRate,
-                  hasNextEpisode: !!nextEpisode,
+                  hasNextEpisode: !!nextItem,
                 });
               }
             }

@@ -113,7 +113,7 @@ export function attachRemoteControl(server: Server): WebSocketServer {
 
     ws.on('message', (raw) => {
       try {
-        const msg = JSON.parse(raw.toString()) as Record<string, unknown>;
+        const msg = JSON.parse((raw as Buffer).toString()) as Record<string, unknown>;
         const c = clients.get(ws);
         if (!c) return;
 
