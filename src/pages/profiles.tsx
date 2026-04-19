@@ -70,13 +70,6 @@ export default function ProfilesPage() {
             <span className="text-muted-foreground group-hover:text-foreground text-sm font-medium transition-colors tracking-wide">
               {profile.name}
             </span>
-
-            {/* Kids badge */}
-            {profile.restricted && (
-              <span className="text-[10px] bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 px-2 py-0.5 rounded-full font-medium -mt-2">
-                G &amp; PG only
-              </span>
-            )}
           </motion.button>
         ))}
       </div>
