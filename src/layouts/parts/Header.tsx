@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Search, Upload, MessageCircle, Menu, X, Film } from 'lucide-react';
+import { Search, Upload, Menu, X, Film, Bookmark } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { useMedia } from '@/context/MediaContext';
 
 interface HeaderProps {
   onChatOpen?: () => void;
@@ -14,6 +15,7 @@ export default function Header({ onChatOpen: _onChatOpen }: HeaderProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
+  const { watchlist } = useMedia();
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
@@ -34,6 +36,7 @@ export default function Header({ onChatOpen: _onChatOpen }: HeaderProps) {
     { to: '/', label: 'Home' },
     { to: '/browse', label: 'Browse' },
     { to: '/shows', label: 'TV Shows' },
+    { to: '/watchlist', label: 'Watchlist' },
     { to: '/library', label: 'My Library' },
   ];
 
@@ -111,13 +114,19 @@ export default function Header({ onChatOpen: _onChatOpen }: HeaderProps) {
               <span>Upload</span>
             </Link>
 
-            {/* AI Chat */}
-            <button
-              className="p-2 text-muted-foreground hover:text-foreground transition-colors"
-              title="AI Assistant"
+            {/* Watchlist shortcut */}
+            <Link
+              to="/watchlist"
+              className="relative p-2 text-muted-foreground hover:text-foreground transition-colors"
+              title="My Watchlist"
             >
-              <MessageCircle className="w-5 h-5" />
-            </button>
+              <Bookmark className={`w-5 h-5 transition-colors ${location.pathname === '/watchlist' ? 'text-primary fill-primary' : ''}`} />
+              {watchlist.length > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 bg-primary text-white text-[9px] font-bold rounded-full flex items-center justify-center px-0.5">
+                  {watchlist.length > 99 ? '99+' : watchlist.length}
+                </span>
+              )}
+            </Link>
 
             {/* Mobile Menu */}
             <button
@@ -159,6 +168,14 @@ export default function Header({ onChatOpen: _onChatOpen }: HeaderProps) {
               >
                 <Upload className="w-4 h-4" />
                 Upload Media
+              </Link>
+              <Link
+                to="/watchlist"
+                onClick={() => setMobileOpen(false)}
+                className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground"
+              >
+                <Bookmark className="w-4 h-4" />
+                Watchlist {watchlist.length > 0 && `(${watchlist.length})`}
               </Link>
             </nav>
           </motion.div>

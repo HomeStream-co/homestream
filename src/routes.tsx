@@ -6,6 +6,7 @@ const BrowsePage = lazy(() => import('./pages/browse'));
 const LibraryPage = lazy(() => import('./pages/library'));
 const PlayerPage = lazy(() => import('./pages/player'));
 const ShowsPage = lazy(() => import('./pages/shows'));
+const WatchlistPage = lazy(() => import('./pages/watchlist'));
 
 // 404 routing by runtime:
 const NotFoundPage = import.meta.env.DEV
@@ -13,31 +14,14 @@ const NotFoundPage = import.meta.env.DEV
   : lazy(() => import('./pages/_404'));
 
 export const routes: RouteObject[] = [
-  {
-    path: '/',
-    element: <HomePage />,
-  },
-  {
-    path: '/browse',
-    element: <BrowsePage />,
-  },
-  {
-    path: '/library',
-    element: <LibraryPage />,
-  },
-  {
-    path: '/shows',
-    element: <ShowsPage />,
-  },
-  {
-    path: '/player/:id',
-    element: <PlayerPage />,
-  },
-  {
-    path: '*',
-    element: <NotFoundPage />,
-  },
+  { path: '/', element: <HomePage /> },
+  { path: '/browse', element: <BrowsePage /> },
+  { path: '/library', element: <LibraryPage /> },
+  { path: '/shows', element: <ShowsPage /> },
+  { path: '/watchlist', element: <WatchlistPage /> },
+  { path: '/player/:id', element: <PlayerPage /> },
+  { path: '*', element: <NotFoundPage /> },
 ];
 
-export type Path = '/' | '/browse' | '/library' | '/shows' | '/player/:id';
+export type Path = '/' | '/browse' | '/library' | '/shows' | '/watchlist' | '/player/:id';
 export type Params = Record<string, string | undefined>;
