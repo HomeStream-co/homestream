@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Play, Pause, Volume2, VolumeX, Maximize, Minimize,
   Info, Star, RotateCcw, Sparkles, MessageCircle, SkipForward,
-  CheckCircle2, FastForward, Rewind,
+  CheckCircle2, FastForward, Rewind, Wand2, Loader2,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useMedia } from '@/context/MediaContext';
@@ -102,6 +102,36 @@ export default function PlayerPage() {
   // Loading state — true until canplaythrough fires (enough buffered to play without stall)
   const [videoLoading, setVideoLoading] = useState(true);
   const resumeApplied = useRef(false);
+
+  // ── AI Enrichment (on-demand from player page) ──
+  const [enrichRunning, setEnrichRunning] = useState(false);
+  const [enrichError, setEnrichError] = useState<string | null>(null);
+
+  const runEnrichment = useCallback(async () => {
+    if (!id || enrichRunning) return;
+    setEnrichRunning(true);
+    setEnrichError(null);
+    try {
+      // The enrich endpoint streams SSE — we just drain it; MediaContext will
+      // pick up the updated item via its polling interval.
+      const res = await fetch(`/api/enrich/${id}`, {
+        method: 'POST',
+        headers: { Accept: 'text/event-stream' },
+      });
+      if (!res.ok) throw new Error(`Server returned ${res.status}`);
+      if (res.body) {
+        const reader = res.body.getReader();
+        while (true) {
+          const { done } = await reader.read();
+          if (done) break;
+        }
+      }
+    } catch (err) {
+      setEnrichError(err instanceof Error ? err.message : 'Enrichment failed');
+    } finally {
+      setEnrichRunning(false);
+    }
+  }, [id, enrichRunning]);
 
   // ── Derived ──
   const resumeItems = continueWatching
@@ -991,7 +1021,7 @@ export default function PlayerPage() {
             </div>
 
             {/* ── AI Enrichment section ── */}
-            {item.enrichment && (
+            {item.enrichment ? (
               <div className="mb-4 space-y-2">
                 {item.enrichment.whyWatch && (
                   <p className="text-sm text-primary font-medium italic">"{item.enrichment.whyWatch}"</p>
@@ -1018,6 +1048,32 @@ export default function PlayerPage() {
                     {item.enrichment.contentWarnings.map(w => (
                       <span key={w} className="bg-destructive/10 text-destructive border border-destructive/20 text-xs px-2 py-0.5 rounded-full">{w}</span>
                     ))}
+                  </div>
+                )}
+              </div>
+            ) : (
+              /* ── No enrichment yet — offer to run it ── */
+              <div className="mb-4">
+                {enrichRunning ? (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                    <span>Analysing with AI — this takes about 10–20 seconds…</span>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-1.5">
+                    <button
+                      onClick={runEnrichment}
+                      className="inline-flex items-center gap-2 self-start bg-primary/10 hover:bg-primary/20 border border-primary/30 hover:border-primary/50 text-primary text-sm font-medium px-3 py-1.5 rounded-lg transition-colors"
+                    >
+                      <Wand2 className="w-4 h-4" />
+                      Run AI Analysis
+                    </button>
+                    {enrichError && (
+                      <p className="text-xs text-destructive">{enrichError}</p>
+                    )}
+                    <p className="text-xs text-muted-foreground">
+                      Adds mood tags, themes, content warnings, and a personalised summary using Gemini.
+                    </p>
                   </div>
                 )}
               </div>
