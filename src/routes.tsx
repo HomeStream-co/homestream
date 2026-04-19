@@ -1,9 +1,4 @@
 // @refresh reset
-/**
- * Route definitions — lives in its own file so App.tsx can import the
- * routes array without pulling in the lazy-component declarations into
- * a file that also has non-component exports (which breaks Fast Refresh).
- */
 import { RouteObject } from 'react-router-dom';
 import { lazy } from 'react';
 import HomePage from './pages/index';
@@ -23,12 +18,14 @@ const HttpsSetupPage = lazy(() => import('./pages/https-setup'));
 const HistoryPage = lazy(() => import('./pages/history'));
 const RemotePage = lazy(() => import('./pages/remote'));
 
+// 404 routing by runtime:
 const NotFoundPage = import.meta.env.DEV
   ? lazy(() => import('../dev-tools/src/PageNotFound'))
   : lazy(() => import('./pages/_404'));
 
 export const routes: RouteObject[] = [
   { path: '/', element: <HomePage /> },
+  // /browse redirects to home — kept for backwards-compat with any saved links
   { path: '/browse', element: <HomePage /> },
   { path: '/movies', element: <MoviesPage /> },
   { path: '/movie/:id', element: <MoviePage /> },
@@ -46,3 +43,6 @@ export const routes: RouteObject[] = [
   { path: '/remote', element: <RemotePage /> },
   { path: '*', element: <NotFoundPage /> },
 ];
+
+export type Path = '/' | '/movie/:id' | '/show/:id' | '/library' | '/watchlist' | '/player/:id' | '/profiles' | '/discover' | '/downloads' | '/history';
+export type Params = Record<string, string | undefined>;

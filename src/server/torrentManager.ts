@@ -21,7 +21,6 @@ import WebTorrent from 'webtorrent';
 import { writeLibrary } from './libraryStore.js';
 import { createJob } from './transcodeStore.js';
 import { transcodeFile } from './transcodeWorker.js';
-import { fetchOMDB, type OMDBData } from './mediaUtils.js';
 
 const UPLOADS_DIR = path.resolve('./uploads');
 if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
@@ -119,6 +118,23 @@ export function pickBestStream(streams: Array<{ quality: string; seeds: string; 
   return withRes.sort((a, b) => b.seedCount - a.seedCount)[0];
 }
 
+// ─── OMDB metadata fetch (reused from upload handler) ────────────────────────
+
+async function fetchOMDB(title: string, year?: string): Promise<Record<string, string> | null> {
+  const apiKey = process.env.OMDB_API_KEY;
+  if (!apiKey) return null;
+  try {
+    const yearParam = year ? `&y=${year}` : '';
+    const res = await fetch(`http://www.omdbapi.com/?t=${encodeURIComponent(title)}${yearParam}&apikey=${apiKey}`, {
+      signal: AbortSignal.timeout(8000),
+    });
+    const data = await res.json() as Record<string, string>;
+    return data.Response === 'True' ? data : null;
+  } catch {
+    return null;
+  }
+}
+
 // ─── Core download function ───────────────────────────────────────────────────
 
 export async function startTorrentDownload(params: {
@@ -202,7 +218,7 @@ export async function startTorrentDownload(params: {
         }
 
         // Fetch OMDB metadata
-        const omdb: OMDBData | null = await fetchOMDB(title, year);
+        const omdb = await fetchOMDB(title, year);
 
         const outputFilename = inputFilename.replace(/\.[^.]+$/, '') + '_tc.mp4';
         const genres = omdb?.Genre

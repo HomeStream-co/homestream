@@ -39,21 +39,6 @@ function serverBundlePlugin(): Plugin {
 				outfile: path.resolve(__dirname, "dist", "server.bundle.mjs"),
 				packages: "bundle",
 				sourcemap: true,
-				// webrtc-polyfill uses top-level await in Blob.js, which esbuild cannot
-				// inline into its synchronous __esm() wrappers. The async-ness propagates
-				// through the entire module graph (RTCDataChannel → Blob → whole package),
-				// producing "SyntaxError: Unexpected reserved word" at runtime.
-				// On Node 18+ all WebRTC globals are provided by node-datachannel anyway,
-				// so we replace the entire webrtc-polyfill package with a synchronous stub.
-				alias: {
-					"webrtc-polyfill": path.resolve(
-						__dirname,
-						"src/server/stubs/webrtc-polyfill-stub.js"
-					),
-				},
-				// node-datachannel is a native addon (glibc) — cannot run on Alpine (musl).
-				// Keep it external so it fails gracefully at runtime rather than at bundle time.
-				external: ["node-datachannel"],
 				banner: {
 					js: `import { createRequire } from 'module';
 const require = createRequire(import.meta.url);`,

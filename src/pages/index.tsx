@@ -24,7 +24,7 @@ import { Play, Plus, Check, Star, Upload, Clock, Search, X, SlidersHorizontal, B
 import { motion, AnimatePresence } from 'motion/react';
 import { useMedia } from '@/context/MediaContext';
 import { useProfile } from '@/context/ProfileContext';
-import { useTMDBContext } from '@/context/TMDBContextCore';
+import { useTMDBContext } from '@/context/TMDBContext';
 import MediaCarousel from '@/components/MediaCarousel';
 import MediaCard from '@/components/MediaCard';
 import HeroBanner from '@/components/HeroBanner';
