@@ -39,6 +39,22 @@ function serverBundlePlugin(): Plugin {
 				outfile: path.resolve(__dirname, "dist", "server.bundle.mjs"),
 				packages: "bundle",
 				sourcemap: true,
+				// webtorrent pulls in webrtc-polyfill which uses await inside __esm
+				// wrappers — not valid in a non-async context. Keep these as externals
+				// so they're loaded at runtime rather than inlined by esbuild.
+				external: [
+					"webtorrent",
+					"webrtc-polyfill",
+					"bittorrent-tracker",
+					"ut-metadata",
+					"ut-pex",
+					"create-torrent",
+					"parse-torrent",
+					"torrent-discovery",
+					"bittorrent-dht",
+					"bittorrent-lsd",
+					"node-datachannel",
+				],
 				banner: {
 					js: `import { createRequire } from 'module';
 const require = createRequire(import.meta.url);`,
