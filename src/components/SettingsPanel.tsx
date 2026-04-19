@@ -12,9 +12,18 @@ import {
   Settings, Check, Palette, Play, Library,
   Monitor, Zap, SkipForward, RotateCcw, Tag, HardDrive,
   Compass, RefreshCw, Clock, WifiOff, KeyRound, Eye, EyeOff,
-  Loader2, CheckCircle2, XCircle,
+  Loader2, CheckCircle2, XCircle, ScanLine, Database,
 } from 'lucide-react';
+import { toast } from 'sonner';
 import { useTheme, THEMES, type AppSettings } from '@/context/ThemeContext';
+
+// ── Format bytes helper ───────────────────────────────────────────────────────
+function fmtBytes(bytes: number): string {
+  if (bytes >= 1_099_511_627_776) return `${(bytes / 1_099_511_627_776).toFixed(1)} TB`;
+  if (bytes >= 1_073_741_824)     return `${(bytes / 1_073_741_824).toFixed(1)} GB`;
+  if (bytes >= 1_048_576)         return `${(bytes / 1_048_576).toFixed(0)} MB`;
+  return `${(bytes / 1024).toFixed(0)} KB`;
+}
 
 // ── Small reusable toggle ─────────────────────────────────────────────────────
 function Toggle({
@@ -177,6 +186,19 @@ export default function SettingsPanel() {
   const [apiKeysSaved, setApiKeysSaved] = useState(false);
   const [apiKeysLoaded, setApiKeysLoaded] = useState(false);
 
+  // Storage stats state
+  const [storageStats, setStorageStats] = useState<{
+    libraryBytes: number;
+    libraryCount: number;
+    diskFreeBytes: number | null;
+    diskTotalBytes: number | null;
+  } | null>(null);
+  const [storageLoading, setStorageLoading] = useState(false);
+
+  // Scan library state
+  const [scanning, setScanning] = useState(false);
+  const [scanResult, setScanResult] = useState<{ added: number; skipped: number } | null>(null);
+
   // Load current keys when panel opens (masked — server returns partial keys)
   useEffect(() => {
     if (!open || apiKeysLoaded) return;
@@ -194,6 +216,40 @@ export default function SettingsPanel() {
       })
       .catch(() => setApiKeysLoaded(true));
   }, [open, apiKeysLoaded]);
+
+  // Load storage stats when panel opens
+  useEffect(() => {
+    if (!open || storageStats) return;
+    setStorageLoading(true);
+    fetch('/api/library/storage')
+      .then(r => r.json())
+      .then((data: { libraryBytes: number; libraryCount: number; diskFreeBytes: number | null; diskTotalBytes: number | null }) => {
+        setStorageStats(data);
+      })
+      .catch(() => { /* ignore */ })
+      .finally(() => setStorageLoading(false));
+  }, [open, storageStats]);
+
+  const handleScanLibrary = async () => {
+    setScanning(true);
+    setScanResult(null);
+    try {
+      const res = await fetch('/api/library/scan', { method: 'POST' });
+      const data = await res.json() as { added: number; skipped: number; errors?: string[] };
+      setScanResult({ added: data.added, skipped: data.skipped });
+      if (data.added > 0) {
+        toast.success(`Found ${data.added} new file${data.added !== 1 ? 's' : ''} — added to library`);
+        // Refresh storage stats
+        setStorageStats(null);
+      } else {
+        toast.info('Library is up to date — no new files found');
+      }
+    } catch {
+      toast.error('Scan failed — check server logs');
+    } finally {
+      setScanning(false);
+    }
+  };
 
   const saveApiKeys = async () => {
     setApiKeysSaving(true);
@@ -467,7 +523,91 @@ export default function SettingsPanel() {
                 </div>
               </div>
 
-              {/* ── 5. API Keys ── */}
+              {/* ── 5. Storage & Library ── */}
+              <div className="border-t border-border/50">
+                <SectionHeader icon={Database} label="Storage & Library" />
+                <div className="px-4 pb-4 space-y-3">
+
+                  {/* Storage stats */}
+                  {storageLoading ? (
+                    <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                      Loading storage info…
+                    </div>
+                  ) : storageStats ? (
+                    <div className="space-y-2">
+                      {/* Library size */}
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="text-muted-foreground flex items-center gap-1.5">
+                          <HardDrive className="w-3 h-3" /> Library ({storageStats.libraryCount} items)
+                        </span>
+                        <span className="text-foreground font-medium">
+                          {fmtBytes(storageStats.libraryBytes)}
+                        </span>
+                      </div>
+
+                      {/* Disk free / total */}
+                      {storageStats.diskTotalBytes && storageStats.diskFreeBytes !== null && (
+                        <>
+                          <div className="flex items-center justify-between text-[11px]">
+                            <span className="text-muted-foreground">Disk free</span>
+                            <span className={`font-medium ${
+                              storageStats.diskFreeBytes / storageStats.diskTotalBytes < 0.1
+                                ? 'text-destructive'
+                                : storageStats.diskFreeBytes / storageStats.diskTotalBytes < 0.2
+                                  ? 'text-orange-400'
+                                  : 'text-foreground'
+                            }`}>
+                              {fmtBytes(storageStats.diskFreeBytes)} / {fmtBytes(storageStats.diskTotalBytes)}
+                            </span>
+                          </div>
+                          {/* Usage bar */}
+                          <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                            <div
+                              className={`h-full rounded-full transition-all ${
+                                storageStats.diskFreeBytes / storageStats.diskTotalBytes < 0.1
+                                  ? 'bg-destructive'
+                                  : storageStats.diskFreeBytes / storageStats.diskTotalBytes < 0.2
+                                    ? 'bg-orange-400'
+                                    : 'bg-primary'
+                              }`}
+                              style={{
+                                width: `${Math.round(((storageStats.diskTotalBytes - storageStats.diskFreeBytes) / storageStats.diskTotalBytes) * 100)}%`,
+                              }}
+                            />
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-[11px] text-muted-foreground">Storage info unavailable</p>
+                  )}
+
+                  {/* Scan Library button */}
+                  <div className="space-y-1.5">
+                    <button
+                      onClick={handleScanLibrary}
+                      disabled={scanning}
+                      className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-primary/10 hover:bg-primary/20 border border-primary/20 text-primary text-xs font-semibold transition-colors disabled:opacity-60"
+                    >
+                      <ScanLine className={`w-3.5 h-3.5 ${scanning ? 'animate-pulse' : ''}`} />
+                      {scanning ? 'Scanning media folder…' : 'Scan Library for New Files'}
+                    </button>
+                    {scanResult && (
+                      <p className="text-[10px] text-center text-muted-foreground">
+                        {scanResult.added > 0
+                          ? `✓ Added ${scanResult.added} new file${scanResult.added !== 1 ? 's' : ''} · ${scanResult.skipped} already in library`
+                          : `✓ Up to date · ${scanResult.skipped} file${scanResult.skipped !== 1 ? 's' : ''} already in library`}
+                      </p>
+                    )}
+                    <p className="text-[10px] text-muted-foreground text-center">
+                      Finds video files in your media folder not yet in the library
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* ── 6. API Keys ── */}
               <div className="border-t border-border/50">
                 <SectionHeader icon={KeyRound} label="API Keys" />
                 <div className="px-4 pb-4 divide-y divide-border/30">

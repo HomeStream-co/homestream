@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Search, Upload, Menu, X, Film, Bookmark, ChevronDown, Wrench, ShieldCheck } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { toast } from 'sonner';
 import { useMedia } from '@/context/MediaContext';
 import { useProfile, PROFILES } from '@/context/ProfileContext';
 import SettingsPanel from '@/components/SettingsPanel';
@@ -13,10 +14,24 @@ interface HeaderProps {
   onChatOpen?: () => void;
 }
 
-/** Poll /api/stremio/downloads every 5s to get active download count for the badge */
+interface DownloadEntry {
+  hash: string;
+  title?: string;
+  name?: string;
+  status: string;
+}
+
+/**
+ * Poll /api/stremio/downloads every 5s.
+ * Returns active download count and fires a toast when a torrent transitions
+ * from downloading → done/seeding.
+ */
 function useActiveDownloadCount(): number {
   const [count, setCount] = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Track previous statuses so we can detect transitions
+  const prevStatuses = useRef<Map<string, string>>(new Map());
+  const { refreshLibrary } = useMedia();
 
   useEffect(() => {
     const poll = async () => {
@@ -24,9 +39,38 @@ function useActiveDownloadCount(): number {
         const res = await fetch('/api/stremio/downloads');
         if (!res.ok) return;
         const data = await res.json() as {
-          jobs?: { status: string }[];
-          qbitTorrents?: { status: string }[];
+          jobs?: DownloadEntry[];
+          qbitTorrents?: DownloadEntry[];
         };
+
+        const allEntries: DownloadEntry[] = [
+          ...(data.jobs ?? []),
+          ...(data.qbitTorrents ?? []),
+        ];
+
+        // Detect completions
+        for (const entry of allEntries) {
+          const prev = prevStatuses.current.get(entry.hash);
+          const isNowDone = entry.status === 'done' || entry.status === 'seeding';
+          const wasActive = prev === 'downloading' || prev === 'queued';
+
+          if (wasActive && isNowDone) {
+            const label = entry.title || entry.name || 'Download';
+            toast.success(`"${label}" is ready to watch`, {
+              description: 'Added to your library',
+              duration: 6000,
+              action: { label: 'Go to Library', onClick: () => window.location.assign('/library') },
+            });
+            // Refresh library so the new item appears immediately
+            refreshLibrary?.();
+          }
+        }
+
+        // Update prev map
+        const next = new Map<string, string>();
+        for (const e of allEntries) next.set(e.hash, e.status);
+        prevStatuses.current = next;
+
         const active =
           (data.jobs ?? []).filter(j => j.status === 'downloading' || j.status === 'queued' || j.status === 'transcoding').length +
           (data.qbitTorrents ?? []).filter(t => t.status === 'downloading' || t.status === 'queued').length;
@@ -37,6 +81,7 @@ function useActiveDownloadCount(): number {
     poll();
     timerRef.current = setInterval(poll, 5_000);
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return count;

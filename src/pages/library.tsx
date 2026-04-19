@@ -361,6 +361,12 @@ export default function LibraryPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const sseRefs = useRef<Map<string, EventSource>>(new Map());
 
+  // ── Bulk delete state ──
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
+
   const genId = () => Math.random().toString(36).slice(2);
 
   // ── On mount: reconnect SSE for any items still transcoding in the library ──
@@ -631,6 +637,31 @@ export default function LibraryPage() {
     toast.success(`"${item?.title}" removed from library`);
   };
 
+  const confirmBulkDelete = async () => {
+    setBulkDeleting(true);
+    const ids = Array.from(selectedIds);
+    let deleted = 0;
+    for (const id of ids) {
+      try {
+        await deleteMedia(id);
+        deleted++;
+      } catch { /* continue */ }
+    }
+    setBulkDeleting(false);
+    setBulkDeleteConfirm(false);
+    setSelectMode(false);
+    setSelectedIds(new Set());
+    toast.success(`Removed ${deleted} item${deleted !== 1 ? 's' : ''} from library`);
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
   return (
     <div className="min-h-screen bg-background pt-20 pb-16">
       <title>My Library — HomeStream</title>
@@ -852,10 +883,55 @@ export default function LibraryPage() {
         </AnimatePresence>
 
         {/* ── Library Grid ── */}
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
           <h2 className="text-xl font-heading text-foreground">
             {library.length} Title{library.length !== 1 ? 's' : ''}
           </h2>
+          <div className="flex items-center gap-2">
+            {selectMode ? (
+              <>
+                <span className="text-xs text-muted-foreground">
+                  {selectedIds.size} selected
+                </span>
+                <button
+                  onClick={() => setSelectedIds(new Set(library.map(m => m.id)))}
+                  className="text-xs text-primary hover:text-primary/80 transition-colors"
+                >
+                  Select all
+                </button>
+                <button
+                  onClick={() => setSelectedIds(new Set())}
+                  className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  Clear
+                </button>
+                {selectedIds.size > 0 && (
+                  <button
+                    onClick={() => setBulkDeleteConfirm(true)}
+                    className="flex items-center gap-1.5 text-xs bg-destructive/15 hover:bg-destructive/25 text-destructive border border-destructive/30 px-3 py-1.5 rounded-lg transition-colors"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    Delete {selectedIds.size}
+                  </button>
+                )}
+                <button
+                  onClick={() => { setSelectMode(false); setSelectedIds(new Set()); }}
+                  className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground border border-border px-3 py-1.5 rounded-lg transition-colors"
+                >
+                  <X className="w-3.5 h-3.5" /> Cancel
+                </button>
+              </>
+            ) : (
+              library.length > 0 && (
+                <button
+                  onClick={() => setSelectMode(true)}
+                  className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground border border-border px-3 py-1.5 rounded-lg transition-colors"
+                >
+                  <Check className="w-3.5 h-3.5" /> Select
+                </button>
+              )
+            )}
+          </div>
         </div>
 
         {loading ? (
@@ -875,8 +951,14 @@ export default function LibraryPage() {
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
             {library.map((item: MediaItem & { transcoding?: boolean; transcodeWarning?: string; transcodeError?: string }) => (
-              <div key={item.id} className="group relative">
-                <div className="aspect-[2/3] rounded-lg overflow-hidden bg-card relative">
+              <div
+                key={item.id}
+                className={`group relative ${selectMode ? 'cursor-pointer' : ''}`}
+                onClick={selectMode ? () => toggleSelect(item.id) : undefined}
+              >
+                <div className={`aspect-[2/3] rounded-lg overflow-hidden bg-card relative transition-all ${
+                  selectMode && selectedIds.has(item.id) ? 'ring-2 ring-primary ring-offset-2 ring-offset-background' : ''
+                }`}>
                   {/* Poster — with proper icon fallback (no external placeholder URLs) */}
                   {item.poster ? (
                     <PosterImage poster={item.poster} title={item.title} />
@@ -884,6 +966,17 @@ export default function LibraryPage() {
                     <div className="w-full h-full flex flex-col items-center justify-center gap-2 bg-card p-2">
                       <Film className="w-8 h-8 text-muted-foreground/30" />
                       <p className="text-[10px] text-muted-foreground text-center line-clamp-3">{item.title}</p>
+                    </div>
+                  )}
+
+                  {/* Select mode checkbox overlay */}
+                  {selectMode && (
+                    <div className={`absolute top-2 left-2 z-10 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${
+                      selectedIds.has(item.id)
+                        ? 'bg-primary border-primary'
+                        : 'bg-black/50 border-white/60'
+                    }`}>
+                      {selectedIds.has(item.id) && <Check className="w-3.5 h-3.5 text-white" />}
                     </div>
                   )}
 
@@ -1009,6 +1102,30 @@ export default function LibraryPage() {
             <AlertDialogCancel className="bg-secondary text-foreground border-border hover:bg-secondary/70">Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={confirmDelete} className="bg-destructive hover:bg-destructive/80 text-white">
               Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* ── Bulk Delete Confirmation ── */}
+      <AlertDialog open={bulkDeleteConfirm} onOpenChange={setBulkDeleteConfirm}>
+        <AlertDialogContent className="bg-card border-border">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-foreground">
+              Delete {selectedIds.size} item{selectedIds.size !== 1 ? 's' : ''}?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-muted-foreground">
+              This will permanently delete {selectedIds.size} file{selectedIds.size !== 1 ? 's' : ''} and remove them from your library. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="bg-secondary text-foreground border-border hover:bg-secondary/70">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmBulkDelete}
+              disabled={bulkDeleting}
+              className="bg-destructive hover:bg-destructive/80 text-white"
+            >
+              {bulkDeleting ? 'Deleting…' : `Delete ${selectedIds.size}`}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
