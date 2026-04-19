@@ -15,6 +15,7 @@ import {
   X, RefreshCw, CheckCircle2, AlertTriangle, XCircle,
   HelpCircle, Wrench, Loader2, ChevronRight, Trash2,
   Database, Wifi, Download, Cpu, Film, Server,
+  ClipboardCopy, ClipboardCheck, Bug, ChevronDown,
 } from 'lucide-react';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -32,6 +33,18 @@ interface HealthReport {
   overall: SubsystemStatus;
   checks: SubsystemCheck[];
   timestamp: string;
+}
+
+interface CrashEntry {
+  id: string;
+  timestamp: string;
+  type: string;
+  message: string;
+  stack?: string;
+  context?: string;
+  nodeVersion: string;
+  platform: string;
+  uptime: number;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -59,6 +72,192 @@ function subsystemIcon(name: string) {
   if (name.includes('Torrentio')) return <Wifi className="w-3.5 h-3.5 text-muted-foreground" />;
   if (name.includes('Download')) return <Database className="w-3.5 h-3.5 text-muted-foreground" />;
   return <Server className="w-3.5 h-3.5 text-muted-foreground" />;
+}
+
+// ── Crash Log Section ─────────────────────────────────────────────────────────
+
+function CrashLogSection() {
+  const [entries, setEntries] = useState<CrashEntry[] | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [clearing, setClearing] = useState(false);
+  const [open, setOpen] = useState(false);
+
+  const fetchLog = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch('/api/crash-log');
+      const data = await res.json() as { entries: CrashEntry[] };
+      setEntries(data.entries ?? []);
+    } catch {
+      setEntries([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const handleOpen = () => {
+    setOpen(v => {
+      if (!v && entries === null) fetchLog();
+      return !v;
+    });
+  };
+
+  const copyAll = async () => {
+    if (!entries?.length) return;
+    const text = [
+      `HomeStream Crash Log — ${new Date().toISOString()}`,
+      `Total entries: ${entries.length}`,
+      '─'.repeat(60),
+      ...entries.map(e => [
+        `[${e.timestamp}] ${e.type.toUpperCase()}`,
+        `Message: ${e.message}`,
+        e.context ? `Context: ${e.context}` : null,
+        `Platform: ${e.platform}`,
+        `Node: ${e.nodeVersion}  Uptime: ${e.uptime}s`,
+        e.stack ? `Stack:\n${e.stack}` : null,
+        '─'.repeat(40),
+      ].filter(Boolean).join('\n')),
+    ].join('\n');
+    await navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2500);
+  };
+
+  const clearLog = async () => {
+    setClearing(true);
+    try {
+      await fetch('/api/crash-log?clear=1');
+      setEntries([]);
+    } finally {
+      setClearing(false);
+    }
+  };
+
+  const typeColor = (type: string) => {
+    if (type === 'uncaughtException') return 'text-destructive bg-destructive/10 border-destructive/20';
+    if (type === 'unhandledRejection') return 'text-orange-400 bg-orange-500/10 border-orange-500/20';
+    if (type === 'expressError') return 'text-yellow-400 bg-yellow-500/10 border-yellow-500/20';
+    return 'text-muted-foreground bg-muted/20 border-border';
+  };
+
+  return (
+    <div className="border-t border-border">
+      {/* Collapsible header */}
+      <button
+        onClick={handleOpen}
+        className="w-full flex items-center justify-between px-4 py-3 hover:bg-muted/30 transition-colors"
+      >
+        <div className="flex items-center gap-2">
+          <Bug className="w-3.5 h-3.5 text-destructive" />
+          <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Crash Log</span>
+          {entries !== null && entries.length > 0 && (
+            <span className="text-[9px] bg-destructive/20 text-destructive px-1.5 py-0.5 rounded-full font-bold">
+              {entries.length}
+            </span>
+          )}
+        </div>
+        <ChevronDown className={`w-3.5 h-3.5 text-muted-foreground transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+
+      {open && (
+        <div className="px-4 pb-4 flex flex-col gap-3">
+          {/* Actions row */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={fetchLog}
+              disabled={loading}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-muted hover:bg-muted/80 text-foreground text-[10px] font-medium transition-colors disabled:opacity-50"
+            >
+              <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} />
+              Refresh
+            </button>
+            <button
+              onClick={copyAll}
+              disabled={!entries?.length}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-primary/20 hover:bg-primary/30 text-primary text-[10px] font-semibold transition-colors disabled:opacity-40"
+            >
+              {copied
+                ? <><ClipboardCheck className="w-3 h-3" /> Copied!</>
+                : <><ClipboardCopy className="w-3 h-3" /> Copy All for Support</>
+              }
+            </button>
+            {entries !== null && entries.length > 0 && (
+              <button
+                onClick={clearLog}
+                disabled={clearing}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-destructive/10 hover:bg-destructive/20 text-destructive text-[10px] font-medium transition-colors ml-auto"
+              >
+                {clearing ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
+                Clear
+              </button>
+            )}
+          </div>
+
+          {/* Hint */}
+          <p className="text-[10px] text-muted-foreground leading-relaxed">
+            If HomeStream crashes or behaves unexpectedly, click <strong className="text-foreground/70">Copy All for Support</strong> and paste the result into the chat. This includes full stack traces, platform info, and timing.
+          </p>
+
+          {/* Loading */}
+          {loading && (
+            <div className="flex items-center gap-2 py-3 justify-center text-muted-foreground text-xs">
+              <Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading crash log…
+            </div>
+          )}
+
+          {/* Empty state */}
+          {!loading && entries !== null && entries.length === 0 && (
+            <div className="flex items-center gap-2 py-3 justify-center text-muted-foreground text-xs">
+              <CheckCircle2 className="w-3.5 h-3.5 text-green-400" /> No crashes recorded
+            </div>
+          )}
+
+          {/* Entries */}
+          {!loading && entries !== null && entries.length > 0 && (
+            <div className="flex flex-col gap-2 max-h-72 overflow-y-auto pr-1">
+              {entries.map(entry => (
+                <div key={entry.id} className={`rounded-xl border text-[10px] overflow-hidden ${typeColor(entry.type)}`}>
+                  <button
+                    onClick={() => setExpanded(expanded === entry.id ? null : entry.id)}
+                    className="w-full flex items-start gap-2 p-2.5 text-left hover:opacity-80 transition-opacity"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
+                        <span className="font-bold uppercase text-[9px] tracking-wide">{entry.type}</span>
+                        <span className="text-muted-foreground">{new Date(entry.timestamp).toLocaleString()}</span>
+                      </div>
+                      <p className="font-mono truncate">{entry.message}</p>
+                      {entry.context && <p className="text-muted-foreground truncate">in {entry.context}</p>}
+                    </div>
+                    <ChevronRight className={`w-3 h-3 flex-shrink-0 mt-0.5 transition-transform ${expanded === entry.id ? 'rotate-90' : ''}`} />
+                  </button>
+                  {expanded === entry.id && (
+                    <div className="px-2.5 pb-2.5 border-t border-current/10">
+                      <div className="flex flex-col gap-1 mt-2">
+                        <div className="flex gap-2 text-muted-foreground">
+                          <span>Node: {entry.nodeVersion}</span>
+                          <span>·</span>
+                          <span>Uptime: {entry.uptime}s</span>
+                        </div>
+                        <p className="text-muted-foreground">{entry.platform}</p>
+                        {entry.stack && (
+                          <pre className="mt-1.5 p-2 bg-black/30 rounded-lg text-[9px] font-mono whitespace-pre-wrap break-all leading-relaxed max-h-40 overflow-y-auto">
+                            {entry.stack}
+                          </pre>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
 // ── Quick-fix actions ─────────────────────────────────────────────────────────

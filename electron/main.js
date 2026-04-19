@@ -18,8 +18,55 @@ const path = require('path');
 const { spawn } = require('child_process');
 const http = require('http');
 const os = require('os');
+const fs = require('fs');
 
-// Resolve the bundled ffmpeg binary path.
+// ── Electron-side crash logger ────────────────────────────────────────────────
+// Captures crashes in the Electron main process itself (not the server child).
+// Writes to the same crash-log.json the server uses so everything is in one place.
+
+function getElectronCrashLogPath() {
+  // Try persistent storage first (same as server), fall back to userData
+  const persistent = '/shared-storage/public/assets/crash-log.json';
+  try {
+    if (fs.existsSync(path.dirname(persistent))) return persistent;
+  } catch { /* ignore */ }
+  return path.join(app.getPath('userData'), 'crash-log.json');
+}
+
+function logElectronCrash(type, err) {
+  try {
+    const logPath = getElectronCrashLogPath();
+    let entries = [];
+    try { entries = JSON.parse(fs.readFileSync(logPath, 'utf-8')); } catch { /* empty */ }
+    const entry = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      timestamp: new Date().toISOString(),
+      type,
+      message: err?.message ?? String(err),
+      stack: err?.stack,
+      context: 'Electron main process',
+      nodeVersion: process.version,
+      platform: `${os.platform()} ${os.arch()} (${os.release()})`,
+      uptime: Math.floor(process.uptime()),
+    };
+    const updated = [entry, ...entries].slice(0, 100);
+    const dir = path.dirname(logPath);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(logPath, JSON.stringify(updated, null, 2));
+  } catch (writeErr) {
+    process.stderr.write(`[electron-crash] Failed to write log: ${writeErr}\n`);
+  }
+}
+
+process.on('uncaughtException', (err) => {
+  logElectronCrash('uncaughtException', err);
+  process.stderr.write(`[Electron CRASH] uncaughtException: ${err?.stack ?? err}\n`);
+});
+
+process.on('unhandledRejection', (reason) => {
+  logElectronCrash('unhandledRejection', reason instanceof Error ? reason : new Error(String(reason)));
+  process.stderr.write(`[Electron CRASH] unhandledRejection: ${reason}\n`);
+});
 // ffmpeg-static ships a pre-built binary for the current platform.
 // In a packaged Electron app the node_modules tree is included, so this
 // resolves correctly at runtime without the user installing FFmpeg manually.

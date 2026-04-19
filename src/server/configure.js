@@ -4,6 +4,14 @@ import { fileURLToPath } from "node:url";
 import { dirname, join, extname } from "node:path";
 import zlib from "node:zlib";
 
+// Install process-level crash handlers as early as possible so even
+// errors during startup are captured to the persistent crash log.
+import('./crashLogger.js').then(({ installCrashHandlers }) => {
+  installCrashHandlers();
+}).catch(err => {
+  process.stderr.write(`[configure] Failed to install crash handlers: ${err}\n`);
+});
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 /**
@@ -169,6 +177,10 @@ export const serverAfter = (server) => {
 
   const errorHandler = (err, req, res, next) => {
     if (err instanceof Error) {
+      // Log to persistent crash log so it shows up in the Debug Panel
+      import('./crashLogger.js').then(({ logCrash }) => {
+        logCrash('expressError', err, `${req.method} ${req.path}`);
+      }).catch(() => {});
       res.status(500).json({ error: err.message });
     } else {
       next(err);
