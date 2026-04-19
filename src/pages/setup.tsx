@@ -475,23 +475,74 @@ export default function SetupPage() {
                   </p>
                 </div>
 
-                <div className="flex flex-col gap-3">
-                  {[
-                    { icon: HardDrive, label: 'Media folder', desc: 'Where your movies and shows live' },
-                    { icon: Wifi, label: 'qBittorrent', desc: 'Download engine (optional but recommended)' },
-                    { icon: Tv2, label: 'Jellyfin', desc: 'Stream to any device on your network' },
-                    { icon: KeyRound, label: 'API keys', desc: 'TMDB, OMDB, Google AI — all free, all optional' },
-                  ].map(({ icon: Icon, label, desc }) => (
-                    <div key={label} className="flex items-center gap-3 p-3 rounded-xl bg-muted/40">
-                      <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                        <Icon className="w-4 h-4 text-primary" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-foreground">{label}</p>
-                        <p className="text-xs text-muted-foreground">{desc}</p>
-                      </div>
+                {/* What you actually need */}
+                <div className="flex flex-col gap-2">
+                  {/* Required */}
+                  <div className="flex items-start gap-3 p-3 rounded-xl bg-muted/40 border border-border">
+                    <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <HardDrive className="w-4 h-4 text-primary" />
                     </div>
-                  ))}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="text-sm font-semibold text-foreground">Media Folder</p>
+                        <span className="text-[10px] bg-primary/20 text-primary px-1.5 py-0.5 rounded-full font-bold">REQUIRED</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-0.5">The folder where your video files live. HomeStream reads from here — nothing is moved or copied.</p>
+                    </div>
+                  </div>
+
+                  {/* qBittorrent */}
+                  <div className="flex items-start gap-3 p-3 rounded-xl bg-muted/40 border border-border">
+                    <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <Wifi className="w-4 h-4 text-blue-400" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="text-sm font-semibold text-foreground">qBittorrent</p>
+                        <span className="text-[10px] bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded-full font-bold">OPTIONAL</span>
+                        <span className="text-[10px] bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded-full font-bold">FREE</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-0.5">Adds in-app downloading. <strong className="text-foreground/70">Without it:</strong> you can still play any files already in your media folder — just no download button.</p>
+                    </div>
+                  </div>
+
+                  {/* Jellyfin */}
+                  <div className="flex items-start gap-3 p-3 rounded-xl bg-muted/40 border border-border">
+                    <div className="w-8 h-8 rounded-lg bg-purple-500/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <Tv2 className="w-4 h-4 text-purple-400" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="text-sm font-semibold text-foreground">Jellyfin</p>
+                        <span className="text-[10px] bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded-full font-bold">OPTIONAL</span>
+                        <span className="text-[10px] bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded-full font-bold">FREE</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-0.5">Enables Roku, Fire TV, Apple TV, and Kodi apps via Jellyfin's API. <strong className="text-foreground/70">Without it:</strong> HomeStream's own browser UI and phone remote still work perfectly — you just can't use Jellyfin client apps.</p>
+                    </div>
+                  </div>
+
+                  {/* API Keys */}
+                  <div className="flex items-start gap-3 p-3 rounded-xl bg-muted/40 border border-border">
+                    <div className="w-8 h-8 rounded-lg bg-yellow-500/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <KeyRound className="w-4 h-4 text-yellow-400" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="text-sm font-semibold text-foreground">API Keys</p>
+                        <span className="text-[10px] bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded-full font-bold">OPTIONAL</span>
+                        <span className="text-[10px] bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded-full font-bold">ALL FREE</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-0.5">TMDB for movie art &amp; trending, OMDB for IMDb ratings, Google AI for recommendations. <strong className="text-foreground/70">Without them:</strong> HomeStream still plays your files — just no posters, metadata, or AI chat.</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Minimum viable setup callout */}
+                <div className="flex items-start gap-2.5 p-3 bg-green-500/10 border border-green-500/20 rounded-xl">
+                  <CheckCircle2 className="w-4 h-4 text-green-400 mt-0.5 flex-shrink-0" />
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    <strong className="text-green-400">Minimum setup:</strong> Just set a media folder and you're done. HomeStream will play any video files it finds immediately — everything else is a bonus.
+                  </p>
                 </div>
 
                 <div className="bg-primary/10 border border-primary/20 rounded-xl p-3 text-xs text-muted-foreground leading-relaxed">
@@ -602,10 +653,22 @@ export default function SetupPage() {
                   <div className="flex items-center gap-2 mb-1">
                     <Wifi className="w-5 h-5 text-primary" />
                     <h2 className="text-xl font-heading font-bold text-foreground">qBittorrent</h2>
+                    <span className="text-[10px] bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded-full font-bold">OPTIONAL</span>
                   </div>
                   <p className="text-sm text-muted-foreground">
-                    Connect to qBittorrent for fast, reliable downloads with full BitTorrent swarm access.
+                    Connect to qBittorrent for in-app downloading with full BitTorrent swarm access.
                   </p>
+                </div>
+
+                {/* What works without it */}
+                <div className="flex items-start gap-2.5 p-3 bg-muted/30 border border-dashed border-border rounded-xl">
+                  <CheckCircle2 className="w-4 h-4 text-green-400 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="text-xs font-semibold text-foreground mb-0.5">Works fine without qBittorrent</p>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      HomeStream will still play any video files already in your media folder. You just won't have the in-app download button — you can always add qBittorrent later in <strong>Settings → Downloads</strong>.
+                    </p>
+                  </div>
                 </div>
 
                 <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-3 text-xs text-muted-foreground leading-relaxed">
@@ -703,10 +766,36 @@ export default function SetupPage() {
                   <div className="flex items-center gap-2 mb-1">
                     <Tv2 className="w-5 h-5 text-primary" />
                     <h2 className="text-xl font-heading font-bold text-foreground">Jellyfin</h2>
+                    <span className="text-[10px] bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded-full font-bold">OPTIONAL</span>
+                    <span className="text-[10px] bg-green-500/20 text-green-400 px-2 py-0.5 rounded-full font-bold">FREE</span>
                   </div>
                   <p className="text-sm text-muted-foreground">
-                    Connect Jellyfin to stream your library to any TV, phone, or browser on your network.
+                    Adds Jellyfin API compatibility so TV apps like Infuse, Swiftfin, and Kodi can connect to HomeStream.
                   </p>
+                </div>
+
+                {/* What Jellyfin is actually for */}
+                <div className="grid grid-cols-1 gap-2">
+                  <div className="flex items-start gap-2.5 p-3 bg-green-500/10 border border-green-500/20 rounded-xl">
+                    <CheckCircle2 className="w-4 h-4 text-green-400 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <p className="text-xs font-semibold text-foreground mb-0.5">HomeStream works fully without Jellyfin</p>
+                      <p className="text-xs text-muted-foreground leading-relaxed">
+                        The HomeStream browser UI, phone remote, Chromecast, and DLNA casting all work without Jellyfin. You only need it if you want to use <strong className="text-foreground/70">Jellyfin client apps</strong> (Infuse, Swiftfin, Kodi, Emby Theater, etc.) on your TV or phone.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2.5 p-3 bg-muted/30 border border-border rounded-xl">
+                    <Tv2 className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                    <div>
+                      <p className="text-xs font-semibold text-foreground mb-0.5">Want to use a TV app?</p>
+                      <p className="text-xs text-muted-foreground leading-relaxed">
+                        Install Jellyfin (free, open-source) on the same machine as HomeStream. Then connect your TV app to HomeStream's address — it speaks Jellyfin's API natively.
+                        <br />
+                        <span className="text-[10px] mt-1 block">Recommended TV apps: <a href="https://infuse.video" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Infuse</a> (Apple TV/iOS) · <a href="https://github.com/jellyfin/Swiftfin" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Swiftfin</a> (iOS) · <a href="https://jellyfin.org/clients" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">All Jellyfin clients</a></span>
+                      </p>
+                    </div>
+                  </div>
                 </div>
 
                 <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-3 text-xs text-muted-foreground leading-relaxed">
@@ -1061,10 +1150,19 @@ export default function SetupPage() {
                   )}
 
                   {!form.vpnEnabled && (
-                    <div className="p-4 bg-muted/20 rounded-xl border border-dashed border-border text-center">
-                      <p className="text-sm text-muted-foreground">
-                        No VPN — you can add one later in Settings → VPN.
-                      </p>
+                    <div className="p-4 bg-muted/20 rounded-xl border border-dashed border-border">
+                      <div className="flex items-start gap-2.5">
+                        <CheckCircle2 className="w-4 h-4 text-green-400 mt-0.5 flex-shrink-0" />
+                        <div>
+                          <p className="text-sm font-semibold text-foreground mb-1">HomeStream works fine without a VPN</p>
+                          <p className="text-xs text-muted-foreground leading-relaxed">
+                            Streaming and playback are never affected by VPN status. A VPN only matters if you use the download feature — it shields your IP from your ISP while torrenting.
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
+                            <strong className="text-foreground/70">Free options:</strong> <a href="https://protonvpn.com" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">ProtonVPN</a> has a free tier with WireGuard support. <a href="https://mullvad.net" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Mullvad</a> is €5/month with no account required. You can also add a VPN later in <strong>Settings → VPN</strong>.
+                          </p>
+                        </div>
+                      </div>
                     </div>
                   )}
 
@@ -1109,10 +1207,35 @@ export default function SetupPage() {
                   <div className="flex items-center gap-2 mb-1">
                     <KeyRound className="w-5 h-5 text-primary" />
                     <h2 className="text-xl font-heading font-bold text-foreground">API Keys</h2>
+                    <span className="text-[10px] bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded-full font-bold">ALL OPTIONAL</span>
                   </div>
                   <p className="text-sm text-muted-foreground">
                     All optional — HomeStream works without them, but they unlock richer features.
                   </p>
+                </div>
+
+                {/* What works without any keys */}
+                <div className="grid grid-cols-2 gap-2 text-[11px]">
+                  <div className="p-2.5 rounded-xl bg-green-500/10 border border-green-500/20">
+                    <p className="font-semibold text-green-400 mb-1">✓ Always works</p>
+                    <ul className="text-muted-foreground space-y-0.5">
+                      <li>Video playback</li>
+                      <li>Subtitles &amp; audio tracks</li>
+                      <li>Watch progress &amp; history</li>
+                      <li>Phone remote &amp; Chromecast</li>
+                      <li>HLS transcoding</li>
+                    </ul>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-muted/30 border border-border">
+                    <p className="font-semibold text-foreground/70 mb-1">+ Unlocked by keys</p>
+                    <ul className="text-muted-foreground space-y-0.5">
+                      <li>Movie posters &amp; backdrops</li>
+                      <li>IMDb ratings &amp; plot</li>
+                      <li>Trending &amp; upcoming</li>
+                      <li>AI recommendations</li>
+                      <li>Auto-enrichment</li>
+                    </ul>
+                  </div>
                 </div>
 
                 <div className="flex flex-col gap-4">
