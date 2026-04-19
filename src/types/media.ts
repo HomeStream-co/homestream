@@ -45,6 +45,11 @@ export interface MediaItem {
   // AI enrichment (populated after upload wizard runs)
   enrichment?: MediaEnrichment;
   enriching?: boolean;          // true while wizard is running
+  // Closed caption availability (populated after caption fetch)
+  captions?: {
+    en?: 'downloaded' | 'stub' | 'exists';
+    es?: 'downloaded' | 'stub' | 'exists';
+  };
   // TV show episode tracking
   totalSeasons?: number;
   episodes?: Episode[];

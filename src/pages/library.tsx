@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import {
   Film, Trash2, Edit2, Check, X, Star, AlertCircle,
-  Upload, Clapperboard, Cpu, CheckCircle2, Clock, Zap, WifiOff, PenLine,
+  Upload, Clapperboard, Cpu, CheckCircle2, Clock, Zap, WifiOff, PenLine, Captions,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'sonner';
@@ -280,6 +280,9 @@ interface UploadingFile {
   enrichmentDone: boolean;   // wizard finished
   needsMetadata?: boolean;   // true = offline upload, user should fill in details
   offlineMode?: boolean;     // true = server had no internet during upload
+  // Closed captions
+  ccStatus?: 'fetching' | 'done' | 'failed' | 'offline';
+  ccLangs?: { en?: string; es?: string };
 }
 
 interface EditState {
@@ -391,6 +394,41 @@ export default function LibraryPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading]);
 
+  // ── Fetch CC subtitles for a media item ──
+  const fetchCaptions = useCallback(async (uiId: string, mediaId: string, isOffline: boolean) => {
+    if (isOffline) {
+      setUploading(prev => prev.map(u =>
+        u.id === uiId ? { ...u, ccStatus: 'offline' } : u
+      ));
+      return;
+    }
+    setUploading(prev => prev.map(u =>
+      u.id === uiId ? { ...u, ccStatus: 'fetching' } : u
+    ));
+    try {
+      const res = await fetch(`/api/captions/${mediaId}/fetch`, { method: 'POST' });
+      const data = await res.json() as { success: boolean; langs?: Record<string, string> };
+      setUploading(prev => prev.map(u =>
+        u.id === uiId
+          ? { ...u, ccStatus: data.success ? 'done' : 'failed', ccLangs: data.langs }
+          : u
+      ));
+      if (data.success) {
+        // Persist caption availability to the library item
+        await fetch(`/api/media/${mediaId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ captions: data.langs }),
+        });
+        refreshLibrary();
+      }
+    } catch {
+      setUploading(prev => prev.map(u =>
+        u.id === uiId ? { ...u, ccStatus: 'failed' } : u
+      ));
+    }
+  }, [refreshLibrary]);
+
   // ── SSE listener for a transcode job ──
   const listenToTranscode = useCallback((uiId: string, transcodeId: string) => {
     // Close any existing SSE for this item
@@ -418,6 +456,14 @@ export default function LibraryPage() {
           sseRefs.current.delete(uiId);
           refreshLibrary();
           toast.success('Transcode complete — ready to watch!');
+          // Kick off CC download in background (non-blocking)
+          setUploading(prev => {
+            const u = prev.find(f => f.id === uiId);
+            if (u?.transcodeId) {
+              fetchCaptions(uiId, u.transcodeId, u.offlineMode ?? false);
+            }
+            return prev;
+          });
         } else if (job.status === 'error') {
           setUploading(prev => prev.map(u =>
             u.id === uiId
@@ -453,7 +499,7 @@ export default function LibraryPage() {
       sseRefs.current.delete(uiId);
       refreshLibrary();
     };
-  }, [refreshLibrary]);
+  }, [refreshLibrary, fetchCaptions]);
 
   // Clean up SSE connections on unmount
   useEffect(() => {
@@ -723,10 +769,35 @@ export default function LibraryPage() {
                           </p>
                         )}
                       </div>
-                      <div className="ml-auto">
+                      <div className="ml-auto flex flex-col items-end gap-1.5">
                         <span className="text-xs text-green-400 flex items-center gap-1">
                           <CheckCircle2 className="w-3.5 h-3.5" /> H.264 faststart
                         </span>
+                        {/* CC download status */}
+                        {u.ccStatus === 'fetching' && (
+                          <span className="text-xs text-muted-foreground flex items-center gap-1 animate-pulse">
+                            <Captions className="w-3.5 h-3.5" /> Fetching CC…
+                          </span>
+                        )}
+                        {u.ccStatus === 'done' && (
+                          <span className="text-xs text-primary flex items-center gap-1">
+                            <Captions className="w-3.5 h-3.5" />
+                            CC {[
+                              u.ccLangs?.en === 'downloaded' ? 'EN' : null,
+                              u.ccLangs?.es === 'downloaded' ? 'ES' : null,
+                            ].filter(Boolean).join(' · ') || 'saved'}
+                          </span>
+                        )}
+                        {u.ccStatus === 'offline' && (
+                          <span className="text-xs text-yellow-500 flex items-center gap-1">
+                            <WifiOff className="w-3 h-3" /> CC offline — retry later
+                          </span>
+                        )}
+                        {u.ccStatus === 'failed' && (
+                          <span className="text-xs text-muted-foreground flex items-center gap-1">
+                            <Captions className="w-3.5 h-3.5" /> No CC found
+                          </span>
+                        )}
                       </div>
                     </div>
                   )}
@@ -903,6 +974,18 @@ export default function LibraryPage() {
                       ))}
                     </div>
                   ) : null}
+                  {/* CC availability pill */}
+                  {item.captions && (item.captions.en === 'downloaded' || item.captions.es === 'downloaded') && (
+                    <div className="flex items-center gap-0.5 mt-1">
+                      <Captions className="w-2.5 h-2.5 text-primary flex-shrink-0" />
+                      <span className="text-[9px] text-primary font-medium">
+                        CC {[
+                          item.captions.en === 'downloaded' ? 'EN' : null,
+                          item.captions.es === 'downloaded' ? 'ES' : null,
+                        ].filter(Boolean).join('·')}
+                      </span>
+                    </div>
+                  )}
                   {item.transcodeWarning && !item.transcodeError && (
                     <p className="text-[9px] text-yellow-500 mt-0.5 truncate" title={item.transcodeWarning}>
                       ⚠ {item.transcodeWarning}
