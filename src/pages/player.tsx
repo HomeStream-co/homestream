@@ -244,7 +244,44 @@ export default function PlayerPage() {
         .map(({ item: m }) => m)
     : [];
 
-  const nextItem = similarItems[0] ?? null;
+  // ── Next item: for series try to find the next episode in the library,
+  //    otherwise fall back to the top similarity match ──
+  const nextItem = (() => {
+    if (!item) return null;
+
+    if (item.type === 'series') {
+      // Try to find another episode of the same show that hasn't been watched yet.
+      // Match by title prefix (same show name) and pick the one with the lowest
+      // season/episode number that is still unwatched (watchProgress < 90).
+      const showTitle = item.title
+        .replace(/\s*[Ss]\d+[Ee]\d+.*$/, '')   // strip S01E02 suffix
+        .replace(/\s*[-–]\s*Season\s*\d+.*$/i, '') // strip "Season N" suffix
+        .replace(/\s*\(\d{4}\)$/, '')           // strip year
+        .trim()
+        .toLowerCase();
+
+      const sameShow = library
+        .filter(m =>
+          m.id !== item.id &&
+          m.type === 'series' &&
+          m.title.toLowerCase().startsWith(showTitle) &&
+          (m.watchProgress ?? 0) < 90
+        )
+        .sort((a, b) => {
+          // Sort by season then episode extracted from filename / title
+          const epNum = (t: string) => {
+            const m = t.match(/[Ss](\d+)[Ee](\d+)/);
+            return m ? parseInt(m[1]) * 1000 + parseInt(m[2]) : 9999;
+          };
+          return epNum(a.filename) - epNum(b.filename);
+        });
+
+      if (sameShow.length > 0) return sameShow[0];
+    }
+
+    // Fallback: top similarity match
+    return similarItems[0] ?? null;
+  })();
 
   // ── Save progress helper — call this any time we want to persist ──
   const saveProgress = useCallback(() => {

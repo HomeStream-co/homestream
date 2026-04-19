@@ -1,312 +1,262 @@
-# V8 App Template
+# 🎬 HomeStream
 
-A modern, production-ready web application template built with Vite, React, and TypeScript. Designed for AI-assisted development with component introspection, layout systems, and excellent developer experience.
-
-## 🚀 Features
-
-- **⚡ Lightning Fast**: Vite for instant hot module replacement and optimized builds
-- **🎯 Type Safe**: Full TypeScript coverage across frontend and backend
-- **🎨 Beautiful UI**: shadcn/ui components with Tailwind CSS
-- **🧠 AI-Friendly**: Component introspection for AI development tools
-- **📱 Responsive**: Mobile-first design with modern CSS
-- **🔧 Developer Experience**: Hot reload, linting, formatting, and testing setup
-- **🚀 Production Ready**: SSR support, optimized builds, and deployment-ready
-
-## 🛠️ Tech Stack
-
-### Frontend
-
-- **React 18+** - Modern React with hooks and concurrent features
-- **TypeScript 5** - Full type safety across the application
-- **Vite 5** - Fast build tool and dev server with HMR
-- **Tailwind CSS 3** - Utility-first CSS framework
-- **shadcn/ui** - Beautiful, accessible component library
-- **React Router DOM** - Client-side routing
-- **Framer Motion** - Smooth animations and transitions
-
-### Backend
-
-- **Node.js API** - Simple health check and utilities
-- **TypeScript** - Type-safe backend development
-
-### Development Tools
-
-- **ESLint 9** - Code linting
-- **Prettier** - Code formatting
-- **Vitest** - Fast unit testing
-- **TypeScript ESLint** - TypeScript-specific linting
-
-> **Note:** SSR support with vite-plugin-ssr has been temporarily removed due to compatibility issues with the directory structure. This can be re-added later when the plugin is updated or replaced with a more stable alternative.
-
-## 📁 Project Structure
-
-```
-v8-app-template/
-├── src/
-│   ├── components/       # React components
-│   │   ├── ui/           # shadcn/ui base components (40+ components)
-│   │   └── Spinner.tsx
-│   ├── layouts/          # Layout systems
-│   │   ├── RootLayout.tsx    # Centralized layout wrapper
-│   │   ├── Website.tsx       # Structural container
-│   │   ├── Dashboard.tsx     # Dashboard layout
-│   │   ├── RootLayout.md     # RootLayout documentation
-│   │   ├── Website.md        # Website layout documentation
-│   │   └── parts/            # Layout components
-│   │       ├── Header.tsx
-│   │       └── Footer.tsx
-│   ├── pages/            # Page components (content only)
-│   │   ├── index.tsx     # Homepage
-│   │   └── _404.tsx      # 404 page
-│   ├── lib/              # Utilities and API
-│   │   ├── utils.ts      # Utility functions
-│   │   └── api-client.ts # API client
-│   ├── api/              # Backend API routes
-│   │   └── health.ts     # Health check endpoint
-│   ├── styles/           # Global styles
-│   │   └── globals.css
-│   ├── test/             # Test setup
-│   │   └── setup.ts
-│   ├── App.tsx           # Root application component
-│   ├── main.tsx          # Application entry point
-│   ├── router.ts         # Route definitions
-│   └── routes.tsx        # Route components
-├── dev-tools/            # Development mode enhancements
-├── source-mapper/        # AI introspection plugin
-├── public/               # Static assets
-└── scripts/              # Development scripts
-```
-
-## 📜 Available Scripts
-
-- `npm run dev` - Start development server with hot reload
-- `npm run build` - Build for production
-- `npm run preview` - Preview production build locally
-- `npm run test` - Run Vitest unit tests
-- `npm run lint` - Run ESLint code linting
-- `npm run type-check` - Run TypeScript type checking
-- `npm run setup` - Initialize project with dependencies
-
-## 🎨 UI Components
-
-This template includes shadcn/ui components that are:
-
-- **Accessible** - Built with Radix UI primitives
-- **Customizable** - Easy to modify and extend
-- **Consistent** - Design system with CSS variables
-- **Copy-paste friendly** - Own your components
-
-The template includes 40+ pre-configured shadcn/ui components:
-
-- **Layout**: Card, Separator, Tabs, Sheet, Dialog
-- **Forms**: Button, Input, Textarea, Select, Checkbox, Switch
-- **Navigation**: Navigation Menu, Breadcrumb, Pagination
-- **Feedback**: Alert, Badge, Progress, Skeleton, Sonner
-- **Data Display**: Table, Avatar, Calendar, Hover Card
-- **Overlays**: Popover, Tooltip, Alert Dialog, Drawer
-- **Interactive**: Accordion, Collapsible, Command, Context Menu
-
-To add new components:
-
-```bash
-npx shadcn-ui@latest add component-name
-```
-
-## 🧠 AI Integration
-
-### Component Introspection
-
-The custom source-mapper plugin adds metadata to components in development:
-
-```html
-<div
-  data-source-file="/src/components/Button.tsx"
-  data-source-line="15"
-  data-source-component="Button"
->
-  Click Me
-</div>
-```
-
-### Development Mode Integration
-
-The dev-tools package provides:
-
-- **Element selection**: Click to identify components
-- **Live editing**: Modify component props in real-time
-- **Source mapping**: Navigate directly to component source
-- **AI integration**: Enhanced context for AI development tools
-
-### AI-Friendly Patterns
-
-- **Consistent naming**: PascalCase components, camelCase hooks
-- **Clear file structure**: Logical separation of concerns
-- **Type-first approach**: Comprehensive TypeScript types
-- **Standard patterns**: CRUD operations, form handling, error boundaries
-
-## 🗃️ API & Layouts
-
-### API Routes
-
-The template includes:
-
-- `GET /api/health` - Health check endpoint
-- Extensible API client setup in `src/lib/api-client.ts`
-
-### Layout System
-
-**RootLayout Pattern** (Recommended for multi-page sites):
-
-Configure header and footer once in `App.tsx`, applies to all pages:
-
-```tsx
-// src/App.tsx
-const headerConfig = {
-  logo: { text: "MyApp" },
-  navItems: [
-    { href: "/", label: "Home" },
-    { href: "/about", label: "About" },
-  ],
-};
-
-const router = createBrowserRouter([
-  {
-    path: "/",
-    element: (
-      <RootLayout config={{ header: headerConfig, footer: footerConfig }}>
-        <Outlet />
-      </RootLayout>
-    ),
-    children: routes,
-  },
-]);
-```
-
-Pages become simple content components:
-
-```tsx
-// src/pages/home.tsx
-export default function HomePage() {
-  return <div>Your content here</div>;
-}
-```
-
-**Available Layouts**:
-
-- **RootLayout** (`src/layouts/RootLayout.tsx`) - Centralized header/footer wrapper
-- **Website** (`src/layouts/Website.tsx`) - Structural container (used by RootLayout)
-- **Dashboard** (`src/layouts/Dashboard.tsx`) - Admin panels and dashboards
-
-See `src/layouts/*.md` for detailed usage documentation.
-
-## 🧪 Testing
-
-Run tests with:
-
-```bash
-npm run test
-```
-
-The template includes:
-
-- **Vitest** - Fast unit testing framework
-- **React Testing Library** - Component testing utilities
-- **Jest DOM** - Custom Jest matchers
-
-## 📦 Deployment
-
-### Build for production:
-
-```bash
-npm run build
-```
-
-### Deploy options:
-
-- **Vercel/Netlify** - Frontend deployment
-- **Railway/Render** - Full-stack deployment
-- **Docker** - Containerized deployment
-
-## 🔧 Configuration
-
-### Environment Variables
-
-Copy `env.example` to `.env` and configure:
-
-```env
-VITE_APP_NAME=V8 App Template
-VITE_API_URL=http://localhost:5173/api
-NODE_ENV=development
-PORT=5173
-```
-
-### Custom Plugins
-
-**Source Mapper Plugin**: Adds component introspection for AI tools
-**Dev Tools Plugin**: Enables development mode enhancements
-**Fullstory Integration**: Optional user analytics (configurable)
-
-Configure in `vite.config.ts`:
-
-```typescript
-import { defineConfig } from "vite";
-import { sourceMapperPlugin } from "./source-mapper";
-import { devToolsPlugin } from "./dev-tools";
-
-export default defineConfig({
-  plugins: [sourceMapperPlugin(), devToolsPlugin()],
-});
-```
-
-## 🎯 Best Practices
-
-### Component Architecture
-
-- Keep components small and focused
-- Use composition over inheritance
-- Extract reusable logic into hooks
-- Prefer function components with hooks
-
-### State Management
-
-- Keep local state in components with useState/useReducer
-- Use React Context for app-wide state (theme, auth)
-- Consider external libraries (Zustand, Redux Toolkit) for complex state
-- Leverage layout props for shared configuration
-
-### Layout Usage
-
-- Use RootLayout for multi-page sites (configure in `App.tsx`)
-- Pages should only contain content, not layout concerns
-- Define header/footer once, applies to all pages
-- Follow layout documentation in `src/layouts/*.md`
-- Never duplicate header/footer config across pages
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if needed
-5. Run linting and tests
-6. Submit a pull request
-
-## 📄 License
-
-MIT License - feel free to use this template for any project.
-
-## 🙏 Acknowledgments
-
-Built with amazing open-source tools:
-
-- [Vite](https://vitejs.dev/)
-- [React](https://react.dev/)
-- [shadcn/ui](https://ui.shadcn.com/)
-- [Tailwind CSS](https://tailwindcss.com/)
-- [TypeScript](https://www.typescriptlang.org/)
-- [Framer Motion](https://www.framer.com/motion/)
-- [Vitest](https://vitest.dev/)
+**Self-hosted Netflix-style family media streaming** — watch your personal movie and TV collection from any device on your home network (or over the internet with a reverse proxy).
 
 ---
 
-**Happy coding! 🎉**
+## ✨ Features
+
+| Feature | Details |
+|---|---|
+| **Video Player** | Custom controls, ±10s seek, speed 0.5×–3×, keyboard shortcuts, TV D-pad navigation |
+| **Closed Captions** | Auto-fetch EN/ES WebVTT, SRT upload, one-key CC cycling (C key) |
+| **Resume Playback** | Saves progress every 10s; resumes to exact second |
+| **Profiles** | Adult + Kids (G/PG filter); optional 4-digit PIN lock on Adult profile |
+| **Admin Password** | Optional login gate for the whole app |
+| **Watch History** | Full history page with per-item removal and clear-all |
+| **Watchlist** | Bookmark titles to watch later |
+| **AI Enrichment** | Gemini-powered tags, mood, themes, summaries, similar titles |
+| **AI Chat** | Ask for recommendations from your library |
+| **Torrent Downloads** | Stremio/Torrentio integration + qBittorrent support |
+| **Security Scanning** | 4-layer scan: extension check → VirusTotal → magic bytes → archive inspection |
+| **DLNA Casting** | Cast to any DLNA/UPnP TV on your network |
+| **Transcoding** | FFmpeg H.264 re-encode for browser compatibility |
+| **Dark Themes** | 6 built-in themes (Netflix Red, Ocean Blue, Forest Green, etc.) |
+
+---
+
+## 🐳 Docker Deployment (Recommended)
+
+### Prerequisites
+
+- [Docker](https://docs.docker.com/get-docker/) ≥ 24
+- [Docker Compose](https://docs.docker.com/compose/install/) ≥ 2.20
+- A folder of video files on your host machine
+
+### 1. Clone the repository
+
+```bash
+git clone https://github.com/yourname/homestream.git
+cd homestream
+```
+
+### 2. Create your `docker-compose.yml`
+
+```yaml
+version: "3.9"
+
+services:
+  homestream:
+    image: homestream:latest          # or build: . if building locally
+    build: .
+    container_name: homestream
+    restart: unless-stopped
+    ports:
+      - "8080:5173"                   # host:container — change 8080 to any free port
+    volumes:
+      - /your/media/folder:/media     # ← point this at your video library
+      - homestream-data:/data         # persistent config + library database
+    environment:
+      # ── Required ──────────────────────────────────────────────────────────
+      MEDIA_DIR: /media               # path inside the container
+
+      # ── Optional API keys (all features work without them) ────────────────
+      OMDB_API_KEY: ""                # https://www.omdbapi.com/apikey.aspx (free)
+      TMDB_API_KEY: ""                # https://www.themoviedb.org/settings/api (free)
+      GEMINI_API_KEY: ""              # https://aistudio.google.com/app/apikey (free tier)
+      VIRUSTOTAL_API_KEY: ""          # https://www.virustotal.com/gui/my-apikey (free)
+
+      # ── Security ──────────────────────────────────────────────────────────
+      ADMIN_PASSWORD: ""              # leave blank to disable login gate
+                                      # set to a strong password to require login
+
+      # ── qBittorrent (optional) ────────────────────────────────────────────
+      QBITTORRENT_URL: ""             # e.g. http://192.168.1.100:8080
+      QBITTORRENT_USER: ""
+      QBITTORRENT_PASS: ""
+
+      # ── AI provider (optional) ────────────────────────────────────────────
+      AI_PROVIDER: "gemini"           # "gemini" or "ollama"
+      OLLAMA_URL: ""                  # e.g. http://host.docker.internal:11434
+      OLLAMA_MODEL: "llama3"
+
+volumes:
+  homestream-data:
+```
+
+### 3. Build and start
+
+```bash
+# Build the image (first time or after code changes)
+docker compose build
+
+# Start in the background
+docker compose up -d
+
+# View logs
+docker compose logs -f homestream
+```
+
+### 4. Open in your browser
+
+```
+http://localhost:8080
+```
+
+Or replace `localhost` with your server's IP address to access from other devices on your network.
+
+---
+
+## 🔧 Configuration Reference
+
+All configuration is done via environment variables or the in-app **Settings** panel (⚙️ icon in the header).
+
+| Variable | Default | Description |
+|---|---|---|
+| `MEDIA_DIR` | `/media` | Path to your video library inside the container |
+| `ADMIN_PASSWORD` | *(blank)* | If set, requires login before accessing the app |
+| `OMDB_API_KEY` | *(blank)* | Fetches movie metadata (title, poster, rating, plot) |
+| `TMDB_API_KEY` | *(blank)* | Additional metadata + TMDB posters |
+| `GEMINI_API_KEY` | *(blank)* | AI enrichment + chat recommendations |
+| `VIRUSTOTAL_API_KEY` | *(blank)* | Hash-based malware scan on downloads |
+| `QBITTORRENT_URL` | *(blank)* | qBittorrent Web UI URL |
+| `QBITTORRENT_USER` | *(blank)* | qBittorrent username |
+| `QBITTORRENT_PASS` | *(blank)* | qBittorrent password |
+| `AI_PROVIDER` | `gemini` | `gemini` or `ollama` |
+| `OLLAMA_URL` | *(blank)* | Ollama server URL (if using local AI) |
+| `OLLAMA_MODEL` | `llama3` | Ollama model name |
+
+---
+
+## 📁 Media Library Structure
+
+HomeStream scans your media folder recursively. Supported formats:
+
+```
+/media
+├── movies/
+│   ├── Inception (2010).mkv
+│   ├── The Dark Knight (2008).mp4
+│   └── ...
+├── tv/
+│   ├── Breaking Bad S01E01.mkv
+│   ├── Breaking Bad S01E02.mkv
+│   └── ...
+└── any-other-folder/
+    └── video.avi
+```
+
+**Supported formats:** `.mp4`, `.mkv`, `.avi`, `.webm`, `.mov`, `.m4v`
+
+**Naming tips for best metadata matching:**
+- Movies: `Title (Year).ext` → `Inception (2010).mkv`
+- TV Shows: `Show Name S01E01.ext` → `Breaking Bad S01E01.mkv`
+
+---
+
+## 🔒 Security
+
+### Admin Password
+
+Set `ADMIN_PASSWORD` to require a login before anyone can access HomeStream. Useful when exposing the app to the internet via a reverse proxy.
+
+### Adult Profile PIN
+
+In **Settings → Adult Profile PIN**, set a 4-digit PIN to prevent switching to the Adult profile without entering the PIN. Useful for shared family devices.
+
+### Kids Profile
+
+The Kids profile automatically filters out any content rated above PG (TV-PG, PG-13, R, etc.) across all pages.
+
+---
+
+## 🌐 Exposing to the Internet (Optional)
+
+To access HomeStream outside your home network, use a reverse proxy with HTTPS:
+
+### Nginx example
+
+```nginx
+server {
+    listen 443 ssl;
+    server_name homestream.yourdomain.com;
+
+    ssl_certificate     /etc/letsencrypt/live/homestream.yourdomain.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/homestream.yourdomain.com/privkey.pem;
+
+    # Increase timeout for large video streams
+    proxy_read_timeout 3600;
+    proxy_send_timeout 3600;
+
+    # Allow large uploads
+    client_max_body_size 50G;
+
+    location / {
+        proxy_pass         http://localhost:8080;
+        proxy_http_version 1.1;
+        proxy_set_header   Upgrade $http_upgrade;
+        proxy_set_header   Connection "upgrade";
+        proxy_set_header   Host $host;
+        proxy_set_header   X-Real-IP $remote_addr;
+        proxy_buffering    off;   # required for video streaming
+    }
+}
+```
+
+> **Security tip:** Always set `ADMIN_PASSWORD` when exposing HomeStream to the internet.
+
+---
+
+## 🛠️ Building from Source
+
+If you want to run without Docker:
+
+### Requirements
+
+- Node.js ≥ 20
+- npm ≥ 10
+- FFmpeg (for transcoding) — `sudo apt install ffmpeg` / `brew install ffmpeg`
+
+### Steps
+
+```bash
+# Install dependencies
+npm install
+
+# Development server (hot reload)
+npm run dev
+
+# Production build
+npm run build
+
+# Start production server
+node dist/server.bundle.mjs
+```
+
+Set environment variables in a `.env` file at the project root (same variables as the Docker table above).
+
+---
+
+## 🐛 Troubleshooting
+
+### Video won't play / shows transcoding spinner
+
+FFmpeg is re-encoding the file for browser compatibility. This happens once per file. Check progress in **Library → transcoding indicator**. If it's stuck, open **Settings → Debug Panel → Fix Stuck Transcodes**.
+
+### Metadata not loading (no poster / plot)
+
+Add an OMDB API key in **Settings → API Keys**. Free tier allows 1,000 requests/day.
+
+### Can't find my media files
+
+Check that your `MEDIA_DIR` environment variable matches the container mount path. Use **Settings → Scan for New Files** to trigger a manual scan.
+
+### Health check
+
+Visit `/api/health/full` in your browser for a live status of all 7 subsystems (media scanner, FFmpeg, qBittorrent, AI, captions, security, database).
+
+---
+
+## 📝 License
+
+MIT — use freely, modify freely, no warranty.
