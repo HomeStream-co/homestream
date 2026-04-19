@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Search, Upload, Menu, X, Film, Bookmark, ChevronDown } from 'lucide-react';
+import { Search, Upload, Menu, X, Film, Bookmark, ChevronDown, Download } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useMedia } from '@/context/MediaContext';
 import { useProfile, PROFILES } from '@/context/ProfileContext';
@@ -9,6 +9,35 @@ import StremioPanel from '@/components/StremioPanel';
 
 interface HeaderProps {
   onChatOpen?: () => void;
+}
+
+/** Poll /api/stremio/downloads every 5s to get active download count for the badge */
+function useActiveDownloadCount(): number {
+  const [count, setCount] = useState(0);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    const poll = async () => {
+      try {
+        const res = await fetch('/api/stremio/downloads');
+        if (!res.ok) return;
+        const data = await res.json() as {
+          jobs?: { status: string }[];
+          qbitTorrents?: { status: string }[];
+        };
+        const active =
+          (data.jobs ?? []).filter(j => j.status === 'downloading' || j.status === 'queued' || j.status === 'transcoding').length +
+          (data.qbitTorrents ?? []).filter(t => t.status === 'downloading' || t.status === 'queued').length;
+        setCount(active);
+      } catch { /* ignore */ }
+    };
+
+    poll();
+    timerRef.current = setInterval(poll, 5_000);
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  }, []);
+
+  return count;
 }
 
 export default function Header({ onChatOpen: _onChatOpen }: HeaderProps) {
@@ -21,6 +50,7 @@ export default function Header({ onChatOpen: _onChatOpen }: HeaderProps) {
   const location = useLocation();
   const { watchlist } = useMedia();
   const { activeProfile, setActiveProfile } = useProfile();
+  const activeDownloads = useActiveDownloadCount();
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
@@ -137,6 +167,20 @@ export default function Header({ onChatOpen: _onChatOpen }: HeaderProps) {
               {watchlist.length > 0 && (
                 <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 bg-primary text-white text-[9px] font-bold rounded-full flex items-center justify-center px-0.5">
                   {watchlist.length > 99 ? '99+' : watchlist.length}
+                </span>
+              )}
+            </Link>
+
+            {/* Downloads shortcut */}
+            <Link
+              to="/downloads"
+              className="relative p-2 text-muted-foreground hover:text-foreground transition-colors"
+              title="Downloads"
+            >
+              <Download className={`w-5 h-5 transition-colors ${location.pathname === '/downloads' ? 'text-primary' : ''}`} />
+              {activeDownloads > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 bg-blue-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center px-0.5 animate-pulse">
+                  {activeDownloads > 9 ? '9+' : activeDownloads}
                 </span>
               )}
             </Link>
@@ -259,6 +303,19 @@ export default function Header({ onChatOpen: _onChatOpen }: HeaderProps) {
               >
                 <Upload className="w-4 h-4" />
                 Upload Media
+              </Link>
+              <Link
+                to="/downloads"
+                onClick={() => setMobileOpen(false)}
+                className="relative flex items-center gap-1.5 text-sm font-medium text-muted-foreground"
+              >
+                <Download className="w-4 h-4" />
+                Downloads
+                {activeDownloads > 0 && (
+                  <span className="ml-1 px-1.5 py-0.5 bg-blue-500 text-white text-[9px] font-bold rounded-full">
+                    {activeDownloads}
+                  </span>
+                )}
               </Link>
               <Link
                 to="/watchlist"

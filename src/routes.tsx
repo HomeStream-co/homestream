@@ -9,6 +9,7 @@ const ShowsPage = lazy(() => import('./pages/shows'));
 const WatchlistPage = lazy(() => import('./pages/watchlist'));
 const ProfilesPage = lazy(() => import('./pages/profiles'));
 const SetupPage = lazy(() => import('./pages/setup'));
+const DownloadsPage = lazy(() => import('./pages/downloads'));
 
 // 404 routing by runtime:
 const NotFoundPage = import.meta.env.DEV
@@ -24,6 +25,7 @@ export const routes: RouteObject[] = [
   { path: '/player/:id', element: <PlayerPage /> },
   { path: '/profiles', element: <ProfilesPage /> },
   { path: '/setup', element: <SetupPage /> },
+  { path: '/downloads', element: <DownloadsPage /> },
   { path: '*', element: <NotFoundPage /> },
 ];
 
