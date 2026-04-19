@@ -18,7 +18,6 @@ import {
   AlertCircle, RefreshCw, Wifi, Lock, Terminal,
   ArrowLeft, Info, Zap,
 } from 'lucide-react';
-import { toast } from 'sonner';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
