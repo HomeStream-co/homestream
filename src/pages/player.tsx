@@ -10,6 +10,7 @@ import { useMedia } from '@/context/MediaContext';
 import { useProfile } from '@/context/ProfileContext';
 import { useTheme } from '@/context/ThemeContext';
 import MediaCard from '@/components/MediaCard';
+import CastButton from '@/components/CastButton';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -908,6 +909,13 @@ export default function PlayerPage() {
                     <button onClick={toggleFullscreen} className="text-white hover:text-white/80">
                       {fullscreen ? <Minimize className="w-5 h-5" /> : <Maximize className="w-5 h-5" />}
                     </button>
+                    {/* ── Cast to TV ── */}
+                    {item?.filename && (
+                      <CastButton
+                        streamUrl={`/api/stream/${item.filename}`}
+                        title={item.title ?? 'HomeStream'}
+                      />
+                    )}
                   </div>
                 </div>
               </div>

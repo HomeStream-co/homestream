@@ -11,7 +11,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import {
   Settings, Check, Palette, Play, Library,
   Monitor, Zap, SkipForward, RotateCcw, Tag, HardDrive,
-  Compass, RefreshCw, Clock, WifiOff,
+  Compass, RefreshCw, Clock, WifiOff, KeyRound, Eye, EyeOff,
+  Loader2, CheckCircle2, XCircle,
 } from 'lucide-react';
 import { useTheme, THEMES, type AppSettings } from '@/context/ThemeContext';
 
@@ -65,6 +66,93 @@ function SectionHeader({ icon: Icon, label }: { icon: React.ElementType; label: 
   );
 }
 
+// ── API Key field ─────────────────────────────────────────────────────────────
+
+type TestStatus = 'idle' | 'testing' | 'ok' | 'error';
+
+function ApiKeyField({
+  label,
+  description,
+  value,
+  onChange,
+  onTest,
+  placeholder,
+  testLabel,
+}: {
+  label: string;
+  description: string;
+  value: string;
+  onChange: (v: string) => void;
+  onTest?: () => Promise<{ ok: boolean; message?: string }>;
+  placeholder?: string;
+  testLabel?: string;
+}) {
+  const [show, setShow] = useState(false);
+  const [status, setStatus] = useState<TestStatus>('idle');
+  const [testMsg, setTestMsg] = useState('');
+  const [dirty, setDirty] = useState(false);
+
+  const handleTest = async () => {
+    if (!onTest) return;
+    setStatus('testing');
+    setTestMsg('');
+    try {
+      const result = await onTest();
+      setStatus(result.ok ? 'ok' : 'error');
+      setTestMsg(result.message ?? (result.ok ? 'Connected' : 'Failed'));
+    } catch (err) {
+      setStatus('error');
+      setTestMsg(String(err));
+    }
+  };
+
+  return (
+    <div className="py-2.5">
+      <p className="text-sm text-foreground font-medium mb-0.5">{label}</p>
+      <p className="text-[11px] text-muted-foreground mb-2 leading-snug">{description}</p>
+      <div className="flex gap-1.5">
+        <div className="relative flex-1">
+          <input
+            type={show ? 'text' : 'password'}
+            value={value}
+            onChange={e => { onChange(e.target.value); setDirty(true); setStatus('idle'); }}
+            placeholder={placeholder ?? 'Enter API key…'}
+            className="w-full pr-8 pl-3 py-1.5 text-xs bg-background border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary font-mono"
+          />
+          <button
+            type="button"
+            onClick={() => setShow(s => !s)}
+            className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+          >
+            {show ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+          </button>
+        </div>
+        {onTest && (
+          <button
+            onClick={handleTest}
+            disabled={!value.trim() || status === 'testing'}
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold border transition-colors disabled:opacity-40 flex-shrink-0 bg-muted hover:bg-muted/80 border-border text-foreground"
+          >
+            {status === 'testing' ? <Loader2 className="w-3 h-3 animate-spin" /> :
+             status === 'ok' ? <CheckCircle2 className="w-3 h-3 text-green-400" /> :
+             status === 'error' ? <XCircle className="w-3 h-3 text-destructive" /> :
+             null}
+            {testLabel ?? 'Test'}
+          </button>
+        )}
+      </div>
+      {testMsg && (
+        <p className={`text-[10px] mt-1.5 ${status === 'ok' ? 'text-green-400' : 'text-destructive'}`}>
+          {status === 'ok' ? '✓ ' : '✗ '}{testMsg}
+        </p>
+      )}
+      {dirty && status === 'idle' && (
+        <p className="text-[10px] text-yellow-400 mt-1">Unsaved — click Save below</p>
+      )}
+    </div>
+  );
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 export default function SettingsPanel() {
   const { settings, activeTheme, setTheme, updateSetting } = useTheme();
@@ -82,6 +170,69 @@ export default function SettingsPanel() {
     } catch { return null; }
   });
   const [tmdbStale, setTmdbStale] = useState(false);
+
+  // API Keys state
+  const [apiKeys, setApiKeys] = useState({ omdbApiKey: '', googleAiApiKey: '', tmdbApiKey: '' });
+  const [apiKeysSaving, setApiKeysSaving] = useState(false);
+  const [apiKeysSaved, setApiKeysSaved] = useState(false);
+  const [apiKeysLoaded, setApiKeysLoaded] = useState(false);
+
+  // Load current keys when panel opens (masked — server returns partial keys)
+  useEffect(() => {
+    if (!open || apiKeysLoaded) return;
+    fetch('/api/setup')
+      .then(r => r.json())
+      .then((data: { config?: { omdbApiKey?: string; googleAiApiKey?: string; tmdbApiKey?: string } }) => {
+        if (data.config) {
+          setApiKeys({
+            omdbApiKey: data.config.omdbApiKey ?? '',
+            googleAiApiKey: data.config.googleAiApiKey ?? '',
+            tmdbApiKey: data.config.tmdbApiKey ?? '',
+          });
+          setApiKeysLoaded(true);
+        }
+      })
+      .catch(() => setApiKeysLoaded(true));
+  }, [open, apiKeysLoaded]);
+
+  const saveApiKeys = async () => {
+    setApiKeysSaving(true);
+    setApiKeysSaved(false);
+    try {
+      await fetch('/api/setup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'save', ...apiKeys }),
+      });
+      setApiKeysSaved(true);
+      setTimeout(() => setApiKeysSaved(false), 3000);
+    } catch { /* ignore */ } finally {
+      setApiKeysSaving(false);
+    }
+  };
+
+  const testOmdb = async () => {
+    const res = await fetch(`https://www.omdbapi.com/?t=Inception&apikey=${apiKeys.omdbApiKey}`);
+    const data = await res.json() as { Response?: string; Error?: string; Title?: string };
+    if (data.Response === 'True') return { ok: true, message: `Connected — found "${data.Title}"` };
+    return { ok: false, message: data.Error ?? 'Invalid key' };
+  };
+
+  const testTmdb = async () => {
+    const res = await fetch('https://api.themoviedb.org/3/configuration', {
+      headers: { Authorization: `Bearer ${apiKeys.tmdbApiKey}` },
+    });
+    if (res.ok) return { ok: true, message: 'Connected to TMDB' };
+    if (res.status === 401) return { ok: false, message: 'Invalid API key (401)' };
+    return { ok: false, message: `HTTP ${res.status}` };
+  };
+
+  const testGemini = async () => {
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKeys.googleAiApiKey}`);
+    if (res.ok) return { ok: true, message: 'Gemini API key valid' };
+    if (res.status === 400 || res.status === 403) return { ok: false, message: 'Invalid API key' };
+    return { ok: false, message: `HTTP ${res.status}` };
+  };
 
   const handleTmdbRefresh = async () => {
     setTmdbRefreshing(true);
@@ -313,6 +464,60 @@ export default function SettingsPanel() {
                     <RefreshCw className={`w-3.5 h-3.5 ${tmdbRefreshing ? 'animate-spin' : ''}`} />
                     {tmdbRefreshing ? 'Refreshing…' : 'Refresh New Releases Now'}
                   </button>
+                </div>
+              </div>
+
+              {/* ── 5. API Keys ── */}
+              <div className="border-t border-border/50">
+                <SectionHeader icon={KeyRound} label="API Keys" />
+                <div className="px-4 pb-4 divide-y divide-border/30">
+                  <ApiKeyField
+                    label="OMDB"
+                    description="Movie metadata (posters, ratings, plot). Get free key at omdbapi.com"
+                    value={apiKeys.omdbApiKey}
+                    onChange={v => setApiKeys(k => ({ ...k, omdbApiKey: v }))}
+                    onTest={testOmdb}
+                    placeholder="e.g. a1b2c3d4"
+                  />
+                  <ApiKeyField
+                    label="TMDB"
+                    description="Discover page, trending movies & TV. Get key at themoviedb.org"
+                    value={apiKeys.tmdbApiKey}
+                    onChange={v => setApiKeys(k => ({ ...k, tmdbApiKey: v }))}
+                    onTest={testTmdb}
+                    placeholder="Bearer token or v4 key"
+                  />
+                  <ApiKeyField
+                    label="Google Gemini"
+                    description="AI enrichment & chat assistant. Get key at aistudio.google.com"
+                    value={apiKeys.googleAiApiKey}
+                    onChange={v => setApiKeys(k => ({ ...k, googleAiApiKey: v }))}
+                    onTest={testGemini}
+                    placeholder="AIza…"
+                  />
+                  <div className="pt-3">
+                    <button
+                      onClick={saveApiKeys}
+                      disabled={apiKeysSaving}
+                      className={`w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold transition-colors ${
+                        apiKeysSaved
+                          ? 'bg-green-500/20 border border-green-500/30 text-green-400'
+                          : 'bg-primary/10 hover:bg-primary/20 border border-primary/20 text-primary'
+                      } disabled:opacity-60`}
+                    >
+                      {apiKeysSaving ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : apiKeysSaved ? (
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                      ) : (
+                        <KeyRound className="w-3.5 h-3.5" />
+                      )}
+                      {apiKeysSaving ? 'Saving…' : apiKeysSaved ? 'Saved!' : 'Save API Keys'}
+                    </button>
+                    <p className="text-[10px] text-muted-foreground text-center mt-2">
+                      Keys are stored in homestream-config.json on your server
+                    </p>
+                  </div>
                 </div>
               </div>
 
