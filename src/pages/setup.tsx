@@ -356,8 +356,8 @@ export default function SetupPage() {
                         <p className="text-xs text-muted-foreground">Watch for new files and add them automatically</p>
                       </div>
                       <button onClick={() => set('watchFolderEnabled', !form.watchFolderEnabled)}
-                        className={`relative w-10 h-5 rounded-full transition-colors flex-shrink-0 ${form.watchFolderEnabled ? 'bg-primary' : 'bg-muted'}`}>
-                        <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${form.watchFolderEnabled ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                        className={`relative w-9 h-5 rounded-full transition-colors flex-shrink-0 focus:outline-none ${form.watchFolderEnabled ? 'bg-primary' : 'bg-muted'}`}>
+                        <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform duration-200 ${form.watchFolderEnabled ? 'translate-x-4' : 'translate-x-0'}`} />
                       </button>
                     </label>
                     <label className="flex items-center justify-between cursor-pointer">
@@ -366,8 +366,8 @@ export default function SetupPage() {
                         <p className="text-xs text-muted-foreground">Ensures all files play in any browser</p>
                       </div>
                       <button onClick={() => set('autoTranscode', !form.autoTranscode)}
-                        className={`relative w-10 h-5 rounded-full transition-colors flex-shrink-0 ${form.autoTranscode ? 'bg-primary' : 'bg-muted'}`}>
-                        <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${form.autoTranscode ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                        className={`relative w-9 h-5 rounded-full transition-colors flex-shrink-0 focus:outline-none ${form.autoTranscode ? 'bg-primary' : 'bg-muted'}`}>
+                        <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform duration-200 ${form.autoTranscode ? 'translate-x-4' : 'translate-x-0'}`} />
                       </button>
                     </label>
                   </div>
