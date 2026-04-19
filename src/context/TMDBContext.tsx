@@ -1,32 +1,15 @@
 // @refresh reset
 /**
- * TMDBContext — fetches TMDB data once per app session.
+ * TMDBProvider — fetches TMDB data once per app session and shares it
+ * via TMDBContext. Only the provider component lives here so this file
+ * satisfies Vite Fast Refresh (pure-component exports only).
  *
- * Previously useTMDB was called inside the home page, meaning every
- * navigation back to "/" re-evaluated the hook. Now the data lives here
- * at the app root so it is fetched exactly once and shared everywhere.
- *
- * Consumers: home page (hero banner, Discover section), Settings panel (refresh).
+ * Hook + context object: src/context/TMDBContextCore.ts
  */
 
-import {
-  createContext, useContext, useState, useEffect, useCallback, useRef,
-  type ReactNode,
-} from 'react';
+import { useState, useEffect, useCallback, useRef, type ReactNode } from 'react';
 import type { TMDBMovie } from '@/server/tmdbCache';
-
-export interface TMDBState {
-  upcoming: TMDBMovie[];
-  trending: TMDBMovie[];
-  trendingShows: TMDBMovie[];
-  recommended: TMDBMovie[];
-  fetchedAt: number;
-  stale: boolean;
-  loading: boolean;
-  error: string | null;
-  lastRefreshed: Date | null;
-  refresh: () => void;
-}
+import { TMDBContext, type TMDBState } from './TMDBContextCore';
 
 // Bump SESSION_VERSION whenever the session shape changes to bust stale caches.
 const SESSION_VERSION = 2;
@@ -50,7 +33,6 @@ function loadSession() {
     const raw = sessionStorage.getItem(SESSION_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
-    // Invalidate sessions from before trendingShows was added
     if ((parsed._v ?? 1) < SESSION_VERSION) return null;
     return parsed;
   } catch { return null; }
@@ -59,8 +41,6 @@ function loadSession() {
 function saveSession(data: object) {
   try { sessionStorage.setItem(SESSION_KEY, JSON.stringify({ ...data, _v: SESSION_VERSION })); } catch { /* quota */ }
 }
-
-const TMDBContext = createContext<TMDBState | null>(null);
 
 interface TMDBProviderProps {
   children: ReactNode;
@@ -121,7 +101,6 @@ export function TMDBProvider({ children, libraryGenres = [] }: TMDBProviderProps
     if (hasFetched.current) return;
     hasFetched.current = true;
     const s = loadSession();
-    // Session is good only if it has both movies AND shows (v2+ shape)
     if (s && s.upcoming?.length > 0 && s.trendingShows?.length > 0) return;
     fetchData(false);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -136,11 +115,6 @@ export function TMDBProvider({ children, libraryGenres = [] }: TMDBProviderProps
   );
 }
 
-export function useTMDBContext(): TMDBState {
-  const ctx = useContext(TMDBContext);
-  if (!ctx) throw new Error('useTMDBContext must be used within TMDBProvider');
-  return ctx;
-}
-
-// Re-export context for consumers that need raw access
-export { TMDBContext };
+// Re-export for consumers that previously imported from this file
+export { TMDBContext, useTMDBContext } from './TMDBContextCore';
+export type { TMDBState } from './TMDBContextCore';

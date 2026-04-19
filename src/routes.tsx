@@ -44,5 +44,5 @@ export const routes: RouteObject[] = [
   { path: '*', element: <NotFoundPage /> },
 ];
 
-export type Path = '/' | '/movie/:id' | '/show/:id' | '/library' | '/watchlist' | '/player/:id' | '/profiles' | '/discover' | '/downloads' | '/history';
-export type Params = Record<string, string | undefined>;
+// Re-export path types for consumers
+export type { Path, Params } from './routeConfig';
