@@ -8,6 +8,7 @@ import Website from '@/layouts/Website';
 import AIChatAssistant from '@/components/AIChatAssistant';
 import { MediaProvider } from '@/context/MediaContext';
 import { ProfileProvider, useProfile } from '@/context/ProfileContext';
+import { ThemeProvider } from '@/context/ThemeContext';
 
 interface RootLayoutProps {
   children: ReactElement;
@@ -35,28 +36,30 @@ export default function RootLayout({ children }: RootLayoutProps) {
   const isProfiles = location.pathname === '/profiles';
 
   return (
-    <ProfileProvider>
-      <MediaProvider>
-        <Website>
-          {!isPlayer && !isProfiles && <Header />}
-          <ProfileGuard>
-            {children}
-          </ProfileGuard>
-          {!isPlayer && !isProfiles && <Footer />}
-          {!isProfiles && <AIChatAssistant />}
-          <Toaster
-            theme="dark"
-            position="bottom-left"
-            toastOptions={{
-              style: {
-                background: 'hsl(var(--card))',
-                border: '1px solid hsl(var(--border))',
-                color: 'hsl(var(--foreground))',
-              },
-            }}
-          />
-        </Website>
-      </MediaProvider>
-    </ProfileProvider>
+    <ThemeProvider>
+      <ProfileProvider>
+        <MediaProvider>
+          <Website>
+            {!isPlayer && !isProfiles && <Header />}
+            <ProfileGuard>
+              {children}
+            </ProfileGuard>
+            {!isPlayer && !isProfiles && <Footer />}
+            {!isProfiles && <AIChatAssistant />}
+            <Toaster
+              theme="dark"
+              position="bottom-left"
+              toastOptions={{
+                style: {
+                  background: 'hsl(var(--card))',
+                  border: '1px solid hsl(var(--border))',
+                  color: 'hsl(var(--foreground))',
+                },
+              }}
+            />
+          </Website>
+        </MediaProvider>
+      </ProfileProvider>
+    </ThemeProvider>
   );
 }

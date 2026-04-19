@@ -4,6 +4,7 @@ import { Search, Upload, Menu, X, Film, Bookmark, ChevronDown } from 'lucide-rea
 import { motion, AnimatePresence } from 'motion/react';
 import { useMedia } from '@/context/MediaContext';
 import { useProfile, PROFILES } from '@/context/ProfileContext';
+import SettingsPanel from '@/components/SettingsPanel';
 
 interface HeaderProps {
   onChatOpen?: () => void;
@@ -138,6 +139,9 @@ export default function Header({ onChatOpen: _onChatOpen }: HeaderProps) {
                 </span>
               )}
             </Link>
+
+            {/* ── Settings cog ── */}
+            <SettingsPanel />
 
             {/* ── Profile Switcher ── */}
             {activeProfile && (

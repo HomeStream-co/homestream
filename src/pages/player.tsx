@@ -8,6 +8,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { useMedia } from '@/context/MediaContext';
 import { useProfile } from '@/context/ProfileContext';
+import { useTheme } from '@/context/ThemeContext';
 import MediaCard from '@/components/MediaCard';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -54,6 +55,8 @@ export default function PlayerPage() {
   const navigate = useNavigate();
   const { library, updateProgress, triggerPostWatchRecommendation, continueWatching } = useMedia();
   const { isAllowed } = useProfile();
+  const { settings: appSettings } = useTheme();
+  const playerAccent = appSettings.syncPlayerColor ? 'hsl(var(--primary))' : 'rgba(255,255,255,0.9)';
   const item = library.find(m => m.id === id);
 
   // ── Kids profile block — redirect if content not allowed ──
@@ -226,7 +229,7 @@ export default function PlayerPage() {
 
   // ── Autoplay countdown ──
   useEffect(() => {
-    if (!showEndOverlay || autoplayCancelled || !nextItem) return;
+    if (!showEndOverlay || autoplayCancelled || !nextItem || !appSettings.autoplayNext) return;
     autoplayTimerRef.current = setInterval(() => {
       setAutoplayCountdown(prev => {
         if (prev <= 1) {
@@ -238,12 +241,16 @@ export default function PlayerPage() {
       });
     }, 1000);
     return () => clearInterval(autoplayTimerRef.current);
-  }, [showEndOverlay, autoplayCancelled, nextItem, navigate]);
+  }, [showEndOverlay, autoplayCancelled, nextItem, navigate, appSettings.autoplayNext]);
 
-  // ── Skip Intro visibility ──
+  // ── Skip Intro visibility + auto-skip ──
   useEffect(() => {
-    setShowSkipIntro(currentTime > 30 && currentTime < SKIP_INTRO_END && playing);
-  }, [currentTime, playing]);
+    const inIntro = currentTime > 30 && currentTime < SKIP_INTRO_END && playing;
+    setShowSkipIntro(inIntro);
+    if (inIntro && appSettings.autoSkipIntro) {
+      skipIntro();
+    }
+  }, [currentTime, playing, appSettings.autoSkipIntro]);
 
   // ── Auto-hide controls ──
   const resetControlsTimer = useCallback(() => {
@@ -508,7 +515,7 @@ export default function PlayerPage() {
             if (!video) return;
             setDuration(video.duration);
             // Restore resume position exactly once, as soon as we know duration
-            if (!resumeApplied.current && item.watchProgress && item.watchProgress > 2 && item.watchProgress < 95) {
+            if (appSettings.autoResume && !resumeApplied.current && item.watchProgress && item.watchProgress > 2 && item.watchProgress < 95) {
               const resumeAt = (item.watchProgress / 100) * video.duration;
               video.currentTime = resumeAt;
               resumeApplied.current = true;
@@ -655,7 +662,7 @@ export default function PlayerPage() {
                     onChange={handleSeek}
                     className="w-full h-1 appearance-none bg-white/20 rounded-full cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white"
                     style={{
-                      background: `linear-gradient(to right, hsl(var(--primary)) ${duration > 0 ? (currentTime / duration) * 100 : 0}%, rgba(255,255,255,0.2) 0%)`,
+                      background: `linear-gradient(to right, ${playerAccent} ${duration > 0 ? (currentTime / duration) * 100 : 0}%, rgba(255,255,255,0.2) 0%)`,
                     }}
                   />
                 </div>
