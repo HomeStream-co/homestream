@@ -4,47 +4,47 @@
 
 @layer base {
   :root {
-    /* Core Colors */
-    --background: 0 0% 100%;
-    --foreground: 0 0% 4%;
-    --card: 0 0% 96%;
-    --card-foreground: 0 0% 4%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 4%;
-    --primary: 0 0% 25%;
+    /* HomeStream Dark Cinematic Theme */
+    --background: 240 20% 4%;
+    --foreground: 0 0% 100%;
+    --card: 240 18% 8%;
+    --card-foreground: 0 0% 100%;
+    --popover: 240 18% 8%;
+    --popover-foreground: 0 0% 100%;
+    --primary: 0 86% 47%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 0 0% 45%;
+    --secondary: 240 10% 15%;
     --secondary-foreground: 0 0% 100%;
-    --muted: 0 0% 96%;
-    --muted-foreground: 0 0% 4%;
-    --accent: 0 0% 15%;
-    --accent-foreground: 0 0% 100%;
+    --muted: 240 10% 15%;
+    --muted-foreground: 220 9% 46%;
+    --accent: 45 100% 54%;
+    --accent-foreground: 0 0% 0%;
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
-    --border: 0 0% 90%;
-    --input: 0 0% 90%;
-    --ring: 0 0% 25%;
+    --border: 240 10% 18%;
+    --input: 240 10% 18%;
+    --ring: 0 86% 47%;
 
     /* Extended Colors */
-    --chart-1: 0 0% 55%;
-    --chart-2: 0 0% 40%;
-    --chart-3: 0 0% 25%;
-    --chart-4: 0 0% 10%;
-    --chart-5: 0 0% 0%;
+    --chart-1: 0 86% 47%;
+    --chart-2: 45 100% 54%;
+    --chart-3: 220 70% 50%;
+    --chart-4: 160 60% 45%;
+    --chart-5: 280 65% 60%;
 
     /* Sidebar Colors */
-    --sidebar: 0 0% 96%;
-    --sidebar-foreground: 0 0% 4%;
-    --sidebar-primary: 0 0% 25%;
+    --sidebar: 240 18% 8%;
+    --sidebar-foreground: 0 0% 100%;
+    --sidebar-primary: 0 86% 47%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 0 0% 15%;
+    --sidebar-accent: 240 10% 15%;
     --sidebar-accent-foreground: 0 0% 100%;
-    --sidebar-border: 0 0% 90%;
-    --sidebar-ring: 0 0% 25%;
+    --sidebar-border: 240 10% 18%;
+    --sidebar-ring: 0 86% 47%;
 
     /* Typography */
-    --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    --font-heading: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    --font-heading: "Bebas Neue", "Inter", sans-serif;
     --font-serif: ui-serif, Georgia, "Times New Roman", serif;
     --font-mono: ui-monospace, "SF Mono", Monaco, "Cascadia Code", "Roboto Mono", Consolas, "Courier New", monospace;
 
