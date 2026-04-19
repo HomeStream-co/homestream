@@ -51,6 +51,9 @@ export default async function handler(req: Request, res: Response) {
           'omdbApiKey', 'googleAiApiKey', 'tmdbApiKey', 'virusTotalApiKey',
           'aiProvider', 'ollamaUrl', 'ollamaModel',
           'preferredQuality', 'watchFolderEnabled', 'autoTranscode',
+          // VPN fields
+          'vpnEnabled', 'vpnProtocol', 'vpnProvider',
+          'vpnConfigContent', 'vpnUsername', 'vpnPassword', 'vpnAutoConnect',
         ];
         const updates: Record<string, unknown> = {};
         for (const key of allowed) {
@@ -63,6 +66,8 @@ export default async function handler(req: Request, res: Response) {
         // Boolean coercion
         if (fields.watchFolderEnabled !== undefined) updates.watchFolderEnabled = fields.watchFolderEnabled === 'true';
         if (fields.autoTranscode !== undefined) updates.autoTranscode = fields.autoTranscode === 'true';
+        if (fields.vpnEnabled !== undefined) updates.vpnEnabled = fields.vpnEnabled === 'true';
+        if (fields.vpnAutoConnect !== undefined) updates.vpnAutoConnect = fields.vpnAutoConnect === 'true';
 
         // Create media directories if mediaDir provided
         if (fields.mediaDir) {

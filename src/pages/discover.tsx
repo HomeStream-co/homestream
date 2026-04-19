@@ -25,6 +25,7 @@ import {
 import { useMedia } from '@/context/MediaContext';
 import { useTMDBContext } from '@/context/TMDBContext';
 import type { TMDBMovie } from '@/server/tmdbCache';
+import { fetchTrailerKey } from '@/lib/trailerCache';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -37,30 +38,6 @@ function formatDate(d: string) {
 function formatRating(r: number) {
   if (!r) return null;
   return r.toFixed(1);
-}
-
-// ── Trailer key cache (in-memory, survives re-renders) ────────────────────────
-
-const trailerKeyCache = new Map<number, string | null>();
-
-async function fetchTrailerKey(movie: TMDBMovie): Promise<string | null> {
-  if (trailerKeyCache.has(movie.id)) return trailerKeyCache.get(movie.id)!;
-  try {
-    const year = movie.release_date ? movie.release_date.slice(0, 4) : '';
-    const params = new URLSearchParams({
-      title: movie.title,
-      type: 'movie',
-      ...(year ? { year } : {}),
-    });
-    const res = await fetch(`/api/tmdb/trailer?${params}`);
-    const data = await res.json() as { trailerKey?: string | null };
-    const key = data.trailerKey ?? null;
-    trailerKeyCache.set(movie.id, key);
-    return key;
-  } catch {
-    trailerKeyCache.set(movie.id, null);
-    return null;
-  }
 }
 
 // ── Trailer Modal ─────────────────────────────────────────────────────────────
@@ -84,7 +61,8 @@ function TrailerModal({
   const overlayRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    fetchTrailerKey(movie).then(key => setTrailerKey(key));
+    const year = movie.release_date ? movie.release_date.slice(0, 4) : undefined;
+    fetchTrailerKey(movie.title, year, 'movie').then(key => setTrailerKey(key));
   }, [movie]);
 
   // Close on Escape

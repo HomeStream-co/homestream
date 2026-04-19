@@ -1077,20 +1077,47 @@ export default function SetupPage() {
 
                 <div className="flex flex-col gap-4">
                   {/* Admin password */}
-                  <div className="p-4 rounded-xl border border-border bg-muted/20">
-                    <div className="flex items-center gap-2 mb-3">
+                  <div className="p-4 rounded-xl border border-primary/30 bg-primary/5">
+                    <div className="flex items-center gap-2 mb-1">
                       <Shield className="w-4 h-4 text-primary" />
                       <p className="text-sm font-semibold text-foreground">Admin Password</p>
-                      <span className="text-[10px] bg-muted text-muted-foreground px-1.5 py-0.5 rounded">Optional</span>
+                      <span className="text-[10px] bg-primary/20 text-primary px-1.5 py-0.5 rounded font-medium">Recommended</span>
                     </div>
-                    <div className="relative">
-                      <input type={showAdminPass ? 'text' : 'password'} value={form.adminPassword}
-                        onChange={e => set('adminPassword', e.target.value)}
-                        placeholder="Set a password to protect settings"
-                        className="w-full bg-background border border-border rounded-lg px-3 pr-9 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary" />
-                      <button onClick={() => setShowAdminPass(v => !v)} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
-                        {showAdminPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                      </button>
+                    <p className="text-xs text-muted-foreground mb-3">
+                      Protects the Settings panel and setup reset. Leave blank to skip (anyone on your LAN can access settings).
+                    </p>
+                    <div className="flex flex-col gap-2">
+                      <div className="relative">
+                        <input type={showAdminPass ? 'text' : 'password'} value={form.adminPassword}
+                          onChange={e => set('adminPassword', e.target.value)}
+                          placeholder="Enter a password"
+                          className="w-full bg-background border border-border rounded-lg px-3 pr-9 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary" />
+                        <button onClick={() => setShowAdminPass(v => !v)} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                          {showAdminPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
+                      {form.adminPassword && (
+                        <div className="relative">
+                          <input type={showAdminPass ? 'text' : 'password'} value={form.adminPasswordConfirm}
+                            onChange={e => set('adminPasswordConfirm', e.target.value)}
+                            placeholder="Confirm password"
+                            className={`w-full bg-background border rounded-lg px-3 pr-9 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary ${
+                              form.adminPasswordConfirm && form.adminPasswordConfirm !== form.adminPassword
+                                ? 'border-destructive'
+                                : 'border-border'
+                            }`} />
+                        </div>
+                      )}
+                      {form.adminPassword && form.adminPasswordConfirm && form.adminPasswordConfirm !== form.adminPassword && (
+                        <p className="text-xs text-destructive flex items-center gap-1">
+                          <AlertCircle className="w-3 h-3" /> Passwords don't match
+                        </p>
+                      )}
+                      {form.adminPassword && form.adminPasswordConfirm && form.adminPasswordConfirm === form.adminPassword && (
+                        <p className="text-xs text-green-400 flex items-center gap-1">
+                          <CheckCircle2 className="w-3 h-3" /> Passwords match
+                        </p>
+                      )}
                     </div>
                   </div>
 
@@ -1322,7 +1349,11 @@ export default function SetupPage() {
                     <ChevronLeft className="w-4 h-4" />Back
                   </button>
                   <button onClick={saveApiKeys}
-                    className="flex-1 flex items-center justify-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground py-2.5 rounded-xl font-semibold text-sm transition-colors">
+                    disabled={
+                      status.apiKeys === 'saving' ||
+                      (!!form.adminPassword && form.adminPassword !== form.adminPasswordConfirm)
+                    }
+                    className="flex-1 flex items-center justify-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground py-2.5 rounded-xl font-semibold text-sm transition-colors disabled:opacity-60 disabled:cursor-not-allowed">
                     {status.apiKeys === 'saving' ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
                     Save & Continue <ChevronRight className="w-4 h-4" />
                   </button>

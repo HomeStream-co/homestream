@@ -20,25 +20,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Youtube, X, Loader2, Volume2, VolumeX } from 'lucide-react';
-
-// ── Trailer key cache ─────────────────────────────────────────────────────────
-const trailerCache = new Map<string, string | null>();
-
-async function resolveTrailerKey(title: string, year?: string, type = 'movie'): Promise<string | null> {
-  const cacheKey = `${title}::${year ?? ''}::${type}`;
-  if (trailerCache.has(cacheKey)) return trailerCache.get(cacheKey)!;
-  try {
-    const params = new URLSearchParams({ title, type });
-    if (year) params.set('year', year);
-    const res = await fetch(`/api/tmdb/trailer?${params}`);
-    const data = await res.json() as { trailerKey: string | null };
-    trailerCache.set(cacheKey, data.trailerKey ?? null);
-    return data.trailerKey ?? null;
-  } catch {
-    trailerCache.set(cacheKey, null);
-    return null;
-  }
-}
+import { fetchTrailerKey } from '@/lib/trailerCache';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -68,7 +50,7 @@ export default function TrailerButton({
 
     setLoading(true);
     try {
-      const key = await resolveTrailerKey(title, year, type);
+      const key = await fetchTrailerKey(title, year, type);
       if (key) {
         setTrailerKey(key);
         setOpen(true);
