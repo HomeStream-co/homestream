@@ -9,7 +9,9 @@ const SUGGESTED_PROMPTS = [
   "What should I watch tonight?",
   "I'm in the mood for something scary",
   "Recommend a family movie",
-  "Show me the top rated titles",
+  "What's the highest rated film in my library?",
+  "Something short — under 90 minutes",
+  "I want a feel-good movie",
 ];
 
 function genId() {
@@ -164,7 +166,7 @@ export default function AIChatAssistant() {
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-foreground">HomeStream Assistant</p>
-                  <p className="text-[10px] text-muted-foreground">Your personal film guide</p>
+                  <p className="text-[10px] text-muted-foreground">Movie &amp; TV recommendations only</p>
                 </div>
               </div>
               <button
@@ -184,7 +186,8 @@ export default function AIChatAssistant() {
                       <Film className="w-3.5 h-3.5 text-white" />
                     </div>
                     <div className="bg-secondary rounded-2xl rounded-tl-sm px-3 py-2 max-w-[85%]">
-                      <p className="text-sm text-foreground">Hey! I'm your HomeStream assistant. Ask me what to watch and I'll find the perfect pick from your library!</p>
+                      <p className="text-sm text-foreground">Hey! I'm your HomeStream movie guide. Ask me what to watch and I'll find the perfect pick from your library!</p>
+                      <p className="text-[10px] text-muted-foreground mt-1.5">I only handle movie &amp; TV questions — recommendations, ratings, genres, and more.</p>
                     </div>
                   </div>
                   <div className="flex flex-col gap-2 mt-2">
@@ -275,7 +278,7 @@ export default function AIChatAssistant() {
                 type="text"
                 value={input}
                 onChange={e => setInput(e.target.value)}
-                placeholder="Ask for a recommendation..."
+                placeholder="Ask for a movie recommendation..."
                 className="flex-1 bg-secondary border border-border rounded-xl px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary"
               />
               <button
