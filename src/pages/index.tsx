@@ -55,11 +55,6 @@ export default function HomePage() {
   const { isAllowed, activeProfile } = useProfile();
   const { upcoming, loading: tmdbLoading, stale: tmdbStale, error: tmdbError } = useTMDBContext();
   const navigate = useNavigate();
-
-  // ── Show skeleton on first load (library not yet fetched) ──
-  if (loading && library.length === 0) {
-    return <HomePageSkeleton />;
-  }
   const [searchParams, setSearchParams] = useSearchParams();
 
   // ── Search / filter state ──
@@ -84,6 +79,11 @@ export default function HomePage() {
     () => library.filter(m => isAllowed(m.rated)),
     [library, isAllowed],
   );
+
+  // ── Show skeleton on first load (library not yet fetched) ──
+  if (loading && library.length === 0) {
+    return <HomePageSkeleton />;
+  }
 
   // ── Carousel derivations — all memoized ──
   const featured = useMemo(() => visibleLibrary[0], [visibleLibrary]);
