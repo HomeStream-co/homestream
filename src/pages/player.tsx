@@ -88,6 +88,11 @@ export default function PlayerPage() {
   const watchCompleteTriggered = useRef(false);
   const fadeIntervalRef = useRef<ReturnType<typeof setInterval>>(undefined);
 
+  // Double-tap seek refs — track tap count per side so rapid taps accumulate
+  // e.g. triple-tap = +30s, exactly like Netflix mobile
+  const doubleTapTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const doubleTapCountRef = useRef<{ side: 'forward' | 'back'; count: number }>({ side: 'forward', count: 0 });
+
   // ── State ──
   const [playing, setPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -103,6 +108,7 @@ export default function PlayerPage() {
   const [autoplayCancelled, setAutoplayCancelled] = useState(false);
   const [showSkipIntro, setShowSkipIntro] = useState(false);
   const [seekFlash, setSeekFlash] = useState<'forward' | 'back' | null>(null);
+  const [seekFlashCount, setSeekFlashCount] = useState(0); // accumulated taps for label (+10s, +20s…)
   const [playbackRate, setPlaybackRate] = useState(1);
   const [showSpeedMenu, setShowSpeedMenu] = useState(false);
   // Closed captions
@@ -364,14 +370,16 @@ export default function PlayerPage() {
           e.preventDefault();
           video.currentTime = Math.min(video.currentTime + 10, video.duration);
           setSeekFlash('forward');
-          setTimeout(() => setSeekFlash(null), 600);
+          setSeekFlashCount(10);
+          setTimeout(() => { setSeekFlash(null); setSeekFlashCount(0); }, 600);
           break;
         case 'ArrowLeft':
         case 'j':
           e.preventDefault();
           video.currentTime = Math.max(video.currentTime - 10, 0);
           setSeekFlash('back');
-          setTimeout(() => setSeekFlash(null), 600);
+          setSeekFlashCount(10);
+          setTimeout(() => { setSeekFlash(null); setSeekFlashCount(0); }, 600);
           break;
         case 'ArrowUp':
           e.preventDefault();
@@ -444,6 +452,55 @@ export default function PlayerPage() {
       }
     }, 30);
   }, [navigate]);
+
+  // ── Double-tap seek (mobile Netflix-style) ────────────────────────────────
+  // Each tap on the left/right third of the screen adds 10s to the seek.
+  // Taps accumulate for 400ms — triple-tap = +30s, quad = +40s, etc.
+  // The middle third is reserved for play/pause so accidental taps don't seek.
+  const handleDoubleTap = useCallback((e: React.TouchEvent<HTMLDivElement>) => {
+    const video = videoRef.current;
+    const container = containerRef.current;
+    if (!video || !container) return;
+
+    const touch = e.changedTouches[0];
+    const rect = container.getBoundingClientRect();
+    const relX = touch.clientX - rect.left;
+    const third = rect.width / 3;
+
+    // Middle third = play/pause zone — ignore for seek
+    if (relX >= third && relX <= third * 2) return;
+
+    const side: 'forward' | 'back' = relX > third * 2 ? 'forward' : 'back';
+
+    // Accumulate taps on the same side
+    if (doubleTapCountRef.current.side === side) {
+      doubleTapCountRef.current.count += 1;
+    } else {
+      doubleTapCountRef.current = { side, count: 1 };
+    }
+
+    const totalCount = doubleTapCountRef.current.count;
+    const seekSeconds = totalCount * 10;
+
+    // Apply seek immediately on each tap
+    if (side === 'forward') {
+      video.currentTime = Math.min(video.currentTime + 10, video.duration);
+    } else {
+      video.currentTime = Math.max(video.currentTime - 10, 0);
+    }
+
+    // Update flash indicator with accumulated count
+    setSeekFlash(side);
+    setSeekFlashCount(seekSeconds);
+
+    // Reset after 400ms of no taps — clears the accumulator and hides flash
+    clearTimeout(doubleTapTimerRef.current);
+    doubleTapTimerRef.current = setTimeout(() => {
+      doubleTapCountRef.current = { side: 'forward', count: 0 };
+      setSeekFlash(null);
+      setSeekFlashCount(0);
+    }, 700);
+  }, []);
 
   // ── Controls ──
   const togglePlay = () => {
@@ -657,7 +714,7 @@ export default function PlayerPage() {
         <AnimatePresence>
           {seekFlash && (
             <motion.div
-              key={seekFlash}
+              key={`${seekFlash}-${seekFlashCount}`}
               initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 1.1 }}
@@ -672,12 +729,24 @@ export default function PlayerPage() {
                   : <Rewind className="w-8 h-8 text-white" />
                 }
               </div>
-              <span className="text-white text-xs font-medium">
-                {seekFlash === 'forward' ? '+10s' : '-10s'}
+              <span className="text-white text-sm font-semibold drop-shadow">
+                {seekFlash === 'forward' ? `+${seekFlashCount}s` : `-${seekFlashCount}s`}
               </span>
             </motion.div>
           )}
         </AnimatePresence>
+
+        {/* ── Double-tap seek zones (mobile) ── */}
+        {/* Left zone: rewind | Middle zone: play/pause | Right zone: forward */}
+        <div
+          className="absolute inset-0 grid"
+          style={{ gridTemplateColumns: '1fr 1fr 1fr', pointerEvents: 'auto' }}
+          onTouchEnd={handleDoubleTap}
+        >
+          <div className="relative overflow-hidden" />
+          <div />
+          <div className="relative overflow-hidden" />
+        </div>
 
         {/* ── Skip Intro Button ── */}
         <AnimatePresence>
