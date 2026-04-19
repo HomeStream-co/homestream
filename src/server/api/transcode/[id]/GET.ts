@@ -5,8 +5,10 @@
  */
 import type { Request, Response } from 'express';
 import { getJob, subscribe } from '../../../transcodeStore.js';
+import { requireAuth } from '../../../authMiddleware.js';
 
 export default function handler(req: Request, res: Response) {
+  if (!requireAuth(req, res)) return;
   const { id } = req.params;
 
   const job = getJob(id);

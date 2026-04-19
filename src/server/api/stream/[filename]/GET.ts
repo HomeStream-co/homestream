@@ -12,6 +12,7 @@
 import type { Request, Response } from 'express';
 import fs from 'fs';
 import path from 'path';
+import { requireAuth } from '../../../authMiddleware.js';
 
 const UPLOADS_DIR = path.resolve('./uploads');
 
@@ -49,6 +50,7 @@ function resolveFilePath(filename: string): string | null {
 }
 
 export default function handler(req: Request, res: Response) {
+  if (!requireAuth(req, res)) return;
   try {
     const { filename } = req.params;
     const filePath = resolveFilePath(filename);

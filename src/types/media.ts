@@ -13,6 +13,14 @@ export interface MediaEnrichment {
   enrichmentVersion: number;    // bump when schema changes
 }
 
+export interface ProfileProgressEntry {
+  progress: number;
+  watchedSeconds?: number;
+  totalSeconds?: number;
+  lastWatchedAt?: string;
+  watchedAt?: string;
+}
+
 export interface MediaItem {
   id: string;
   filename: string;
@@ -54,6 +62,10 @@ export interface MediaItem {
     en?: 'downloaded' | 'stub' | 'exists';
     es?: 'downloaded' | 'stub' | 'exists';
   };
+  // Per-profile watch progress — keyed by profileId ("adult" | "kids")
+  // Top-level watchProgress / watchedSeconds / lastWatchedAt mirror the adult profile
+  // for backwards compatibility with Jellyfin API and legacy code.
+  profileProgress?: Record<string, ProfileProgressEntry>;
   // TV show episode tracking
   totalSeasons?: number;
   episodes?: Episode[];

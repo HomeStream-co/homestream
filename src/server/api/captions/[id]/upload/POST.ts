@@ -21,6 +21,7 @@ import fs from 'fs';
 import path from 'path';
 import multer from 'multer';
 import { readLibrary, writeLibraryDirect } from '../../../../libraryStore.js';
+import { requireAuth } from '../../../../authMiddleware.js';
 
 // ── Multer — memory storage so we can inspect before writing ─────────────────
 
@@ -51,6 +52,7 @@ function srtToVtt(srt: string): string {
 // ── Handler ───────────────────────────────────────────────────────────────────
 
 export default function handler(req: Request, res: Response) {
+  if (!requireAuth(req, res)) return;
   // Run multer middleware inline
   upload.single('subtitle')(req, res, async (err) => {
     if (err) {

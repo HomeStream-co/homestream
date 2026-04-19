@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
 import type { MediaItem } from '@/types/media';
+import { useProfile } from '@/context/ProfileContext';
 
 interface ContinueWatchingItem {
   id: string;
@@ -28,21 +29,44 @@ export function MediaProvider({ children }: { children: ReactNode }) {
   const [library, setLibrary] = useState<MediaItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [pendingRecommendation, setPendingRecommendation] = useState<string | null>(null);
+
+  // Get active profile so we can scope library fetches and progress writes
+  const { activeProfile } = useProfile();
+  const profileId = activeProfile?.id ?? 'adult';
+
+  // Watchlist — server is source of truth; localStorage is a fast initial value
+  // that gets replaced on first successful server fetch.
   const [watchlist, setWatchlist] = useState<string[]>(() => {
     try {
       return JSON.parse(localStorage.getItem('homestream-watchlist') || '[]');
     } catch { return []; }
   });
+
   const [continueWatching, setContinueWatching] = useState<ContinueWatchingItem[]>(() => {
     try {
       return JSON.parse(localStorage.getItem('homestream-progress') || '[]');
     } catch { return []; }
   });
 
+  // ── Fetch watchlist from server on mount ────────────────────────────────────
+  useEffect(() => {
+    fetch('/api/watchlist')
+      .then(r => r.ok ? r.json() as Promise<string[]> : Promise.reject())
+      .then(ids => {
+        setWatchlist(ids);
+        // Keep localStorage in sync as a fast-load cache
+        localStorage.setItem('homestream-watchlist', JSON.stringify(ids));
+      })
+      .catch(() => {
+        // Server unavailable — keep localStorage value, will sync on next load
+      });
+  }, []);
+
   const refreshLibrary = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await fetch('/api/media');
+      // Pass active profile so server resolves per-profile progress fields
+      const res = await fetch(`/api/media?profile=${profileId}`);
       if (res.ok) {
         const data = await res.json() as MediaItem[];
         setLibrary(data);
@@ -66,26 +90,61 @@ export function MediaProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [profileId]);
 
   useEffect(() => {
     refreshLibrary();
   }, [refreshLibrary]);
 
+  // ── Watchlist mutations — optimistic UI + server persist ───────────────────
+
   const addToWatchlist = useCallback((id: string) => {
+    // Optimistic update
     setWatchlist(prev => {
+      if (prev.includes(id)) return prev;
       const next = [...prev, id];
       localStorage.setItem('homestream-watchlist', JSON.stringify(next));
       return next;
     });
+    // Persist to server
+    fetch(`/api/watchlist/${id}`, { method: 'PUT' })
+      .then(r => r.ok ? r.json() as Promise<{ watchlist: string[] }> : Promise.reject())
+      .then(({ watchlist: serverList }) => {
+        setWatchlist(serverList);
+        localStorage.setItem('homestream-watchlist', JSON.stringify(serverList));
+      })
+      .catch(() => {
+        // Server write failed — revert optimistic update
+        setWatchlist(prev => {
+          const reverted = prev.filter(w => w !== id);
+          localStorage.setItem('homestream-watchlist', JSON.stringify(reverted));
+          return reverted;
+        });
+      });
   }, []);
 
   const removeFromWatchlist = useCallback((id: string) => {
+    // Optimistic update
     setWatchlist(prev => {
       const next = prev.filter(w => w !== id);
       localStorage.setItem('homestream-watchlist', JSON.stringify(next));
       return next;
     });
+    // Persist to server
+    fetch(`/api/watchlist/${id}`, { method: 'DELETE' })
+      .then(r => r.ok ? r.json() as Promise<{ watchlist: string[] }> : Promise.reject())
+      .then(({ watchlist: serverList }) => {
+        setWatchlist(serverList);
+        localStorage.setItem('homestream-watchlist', JSON.stringify(serverList));
+      })
+      .catch(() => {
+        // Server write failed — revert optimistic update (add back)
+        setWatchlist(prev => {
+          const reverted = [...prev, id];
+          localStorage.setItem('homestream-watchlist', JSON.stringify(reverted));
+          return reverted;
+        });
+      });
   }, []);
 
   const updateProgress = useCallback((id: string, progress: number, currentTime?: number, duration?: number) => {
@@ -111,9 +170,9 @@ export function MediaProvider({ children }: { children: ReactNode }) {
     fetch(`/api/media/${id}/progress`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ progress, currentTime, duration }),
+      body: JSON.stringify({ progress, currentTime, duration, profileId }),
     }).catch(console.error);
-  }, []);
+  }, [profileId]);
 
   const triggerPostWatchRecommendation = useCallback((id: string) => {
     setPendingRecommendation(id);
@@ -126,7 +185,9 @@ export function MediaProvider({ children }: { children: ReactNode }) {
   const deleteMedia = useCallback(async (id: string) => {
     await fetch(`/api/media/${id}`, { method: 'DELETE' });
     setLibrary(prev => prev.filter(m => m.id !== id));
-  }, []);
+    // Also remove from watchlist if present
+    removeFromWatchlist(id);
+  }, [removeFromWatchlist]);
 
   const updateMedia = useCallback(async (id: string, updates: Partial<MediaItem>) => {
     const res = await fetch(`/api/media/${id}`, {

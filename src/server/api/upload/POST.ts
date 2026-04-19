@@ -5,6 +5,7 @@ import multer from 'multer';
 import { createJob } from '../../transcodeStore.js';
 import { transcodeFile } from '../../transcodeWorker.js';
 import { writeLibrary } from '../../libraryStore.js';
+import { requireAuth } from '../../authMiddleware.js';
 import {
   extractTitle,
   fetchOMDB,
@@ -38,6 +39,7 @@ const upload = multer({
 });
 
 export default function handler(req: Request, res: Response) {
+  if (!requireAuth(req, res)) return;
   upload.single('video')(req, res, async (err) => {
     if (err) return res.status(400).json({ error: err.message });
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
