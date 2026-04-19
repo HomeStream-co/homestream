@@ -7,12 +7,13 @@
  *  3. Library     — show storage savings badges, show enrichment tags
  */
 import { useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Settings, Check, Palette, Play, Library,
   Monitor, Zap, SkipForward, RotateCcw, Tag, HardDrive,
   Compass, RefreshCw, Clock, WifiOff, KeyRound, Eye, EyeOff,
-  Loader2, CheckCircle2, XCircle, ScanLine, Database, ShieldCheck, LogOut, Wrench,
+  Loader2, CheckCircle2, XCircle, ScanLine, Database, ShieldCheck, LogOut, Wrench, Lock,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTheme, THEMES, type AppSettings } from '@/context/ThemeContext';
@@ -174,6 +175,7 @@ export default function SettingsPanel({ onOpenSecurity, onOpenDebug }: SettingsP
   const { settings, activeTheme, setTheme, updateSetting } = useTheme();
   const { adultPinEnabled, setAdultPin, clearAdultPin } = useProfile();
   const { requiresPassword, logout } = useAuth();
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
 
@@ -782,6 +784,21 @@ export default function SettingsPanel({ onOpenSecurity, onOpenDebug }: SettingsP
                     <p className="text-[11px] text-muted-foreground">Quarantine, scan &amp; threat log</p>
                   </div>
                   <Database className="w-3.5 h-3.5 text-muted-foreground group-hover:text-foreground transition-colors" />
+                </button>
+
+                {/* HTTPS Setup */}
+                <button
+                  onClick={() => { setOpen(false); navigate('/https-setup'); }}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border border-border hover:border-primary/40 hover:bg-primary/5 transition-colors text-left group"
+                >
+                  <div className="w-7 h-7 rounded-lg bg-blue-500/10 flex items-center justify-center flex-shrink-0 group-hover:bg-blue-500/20 transition-colors">
+                    <Lock className="w-4 h-4 text-blue-400" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-foreground leading-tight">HTTPS Setup</p>
+                    <p className="text-[11px] text-muted-foreground">Caddy, Let's Encrypt &amp; remote access</p>
+                  </div>
+                  <Compass className="w-3.5 h-3.5 text-muted-foreground group-hover:text-foreground transition-colors" />
                 </button>
 
                 {/* Debug Panel — dev only */}

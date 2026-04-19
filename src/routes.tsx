@@ -13,6 +13,7 @@ const ProfilesPage = lazy(() => import('./pages/profiles'));
 const SetupPage = lazy(() => import('./pages/setup'));
 const DownloadsPage = lazy(() => import('./pages/downloads'));
 const DiscoverPage = lazy(() => import('./pages/discover'));
+const HttpsSetupPage = lazy(() => import('./pages/https-setup'));
 const HistoryPage = lazy(() => import('./pages/history'));
 
 // 404 routing by runtime:
@@ -36,6 +37,7 @@ export const routes: RouteObject[] = [
   { path: '/downloads', element: <DownloadsPage /> },
   { path: '/discover', element: <DiscoverPage /> },
   { path: '/history', element: <HistoryPage /> },
+  { path: '/https-setup', element: <HttpsSetupPage /> },
   { path: '*', element: <NotFoundPage /> },
 ];
 
