@@ -1,0 +1,114 @@
+/**
+ * POST /api/media/:id/fetch-metadata
+ *
+ * Retries OMDB metadata lookup for an existing library item.
+ * Called when a file was uploaded offline and the user is now back online.
+ * Merges OMDB data into the existing item — preserves any manually entered
+ * fields (title, year, genre) if OMDB returns nothing.
+ */
+import type { Request, Response } from 'express';
+import fs from 'fs';
+import path from 'path';
+
+const LIBRARY_PATH = path.resolve('./media-library.json');
+
+interface MediaItem {
+  id: string;
+  title: string;
+  year: string;
+  genre: string[];
+  plot: string;
+  director: string;
+  actors: string;
+  imdbRating: string;
+  poster: string;
+  type: string;
+  runtime: string;
+  rated: string;
+  needsMetadata?: boolean;
+  [key: string]: unknown;
+}
+
+function readLibrary(): MediaItem[] {
+  if (!fs.existsSync(LIBRARY_PATH)) return [];
+  try { return JSON.parse(fs.readFileSync(LIBRARY_PATH, 'utf-8')); }
+  catch { return []; }
+}
+
+function writeLibrary(data: unknown[]) {
+  fs.writeFileSync(LIBRARY_PATH, JSON.stringify(data, null, 2));
+}
+
+async function fetchOMDB(title: string, year?: string): Promise<Record<string, string> | null> {
+  const apiKey = process.env.OMDB_API_KEY;
+  if (!apiKey) return null;
+
+  const yearParam = year && year !== 'Unknown' ? `&y=${year}` : '';
+  const url = `http://www.omdbapi.com/?t=${encodeURIComponent(title)}${yearParam}&apikey=${apiKey}`;
+
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+    const res = await fetch(url, { signal: controller.signal });
+    clearTimeout(timeout);
+    const data = await res.json() as Record<string, string>;
+    return data.Response === 'True' ? data : null;
+  } catch {
+    return null;
+  }
+}
+
+export default async function handler(req: Request, res: Response) {
+  try {
+    const { id } = req.params;
+    const lib = readLibrary();
+    const idx = lib.findIndex(m => m.id === id);
+
+    if (idx === -1) {
+      return res.status(404).json({ error: 'Media item not found' });
+    }
+
+    const item = lib[idx];
+
+    // Try OMDB with the current title (may have been manually corrected)
+    const omdb = await fetchOMDB(item.title, item.year);
+
+    if (!omdb) {
+      // Still offline or title not found — return current item unchanged
+      return res.status(200).json({
+        success: false,
+        message: 'Could not reach OMDB — still offline or title not found',
+        item,
+      });
+    }
+
+    // Merge OMDB data — only overwrite fields that are still "Unknown"/empty
+    const updated: MediaItem = {
+      ...item,
+      // Always take OMDB title if it found a match (better casing/punctuation)
+      title: omdb.Title || item.title,
+      year: omdb.Year || item.year,
+      genre: omdb.Genre
+        ? omdb.Genre.split(',').map((g: string) => g.trim())
+        : (item.genre.length && item.genre[0] !== 'Unknown' ? item.genre : ['Unknown']),
+      plot: omdb.Plot && omdb.Plot !== 'N/A' ? omdb.Plot : item.plot,
+      director: omdb.Director && omdb.Director !== 'N/A' ? omdb.Director : item.director,
+      actors: omdb.Actors && omdb.Actors !== 'N/A' ? omdb.Actors : item.actors,
+      imdbRating: omdb.imdbRating && omdb.imdbRating !== 'N/A' ? omdb.imdbRating : item.imdbRating,
+      poster: (omdb.Poster && omdb.Poster !== 'N/A') ? omdb.Poster : item.poster,
+      type: omdb.Type === 'series' ? 'series' : 'movie',
+      runtime: omdb.Runtime && omdb.Runtime !== 'N/A' ? omdb.Runtime : item.runtime,
+      rated: omdb.Rated && omdb.Rated !== 'N/A' ? omdb.Rated : item.rated,
+      // Clear the offline flags now that we have real data
+      needsMetadata: false,
+      metadataAvailable: true,
+    };
+
+    lib[idx] = updated;
+    writeLibrary(lib);
+
+    res.json({ success: true, item: updated });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch metadata', message: String(error) });
+  }
+}

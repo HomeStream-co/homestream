@@ -30,28 +30,58 @@ interface OfflineMetadataNoticeProps {
   onSaved: (title: string) => void;
 }
 
+const RATING_OPTIONS = ['G', 'PG', 'PG-13', 'R', 'NC-17', 'TV-Y', 'TV-Y7', 'TV-G', 'TV-PG', 'TV-14', 'TV-MA', 'NR'];
+
 function OfflineMetadataNotice({ mediaId, currentTitle, onSaved }: OfflineMetadataNoticeProps) {
   const [editing, setEditing] = useState(false);
+  const [retrying, setRetrying] = useState(false);
   const [title, setTitle] = useState(currentTitle);
   const [year, setYear] = useState('');
   const [genre, setGenre] = useState('');
   const [plot, setPlot] = useState('');
+  const [rated, setRated] = useState('NR');
+  const [imdbRating, setImdbRating] = useState('');
   const [saving, setSaving] = useState(false);
+
+  /** Try to pull OMDB data now that we may be back online */
+  async function handleRetry() {
+    setRetrying(true);
+    try {
+      const res = await fetch(`/api/media/${mediaId}/fetch-metadata`, { method: 'POST' });
+      const data = await res.json() as { success: boolean; item?: { title: string }; message?: string };
+      if (data.success && data.item) {
+        onSaved(data.item.title);
+        toast.success(`Metadata fetched for "${data.item.title}"`);
+      } else {
+        toast.error(data.message || 'Still offline — try again when connected');
+      }
+    } catch {
+      toast.error('Could not reach server');
+    } finally {
+      setRetrying(false);
+    }
+  }
 
   async function handleSave() {
     setSaving(true);
     try {
+      const body: Record<string, unknown> = {
+        title: title.trim() || currentTitle,
+        year: year.trim() || 'Unknown',
+        genre: genre ? genre.split(',').map(g => g.trim()).filter(Boolean) : ['Unknown'],
+        plot: plot.trim() || '',
+        rated,
+      };
+      if (imdbRating.trim()) {
+        const parsed = parseFloat(imdbRating);
+        if (!isNaN(parsed)) body.imdbRating = parsed.toFixed(1);
+      }
       await fetch(`/api/media/${mediaId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: title.trim() || currentTitle,
-          year: year.trim() || 'Unknown',
-          genre: genre ? genre.split(',').map(g => g.trim()).filter(Boolean) : ['Unknown'],
-          plot: plot.trim() || '',
-        }),
+        body: JSON.stringify({ ...body, needsMetadata: false }),
       });
-      onSaved(title.trim() || currentTitle);
+      onSaved((body.title as string));
       setEditing(false);
     } catch {
       toast.error('Failed to save metadata');
@@ -62,33 +92,66 @@ function OfflineMetadataNotice({ mediaId, currentTitle, onSaved }: OfflineMetada
 
   if (!editing) {
     return (
-      <div className="mt-3 pt-3 border-t border-border flex items-center gap-2.5">
-        <WifiOff className="w-3.5 h-3.5 text-yellow-500 flex-shrink-0" />
-        <p className="text-xs text-yellow-500 flex-1">
-          Uploaded offline — no movie info fetched automatically.
-        </p>
-        <button
-          onClick={() => setEditing(true)}
-          className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 transition-colors flex-shrink-0"
-        >
-          <PenLine className="w-3 h-3" />
-          Add details
-        </button>
+      <div className="mt-3 pt-3 border-t border-border">
+        <div className="flex items-center gap-2.5">
+          <WifiOff className="w-3.5 h-3.5 text-yellow-500 flex-shrink-0" />
+          <p className="text-xs text-yellow-500 flex-1">
+            Uploaded offline — no movie info fetched automatically.
+          </p>
+        </div>
+        <div className="flex gap-2 mt-2">
+          <button
+            onClick={handleRetry}
+            disabled={retrying}
+            className="flex items-center gap-1 text-xs bg-primary/15 hover:bg-primary/25 text-primary border border-primary/30 px-2.5 py-1 rounded transition-colors disabled:opacity-50"
+          >
+            {retrying ? (
+              <><span className="animate-spin inline-block w-3 h-3 border border-primary border-t-transparent rounded-full" /> Fetching…</>
+            ) : (
+              <><Zap className="w-3 h-3" /> Fetch from OMDB</>
+            )}
+          </button>
+          <button
+            onClick={() => setEditing(true)}
+            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground border border-border px-2.5 py-1 rounded transition-colors"
+          >
+            <PenLine className="w-3 h-3" />
+            Enter manually
+          </button>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="mt-3 pt-3 border-t border-border space-y-2">
-      <p className="text-xs text-muted-foreground font-medium flex items-center gap-1.5">
-        <PenLine className="w-3 h-3" /> Add movie details manually
-      </p>
+      <div className="flex items-center justify-between">
+        <p className="text-xs text-muted-foreground font-medium flex items-center gap-1.5">
+          <PenLine className="w-3 h-3" /> Add movie details manually
+        </p>
+        <button
+          onClick={handleRetry}
+          disabled={retrying}
+          className="flex items-center gap-1 text-[10px] text-primary hover:text-primary/80 transition-colors disabled:opacity-50"
+        >
+          {retrying ? (
+            <span className="animate-spin inline-block w-2.5 h-2.5 border border-primary border-t-transparent rounded-full" />
+          ) : (
+            <Zap className="w-2.5 h-2.5" />
+          )}
+          {retrying ? 'Fetching…' : 'Try OMDB instead'}
+        </button>
+      </div>
+
+      {/* Title */}
       <input
         value={title}
         onChange={e => setTitle(e.target.value)}
         placeholder="Title"
         className="w-full bg-background border border-border rounded px-2.5 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary"
       />
+
+      {/* Year + Rating */}
       <div className="flex gap-2">
         <input
           value={year}
@@ -96,13 +159,34 @@ function OfflineMetadataNotice({ mediaId, currentTitle, onSaved }: OfflineMetada
           placeholder="Year (e.g. 2023)"
           className="flex-1 bg-background border border-border rounded px-2.5 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary"
         />
+        <select
+          value={rated}
+          onChange={e => setRated(e.target.value)}
+          className="flex-1 bg-background border border-border rounded px-2.5 py-1.5 text-xs text-foreground focus:outline-none focus:border-primary"
+        >
+          {RATING_OPTIONS.map(r => (
+            <option key={r} value={r}>{r}</option>
+          ))}
+        </select>
+      </div>
+
+      {/* Genre + IMDb */}
+      <div className="flex gap-2">
         <input
           value={genre}
           onChange={e => setGenre(e.target.value)}
-          placeholder="Genres (comma-separated)"
+          placeholder="Genres (e.g. Action, Drama)"
           className="flex-1 bg-background border border-border rounded px-2.5 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary"
         />
+        <input
+          value={imdbRating}
+          onChange={e => setImdbRating(e.target.value)}
+          placeholder="IMDb (e.g. 7.5)"
+          className="w-28 bg-background border border-border rounded px-2.5 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary"
+        />
       </div>
+
+      {/* Plot */}
       <textarea
         value={plot}
         onChange={e => setPlot(e.target.value)}
@@ -110,6 +194,7 @@ function OfflineMetadataNotice({ mediaId, currentTitle, onSaved }: OfflineMetada
         rows={2}
         className="w-full bg-background border border-border rounded px-2.5 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary resize-none"
       />
+
       <div className="flex gap-2 justify-end">
         <button
           onClick={() => setEditing(false)}
