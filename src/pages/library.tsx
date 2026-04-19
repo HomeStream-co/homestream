@@ -11,6 +11,7 @@ import type { MediaItem } from '@/types/media';
 import { Skeleton } from '@/components/ui/skeleton';
 import EnrichmentWizard from '@/components/EnrichmentWizard';
 import EnrichmentRevealModal from '@/components/EnrichmentRevealModal';
+import CaptionManager from '@/components/CaptionManager';
 import type { MediaEnrichment } from '@/types/media';
 import {
   AlertDialog,
@@ -974,17 +975,14 @@ export default function LibraryPage() {
                       ))}
                     </div>
                   ) : null}
-                  {/* CC availability pill */}
-                  {item.captions && (item.captions.en === 'downloaded' || item.captions.es === 'downloaded') && (
-                    <div className="flex items-center gap-0.5 mt-1">
-                      <Captions className="w-2.5 h-2.5 text-primary flex-shrink-0" />
-                      <span className="text-[9px] text-primary font-medium">
-                        CC {[
-                          item.captions.en === 'downloaded' ? 'EN' : null,
-                          item.captions.es === 'downloaded' ? 'ES' : null,
-                        ].filter(Boolean).join('·')}
-                      </span>
-                    </div>
+                  {/* CC manager — re-fetch + upload UI */}
+                  {!item.transcoding && !item.transcodeError && (
+                    <CaptionManager
+                      mediaId={item.id}
+                      title={item.title}
+                      captions={item.captions}
+                      onUpdated={refreshLibrary}
+                    />
                   )}
                   {item.transcodeWarning && !item.transcodeError && (
                     <p className="text-[9px] text-yellow-500 mt-0.5 truncate" title={item.transcodeWarning}>
