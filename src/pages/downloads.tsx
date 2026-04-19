@@ -14,7 +14,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
-  Download, Wifi, WifiOff, Trash2, Pause,
+  Download, Wifi, WifiOff, Trash2, Pause, Play,
   CheckCircle2, AlertCircle, Clock, Loader2,
   Film, Tv2, ArrowDown, ArrowUp, Zap, HardDrive,
   RefreshCw, X, ChevronDown, ChevronUp, Activity,
@@ -164,15 +164,33 @@ function ProgressBar({ progress, status }: { progress: number; status: string })
 
 // ─── qBittorrent torrent row ──────────────────────────────────────────────────
 
-function QbitRow({ torrent, onDelete }: {
+function QbitRow({ torrent, onDelete, onPause, onResume }: {
   torrent: QbitTorrent;
   onDelete: (hash: string, deleteFiles: boolean) => void;
+  onPause: (hash: string) => void;
+  onResume: (hash: string) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [actionLoading, setActionLoading] = useState<'pause' | 'resume' | null>(null);
 
   const isActive = torrent.status === 'downloading' || torrent.status === 'queued' || torrent.status === 'stalled';
   const isDone = torrent.status === 'done' || torrent.status === 'seeding';
+  const isPaused = torrent.status === 'paused';
+  const canPause = isActive;
+  const canResume = isPaused;
+
+  const handlePause = async () => {
+    setActionLoading('pause');
+    await onPause(torrent.hash);
+    setActionLoading(null);
+  };
+
+  const handleResume = async () => {
+    setActionLoading('resume');
+    await onResume(torrent.hash);
+    setActionLoading(null);
+  };
 
   return (
     <motion.div
@@ -234,6 +252,34 @@ function QbitRow({ torrent, onDelete }: {
 
         {/* Actions */}
         <div className="flex items-center gap-1 flex-shrink-0">
+          {/* Pause / Resume */}
+          {canPause && (
+            <button
+              onClick={handlePause}
+              disabled={actionLoading === 'pause'}
+              className="p-1.5 rounded-lg hover:bg-yellow-500/10 transition-colors text-muted-foreground hover:text-yellow-400 disabled:opacity-50"
+              title="Pause download"
+            >
+              {actionLoading === 'pause'
+                ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                : <Pause className="w-3.5 h-3.5" />
+              }
+            </button>
+          )}
+          {canResume && (
+            <button
+              onClick={handleResume}
+              disabled={actionLoading === 'resume'}
+              className="p-1.5 rounded-lg hover:bg-green-500/10 transition-colors text-muted-foreground hover:text-green-400 disabled:opacity-50"
+              title="Resume download"
+            >
+              {actionLoading === 'resume'
+                ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                : <Play className="w-3.5 h-3.5" />
+              }
+            </button>
+          )}
+
           <button
             onClick={() => setExpanded(v => !v)}
             className="p-1.5 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
@@ -396,6 +442,37 @@ export default function DownloadsPage() {
       fetchData();
     } catch (err) {
       toast.error(`Failed to remove torrent: ${String(err)}`);
+    }
+  }, [fetchData]);
+
+  const handlePause = useCallback(async (hash: string) => {
+    try {
+      const res = await fetch('/api/stremio/downloads/pause', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ hash }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      toast.success('Download paused');
+      // Optimistic: refresh immediately so the UI reflects the new state
+      setTimeout(fetchData, 600);
+    } catch (err) {
+      toast.error(`Failed to pause: ${String(err)}`);
+    }
+  }, [fetchData]);
+
+  const handleResume = useCallback(async (hash: string) => {
+    try {
+      const res = await fetch('/api/stremio/downloads/resume', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ hash }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      toast.success('Download resumed');
+      setTimeout(fetchData, 600);
+    } catch (err) {
+      toast.error(`Failed to resume: ${String(err)}`);
     }
   }, [fetchData]);
 
@@ -571,7 +648,7 @@ export default function DownloadsPage() {
                   )}
                   <AnimatePresence mode="popLayout">
                     {filteredQbit.map(t => (
-                      <QbitRow key={t.hash} torrent={t} onDelete={handleDelete} />
+                      <QbitRow key={t.hash} torrent={t} onDelete={handleDelete} onPause={handlePause} onResume={handleResume} />
                     ))}
                   </AnimatePresence>
                 </div>
