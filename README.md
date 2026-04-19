@@ -36,7 +36,7 @@
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/yourname/homestream.git
+git clone https://github.com/homestream-app/homestream.git
 cd homestream
 ```
 
