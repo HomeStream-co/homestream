@@ -7,10 +7,7 @@
  * fields (title, year, genre) if OMDB returns nothing.
  */
 import type { Request, Response } from 'express';
-import fs from 'fs';
-import path from 'path';
-
-const LIBRARY_PATH = path.resolve('./media-library.json');
+import { readLibrary, writeLibrary } from '../../../../libraryStore.js';
 
 interface MediaItem {
   id: string;
@@ -29,14 +26,12 @@ interface MediaItem {
   [key: string]: unknown;
 }
 
-function readLibrary(): MediaItem[] {
-  if (!fs.existsSync(LIBRARY_PATH)) return [];
-  try { return JSON.parse(fs.readFileSync(LIBRARY_PATH, 'utf-8')); }
-  catch { return []; }
+function readLibraryLocal(): MediaItem[] {
+  return readLibrary<MediaItem>();
 }
 
-function writeLibrary(data: unknown[]) {
-  fs.writeFileSync(LIBRARY_PATH, JSON.stringify(data, null, 2));
+function writeLibraryLocal(data: MediaItem[]) {
+  writeLibrary(() => data);
 }
 
 async function fetchOMDB(title: string, year?: string): Promise<Record<string, string> | null> {
@@ -61,7 +56,7 @@ async function fetchOMDB(title: string, year?: string): Promise<Record<string, s
 export default async function handler(req: Request, res: Response) {
   try {
     const { id } = req.params;
-    const lib = readLibrary();
+    const lib = readLibraryLocal();
     const idx = lib.findIndex(m => m.id === id);
 
     if (idx === -1) {
@@ -105,7 +100,7 @@ export default async function handler(req: Request, res: Response) {
     };
 
     lib[idx] = updated;
-    writeLibrary(lib);
+    writeLibraryLocal(lib);
 
     res.json({ success: true, item: updated });
   } catch (error) {

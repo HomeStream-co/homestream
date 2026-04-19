@@ -38,6 +38,10 @@ export interface MediaItem {
   // Offline upload flags
   needsMetadata?: boolean;       // true = uploaded offline, no OMDB data yet
   metadataAvailable?: boolean;   // false = server had no internet during upload
+  // Transcode size savings (populated after transcode completes)
+  originalSize?: number;        // original file size in bytes before transcode
+  savedBytes?: number;          // bytes saved vs original (0 if output was larger)
+  transcodeStrategy?: 'remux' | 'encode_h264' | 'skipped';
   // AI enrichment (populated after upload wizard runs)
   enrichment?: MediaEnrichment;
   enriching?: boolean;          // true while wizard is running

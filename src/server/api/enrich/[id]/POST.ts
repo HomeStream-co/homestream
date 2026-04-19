@@ -13,12 +13,9 @@
  * Streams progress via SSE so the UI wizard can show live step-by-step status.
  */
 import type { Request, Response } from 'express';
-import fs from 'fs';
-import path from 'path';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { getSecret } from '#airo/secrets';
-
-const LIBRARY_PATH = path.resolve('./media-library.json');
+import { readLibrary, writeLibrary } from '../../../libraryStore.js';
 
 interface MediaItem {
   id: string;
@@ -36,23 +33,16 @@ interface MediaItem {
   enriching?: boolean;
 }
 
-function readLibrary(): MediaItem[] {
-  if (!fs.existsSync(LIBRARY_PATH)) return [];
-  try { return JSON.parse(fs.readFileSync(LIBRARY_PATH, 'utf-8')); }
-  catch { return []; }
-}
-
-function writeLibrary(data: unknown[]) {
-  fs.writeFileSync(LIBRARY_PATH, JSON.stringify(data, null, 2));
+function readLibraryLocal(): MediaItem[] {
+  return readLibrary<MediaItem>();
 }
 
 function updateItem(id: string, updates: Partial<MediaItem>) {
-  const lib = readLibrary();
-  const idx = lib.findIndex(m => m.id === id);
-  if (idx !== -1) {
-    lib[idx] = { ...lib[idx], ...updates };
-    writeLibrary(lib);
-  }
+  writeLibrary(lib => {
+    const idx = lib.findIndex(m => (m as unknown as { id: string }).id === id);
+    if (idx !== -1) lib[idx] = { ...(lib[idx] as unknown as object), ...updates } as unknown as Record<string, unknown>;
+    return lib;
+  });
 }
 
 function buildEnrichmentPrompt(item: MediaItem): string {
@@ -87,7 +77,7 @@ Be specific and accurate. Tags should be highly searchable keywords a viewer wou
 export default async function handler(req: Request, res: Response) {
   const { id } = req.params;
 
-  const lib = readLibrary();
+  const lib = readLibraryLocal();
   const item = lib.find(m => m.id === id);
 
   if (!item) {

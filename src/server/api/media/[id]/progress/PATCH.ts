@@ -1,24 +1,22 @@
 import type { Request, Response } from 'express';
-import fs from 'fs';
-import path from 'path';
-
-const LIBRARY_PATH = path.resolve('./media-library.json');
+import { readLibrary, writeLibrary } from '../../../../libraryStore.js';
 
 export default async function handler(req: Request, res: Response) {
   try {
     const { id } = req.params;
     const { progress } = req.body;
-    if (!fs.existsSync(LIBRARY_PATH)) {
-      return res.status(404).json({ error: 'Library not found' });
-    }
-    const data = JSON.parse(fs.readFileSync(LIBRARY_PATH, 'utf-8'));
-    const idx = data.findIndex((m: { id: string }) => m.id === id);
+    const data = readLibrary<Record<string, unknown>>();
+    const idx = data.findIndex((m) => m.id === id);
     if (idx === -1) {
       return res.status(404).json({ error: 'Media item not found' });
     }
-    data[idx].watchProgress = progress;
-    fs.writeFileSync(LIBRARY_PATH, JSON.stringify(data, null, 2));
-    res.json(data[idx]);
+    const updated = { ...data[idx], watchProgress: progress };
+    await writeLibrary(lib => {
+      const i = lib.findIndex(m => m.id === id);
+      if (i !== -1) lib[i] = updated;
+      return lib;
+    });
+    res.json(updated);
   } catch (error) {
     res.status(500).json({ error: 'Failed to update progress', message: String(error) });
   }

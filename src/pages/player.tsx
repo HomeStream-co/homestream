@@ -815,13 +815,15 @@ export default function PlayerPage() {
                         onClick={() => { setShowEndOverlay(false); navigate(`/player/${m.id}`); }}
                         className="group text-left"
                       >
-                        <div className="relative aspect-[2/3] rounded-lg overflow-hidden mb-1">
-                          <img
-                            src={m.poster}
-                            alt={m.title}
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
-                            onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                          />
+                        <div className="relative aspect-[2/3] rounded-lg overflow-hidden mb-1 bg-white/10">
+                          {m.poster ? (
+                            <img
+                              src={m.poster}
+                              alt={m.title}
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                              onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                            />
+                          ) : null}
                           <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                             <Play className="w-6 h-6 text-white fill-white" />
                           </div>
@@ -911,7 +913,7 @@ export default function PlayerPage() {
               className="absolute top-0 right-0 bottom-0 w-72 bg-black/90 backdrop-blur-sm p-5 overflow-y-auto"
               onClick={e => e.stopPropagation()}
             >
-              <img src={item.poster} alt={item.title} className="w-full aspect-[2/3] object-cover rounded-lg mb-4" />
+              <img src={item.poster} alt={item.title} className="w-full aspect-[2/3] object-cover rounded-lg mb-4" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
               <h3 className="text-lg font-heading text-white mb-1">{item.title}</h3>
               <div className="flex items-center gap-2 mb-3 text-xs text-white/60">
                 <span>{item.year}</span>
@@ -956,8 +958,18 @@ export default function PlayerPage() {
       {/* ── Below Player ── */}
       <div className="bg-background px-4 sm:px-6 lg:px-8 py-8 max-w-screen-2xl mx-auto">
         <div className="flex flex-col sm:flex-row gap-6 mb-10">
-          <img src={item.poster} alt={item.title} className="w-32 aspect-[2/3] object-cover rounded-lg flex-shrink-0 hidden sm:block" />
-          <div>
+          {/* Poster with onError fallback */}
+          <div className="w-32 aspect-[2/3] rounded-lg overflow-hidden bg-card flex-shrink-0 hidden sm:block">
+            {item.poster ? (
+              <img
+                src={item.poster}
+                alt={item.title}
+                className="w-full h-full object-cover"
+                onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+              />
+            ) : null}
+          </div>
+          <div className="flex-1 min-w-0">
             <h1 className="text-3xl font-heading text-foreground mb-2">{item.title}</h1>
             <div className="flex flex-wrap items-center gap-3 mb-3 text-sm text-muted-foreground">
               <span>{item.year}</span>
@@ -971,12 +983,49 @@ export default function PlayerPage() {
                 </span>
               )}
             </div>
+            {/* Genre chips */}
             <div className="flex flex-wrap gap-1 mb-3">
               {item.genre.map(g => (
                 <span key={g} className="bg-secondary text-foreground text-xs px-2 py-0.5 rounded-full">{g}</span>
               ))}
             </div>
-            <p className="text-sm text-muted-foreground leading-relaxed max-w-2xl">{item.plot}</p>
+
+            {/* ── AI Enrichment section ── */}
+            {item.enrichment && (
+              <div className="mb-4 space-y-2">
+                {item.enrichment.whyWatch && (
+                  <p className="text-sm text-primary font-medium italic">"{item.enrichment.whyWatch}"</p>
+                )}
+                {item.enrichment.mood.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 items-center">
+                    <span className="text-xs text-muted-foreground uppercase tracking-wider mr-1">Mood</span>
+                    {item.enrichment.mood.map(m => (
+                      <span key={m} className="bg-primary/10 text-primary border border-primary/20 text-xs px-2 py-0.5 rounded-full capitalize">{m}</span>
+                    ))}
+                  </div>
+                )}
+                {item.enrichment.tags.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 items-center">
+                    <span className="text-xs text-muted-foreground uppercase tracking-wider mr-1">Tags</span>
+                    {item.enrichment.tags.map(t => (
+                      <span key={t} className="bg-muted text-muted-foreground text-xs px-2 py-0.5 rounded-full">{t}</span>
+                    ))}
+                  </div>
+                )}
+                {item.enrichment.contentWarnings.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 items-center">
+                    <span className="text-xs text-muted-foreground uppercase tracking-wider mr-1">Contains</span>
+                    {item.enrichment.contentWarnings.map(w => (
+                      <span key={w} className="bg-destructive/10 text-destructive border border-destructive/20 text-xs px-2 py-0.5 rounded-full">{w}</span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            <p className="text-sm text-muted-foreground leading-relaxed max-w-2xl">
+              {item.enrichment?.aiSummary || item.plot}
+            </p>
             {item.director !== 'Unknown' && (
               <p className="text-sm text-muted-foreground mt-2">
                 <span className="text-foreground">Director:</span> {item.director}

@@ -5,8 +5,8 @@ import multer from 'multer';
 import { randomUUID } from 'crypto';
 import { createJob } from '../../transcodeStore.js';
 import { transcodeFile } from '../../transcodeWorker.js';
+import { readLibrary, writeLibrary } from '../../libraryStore.js';
 
-const LIBRARY_PATH = path.resolve('./media-library.json');
 const UPLOADS_DIR = path.resolve('./uploads');
 
 if (!fs.existsSync(UPLOADS_DIR)) {
@@ -95,14 +95,13 @@ async function fetchOMDBMetadata(title: string, year?: string): Promise<OMDBResu
   }
 }
 
-function readLibrary() {
-  if (!fs.existsSync(LIBRARY_PATH)) return [];
-  try { return JSON.parse(fs.readFileSync(LIBRARY_PATH, 'utf-8')); }
-  catch { return []; }
+function readLibraryLegacy() {
+  return readLibrary();
 }
 
-function writeLibrary(data: unknown[]) {
-  fs.writeFileSync(LIBRARY_PATH, JSON.stringify(data, null, 2));
+function writeLibraryLegacy(data: unknown[]) {
+  // Fire-and-forget through the queue (upload handler doesn't await this)
+  writeLibrary(() => data as Record<string, unknown>[]);
 }
 
 /**
@@ -191,9 +190,9 @@ export default function handler(req: Request, res: Response) {
     };
 
     // Write to library immediately — item is visible right away
-    const library = readLibrary();
+    const library = readLibraryLegacy();
     library.unshift(mediaItem);
-    writeLibrary(library);
+    writeLibraryLegacy(library);
 
     // Respond to client — includes metadataAvailable so UI can react
     res.status(201).json({ ...mediaItem, transcodeId: mediaId });
@@ -209,37 +208,39 @@ export default function handler(req: Request, res: Response) {
     transcodeFile(mediaId, inputFilename, outputFilename)
       .then((result) => {
         // Mark transcoding: false in library once done; persist size savings
-        const lib = readLibrary();
-        const idx = lib.findIndex((m: { id: string }) => m.id === mediaId);
-        if (idx !== -1) {
-          lib[idx].transcoding = false;
-          lib[idx].filename = result.outputFilename;
-          lib[idx].filepath = `/uploads/${result.outputFilename}`;
-          lib[idx].fileSize = result.finalSize;
-          lib[idx].originalSize = result.originalSize;
-          lib[idx].savedBytes = result.savedBytes;
-          lib[idx].transcodeStrategy = result.strategy;
-          writeLibrary(lib);
-        }
+        writeLibrary(lib => {
+          const idx = lib.findIndex((m) => (m as { id: string }).id === mediaId);
+          if (idx !== -1) {
+            const item = lib[idx] as Record<string, unknown>;
+            item.transcoding = false;
+            item.filename = result.outputFilename;
+            item.filepath = `/uploads/${result.outputFilename}`;
+            item.fileSize = result.finalSize;
+            item.originalSize = result.originalSize;
+            item.savedBytes = result.savedBytes;
+            item.transcodeStrategy = result.strategy;
+          }
+          return lib;
+        });
       })
       .catch((transcodeErr: Error) => {
         console.error(`[transcode] Error for ${mediaId}:`, transcodeErr.message);
         // If FFmpeg failed, keep original file as fallback
-        const lib = readLibrary();
-        const idx = lib.findIndex((m: { id: string }) => m.id === mediaId);
-        if (idx !== -1) {
-          // Fall back to original file
-          const origExt = ext;
-          lib[idx].filename = inputFilename;
-          lib[idx].filepath = `/uploads/${inputFilename}`;
-          lib[idx].transcoding = false;
-          lib[idx].transcodeError = transcodeErr.message;
-          // If original is not mp4, note it
-          if (origExt !== '.mp4') {
-            lib[idx].transcodeWarning = 'Transcode failed — original file kept. May not play in all browsers.';
+        writeLibrary(lib => {
+          const idx = lib.findIndex((m) => (m as { id: string }).id === mediaId);
+          if (idx !== -1) {
+            const item = lib[idx] as Record<string, unknown>;
+            item.filename = inputFilename;
+            item.filepath = `/uploads/${inputFilename}`;
+            item.transcoding = false;
+            item.transcodeError = transcodeErr.message;
+            // If original is not mp4, note it
+            if (ext !== '.mp4') {
+              item.transcodeWarning = 'Transcode failed — original file kept. May not play in all browsers.';
+            }
           }
-          writeLibrary(lib);
-        }
+          return lib;
+        });
       });
   });
 }

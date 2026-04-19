@@ -1,28 +1,40 @@
 import type { Request, Response } from 'express';
 import fs from 'fs';
 import path from 'path';
+import { readLibrary, writeLibrary } from '../../../libraryStore.js';
 
-const LIBRARY_PATH = path.resolve('./media-library.json');
+const UPLOADS_DIR  = path.resolve('./uploads');
+
+/** Safely delete a file in the uploads directory. Ignores missing files. */
+function safeDelete(filename: string) {
+  if (!filename) return;
+  // Only allow deleting files inside the uploads directory (prevent path traversal)
+  const resolved = path.resolve(UPLOADS_DIR, path.basename(filename));
+  if (!resolved.startsWith(UPLOADS_DIR)) return;
+  try { if (fs.existsSync(resolved)) fs.unlinkSync(resolved); } catch { /* ignore */ }
+}
 
 export default async function handler(req: Request, res: Response) {
   try {
     const { id } = req.params;
-    if (!fs.existsSync(LIBRARY_PATH)) {
-      return res.status(404).json({ error: 'Library not found' });
-    }
-    const data = JSON.parse(fs.readFileSync(LIBRARY_PATH, 'utf-8'));
-    const item = data.find((m: { id: string }) => m.id === id);
+    const data = readLibrary<Record<string, unknown>>();
+    const item = data.find((m) => m.id === id);
     if (!item) {
       return res.status(404).json({ error: 'Media item not found' });
     }
-    // Delete the actual file
-    const filePath = path.resolve('.' + item.filepath);
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
+
+    // Delete the transcoded/current file
+    safeDelete(item.filename as string);
+
+    // Also delete the original file if it differs (e.g. transcode was reverted
+    // and the original was kept alongside a failed _tc.mp4, or the original
+    // was a different extension before remux).
+    if (item.originalFilename && item.originalFilename !== item.filename) {
+      safeDelete(item.originalFilename as string);
     }
-    // Remove from library
-    const updated = data.filter((m: { id: string }) => m.id !== id);
-    fs.writeFileSync(LIBRARY_PATH, JSON.stringify(updated, null, 2));
+
+    // Remove from library (serialised through write queue)
+    await writeLibrary(lib => lib.filter(m => m.id !== id));
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: 'Failed to delete media', message: String(error) });

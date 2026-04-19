@@ -27,6 +27,11 @@ const MIME_TYPES: Record<string, string> = {
   '.wmv':  'video/x-ms-wmv',
   '.m4v':  'video/mp4',
   '.webm': 'video/webm',
+  // Additional containers accepted by the upload endpoint
+  '.ts':   'video/mp2t',
+  '.flv':  'video/x-flv',
+  '.3gp':  'video/3gpp',
+  '.ogv':  'video/ogg',
 };
 
 function resolveFilePath(filename: string): string | null {
