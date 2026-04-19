@@ -39,6 +39,21 @@ function serverBundlePlugin(): Plugin {
 				outfile: path.resolve(__dirname, "dist", "server.bundle.mjs"),
 				packages: "bundle",
 				sourcemap: true,
+				// webrtc-polyfill/lib/Blob.js uses top-level await (TLA) which esbuild
+				// cannot inline into synchronous __esm() wrappers. The async-ness
+				// propagates through the entire module graph and causes:
+				//   "SyntaxError: Unexpected reserved word" at runtime.
+				// On Node 18+ all these polyfills are no-ops — node-datachannel provides
+				// real WebRTC. We replace the whole package with a synchronous stub.
+				alias: {
+					"webrtc-polyfill": path.resolve(
+						__dirname,
+						"src/server/stubs/webrtc-polyfill-stub.js"
+					),
+				},
+				// node-datachannel is a native addon — keep external so it resolves
+				// from node_modules at runtime (installed alongside the app).
+				external: ["node-datachannel"],
 				banner: {
 					js: `import { createRequire } from 'module';
 const require = createRequire(import.meta.url);`,
