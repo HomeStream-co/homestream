@@ -1,4 +1,6 @@
 import type { Request, Response } from 'express';
+import { GoogleGenerativeAI } from '@google/generative-ai';
+import { getSecret } from '#airo/secrets';
 
 interface MediaItem {
   id: string;
@@ -11,181 +13,170 @@ interface MediaItem {
   director: string;
   actors: string;
   poster: string;
-  filepath: string;
   watchProgress: number;
+  rated?: string;
+  runtime?: string;
+}
+
+interface ChatMessage {
+  role: 'user' | 'model';
+  parts: [{ text: string }];
 }
 
 interface ChatRequest {
   message: string;
   library: MediaItem[];
+  history?: ChatMessage[];
 }
 
-// Keyword → genre/mood mappings
-const MOOD_MAP: Record<string, string[]> = {
-  action: ['Action', 'Adventure', 'Thriller'],
-  funny: ['Comedy'],
-  comedy: ['Comedy'],
-  laugh: ['Comedy'],
-  humor: ['Comedy'],
-  scary: ['Horror', 'Thriller'],
-  horror: ['Horror'],
-  spooky: ['Horror'],
-  romantic: ['Romance'],
-  romance: ['Romance'],
-  love: ['Romance'],
-  family: ['Family', 'Animation', 'Comedy'],
-  kids: ['Family', 'Animation'],
-  animated: ['Animation'],
-  cartoon: ['Animation'],
-  thriller: ['Thriller', 'Mystery', 'Crime'],
-  mystery: ['Mystery', 'Crime', 'Thriller'],
-  crime: ['Crime', 'Thriller'],
-  drama: ['Drama'],
-  scifi: ['Sci-Fi', 'Science Fiction'],
-  'sci-fi': ['Sci-Fi', 'Science Fiction'],
-  science: ['Sci-Fi', 'Science Fiction'],
-  fantasy: ['Fantasy', 'Adventure'],
-  adventure: ['Adventure', 'Action'],
-  documentary: ['Documentary'],
-  classic: ['Drama', 'Romance'],
-  war: ['War', 'History'],
-  sport: ['Sport'],
-  music: ['Music', 'Musical'],
-  western: ['Western'],
-  short: [],
-  long: [],
-  new: [],
-  classic2: [],
-};
+function buildLibrarySummary(library: MediaItem[]): string {
+  if (library.length === 0) return 'The library is currently empty.';
 
-const RESPONSE_TEMPLATES = {
-  match: (items: MediaItem[]) => {
-    const picks = items.slice(0, 3);
-    const list = picks.map(m => `**${m.title}** (${m.year}) — ${m.imdbRating !== 'N/A' ? `⭐ ${m.imdbRating}/10 — ` : ''}${m.plot.slice(0, 80)}...`).join('\n\n');
-    return `Great choice! Here's what I'd recommend from your library:\n\n${list}\n\nAny of these sound good to you?`;
-  },
-  noMatch: (message: string) => {
-    return `I searched your library for "${message}" but didn't find a perfect match. Try uploading more movies in that genre, or ask me something else — I'm happy to suggest from what you have!`;
-  },
-  empty: () => {
-    return `Your library is empty right now! Head over to the Library page to upload some movies or shows, and I'll be able to give you personalized recommendations.`;
-  },
-  greeting: () => {
-    return `Hey there! I'm your HomeStream assistant — a film-buff friend who knows your entire library. Ask me things like:\n\n• "What should I watch tonight?"\n• "I'm in the mood for something scary"\n• "Recommend a family movie"\n• "Something with great action"\n\nWhat are you feeling?`;
-  },
-  topRated: (items: MediaItem[]) => {
-    const top = [...items].filter(m => m.imdbRating !== 'N/A').sort((a, b) => parseFloat(b.imdbRating) - parseFloat(a.imdbRating)).slice(0, 3);
-    if (!top.length) return `I don't have enough rated content to suggest top picks yet. Upload more movies!`;
-    const list = top.map(m => `**${m.title}** (${m.year}) — ⭐ ${m.imdbRating}/10`).join('\n');
-    return `Here are the highest-rated titles in your library:\n\n${list}\n\nAll excellent picks!`;
-  },
-  random: (items: MediaItem[]) => {
-    const pick = items[Math.floor(Math.random() * items.length)];
-    return `How about **${pick.title}** (${pick.year})? ${pick.imdbRating !== 'N/A' ? `It's rated ⭐ ${pick.imdbRating}/10 and ` : ''}${pick.plot.slice(0, 100)}... Sounds good?`;
-  },
-  similar: (title: string, items: MediaItem[], target?: MediaItem) => {
-    if (!target) return `I couldn't find "${title}" in your library. Make sure it's uploaded first!`;
-    const similar = items.filter(m => m.id !== target.id && m.genre.some(g => target.genre.includes(g))).slice(0, 3);
-    if (!similar.length) return `I found **${target.title}** but don't have similar titles yet. Upload more movies in the ${target.genre[0]} genre!`;
-    const list = similar.map(m => `**${m.title}** (${m.year})`).join(', ');
-    return `If you liked **${target.title}**, you might also enjoy: ${list}. They share similar ${target.genre[0]} vibes!`;
-  },
-};
-
-function detectIntent(message: string): string {
-  const lower = message.toLowerCase();
-  if (/hello|hi|hey|what can you|help/i.test(lower)) return 'greeting';
-  if (/top rated|best|highest rated|greatest/i.test(lower)) return 'topRated';
-  if (/random|surprise|anything|don't care|whatever/i.test(lower)) return 'random';
-  if (/like|similar to|same as|reminds me of/i.test(lower)) return 'similar';
-  return 'mood';
+  return library
+    .map(m => {
+      const rating = m.imdbRating !== 'N/A' ? `IMDb: ${m.imdbRating}/10` : 'Not rated';
+      const progress = m.watchProgress > 0 ? ` [${Math.round(m.watchProgress)}% watched]` : '';
+      return `- "${m.title}" (${m.year}) | ${m.type === 'series' ? 'TV Show' : 'Movie'} | Genres: ${m.genre.join(', ')} | ${rating}${progress} | Director: ${m.director} | Cast: ${m.actors} | Plot: ${m.plot}`;
+    })
+    .join('\n');
 }
 
-function findSimilarTitle(message: string, library: MediaItem[]): MediaItem | undefined {
-  const lower = message.toLowerCase();
-  return library.find(m => lower.includes(m.title.toLowerCase()));
+function buildSystemPrompt(library: MediaItem[]): string {
+  const librarySummary = buildLibrarySummary(library);
+  const totalMovies = library.filter(m => m.type === 'movie').length;
+  const totalShows = library.filter(m => m.type === 'series').length;
+
+  return `You are HomeStream's AI assistant — a warm, knowledgeable film-buff friend who helps the family decide what to watch. You have deep knowledge of cinema and TV, and you know this family's personal media library inside and out.
+
+LIBRARY OVERVIEW:
+- ${totalMovies} movies, ${totalShows} TV shows (${library.length} total titles)
+
+FULL LIBRARY:
+${librarySummary}
+
+YOUR PERSONALITY:
+- Enthusiastic and warm, like a friend who loves movies
+- Concise but insightful — don't ramble
+- Give genuine opinions and reasons, not just lists
+- Use natural language, not bullet points unless listing recommendations
+- Occasionally reference specific details (cast, director, plot) to show you really know the content
+
+YOUR RULES:
+1. ONLY recommend titles that exist in the library above — never suggest something not in the list
+2. When recommending, always mention 1-2 specific reasons why (e.g., "great performances", "edge-of-your-seat pacing")
+3. If the library is empty or has no matches, say so warmly and suggest they upload more content
+4. Keep responses under 150 words unless the user asks for more detail
+5. At the end of your response, output a JSON block (and nothing after it) listing the IDs of titles you're recommending, like this:
+   SUGGESTIONS_JSON:["id1","id2","id3"]
+   Only include this if you're actually recommending specific titles. Max 3 suggestions.
+6. If someone asks about a movie NOT in the library, acknowledge it warmly but redirect to what you do have
+7. Remember conversation context — if they said they already watched something, don't suggest it again`;
 }
 
-function matchByMood(message: string, library: MediaItem[]): MediaItem[] {
-  const lower = message.toLowerCase();
-  const matchedGenres = new Set<string>();
+function extractSuggestions(text: string, library: MediaItem[]): { reply: string; suggestions: MediaItem[] } {
+  const jsonMatch = text.match(/SUGGESTIONS_JSON:\[([^\]]*)\]/);
+  let suggestions: MediaItem[] = [];
+  let reply = text;
 
-  for (const [keyword, genres] of Object.entries(MOOD_MAP)) {
-    if (lower.includes(keyword)) {
-      genres.forEach(g => matchedGenres.add(g));
+  if (jsonMatch) {
+    try {
+      const ids: string[] = JSON.parse(`[${jsonMatch[1]}]`);
+      suggestions = ids
+        .map(id => library.find(m => m.id === id))
+        .filter((m): m is MediaItem => !!m);
+    } catch {
+      // ignore parse errors
     }
+    // Remove the JSON block from the reply
+    reply = text.replace(/\s*SUGGESTIONS_JSON:\[[^\]]*\]/, '').trim();
   }
 
-  if (matchedGenres.size === 0) {
-    // Try direct word match against genres in library
-    const words = lower.split(/\s+/);
-    library.forEach(item => {
-      item.genre.forEach(g => {
-        if (words.some(w => g.toLowerCase().includes(w))) {
-          matchedGenres.add(g);
-        }
-      });
-    });
+  return { reply, suggestions };
+}
+
+// Fallback keyword-based response when Gemini is unavailable
+function fallbackResponse(message: string, library: MediaItem[]): { reply: string; suggestions: MediaItem[] } {
+  if (library.length === 0) {
+    return {
+      reply: "Your library is empty! Head to the Library page to upload some movies and I'll give you personalized recommendations.",
+      suggestions: [],
+    };
   }
 
-  if (matchedGenres.size === 0) return [];
+  const lower = message.toLowerCase();
+  const MOOD_MAP: Record<string, string[]> = {
+    scary: ['Horror', 'Thriller'], horror: ['Horror'], funny: ['Comedy'], comedy: ['Comedy'],
+    family: ['Family', 'Animation'], kids: ['Family', 'Animation'], action: ['Action', 'Adventure'],
+    romantic: ['Romance'], romance: ['Romance'], drama: ['Drama'], 'sci-fi': ['Sci-Fi'],
+    scifi: ['Sci-Fi'], documentary: ['Documentary'], thriller: ['Thriller', 'Mystery'],
+  };
 
-  return library.filter(item =>
-    item.genre.some(g => matchedGenres.has(g))
-  ).sort((a, b) => {
-    const ra = parseFloat(a.imdbRating) || 0;
-    const rb = parseFloat(b.imdbRating) || 0;
-    return rb - ra;
-  });
+  const matchedGenres = new Set<string>();
+  for (const [kw, genres] of Object.entries(MOOD_MAP)) {
+    if (lower.includes(kw)) genres.forEach(g => matchedGenres.add(g));
+  }
+
+  const matches = matchedGenres.size > 0
+    ? library.filter(m => m.genre.some(g => matchedGenres.has(g)))
+        .sort((a, b) => (parseFloat(b.imdbRating) || 0) - (parseFloat(a.imdbRating) || 0))
+        .slice(0, 3)
+    : [...library].sort((a, b) => (parseFloat(b.imdbRating) || 0) - (parseFloat(a.imdbRating) || 0)).slice(0, 3);
+
+  if (matches.length === 0) {
+    return { reply: "I couldn't find a great match for that. Try a different mood or genre!", suggestions: [] };
+  }
+
+  const titles = matches.map(m => `"${m.title}"`).join(', ');
+  return {
+    reply: `Based on your library, I'd suggest ${titles}. Let me know if you want more details on any of these!`,
+    suggestions: matches,
+  };
 }
 
 export default async function handler(req: Request, res: Response) {
   try {
-    const { message, library } = req.body as ChatRequest;
+    const { message, library, history = [] } = req.body as ChatRequest;
 
-    if (!message) {
+    if (!message?.trim()) {
       return res.status(400).json({ error: 'Message is required' });
     }
 
     const lib = library || [];
+    const apiKey = getSecret('GOOGLE_AI_API_KEY');
 
-    if (lib.length === 0) {
-      return res.json({ reply: RESPONSE_TEMPLATES.empty(), suggestions: [] });
+    if (!apiKey) {
+      const fallback = fallbackResponse(message, lib);
+      return res.json(fallback);
     }
 
-    const intent = detectIntent(message);
+    const genAI = new GoogleGenerativeAI(String(apiKey));
+    const model = genAI.getGenerativeModel({
+      model: 'gemini-1.5-flash',
+      systemInstruction: buildSystemPrompt(lib),
+    });
 
-    if (intent === 'greeting') {
-      return res.json({ reply: RESPONSE_TEMPLATES.greeting(), suggestions: [] });
-    }
+    // Build chat history (keep last 10 turns to stay within token limits)
+    const recentHistory = history.slice(-10);
 
-    if (intent === 'topRated') {
-      const top = [...lib].filter(m => m.imdbRating !== 'N/A').sort((a, b) => parseFloat(b.imdbRating) - parseFloat(a.imdbRating)).slice(0, 3);
-      return res.json({ reply: RESPONSE_TEMPLATES.topRated(lib), suggestions: top });
-    }
+    const chat = model.startChat({
+      history: recentHistory,
+      generationConfig: {
+        maxOutputTokens: 512,
+        temperature: 0.8,
+      },
+    });
 
-    if (intent === 'random') {
-      const pick = lib[Math.floor(Math.random() * lib.length)];
-      return res.json({ reply: RESPONSE_TEMPLATES.random(lib), suggestions: [pick] });
-    }
+    const result = await chat.sendMessage(message.trim());
+    const rawText = result.response.text();
 
-    if (intent === 'similar') {
-      const target = findSimilarTitle(message, lib);
-      const similar = target ? lib.filter(m => m.id !== target.id && m.genre.some(g => target.genre.includes(g))).slice(0, 3) : [];
-      return res.json({
-        reply: RESPONSE_TEMPLATES.similar(message, lib, target),
-        suggestions: similar,
-      });
-    }
+    const { reply, suggestions } = extractSuggestions(rawText, lib);
 
-    // Mood-based matching
-    const matches = matchByMood(message, lib);
-    if (matches.length > 0) {
-      return res.json({ reply: RESPONSE_TEMPLATES.match(matches), suggestions: matches.slice(0, 3) });
-    }
-
-    return res.json({ reply: RESPONSE_TEMPLATES.noMatch(message), suggestions: [] });
+    return res.json({ reply, suggestions });
   } catch (error) {
-    res.status(500).json({ error: 'Chat failed', message: String(error) });
+    console.error('Gemini chat error:', error);
+    // Graceful fallback if Gemini fails
+    const { library, message } = req.body as ChatRequest;
+    const fallback = fallbackResponse(message || '', library || []);
+    return res.json(fallback);
   }
 }

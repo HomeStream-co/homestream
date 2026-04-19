@@ -54,10 +54,18 @@ export default function AIChatAssistant() {
     setLoading(true);
 
     try {
+      // Build Gemini-compatible history from previous messages (exclude suggestions)
+      const geminiHistory = messages
+        .filter(m => m.content)
+        .map(m => ({
+          role: m.role === 'user' ? 'user' : 'model' as 'user' | 'model',
+          parts: [{ text: m.content }],
+        }));
+
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: text, library }),
+        body: JSON.stringify({ message: text, library, history: geminiHistory }),
       });
       const data = await res.json();
       const aiMsg: ChatMessage = {
