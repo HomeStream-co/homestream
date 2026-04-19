@@ -554,6 +554,9 @@ export default function DebugPanel({ open, onClose }: DebugPanelProps) {
                 </div>
               </div>
 
+              {/* ── Crash Log ── */}
+              <CrashLogSection />
+
             </div>
           </motion.div>
         </>
