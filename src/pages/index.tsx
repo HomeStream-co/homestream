@@ -80,11 +80,6 @@ export default function HomePage() {
     [library, isAllowed],
   );
 
-  // ── Show skeleton on first load (library not yet fetched) ──
-  if (loading && library.length === 0) {
-    return <HomePageSkeleton />;
-  }
-
   // ── Carousel derivations — all memoized ──
   const featured = useMemo(() => visibleLibrary[0], [visibleLibrary]);
   const inWatchlist = useMemo(() => featured ? watchlist.includes(featured.id) : false, [featured, watchlist]);
@@ -154,6 +149,11 @@ export default function HomePage() {
     }
     return items;
   }, [isSearching, visibleLibrary, query, genre, typeFilter, sortBy]);
+
+  // ── Show skeleton on first load — MUST be after all hooks ──
+  if (loading && library.length === 0) {
+    return <HomePageSkeleton />;
+  }
 
   // ── Hero logic ──
   const showTMDBBanner  = upcoming.length > 0;
