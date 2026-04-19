@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Play, Pause, Volume2, VolumeX, Maximize, Minimize,
   Info, Star, RotateCcw, Sparkles, MessageCircle, SkipForward,
-  CheckCircle2, FastForward, Rewind, Wand2, Loader2,
+  CheckCircle2, FastForward, Rewind, Wand2, Loader2, Captions,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useMedia } from '@/context/MediaContext';
@@ -70,6 +70,8 @@ export default function PlayerPage() {
   useEffect(() => {
     setPlaybackRate(1);
     setShowSpeedMenu(false);
+    setCcLang('off');
+    setShowCcMenu(false);
     watchCompleteTriggered.current = false;
     resumeApplied.current = false;
     setShowEndOverlay(false);
@@ -102,6 +104,9 @@ export default function PlayerPage() {
   const [seekFlash, setSeekFlash] = useState<'forward' | 'back' | null>(null);
   const [playbackRate, setPlaybackRate] = useState(1);
   const [showSpeedMenu, setShowSpeedMenu] = useState(false);
+  // Closed captions
+  const [ccLang, setCcLang] = useState<'off' | 'en' | 'es'>('off');
+  const [showCcMenu, setShowCcMenu] = useState(false);
   // Loading state — true until canplaythrough fires (enough buffered to play without stall)
   const [videoLoading, setVideoLoading] = useState(true);
   const resumeApplied = useRef(false);
@@ -273,6 +278,22 @@ export default function PlayerPage() {
     return () => document.removeEventListener('fullscreenchange', onFsChange);
   }, []);
 
+  // ── Sync CC language → native TextTrack mode ──
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    const tracks = Array.from(video.textTracks);
+    tracks.forEach(track => {
+      if (ccLang === 'off') {
+        track.mode = 'disabled';
+      } else if (track.language === ccLang) {
+        track.mode = 'showing';
+      } else {
+        track.mode = 'disabled';
+      }
+    });
+  }, [ccLang]);
+
   // ── Keyboard shortcuts ──
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -327,6 +348,7 @@ export default function PlayerPage() {
           setShowEndOverlay(false);
           setShowInfo(false);
           setShowSpeedMenu(false);
+          setShowCcMenu(false);
           break;
         case '>':
         case '.': {
@@ -534,7 +556,23 @@ export default function PlayerPage() {
               setMuted(videoRef.current.muted);
             }
           }}
-        />
+        >
+          {/* WebVTT caption tracks — served from /api/captions/:id/:lang if present */}
+          <track
+            kind="subtitles"
+            srcLang="en"
+            label="English"
+            src={`/api/captions/${item.id}/en`}
+            default={ccLang === 'en'}
+          />
+          <track
+            kind="subtitles"
+            srcLang="es"
+            label="Español"
+            src={`/api/captions/${item.id}/es`}
+            default={ccLang === 'es'}
+          />
+        </video>
 
         {/* ── Loading Spinner — only shown while buffering ── */}
         <AnimatePresence>
@@ -692,7 +730,7 @@ export default function PlayerPage() {
                     {/* ── Playback Speed ── */}
                     <div className="relative">
                       <button
-                        onClick={e => { e.stopPropagation(); setShowSpeedMenu(prev => !prev); }}
+                        onClick={e => { e.stopPropagation(); setShowSpeedMenu(prev => !prev); setShowCcMenu(false); }}
                         className={`text-xs font-medium px-2 py-1 rounded transition-colors ${
                           playbackRate !== 1
                             ? 'text-primary bg-primary/20 border border-primary/40'
@@ -727,6 +765,59 @@ export default function PlayerPage() {
                               >
                                 <span>{rate === 1 ? 'Normal' : `${rate}×`}</span>
                                 {playbackRate === rate && (
+                                  <div className="w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0" />
+                                )}
+                              </button>
+                            ))}
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                    {/* ── Closed Captions ── */}
+                    <div className="relative">
+                      <button
+                        onClick={e => { e.stopPropagation(); setShowCcMenu(prev => !prev); setShowSpeedMenu(false); }}
+                        className={`flex items-center gap-1 text-xs font-medium px-2 py-1 rounded transition-colors ${
+                          ccLang !== 'off'
+                            ? 'text-primary bg-primary/20 border border-primary/40'
+                            : 'text-white/70 hover:text-white bg-white/10 hover:bg-white/20'
+                        }`}
+                        title="Closed captions"
+                      >
+                        <Captions className="w-4 h-4" />
+                        <span className="hidden sm:inline">
+                          {ccLang === 'off' ? 'CC' : ccLang === 'en' ? 'EN' : 'ES'}
+                        </span>
+                      </button>
+                      <AnimatePresence>
+                        {showCcMenu && (
+                          <motion.div
+                            initial={{ opacity: 0, y: 6, scale: 0.95 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            exit={{ opacity: 0, y: 6, scale: 0.95 }}
+                            transition={{ duration: 0.12 }}
+                            className="absolute bottom-full right-0 mb-2 bg-black/90 border border-white/20 rounded-lg overflow-hidden shadow-xl backdrop-blur-sm z-20 min-w-[130px]"
+                            onClick={e => e.stopPropagation()}
+                          >
+                            <div className="px-3 py-1.5 border-b border-white/10">
+                              <p className="text-[10px] text-white/40 uppercase tracking-wider font-medium">Subtitles / CC</p>
+                            </div>
+                            {([
+                              { value: 'off', label: 'Off' },
+                              { value: 'en',  label: 'English' },
+                              { value: 'es',  label: 'Español' },
+                            ] as const).map(opt => (
+                              <button
+                                key={opt.value}
+                                onClick={() => { setCcLang(opt.value); setShowCcMenu(false); }}
+                                className={`w-full text-left px-3 py-1.5 text-sm transition-colors flex items-center justify-between gap-3 ${
+                                  ccLang === opt.value
+                                    ? 'text-primary bg-primary/20'
+                                    : 'text-white/80 hover:text-white hover:bg-white/10'
+                                }`}
+                              >
+                                <span>{opt.label}</span>
+                                {ccLang === opt.value && (
                                   <div className="w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0" />
                                 )}
                               </button>
