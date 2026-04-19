@@ -66,6 +66,34 @@ function writeLibrary(data: unknown[]) {
   fs.writeFileSync(LIBRARY_PATH, JSON.stringify(data, null, 2));
 }
 
+/**
+ * Trigger the enrichment endpoint internally by making a loopback HTTP call.
+ * This keeps the enrichment logic in one place (the /api/enrich/:id handler)
+ * and lets it run independently of the upload response.
+ */
+async function runEnrichmentInBackground(mediaId: string): Promise<void> {
+  // Small delay so the library item is definitely written before enrichment reads it
+  await new Promise(r => setTimeout(r, 500));
+  try {
+    // Use loopback — the server calls itself on the same port
+    const port = process.env.PORT || 3000;
+    const res = await fetch(`http://localhost:${port}/api/enrich/${mediaId}`, {
+      method: 'POST',
+      headers: { 'Accept': 'text/event-stream' },
+    });
+    // Drain the SSE stream so the connection closes cleanly
+    if (res.body) {
+      const reader = res.body.getReader();
+      while (true) {
+        const { done } = await reader.read();
+        if (done) break;
+      }
+    }
+  } catch (err) {
+    console.error(`[enrich] Background enrichment failed for ${mediaId}:`, err);
+  }
+}
+
 export default function handler(req: Request, res: Response) {
   upload.single('video')(req, res, async (err) => {
     if (err) return res.status(400).json({ error: err.message });
@@ -129,7 +157,11 @@ export default function handler(req: Request, res: Response) {
     // Respond to client — UI starts polling /api/transcode/:id
     res.status(201).json({ ...mediaItem, transcodeId: mediaId });
 
-    // ── 5. Run transcode in background (non-blocking) ──
+    // ── 5. Kick off AI enrichment wizard in background (non-blocking) ──
+    // Runs in parallel with transcode — enrichment is independent of video processing
+    runEnrichmentInBackground(mediaId);
+
+    // ── 6. Run transcode in background (non-blocking) ──
     transcodeFile(mediaId, inputFilename, outputFilename)
       .then(() => {
         // Mark transcoding: false in library once done

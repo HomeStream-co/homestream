@@ -1,3 +1,18 @@
+export interface MediaEnrichment {
+  // AI-generated deep categorization
+  tags: string[];               // e.g. ["heist", "time-travel", "unreliable narrator"]
+  mood: string[];               // e.g. ["tense", "funny", "heartwarming"]
+  themes: string[];             // e.g. ["redemption", "family", "identity"]
+  pacing: 'slow' | 'moderate' | 'fast' | 'varied';
+  audienceAge: 'kids' | 'family' | 'teens' | 'adults' | 'mature';
+  contentWarnings: string[];    // e.g. ["violence", "strong language"]
+  aiSummary: string;            // 2-sentence punchy description
+  whyWatch: string;             // 1-sentence hook
+  similarTitles: string[];      // titles from OMDB/AI knowledge (not library IDs)
+  enrichedAt: string;           // ISO timestamp
+  enrichmentVersion: number;    // bump when schema changes
+}
+
 export interface MediaItem {
   id: string;
   filename: string;
@@ -17,6 +32,11 @@ export interface MediaItem {
   addedAt: string;
   watchProgress: number;
   fileSize?: number;
+  transcoding?: boolean;
+  transcodeWarning?: string;
+  // AI enrichment (populated after upload wizard runs)
+  enrichment?: MediaEnrichment;
+  enriching?: boolean;          // true while wizard is running
   // TV show episode tracking
   totalSeasons?: number;
   episodes?: Episode[];

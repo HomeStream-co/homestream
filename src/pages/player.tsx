@@ -93,6 +93,8 @@ export default function PlayerPage() {
         .filter(m => m.id !== item.id)
         .map(m => {
           let score = 0;
+
+          // ── Base signals (always available) ──
           const sharedGenres = m.genre.filter(g => item.genre.includes(g)).length;
           score += sharedGenres * 3;
           if (m.director && item.director && m.director !== 'Unknown' && m.director === item.director) score += 4;
@@ -101,6 +103,44 @@ export default function PlayerPage() {
           score += mActors.filter(a => a !== 'Unknown' && itemActors.includes(a)).length * 2;
           if (m.type === item.type) score += 1;
           if (Math.abs((parseFloat(m.imdbRating) || 0) - (parseFloat(item.imdbRating) || 0)) < 1.5) score += 1;
+
+          // ── AI enrichment signals (when available) ──
+          const itemEnrich = item.enrichment;
+          const mEnrich = m.enrichment;
+
+          if (itemEnrich && mEnrich) {
+            // Shared tags — most powerful signal (specific content overlap)
+            const sharedTags = mEnrich.tags.filter(t => itemEnrich.tags.includes(t)).length;
+            score += sharedTags * 4;
+
+            // Shared mood — viewer is in a specific mood
+            const sharedMood = mEnrich.mood.filter(mood => itemEnrich.mood.includes(mood)).length;
+            score += sharedMood * 3;
+
+            // Shared themes — deeper thematic resonance
+            const sharedThemes = mEnrich.themes.filter(t => itemEnrich.themes.includes(t)).length;
+            score += sharedThemes * 3;
+
+            // Same pacing preference
+            if (mEnrich.pacing === itemEnrich.pacing) score += 2;
+
+            // Same audience age
+            if (mEnrich.audienceAge === itemEnrich.audienceAge) score += 2;
+
+            // Appears in "similar titles" list from AI knowledge
+            const titleLower = m.title.toLowerCase();
+            if (itemEnrich.similarTitles.some(t => t.toLowerCase().includes(titleLower) || titleLower.includes(t.toLowerCase()))) {
+              score += 6; // Strong signal — AI explicitly recommended this
+            }
+          } else if (itemEnrich && !mEnrich) {
+            // Partial: item has enrichment but candidate doesn't
+            // Still boost if candidate title appears in item's similar list
+            const titleLower = m.title.toLowerCase();
+            if (itemEnrich.similarTitles.some(t => t.toLowerCase().includes(titleLower) || titleLower.includes(t.toLowerCase()))) {
+              score += 5;
+            }
+          }
+
           return { item: m, score };
         })
         .filter(({ score }) => score > 0)

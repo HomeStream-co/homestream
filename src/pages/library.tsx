@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { useMedia } from '@/context/MediaContext';
 import type { MediaItem } from '@/types/media';
 import { Skeleton } from '@/components/ui/skeleton';
+import EnrichmentWizard from '@/components/EnrichmentWizard';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -40,6 +41,8 @@ interface UploadingFile {
   transcode: TranscodeInfo;
   result?: MediaItem;
   error?: string;
+  showEnrichment: boolean;   // show the wizard panel after transcode done
+  enrichmentDone: boolean;   // wizard finished
 }
 
 interface EditState {
@@ -128,7 +131,12 @@ export default function LibraryPage() {
         if (job.status === 'done' || job.status === 'skipped') {
           setUploading(prev => prev.map(u =>
             u.id === uiId
-              ? { ...u, phase: 'done', transcode: { ...u.transcode, progress: 100, status: 'done' } }
+              ? {
+                  ...u,
+                  phase: 'done',
+                  transcode: { ...u.transcode, progress: 100, status: 'done' },
+                  showEnrichment: true,   // reveal the enrichment wizard
+                }
               : u
           ));
           es.close();
@@ -188,6 +196,8 @@ export default function LibraryPage() {
       uploadProgress: 0,
       phase: 'uploading',
       transcode: { progress: 0, status: 'queued' },
+      showEnrichment: false,
+      enrichmentDone: false,
     }]);
 
     const formData = new FormData();
@@ -428,6 +438,28 @@ export default function LibraryPage() {
                           <CheckCircle2 className="w-3.5 h-3.5" /> H.264 faststart
                         </span>
                       </div>
+                    </div>
+                  )}
+
+                  {/* AI Enrichment Wizard — appears after transcode completes */}
+                  {u.showEnrichment && u.transcodeId && u.result && (
+                    <div className="mt-3">
+                      <EnrichmentWizard
+                        mediaId={u.transcodeId}
+                        title={u.result.title}
+                        onComplete={() => {
+                          setUploading(prev => prev.map(f =>
+                            f.id === u.id ? { ...f, enrichmentDone: true } : f
+                          ));
+                          refreshLibrary();
+                          toast.success(`"${u.result!.title}" fully categorized by AI`);
+                        }}
+                        onError={() => {
+                          setUploading(prev => prev.map(f =>
+                            f.id === u.id ? { ...f, enrichmentDone: true } : f
+                          ));
+                        }}
+                      />
                     </div>
                   )}
                 </motion.div>
