@@ -1,5 +1,9 @@
-import { useState, useRef, useCallback } from 'react';
-import { Film, Trash2, Edit2, Check, X, Star, AlertCircle } from 'lucide-react';import { motion, AnimatePresence } from 'motion/react';
+import { useState, useRef, useCallback, useEffect } from 'react';
+import {
+  Film, Trash2, Edit2, Check, X, Star, AlertCircle,
+  Upload, Clapperboard, Cpu, CheckCircle2, Clock, Zap,
+} from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'sonner';
 import { useMedia } from '@/context/MediaContext';
 import type { MediaItem } from '@/types/media';
@@ -15,11 +19,25 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 
-interface UploadingFile {
-  id: string;
-  name: string;
+// ─── Types ───────────────────────────────────────────────────────────────────
+
+type UploadPhase = 'uploading' | 'transcoding' | 'metadata' | 'done' | 'error';
+
+interface TranscodeInfo {
   progress: number;
-  status: 'uploading' | 'fetching' | 'done' | 'error';
+  fps?: number;
+  speed?: string;
+  eta?: number;
+  status: string;
+}
+
+interface UploadingFile {
+  id: string;           // local UI id
+  transcodeId?: string; // server mediaId for SSE polling
+  name: string;
+  uploadProgress: number;
+  phase: UploadPhase;
+  transcode: TranscodeInfo;
   result?: MediaItem;
   error?: string;
 }
@@ -33,6 +51,57 @@ interface EditState {
   plot: string;
 }
 
+// ─── Phase label helpers ──────────────────────────────────────────────────────
+
+function phaseLabel(u: UploadingFile): string {
+  switch (u.phase) {
+    case 'uploading':   return `Uploading… ${u.uploadProgress}%`;
+    case 'transcoding': {
+      const pct = u.transcode.progress;
+      const eta = u.transcode.eta;
+      const speed = u.transcode.speed;
+      let label = `Transcoding… ${pct}%`;
+      if (speed && speed !== '?x') label += ` · ${speed}`;
+      if (eta && eta > 0) label += ` · ~${eta}s left`;
+      return label;
+    }
+    case 'metadata':    return 'Fetching movie info…';
+    case 'done':        return '✓ Ready to watch';
+    case 'error':       return '✗ Error';
+  }
+}
+
+function phaseColor(phase: UploadPhase): string {
+  switch (phase) {
+    case 'done':  return 'text-green-400';
+    case 'error': return 'text-destructive';
+    default:      return 'text-muted-foreground';
+  }
+}
+
+function phaseIcon(phase: UploadPhase) {
+  switch (phase) {
+    case 'uploading':   return <Upload className="w-3.5 h-3.5" />;
+    case 'transcoding': return <Cpu className="w-3.5 h-3.5 animate-pulse" />;
+    case 'metadata':    return <Clapperboard className="w-3.5 h-3.5" />;
+    case 'done':        return <CheckCircle2 className="w-3.5 h-3.5 text-green-400" />;
+    case 'error':       return <AlertCircle className="w-3.5 h-3.5 text-destructive" />;
+  }
+}
+
+/** Combined 0-100 progress across all 3 phases */
+function totalProgress(u: UploadingFile): number {
+  switch (u.phase) {
+    case 'uploading':   return Math.round(u.uploadProgress * 0.3);           // 0-30%
+    case 'transcoding': return 30 + Math.round(u.transcode.progress * 0.6); // 30-90%
+    case 'metadata':    return 92;
+    case 'done':        return 100;
+    case 'error':       return 0;
+  }
+}
+
+// ─── Main Component ───────────────────────────────────────────────────────────
+
 export default function LibraryPage() {
   const { library, loading, refreshLibrary, deleteMedia, updateMedia } = useMedia();
   const [uploading, setUploading] = useState<UploadingFile[]>([]);
@@ -40,52 +109,143 @@ export default function LibraryPage() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [editState, setEditState] = useState<EditState | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const sseRefs = useRef<Map<string, EventSource>>(new Map());
 
   const genId = () => Math.random().toString(36).slice(2);
 
+  // ── SSE listener for a transcode job ──
+  const listenToTranscode = useCallback((uiId: string, transcodeId: string) => {
+    // Close any existing SSE for this item
+    sseRefs.current.get(uiId)?.close();
+
+    const es = new EventSource(`/api/transcode/${transcodeId}`);
+    sseRefs.current.set(uiId, es);
+
+    es.onmessage = (e) => {
+      try {
+        const job = JSON.parse(e.data);
+
+        if (job.status === 'done' || job.status === 'skipped') {
+          setUploading(prev => prev.map(u =>
+            u.id === uiId
+              ? { ...u, phase: 'done', transcode: { ...u.transcode, progress: 100, status: 'done' } }
+              : u
+          ));
+          es.close();
+          sseRefs.current.delete(uiId);
+          refreshLibrary();
+          toast.success('Transcode complete — ready to watch!');
+        } else if (job.status === 'error') {
+          setUploading(prev => prev.map(u =>
+            u.id === uiId
+              ? { ...u, phase: 'error', error: job.error || 'Transcode failed' }
+              : u
+          ));
+          es.close();
+          sseRefs.current.delete(uiId);
+          toast.error(`Transcode failed: ${job.error}`);
+        } else if (job.status === 'transcoding') {
+          setUploading(prev => prev.map(u =>
+            u.id === uiId
+              ? {
+                  ...u,
+                  phase: 'transcoding',
+                  transcode: {
+                    progress: job.progress ?? 0,
+                    fps: job.fps,
+                    speed: job.speed,
+                    eta: job.eta,
+                    status: 'transcoding',
+                  },
+                }
+              : u
+          ));
+        }
+      } catch { /* ignore parse errors */ }
+    };
+
+    es.onerror = () => {
+      // SSE connection dropped — job may already be done, refresh library
+      es.close();
+      sseRefs.current.delete(uiId);
+      refreshLibrary();
+    };
+  }, [refreshLibrary]);
+
+  // Clean up SSE connections on unmount
+  useEffect(() => {
+    return () => {
+      sseRefs.current.forEach(es => es.close());
+    };
+  }, []);
+
+  // ── Upload a single file ──
   const uploadFile = useCallback(async (file: File) => {
-    const id = genId();
-    setUploading(prev => [...prev, { id, name: file.name, progress: 0, status: 'uploading' }]);
+    const uiId = genId();
+    setUploading(prev => [...prev, {
+      id: uiId,
+      name: file.name,
+      uploadProgress: 0,
+      phase: 'uploading',
+      transcode: { progress: 0, status: 'queued' },
+    }]);
 
     const formData = new FormData();
     formData.append('video', file);
 
     try {
-      // Simulate progress
-      const progressInterval = setInterval(() => {
-        setUploading(prev => prev.map(u =>
-          u.id === id && u.progress < 85 ? { ...u, progress: u.progress + 10 } : u
-        ));
-      }, 300);
+      // XHR for real upload progress
+      const result = await new Promise<{ transcodeId: string } & MediaItem>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', '/api/upload');
 
-      setUploading(prev => prev.map(u => u.id === id ? { ...u, status: 'uploading', progress: 10 } : u));
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable) {
+            const pct = Math.round((e.loaded / e.total) * 100);
+            setUploading(prev => prev.map(u =>
+              u.id === uiId ? { ...u, uploadProgress: pct } : u
+            ));
+          }
+        };
 
-      const res = await fetch('/api/upload', {
-        method: 'POST',
-        body: formData,
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            try { resolve(JSON.parse(xhr.responseText)); }
+            catch { reject(new Error('Invalid server response')); }
+          } else {
+            try {
+              const err = JSON.parse(xhr.responseText);
+              reject(new Error(err.error || 'Upload failed'));
+            } catch {
+              reject(new Error(`Upload failed (${xhr.status})`));
+            }
+          }
+        };
+
+        xhr.onerror = () => reject(new Error('Network error during upload'));
+        xhr.send(formData);
       });
 
-      clearInterval(progressInterval);
+      // Upload done — move to metadata phase briefly, then transcode
+      setUploading(prev => prev.map(u =>
+        u.id === uiId
+          ? { ...u, phase: 'metadata', uploadProgress: 100, transcodeId: result.transcodeId, result }
+          : u
+      ));
 
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Upload failed');
-      }
+      // Start listening to transcode SSE
+      listenToTranscode(uiId, result.transcodeId);
 
-      setUploading(prev => prev.map(u => u.id === id ? { ...u, status: 'fetching', progress: 90 } : u));
-
-      const item: MediaItem = await res.json();
-
-      setUploading(prev => prev.map(u => u.id === id ? { ...u, status: 'done', progress: 100, result: item } : u));
+      // Refresh library so the card appears immediately (with transcoding badge)
       await refreshLibrary();
-      toast.success(`"${item.title}" added to your library!`);
+
     } catch (err) {
       setUploading(prev => prev.map(u =>
-        u.id === id ? { ...u, status: 'error', error: String(err) } : u
+        u.id === uiId ? { ...u, phase: 'error', error: String(err) } : u
       ));
       toast.error(`Failed to upload ${file.name}`);
     }
-  }, [refreshLibrary]);
+  }, [refreshLibrary, listenToTranscode]);
 
   const handleFiles = (files: FileList | null) => {
     if (!files) return;
@@ -134,10 +294,13 @@ export default function LibraryPage() {
     <div className="min-h-screen bg-background pt-20 pb-16">
       <title>My Library — HomeStream</title>
       <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8">
-        <h1 className="text-4xl font-heading text-foreground mb-2">My Library</h1>
-        <p className="text-muted-foreground mb-8">Upload your video files — we'll automatically fetch the poster and metadata.</p>
 
-        {/* Upload Zone */}
+        <h1 className="text-4xl font-heading text-foreground mb-1">My Library</h1>
+        <p className="text-muted-foreground mb-8">
+          Drop any video format — HomeStream auto-transcodes to browser-ready MP4 with zero-latency seeking.
+        </p>
+
+        {/* ── Upload Zone ── */}
         <div
           onDragOver={e => { e.preventDefault(); setDragging(true); }}
           onDragLeave={() => setDragging(false)}
@@ -160,10 +323,14 @@ export default function LibraryPage() {
           <Film className={`w-12 h-12 mx-auto mb-4 ${dragging ? 'text-primary' : 'text-muted-foreground'}`} />
           <p className="text-lg font-medium text-foreground mb-1">Drop your video files here</p>
           <p className="text-sm text-muted-foreground mb-3">or click to browse</p>
-          <p className="text-xs text-muted-foreground">Supports: MP4, MKV, AVI, MOV, WMV, M4V</p>
+          <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground">
+            <span>MP4 · MKV · AVI · MOV · WMV · M4V</span>
+            <span className="text-border">|</span>
+            <span className="flex items-center gap-1"><Zap className="w-3 h-3 text-primary" /> Auto-transcoded to H.264 faststart</span>
+          </div>
         </div>
 
-        {/* Upload Progress */}
+        {/* ── Upload / Transcode Progress Cards ── */}
         <AnimatePresence>
           {uploading.length > 0 && (
             <motion.div
@@ -172,38 +339,79 @@ export default function LibraryPage() {
               className="mb-8 flex flex-col gap-3"
             >
               {uploading.map(u => (
-                <div key={u.id} className="bg-card border border-border rounded-xl p-4">
-                  <div className="flex items-center justify-between mb-2">
+                <motion.div
+                  key={u.id}
+                  layout
+                  className="bg-card border border-border rounded-xl p-4"
+                >
+                  {/* Header row */}
+                  <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2 min-w-0">
                       <Film className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                      <span className="text-sm text-foreground truncate">{u.name}</span>
+                      <span className="text-sm text-foreground truncate font-medium">{u.name}</span>
                     </div>
-                    <span className={`text-xs flex-shrink-0 ml-2 ${
-                      u.status === 'done' ? 'text-green-400' :
-                      u.status === 'error' ? 'text-destructive' :
-                      'text-muted-foreground'
-                    }`}>
-                      {u.status === 'uploading' ? 'Uploading...' :
-                       u.status === 'fetching' ? 'Fetching movie info...' :
-                       u.status === 'done' ? '✓ Done' : '✗ Error'}
-                    </span>
+                    <div className={`flex items-center gap-1.5 text-xs flex-shrink-0 ml-2 ${phaseColor(u.phase)}`}>
+                      {phaseIcon(u.phase)}
+                      <span>{phaseLabel(u)}</span>
+                    </div>
                   </div>
-                  {u.status !== 'error' && (
-                    <div className="h-1.5 bg-secondary rounded-full overflow-hidden">
-                      <motion.div
-                        className="h-full bg-primary rounded-full"
-                        initial={{ width: 0 }}
-                        animate={{ width: `${u.progress}%` }}
-                        transition={{ duration: 0.3 }}
-                      />
+
+                  {/* 3-phase progress bar */}
+                  {u.phase !== 'error' && (
+                    <div className="space-y-1.5">
+                      <div className="h-2 bg-secondary rounded-full overflow-hidden">
+                        <motion.div
+                          className={`h-full rounded-full ${
+                            u.phase === 'done' ? 'bg-green-500' : 'bg-primary'
+                          }`}
+                          initial={{ width: 0 }}
+                          animate={{ width: `${totalProgress(u)}%` }}
+                          transition={{ duration: 0.4, ease: 'easeOut' as const }}
+                        />
+                      </div>
+                      {/* Phase labels */}
+                      <div className="flex justify-between text-[10px] text-muted-foreground px-0.5">
+                        <span className={u.phase === 'uploading' ? 'text-primary' : u.uploadProgress === 100 ? 'text-green-400' : ''}>
+                          Upload
+                        </span>
+                        <span className={u.phase === 'transcoding' ? 'text-primary' : u.phase === 'done' ? 'text-green-400' : ''}>
+                          Transcode
+                        </span>
+                        <span className={u.phase === 'done' ? 'text-green-400' : ''}>
+                          Ready
+                        </span>
+                      </div>
                     </div>
                   )}
-                  {u.status === 'error' && (
+
+                  {/* Transcode stats row */}
+                  {u.phase === 'transcoding' && u.transcode.fps && (
+                    <div className="flex items-center gap-4 mt-2 text-[10px] text-muted-foreground">
+                      <span className="flex items-center gap-1">
+                        <Cpu className="w-3 h-3" /> {u.transcode.fps.toFixed(0)} fps
+                      </span>
+                      {u.transcode.speed && (
+                        <span className="flex items-center gap-1">
+                          <Zap className="w-3 h-3" /> {u.transcode.speed}
+                        </span>
+                      )}
+                      {u.transcode.eta && u.transcode.eta > 0 && (
+                        <span className="flex items-center gap-1">
+                          <Clock className="w-3 h-3" /> ~{u.transcode.eta}s remaining
+                        </span>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Error */}
+                  {u.phase === 'error' && (
                     <p className="text-xs text-destructive mt-1 flex items-center gap-1">
                       <AlertCircle className="w-3 h-3" /> {u.error}
                     </p>
                   )}
-                  {u.status === 'done' && u.result && (
+
+                  {/* Done — show result card */}
+                  {u.phase === 'done' && u.result && (
                     <div className="flex items-center gap-3 mt-3 pt-3 border-t border-border">
                       <img src={u.result.poster} alt={u.result.title} className="w-10 h-14 object-cover rounded" />
                       <div>
@@ -215,15 +423,20 @@ export default function LibraryPage() {
                           </p>
                         )}
                       </div>
+                      <div className="ml-auto">
+                        <span className="text-xs text-green-400 flex items-center gap-1">
+                          <CheckCircle2 className="w-3.5 h-3.5" /> H.264 faststart
+                        </span>
+                      </div>
                     </div>
                   )}
-                </div>
+                </motion.div>
               ))}
             </motion.div>
           )}
         </AnimatePresence>
 
-        {/* Library Grid */}
+        {/* ── Library Grid ── */}
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-heading text-foreground">
             {library.length} Title{library.length !== 1 ? 's' : ''}
@@ -246,33 +459,48 @@ export default function LibraryPage() {
           </div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-            {library.map(item => (
+            {library.map((item: MediaItem & { transcoding?: boolean; transcodeWarning?: string }) => (
               <div key={item.id} className="group relative">
-                <div className="aspect-[2/3] rounded-lg overflow-hidden bg-card">
+                <div className="aspect-[2/3] rounded-lg overflow-hidden bg-card relative">
                   <img
                     src={item.poster}
                     alt={item.title}
                     className="w-full h-full object-cover"
-                    onError={(e) => { (e.target as HTMLImageElement).src = `https://via.placeholder.com/300x450/141420/e50914?text=${encodeURIComponent(item.title)}`; }}
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src =
+                        `https://via.placeholder.com/300x450/141420/e50914?text=${encodeURIComponent(item.title)}`;
+                    }}
                   />
+
+                  {/* Transcoding overlay */}
+                  {item.transcoding && (
+                    <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center gap-2">
+                      <Cpu className="w-6 h-6 text-primary animate-pulse" />
+                      <span className="text-white text-[10px] font-medium">Transcoding…</span>
+                    </div>
+                  )}
+
                   {/* Actions overlay */}
-                  <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center gap-2">
-                    <button
-                      onClick={() => startEdit(item)}
-                      className="p-2 bg-white/20 hover:bg-white/30 rounded-full transition-colors"
-                      title="Edit"
-                    >
-                      <Edit2 className="w-4 h-4 text-white" />
-                    </button>
-                    <button
-                      onClick={() => setDeleteId(item.id)}
-                      className="p-2 bg-destructive/80 hover:bg-destructive rounded-full transition-colors"
-                      title="Delete"
-                    >
-                      <Trash2 className="w-4 h-4 text-white" />
-                    </button>
-                  </div>
+                  {!item.transcoding && (
+                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                      <button
+                        onClick={() => startEdit(item)}
+                        className="p-2 bg-white/20 hover:bg-white/30 rounded-full transition-colors"
+                        title="Edit"
+                      >
+                        <Edit2 className="w-4 h-4 text-white" />
+                      </button>
+                      <button
+                        onClick={() => setDeleteId(item.id)}
+                        className="p-2 bg-destructive/80 hover:bg-destructive rounded-full transition-colors"
+                        title="Delete"
+                      >
+                        <Trash2 className="w-4 h-4 text-white" />
+                      </button>
+                    </div>
+                  )}
                 </div>
+
                 <div className="mt-1.5">
                   <p className="text-xs font-medium text-foreground truncate">{item.title}</p>
                   <div className="flex items-center justify-between">
@@ -283,6 +511,11 @@ export default function LibraryPage() {
                       </p>
                     )}
                   </div>
+                  {item.transcodeWarning && (
+                    <p className="text-[9px] text-yellow-500 mt-0.5 truncate" title={item.transcodeWarning}>
+                      ⚠ Transcode failed
+                    </p>
+                  )}
                 </div>
               </div>
             ))}
@@ -290,7 +523,7 @@ export default function LibraryPage() {
         )}
       </div>
 
-      {/* Delete Confirmation */}
+      {/* ── Delete Confirmation ── */}
       <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
         <AlertDialogContent className="bg-card border-border">
           <AlertDialogHeader>
@@ -308,7 +541,7 @@ export default function LibraryPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Edit Modal */}
+      {/* ── Edit Modal ── */}
       <AnimatePresence>
         {editState && (
           <motion.div
