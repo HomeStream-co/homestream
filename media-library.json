@@ -7,8 +7,8 @@
     "filename": "__demo__big-buck-bunny.mp4",
     "filePath": "__demo__",
     "demoStreamUrl": "https://download.blender.org/peach/bigbuckbunny_movies/BigBuckBunny_320x180.mp4",
-    "poster": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/Big_buck_bunny_poster_big.jpg/800px-Big_buck_bunny_poster_big.jpg",
-    "backdrop": "https://peach.blender.org/wp-content/uploads/bbb-splash.png",
+    "poster": "/demo/bbb-poster.jpg",
+    "backdrop": "/demo/bbb-backdrop.jpg",
     "plot": "A large and lovable rabbit deals with three bullying rodents who want to steal his berries. Freely licensed under Creative Commons by the Blender Foundation.",
     "rating": "G",
     "imdbRating": "7.8",
@@ -23,12 +23,12 @@
       "Big Buck Bunny"
     ],
     "transcoding": false,
-    "watchProgress": 1.841301461036005,
+    "watchProgress": 1.508906742023839,
     "profileProgress": {
       "adult": {
-        "progress": 1.841301461036005,
-        "lastWatchedAt": "2026-04-19T21:28:34.993Z",
-        "watchedSeconds": 10.982596,
+        "progress": 1.508906742023839,
+        "lastWatchedAt": "2026-04-19T21:34:14.303Z",
+        "watchedSeconds": 9,
         "totalSeconds": 596.458333
       },
       "kids": 0
@@ -36,8 +36,8 @@
     "isDemo": true,
     "importedFrom": "demo",
     "addedAt": "2026-04-19T21:23:12.953Z",
-    "lastWatchedAt": "2026-04-19T21:28:34.993Z",
-    "watchedSeconds": 10.982596,
+    "lastWatchedAt": "2026-04-19T21:34:14.303Z",
+    "watchedSeconds": 9,
     "totalSeconds": 596.458333
   }
 ]
