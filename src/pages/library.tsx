@@ -214,6 +214,24 @@ function OfflineMetadataNotice({ mediaId, currentTitle, onSaved }: OfflineMetada
   );
 }
 
+// ─── StorageSavingsBadge — shown below card title after a successful encode ───
+
+function StorageSavingsBadge({ savedBytes, originalSize }: { savedBytes: number; originalSize: number }) {
+  const savedMB = savedBytes / 1_048_576;
+  const pct = originalSize > 0 ? Math.round((savedBytes / originalSize) * 100) : 0;
+
+  // Format: "↓ 1.2 GB (43%)" or "↓ 340 MB (18%)"
+  const label = savedMB >= 1024
+    ? `↓ ${(savedMB / 1024).toFixed(1)} GB (${pct}%)`
+    : `↓ ${Math.round(savedMB)} MB (${pct}%)`;
+
+  return (
+    <p className="text-[9px] text-emerald-500 font-medium mt-0.5 truncate" title={`Saved ${label} vs original`}>
+      {label} saved
+    </p>
+  );
+}
+
 // ─── PosterImage — img with icon+title fallback (no external placeholder URLs) ──
 
 function PosterImage({ poster, title }: { poster: string; title: string }) {
@@ -861,6 +879,13 @@ export default function LibraryPage() {
                       <p className="text-[9px] text-destructive font-medium">Re-upload to fix</p>
                     )}
                   </div>
+                  {/* Storage savings badge — shown when encode saved meaningful space */}
+                  {!item.transcodeError && !item.transcoding && (item as MediaItem & { savedBytes?: number }).savedBytes != null && (item as MediaItem & { savedBytes?: number }).savedBytes! > 1_048_576 && (
+                    <StorageSavingsBadge
+                      savedBytes={(item as MediaItem & { savedBytes?: number }).savedBytes!}
+                      originalSize={(item as MediaItem & { originalSize?: number }).originalSize ?? 0}
+                    />
+                  )}
                   {item.transcodeWarning && !item.transcodeError && (
                     <p className="text-[9px] text-yellow-500 mt-0.5 truncate" title={item.transcodeWarning}>
                       ⚠ {item.transcodeWarning}

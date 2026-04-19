@@ -1,7 +1,34 @@
 /**
- * FFmpeg transcode worker.
- * Converts any video to H.264/AAC MP4 with +faststart for zero-latency seeking.
- * Parses FFmpeg stderr progress lines and broadcasts to SSE subscribers.
+ * FFmpeg transcode worker — Smart Storage-Saving Edition
+ *
+ * Strategy mirrors what HandBrake does with "RF" (Constant Rate Factor) mode:
+ * instead of targeting a fixed bitrate (which wastes space on simple scenes),
+ * CRF lets the encoder use exactly as many bits as the content needs.
+ *
+ * Decision tree (runs before every encode):
+ *
+ *  1. SKIP  — already H.264 MP4 AND file is already small (< 8 MB/min).
+ *             Just remux (+faststart). Fastest path, no quality loss.
+ *
+ *  2. REMUX — already H.264 but in a non-MP4 container (MKV, AVI, etc.)
+ *             OR H.264 MP4 that is large (high-bitrate source).
+ *             Copy video stream, re-encode audio to AAC, add faststart.
+ *             Near-instant, no quality loss.
+ *
+ *  3. ENCODE_H264 — any other codec (HEVC, AV1, VP9, MPEG-2, etc.)
+ *             Re-encode to H.264 with CRF targeting:
+ *               • SD  (≤ 720p)  → CRF 22  (HandBrake RF 22 equivalent)
+ *               • HD  (≤ 1080p) → CRF 20  (HandBrake RF 20 equivalent)
+ *               • UHD (4K+)     → CRF 18  (HandBrake RF 18 equivalent)
+ *             Preset: "medium" — better compression than "fast" at the cost
+ *             of ~2× encode time. Still very fast on modern CPUs.
+ *
+ *  4. POST-ENCODE SIZE CHECK — if the output is larger than the input
+ *     (can happen with already-well-compressed sources), discard the output
+ *     and keep the original. Never make files bigger.
+ *
+ * Returns a TranscodeResult with before/after sizes so the UI can show
+ * a "Saved X MB" badge on the library card.
  */
 
 import { spawn } from 'child_process';
@@ -11,26 +38,140 @@ import { updateJob, broadcast, getJob } from './transcodeStore.js';
 
 const UPLOADS_DIR = path.resolve('./uploads');
 
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+export interface TranscodeResult {
+  /** Final filename that should be served (may be input if encode was skipped/reverted) */
+  outputFilename: string;
+  /** Original file size in bytes */
+  originalSize: number;
+  /** Final file size in bytes */
+  finalSize: number;
+  /** Bytes saved (negative = output was larger, reverted to original) */
+  savedBytes: number;
+  /** Human-readable strategy that was used */
+  strategy: 'remux' | 'encode_h264' | 'skipped';
+}
+
+interface VideoInfo {
+  codec: string;          // e.g. 'h264', 'hevc', 'av1', 'vp9', 'mpeg2video'
+  width: number;
+  height: number;
+  bitrateBps: number;     // video stream bitrate in bits/sec (0 = unknown)
+  audioStreams: number;
+  durationSecs: number;
+  fileSizeBytes: number;
+}
+
+type EncodeStrategy = 'remux' | 'encode_h264' | 'skip_remux_only';
+
+// ─── ffprobe helpers ──────────────────────────────────────────────────────────
+
 /**
- * Parse FFmpeg progress line:
- * frame=  120 fps= 24 q=28.0 size=    1024kB time=00:00:05.00 bitrate=1677.7kbits/s speed=1.2x
+ * Single ffprobe call that returns everything we need to make a strategy decision.
  */
+async function probeFile(filePath: string): Promise<VideoInfo> {
+  return new Promise(resolve => {
+    const probe = spawn('ffprobe', [
+      '-v', 'quiet',
+      '-print_format', 'json',
+      '-show_format',
+      '-show_streams',
+      filePath,
+    ]);
+
+    let out = '';
+    probe.stdout.on('data', (d: Buffer) => { out += d.toString(); });
+
+    probe.on('close', () => {
+      try {
+        const json = JSON.parse(out) as {
+          format?: { duration?: string; bit_rate?: string; size?: string };
+          streams?: Array<{
+            codec_type?: string;
+            codec_name?: string;
+            width?: number;
+            height?: number;
+            bit_rate?: string;
+          }>;
+        };
+
+        const videoStream = json.streams?.find(s => s.codec_type === 'video');
+        const audioStreams = json.streams?.filter(s => s.codec_type === 'audio').length ?? 0;
+
+        resolve({
+          codec: videoStream?.codec_name ?? 'unknown',
+          width: videoStream?.width ?? 0,
+          height: videoStream?.height ?? 0,
+          bitrateBps: parseInt(videoStream?.bit_rate ?? json.format?.bit_rate ?? '0', 10) || 0,
+          audioStreams,
+          durationSecs: parseFloat(json.format?.duration ?? '0') || 0,
+          fileSizeBytes: parseInt(json.format?.size ?? '0', 10) || 0,
+        });
+      } catch {
+        resolve({ codec: 'unknown', width: 0, height: 0, bitrateBps: 0, audioStreams: 0, durationSecs: 0, fileSizeBytes: 0 });
+      }
+    });
+
+    probe.on('error', () => {
+      resolve({ codec: 'unknown', width: 0, height: 0, bitrateBps: 0, audioStreams: 0, durationSecs: 0, fileSizeBytes: 0 });
+    });
+  });
+}
+
+// ─── Strategy engine ──────────────────────────────────────────────────────────
+
+/**
+ * Decide what to do with this file.
+ *
+ * "skip_remux_only" = already H.264 MP4, already efficient — just add faststart.
+ * "remux"           = already H.264 but wrong container or high-bitrate MP4.
+ * "encode_h264"     = needs full re-encode (HEVC, AV1, VP9, MPEG-2, etc.)
+ */
+function transcodeStrategy(info: VideoInfo, inputFilename: string): EncodeStrategy {
+  const isH264 = info.codec === 'h264';
+  const isMp4Container = inputFilename.toLowerCase().endsWith('.mp4');
+
+  if (!isH264) return 'encode_h264';
+
+  // H.264 in a non-MP4 container → remux (copy video, re-encode audio, add faststart)
+  if (!isMp4Container) return 'remux';
+
+  // H.264 MP4 — check if it's already efficient
+  // "Efficient" = bitrate under ~8 Mbps for HD or file is small relative to duration
+  // If bitrate is unknown (0), fall back to remux to be safe (adds faststart at minimum)
+  const mbps = info.bitrateBps / 1_000_000;
+  const isAlreadyEfficient = mbps > 0 && mbps < 8;
+
+  return isAlreadyEfficient ? 'skip_remux_only' : 'remux';
+}
+
+/**
+ * Pick CRF value based on resolution.
+ * Lower CRF = better quality + larger file.
+ * These values mirror HandBrake's default RF presets.
+ */
+function crfForResolution(height: number): number {
+  if (height <= 480)  return 23; // SD  — HandBrake RF 23
+  if (height <= 720)  return 22; // HD-ready — HandBrake RF 22
+  if (height <= 1080) return 20; // Full HD — HandBrake RF 20
+  return 18;                     // 4K/UHD — HandBrake RF 18
+}
+
+// ─── Progress parser ──────────────────────────────────────────────────────────
+
 function parseProgress(line: string, durationSecs: number): {
-  progress: number;
-  fps: number;
-  speed: string;
-  eta: number;
+  progress: number; fps: number; speed: string; eta: number;
 } | null {
   const timeMatch = line.match(/time=(\d{2}):(\d{2}):(\d{2})\.(\d{2})/);
-  const fpsMatch = line.match(/fps=\s*([\d.]+)/);
+  const fpsMatch  = line.match(/fps=\s*([\d.]+)/);
   const speedMatch = line.match(/speed=\s*([\d.]+x)/);
 
   if (!timeMatch) return null;
 
-  const h = parseInt(timeMatch[1]);
-  const m = parseInt(timeMatch[2]);
-  const s = parseInt(timeMatch[3]);
-  const currentSecs = h * 3600 + m * 60 + s;
+  const currentSecs = parseInt(timeMatch[1]) * 3600
+    + parseInt(timeMatch[2]) * 60
+    + parseInt(timeMatch[3]);
 
   const progress = durationSecs > 0
     ? Math.min(99, Math.round((currentSecs / durationSecs) * 100))
@@ -39,145 +180,16 @@ function parseProgress(line: string, durationSecs: number): {
   const fps = fpsMatch ? parseFloat(fpsMatch[1]) : 0;
   const speed = speedMatch ? speedMatch[1] : '?x';
   const speedNum = parseFloat(speed) || 1;
-  const remaining = durationSecs > 0
-    ? Math.round((durationSecs - currentSecs) / speedNum)
-    : 0;
+  const eta = durationSecs > 0 ? Math.round((durationSecs - currentSecs) / speedNum) : 0;
 
-  return { progress, fps, speed, eta: remaining };
+  return { progress, fps, speed, eta };
 }
 
-/**
- * Get video duration in seconds using ffprobe.
- */
-async function getDuration(filePath: string): Promise<number> {
-  return new Promise(resolve => {
-    const probe = spawn('ffprobe', [
-      '-v', 'quiet',
-      '-print_format', 'json',
-      '-show_format',
-      filePath,
-    ]);
-    let out = '';
-    probe.stdout.on('data', (d: Buffer) => { out += d.toString(); });
-    probe.on('close', () => {
-      try {
-        const json = JSON.parse(out);
-        resolve(parseFloat(json.format?.duration || '0'));
-      } catch {
-        resolve(0);
-      }
-    });
-    probe.on('error', () => resolve(0));
-  });
-}
+// ─── FFmpeg runner ────────────────────────────────────────────────────────────
 
-/**
- * Check if a file is already browser-compatible H.264 MP4.
- * If so, we skip transcoding (just copy + faststart remux, which is near-instant).
- */
-async function getVideoCodec(filePath: string): Promise<string> {
-  return new Promise(resolve => {
-    const probe = spawn('ffprobe', [
-      '-v', 'quiet',
-      '-print_format', 'json',
-      '-show_streams',
-      '-select_streams', 'v:0',
-      filePath,
-    ]);
-    let out = '';
-    probe.stdout.on('data', (d: Buffer) => { out += d.toString(); });
-    probe.on('close', () => {
-      try {
-        const json = JSON.parse(out);
-        resolve(json.streams?.[0]?.codec_name || 'unknown');
-      } catch {
-        resolve('unknown');
-      }
-    });
-    probe.on('error', () => resolve('unknown'));
-  });
-}
-
-/**
- * Check how many audio streams a file has.
- * Returns 0 if none — we must omit -c:a args entirely or FFmpeg errors.
- */
-async function getAudioStreamCount(filePath: string): Promise<number> {
-  return new Promise(resolve => {
-    const probe = spawn('ffprobe', [
-      '-v', 'quiet',
-      '-print_format', 'json',
-      '-show_streams',
-      '-select_streams', 'a',
-      filePath,
-    ]);
-    let out = '';
-    probe.stdout.on('data', (d: Buffer) => { out += d.toString(); });
-    probe.on('close', () => {
-      try {
-        const json = JSON.parse(out);
-        resolve((json.streams as unknown[])?.length ?? 0);
-      } catch {
-        resolve(0);
-      }
-    });
-    probe.on('error', () => resolve(0));
-  });
-}
-
-export async function transcodeFile(
-  mediaId: string,
-  inputFilename: string,
-  outputFilename: string,
-): Promise<void> {
-  const inputPath = path.join(UPLOADS_DIR, inputFilename);
-  const outputPath = path.join(UPLOADS_DIR, outputFilename);
-
-  updateJob(mediaId, { status: 'transcoding', startedAt: Date.now() });
-  broadcast(mediaId, getJob(mediaId)!);
-
-  // Get duration for progress calculation
-  const duration = await getDuration(inputPath);
-
-  // Check if already H.264 — if so, do a fast remux instead of full re-encode
-  const codec = await getVideoCodec(inputPath);
-  const isH264 = codec === 'h264';
-
-  // Check for audio streams — files with no audio need different FFmpeg args
-  // (passing -c:a aac on a file with no audio causes FFmpeg to error out)
-  const audioStreams = await getAudioStreamCount(inputPath);
-  const hasAudio = audioStreams > 0;
-
-  // Audio args — omit entirely if no audio track present
-  const audioArgs: string[] = hasAudio
-    ? ['-c:a', 'aac', '-b:a', '192k', '-ac', '2']
-    : ['-an']; // -an = no audio output (avoids "no audio stream" error)
-
-  const ffmpegArgs = isH264
-    ? [
-        '-i', inputPath,
-        '-c:v', 'copy',          // Copy video stream (no re-encode)
-        ...audioArgs,
-        '-movflags', '+faststart', // Move moov atom to front
-        '-y',                    // Overwrite output
-        outputPath,
-      ]
-    : [
-        '-i', inputPath,
-        '-c:v', 'libx264',
-        '-crf', '18',            // Near-lossless quality (18=excellent, 23=default)
-        '-preset', 'fast',       // Fast preset — good balance on home server
-        '-profile:v', 'high',
-        '-level', '4.1',
-        ...audioArgs,
-        '-movflags', '+faststart',
-        '-y',
-        outputPath,
-      ];
-
+function runFFmpeg(args: string[], mediaId: string, durationSecs: number): Promise<void> {
   return new Promise((resolve, reject) => {
-    const ff = spawn('ffmpeg', ffmpegArgs);
-
+    const ff = spawn('ffmpeg', args);
     let stderrBuf = '';
 
     ff.stderr.on('data', (data: Buffer) => {
@@ -186,7 +198,7 @@ export async function transcodeFile(
       stderrBuf = lines.pop() || '';
 
       for (const line of lines) {
-        const parsed = parseProgress(line, duration);
+        const parsed = parseProgress(line, durationSecs);
         if (parsed) {
           updateJob(mediaId, {
             progress: parsed.progress,
@@ -200,34 +212,132 @@ export async function transcodeFile(
     });
 
     ff.on('close', code => {
-      if (code === 0) {
-        // Delete original file to save space (only if different from output)
-        if (inputFilename !== outputFilename && fs.existsSync(inputPath)) {
-          try { fs.unlinkSync(inputPath); } catch { /* ignore */ }
-        }
-        updateJob(mediaId, {
-          status: 'done',
-          progress: 100,
-          finishedAt: Date.now(),
-        });
-        broadcast(mediaId, getJob(mediaId)!);
-        resolve();
-      } else {
-        const errMsg = `FFmpeg exited with code ${code}`;
-        updateJob(mediaId, { status: 'error', error: errMsg });
-        broadcast(mediaId, getJob(mediaId)!);
-        reject(new Error(errMsg));
-      }
+      if (code === 0) { resolve(); }
+      else { reject(new Error(`FFmpeg exited with code ${code}`)); }
     });
 
     ff.on('error', err => {
-      // FFmpeg not installed
       const msg = err.message.includes('ENOENT')
         ? 'FFmpeg not found. Install FFmpeg on your server: sudo apt install ffmpeg'
         : err.message;
-      updateJob(mediaId, { status: 'error', error: msg });
-      broadcast(mediaId, getJob(mediaId)!);
       reject(new Error(msg));
     });
   });
+}
+
+// ─── Main export ──────────────────────────────────────────────────────────────
+
+export async function transcodeFile(
+  mediaId: string,
+  inputFilename: string,
+  outputFilename: string,
+): Promise<TranscodeResult> {
+  const inputPath  = path.join(UPLOADS_DIR, inputFilename);
+  const outputPath = path.join(UPLOADS_DIR, outputFilename);
+
+  updateJob(mediaId, { status: 'transcoding', startedAt: Date.now() });
+  broadcast(mediaId, getJob(mediaId)!);
+
+  // ── 1. Probe the input file ──────────────────────────────────────────────
+  const info = await probeFile(inputPath);
+  const originalSize = info.fileSizeBytes || fs.statSync(inputPath).size;
+
+  // ── 2. Decide strategy ───────────────────────────────────────────────────
+  const strategy = transcodeStrategy(info, inputFilename);
+
+  console.log(
+    `[transcode] ${inputFilename} → strategy=${strategy} ` +
+    `codec=${info.codec} res=${info.width}x${info.height} ` +
+    `bitrate=${(info.bitrateBps / 1_000_000).toFixed(1)}Mbps ` +
+    `size=${(originalSize / 1_048_576).toFixed(1)}MB`
+  );
+
+  // ── 3. Audio args (shared across all paths) ──────────────────────────────
+  const audioArgs: string[] = info.audioStreams > 0
+    ? ['-c:a', 'aac', '-b:a', '192k', '-ac', '2']
+    : ['-an'];
+
+  // ── 4. Build FFmpeg args based on strategy ───────────────────────────────
+  let ffmpegArgs: string[];
+
+  if (strategy === 'skip_remux_only' || strategy === 'remux') {
+    // Copy video stream — just fix container and audio codec
+    ffmpegArgs = [
+      '-i', inputPath,
+      '-c:v', 'copy',
+      ...audioArgs,
+      '-movflags', '+faststart',
+      '-y',
+      outputPath,
+    ];
+  } else {
+    // Full H.264 re-encode with CRF quality targeting
+    const crf = crfForResolution(info.height);
+    console.log(`[transcode] CRF=${crf} for ${info.height}p content`);
+
+    ffmpegArgs = [
+      '-i', inputPath,
+      '-c:v', 'libx264',
+      '-crf', String(crf),
+      '-preset', 'medium',       // Better compression than 'fast'; still reasonable speed
+      '-profile:v', 'high',
+      '-level', '4.1',
+      '-pix_fmt', 'yuv420p',     // Maximum browser compatibility
+      ...audioArgs,
+      '-movflags', '+faststart',
+      '-y',
+      outputPath,
+    ];
+  }
+
+  // ── 5. Run FFmpeg ────────────────────────────────────────────────────────
+  try {
+    await runFFmpeg(ffmpegArgs, mediaId, info.durationSecs);
+  } catch (err) {
+    updateJob(mediaId, { status: 'error', error: (err as Error).message });
+    broadcast(mediaId, getJob(mediaId)!);
+    throw err;
+  }
+
+  // ── 6. Post-encode size check ────────────────────────────────────────────
+  // If the output is larger than the input (can happen with already-compressed
+  // sources), discard the output and keep the original. Never make files bigger.
+  const outputSize = fs.existsSync(outputPath) ? fs.statSync(outputPath).size : 0;
+  const savedBytes = originalSize - outputSize;
+  const outputIsLarger = outputSize > 0 && outputSize >= originalSize;
+
+  let finalFilename = outputFilename;
+  let finalSize = outputSize;
+
+  if (outputIsLarger) {
+    console.log(
+      `[transcode] Output (${(outputSize / 1_048_576).toFixed(1)}MB) ≥ input ` +
+      `(${(originalSize / 1_048_576).toFixed(1)}MB) — reverting to original`
+    );
+    // Delete the larger output, keep original
+    try { fs.unlinkSync(outputPath); } catch { /* ignore */ }
+    finalFilename = inputFilename;
+    finalSize = originalSize;
+  } else {
+    // Output is smaller — delete original to free space
+    if (inputFilename !== outputFilename && fs.existsSync(inputPath)) {
+      try { fs.unlinkSync(inputPath); } catch { /* ignore */ }
+    }
+    const pct = originalSize > 0 ? Math.round((savedBytes / originalSize) * 100) : 0;
+    console.log(
+      `[transcode] Done. ${(originalSize / 1_048_576).toFixed(1)}MB → ` +
+      `${(outputSize / 1_048_576).toFixed(1)}MB (saved ${pct}%)`
+    );
+  }
+
+  updateJob(mediaId, { status: 'done', progress: 100, finishedAt: Date.now() });
+  broadcast(mediaId, getJob(mediaId)!);
+
+  return {
+    outputFilename: finalFilename,
+    originalSize,
+    finalSize,
+    savedBytes: outputIsLarger ? 0 : savedBytes,
+    strategy: strategy === 'skip_remux_only' ? 'remux' : strategy,
+  };
 }

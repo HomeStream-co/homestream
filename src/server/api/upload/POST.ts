@@ -207,12 +207,18 @@ export default function handler(req: Request, res: Response) {
 
     // ── 6. Run transcode in background (non-blocking) ──
     transcodeFile(mediaId, inputFilename, outputFilename)
-      .then(() => {
-        // Mark transcoding: false in library once done
+      .then((result) => {
+        // Mark transcoding: false in library once done; persist size savings
         const lib = readLibrary();
         const idx = lib.findIndex((m: { id: string }) => m.id === mediaId);
         if (idx !== -1) {
           lib[idx].transcoding = false;
+          lib[idx].filename = result.outputFilename;
+          lib[idx].filepath = `/uploads/${result.outputFilename}`;
+          lib[idx].fileSize = result.finalSize;
+          lib[idx].originalSize = result.originalSize;
+          lib[idx].savedBytes = result.savedBytes;
+          lib[idx].transcodeStrategy = result.strategy;
           writeLibrary(lib);
         }
       })
