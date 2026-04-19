@@ -6,9 +6,10 @@ import Footer from '@/layouts/parts/Footer';
 import Header from '@/layouts/parts/Header';
 import Website from '@/layouts/Website';
 import AIChatAssistant from '@/components/AIChatAssistant';
-import { MediaProvider } from '@/context/MediaContext';
+import { MediaProvider, useMedia } from '@/context/MediaContext';
 import { ProfileProvider, useProfile } from '@/context/ProfileContext';
 import { ThemeProvider } from '@/context/ThemeContext';
+import { TMDBProvider } from '@/context/TMDBContext';
 
 interface RootLayoutProps {
   children: ReactElement;
@@ -21,13 +22,19 @@ function ProfileGuard({ children }: { children: ReactElement }) {
   const location = useLocation();
 
   useEffect(() => {
-    // Don't redirect if already on /profiles
     if (!activeProfile && location.pathname !== '/profiles') {
       navigate('/profiles', { replace: true });
     }
   }, [activeProfile, location.pathname, navigate]);
 
   return children;
+}
+
+/** Wraps children with TMDBProvider, passing library genres for personalised recs */
+function TMDBWrapper({ children }: { children: ReactElement }) {
+  const { library } = useMedia();
+  const genres = Array.from(new Set(library.flatMap(m => m.genre ?? [])));
+  return <TMDBProvider libraryGenres={genres}>{children}</TMDBProvider>;
 }
 
 export default function RootLayout({ children }: RootLayoutProps) {
@@ -39,25 +46,27 @@ export default function RootLayout({ children }: RootLayoutProps) {
     <ThemeProvider>
       <ProfileProvider>
         <MediaProvider>
-          <Website>
-            {!isPlayer && !isProfiles && <Header />}
-            <ProfileGuard>
-              {children}
-            </ProfileGuard>
-            {!isPlayer && !isProfiles && <Footer />}
-            {!isProfiles && <AIChatAssistant />}
-            <Toaster
-              theme="dark"
-              position="bottom-left"
-              toastOptions={{
-                style: {
-                  background: 'hsl(var(--card))',
-                  border: '1px solid hsl(var(--border))',
-                  color: 'hsl(var(--foreground))',
-                },
-              }}
-            />
-          </Website>
+          <TMDBWrapper>
+            <Website>
+              {!isPlayer && !isProfiles && <Header />}
+              <ProfileGuard>
+                {children}
+              </ProfileGuard>
+              {!isPlayer && !isProfiles && <Footer />}
+              {!isProfiles && <AIChatAssistant />}
+              <Toaster
+                theme="dark"
+                position="bottom-left"
+                toastOptions={{
+                  style: {
+                    background: 'hsl(var(--card))',
+                    border: '1px solid hsl(var(--border))',
+                    color: 'hsl(var(--foreground))',
+                  },
+                }}
+              />
+            </Website>
+          </TMDBWrapper>
         </MediaProvider>
       </ProfileProvider>
     </ThemeProvider>

@@ -23,8 +23,7 @@ import {
   ChevronDown, Search, X,
 } from 'lucide-react';
 import { useMedia } from '@/context/MediaContext';
-import { useProfile } from '@/context/ProfileContext';
-import { useTMDB } from '@/hooks/useTMDB';
+import { useTMDBContext } from '@/context/TMDBContext';
 import type { TMDBMovie } from '@/server/tmdbCache';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -378,16 +377,10 @@ function DownloadModal({ movie, onClose }: { movie: TMDBMovie; onClose: () => vo
 
 export default function DiscoverPage() {
   const { library, watchlist, addToWatchlist, removeFromWatchlist } = useMedia();
-  const { isAllowed } = useProfile();
   const [downloadTarget, setDownloadTarget] = useState<TMDBMovie | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Derive library genres for personalised recommendations
-  const libraryGenres = Array.from(
-    new Set(library.filter(m => isAllowed(m.rated)).flatMap(m => m.genre ?? []))
-  );
-
-  const { upcoming, trending, recommended, loading, stale, error, refresh, lastRefreshed } = useTMDB(libraryGenres);
+  const { upcoming, trending, recommended, loading, stale, error, refresh, lastRefreshed } = useTMDBContext();
 
   // Build a set of library titles (lowercase) to mark "already in library"
   const libraryTitles = useMemo(

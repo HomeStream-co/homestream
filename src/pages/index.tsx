@@ -1,76 +1,169 @@
 /**
- * Home page — HomeStream
+ * Home Page — / (merged with Browse)
  *
- * Layout (top → bottom):
- *  1. HeroBanner  — scrolling new-release posters from TMDB (this month)
- *                   Falls back to library featured hero when no TMDB data yet
- *  2. Continue Watching carousel  — FIRST carousel, always on top
- *  3. Kids mode banner (if restricted profile)
- *  4. Recently Added
- *  5. Movies
- *  6. TV Shows & Series
- *  7. Top Rated
- *  8. My List
+ * Layout:
+ *  1. HeroBanner (TMDB new releases) or library fallback hero
+ *  2. Inline search bar — typing activates a full-grid search view
+ *     (replaces the old /browse page entirely)
+ *  3. When search is active: filtered grid with genre/type/sort controls
+ *  4. When search is inactive: carousels
+ *     - Continue Watching (most recent first)
+ *     - My List (if non-empty)
+ *     - Recently Added
+ *     - Movies
+ *     - TV Shows
+ *     - Top Rated
+ *
+ * All carousel derivations are memoized so they only recompute when
+ * the library or watchlist actually changes.
  */
 
-import { useNavigate } from 'react-router-dom';
-import { Play, Plus, Check, Star, Upload, Clock } from 'lucide-react';
-import { motion } from 'motion/react';
+import { useState, useMemo, useRef, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Play, Plus, Check, Star, Upload, Clock, Search, X, SlidersHorizontal, Bookmark } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 import { useMedia } from '@/context/MediaContext';
 import { useProfile } from '@/context/ProfileContext';
+import { useTMDBContext } from '@/context/TMDBContext';
 import MediaCarousel from '@/components/MediaCarousel';
+import MediaCard from '@/components/MediaCard';
 import HeroBanner from '@/components/HeroBanner';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useTMDB } from '@/hooks/useTMDB';
+
+// ── Constants ─────────────────────────────────────────────────────────────────
+
+const GENRES = [
+  'All', 'Action', 'Adventure', 'Animation', 'Comedy', 'Crime',
+  'Documentary', 'Drama', 'Family', 'Fantasy', 'Horror',
+  'Romance', 'Sci-Fi', 'Thriller',
+];
+
+const SORT_OPTIONS = [
+  { value: 'added',  label: 'Date Added' },
+  { value: 'rating', label: 'Top Rated' },
+  { value: 'title',  label: 'Title A–Z' },
+  { value: 'year',   label: 'Year' },
+];
+
+// ── Component ─────────────────────────────────────────────────────────────────
 
 export default function HomePage() {
   const { library, loading, watchlist, addToWatchlist, removeFromWatchlist, continueWatching } = useMedia();
   const { isAllowed, activeProfile } = useProfile();
+  const { upcoming, loading: tmdbLoading } = useTMDBContext();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
 
-  // Apply Kids filter to the entire library before building any carousel
-  const visibleLibrary = library.filter(m => isAllowed(m.rated));
+  // ── Search / filter state ──
+  const [query, setQuery] = useState(searchParams.get('q') || '');
+  const [genre, setGenre] = useState('All');
+  const [typeFilter, setTypeFilter] = useState<'all' | 'movie' | 'series'>('all');
+  const [sortBy, setSortBy] = useState('added');
+  const [showFilters, setShowFilters] = useState(false);
+  const searchRef = useRef<HTMLInputElement>(null);
 
-  // ── Derive all unique genre names from the library for personalised recs ──
-  const libraryGenres = Array.from(
-    new Set(visibleLibrary.flatMap(m => m.genre ?? []))
+  const isSearching = query.trim().length > 0 || genre !== 'All' || typeFilter !== 'all';
+
+  // Sync ?q= param → local state (for links from other pages like genre pills)
+  useEffect(() => {
+    const q = searchParams.get('q');
+    if (q && q !== query) setQuery(q);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ── Visible library (kids filter applied once) ──
+  const visibleLibrary = useMemo(
+    () => library.filter(m => isAllowed(m.rated)),
+    [library, isAllowed],
   );
 
-  // ── TMDB data — fetched once, 30-day cache, no background polling ──
-  const { upcoming, loading: tmdbLoading } = useTMDB(libraryGenres);
+  // ── Carousel derivations — all memoized ──
+  const featured = useMemo(() => visibleLibrary[0], [visibleLibrary]);
+  const inWatchlist = useMemo(() => featured ? watchlist.includes(featured.id) : false, [featured, watchlist]);
 
-  // ── Library-based carousels ──
-  const featured = visibleLibrary[0];
-  const inWatchlist = featured ? watchlist.includes(featured.id) : false;
+  const continueWatchingItems = useMemo(() =>
+    visibleLibrary
+      .filter(m => continueWatching.some(c => c.id === m.id && c.progress > 0))
+      .sort((a, b) => {
+        const ta = a.lastWatchedAt ? new Date(a.lastWatchedAt).getTime() : 0;
+        const tb = b.lastWatchedAt ? new Date(b.lastWatchedAt).getTime() : 0;
+        return tb - ta;
+      }),
+    [visibleLibrary, continueWatching],
+  );
 
-  const recentlyAdded = [...visibleLibrary].slice(0, 20);
-  const movies = visibleLibrary.filter(m => m.type === 'movie');
-  const series = visibleLibrary.filter(m => m.type === 'series');
-  const topRated = [...visibleLibrary]
-    .filter(m => m.imdbRating !== 'N/A')
-    .sort((a, b) => parseFloat(b.imdbRating) - parseFloat(a.imdbRating))
-    .slice(0, 20);
+  const myList = useMemo(
+    () => visibleLibrary.filter(m => watchlist.includes(m.id)),
+    [visibleLibrary, watchlist],
+  );
 
-  // Continue Watching — sorted by lastWatchedAt (most recent first)
-  const continueWatchingItems = visibleLibrary
-    .filter(m => continueWatching.some(c => c.id === m.id && c.progress > 0))
-    .sort((a, b) => {
-      const ta = a.lastWatchedAt ? new Date(a.lastWatchedAt).getTime() : 0;
-      const tb = b.lastWatchedAt ? new Date(b.lastWatchedAt).getTime() : 0;
-      return tb - ta;
-    });
+  const recentlyAdded = useMemo(() => [...visibleLibrary].slice(0, 20), [visibleLibrary]);
 
-  // ── Hero section logic ──
-  // Show TMDB banner when we have upcoming movies (even while library loads)
-  // Fall back to library hero when TMDB has nothing yet
-  const showTMDBBanner = upcoming.length > 0;
+  const movies = useMemo(
+    () => visibleLibrary.filter(m => m.type === 'movie'),
+    [visibleLibrary],
+  );
+
+  const series = useMemo(
+    () => visibleLibrary.filter(m => m.type === 'series'),
+    [visibleLibrary],
+  );
+
+  const topRated = useMemo(() =>
+    [...visibleLibrary]
+      .filter(m => m.imdbRating !== 'N/A' && parseFloat(m.imdbRating) > 0)
+      .sort((a, b) => parseFloat(b.imdbRating) - parseFloat(a.imdbRating))
+      .slice(0, 20),
+    [visibleLibrary],
+  );
+
+  // ── Search results ──
+  const searchResults = useMemo(() => {
+    if (!isSearching) return [];
+    let items = [...visibleLibrary];
+
+    if (query.trim()) {
+      const q = query.toLowerCase();
+      items = items.filter(m =>
+        m.title.toLowerCase().includes(q) ||
+        m.plot?.toLowerCase().includes(q) ||
+        m.actors?.toLowerCase().includes(q) ||
+        m.director?.toLowerCase().includes(q) ||
+        m.genre.some(g => g.toLowerCase().includes(q))
+      );
+    }
+    if (genre !== 'All') {
+      items = items.filter(m => m.genre.some(g => g.toLowerCase().includes(genre.toLowerCase())));
+    }
+    if (typeFilter !== 'all') {
+      items = items.filter(m => m.type === typeFilter);
+    }
+    switch (sortBy) {
+      case 'rating': items.sort((a, b) => (parseFloat(b.imdbRating) || 0) - (parseFloat(a.imdbRating) || 0)); break;
+      case 'title':  items.sort((a, b) => a.title.localeCompare(b.title)); break;
+      case 'year':   items.sort((a, b) => parseInt(b.year) - parseInt(a.year)); break;
+      default:       items.sort((a, b) => new Date(b.addedAt).getTime() - new Date(a.addedAt).getTime());
+    }
+    return items;
+  }, [isSearching, visibleLibrary, query, genre, typeFilter, sortBy]);
+
+  // ── Hero logic ──
+  const showTMDBBanner  = upcoming.length > 0;
   const showLibraryHero = !showTMDBBanner && !loading && !!featured;
-  const showEmptyState = !showTMDBBanner && !loading && !featured;
+  const showEmptyState  = !showTMDBBanner && !loading && !featured;
   const showHeroSkeleton = loading && !showTMDBBanner;
+
+  const clearSearch = () => {
+    setQuery('');
+    setGenre('All');
+    setTypeFilter('all');
+    setSearchParams({});
+  };
 
   return (
     <div className="bg-background">
       <title>HomeStream — Your Personal Cinema</title>
+      <meta name="description" content="Stream your personal media library. Movies, TV shows, and more." />
 
       {/* ── Hero ── */}
       {showHeroSkeleton ? (
@@ -80,9 +173,8 @@ export default function HomePage() {
       ) : showTMDBBanner ? (
         <HeroBanner movies={upcoming} loading={tmdbLoading && upcoming.length === 0} />
       ) : showLibraryHero ? (
-        /* Library featured hero (fallback when TMDB not yet loaded) */
         <div className="relative h-[70vh] overflow-hidden">
-          {featured!.poster ? (
+          {featured!.poster && (
             <img
               src={featured!.poster}
               alt={featured!.title}
@@ -90,7 +182,7 @@ export default function HomePage() {
               style={{ filter: 'blur(2px) brightness(0.4)' }}
               onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
             />
-          ) : null}
+          )}
           <div className="absolute inset-0 bg-gradient-to-br from-primary/20 via-background/60 to-background" />
           <div className="absolute inset-0 bg-gradient-to-r from-background via-background/60 to-transparent" />
           <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-transparent" />
@@ -117,14 +209,10 @@ export default function HomePage() {
                 {featured!.rated && featured!.rated !== 'N/A' && (
                   <span className="border border-muted-foreground px-1.5 py-0.5 rounded text-xs">{featured!.rated}</span>
                 )}
-                {featured!.runtime && featured!.runtime !== 'Unknown' && (
-                  <span>{featured!.runtime}</span>
-                )}
+                {featured!.runtime && featured!.runtime !== 'Unknown' && <span>{featured!.runtime}</span>}
                 <span>{featured!.genre.slice(0, 2).join(' · ')}</span>
               </div>
-              <p className="text-sm text-foreground/80 mb-6 line-clamp-3 leading-relaxed">
-                {featured!.plot}
-              </p>
+              <p className="text-sm text-foreground/80 mb-6 line-clamp-3 leading-relaxed">{featured!.plot}</p>
               <div className="flex items-center gap-3">
                 <button
                   onClick={() => navigate(`/player/${featured!.id}`)}
@@ -163,44 +251,198 @@ export default function HomePage() {
         </div>
       ) : null}
 
-      {/* ── Carousels ── */}
-      <div className="pt-6">
-
-        {/* ── 1. CONTINUE WATCHING — always first ── */}
-        {continueWatchingItems.length > 0 && (
-          <div className="mb-2">
-            <MediaCarousel
-              title="Continue Watching"
-              items={continueWatchingItems}
-              showProgress
-              titleIcon={<Clock className="w-4 h-4 text-primary" />}
+      {/* ── Search bar ── */}
+      <div className="sticky top-16 z-30 bg-background/90 backdrop-blur-sm border-b border-border/40 px-4 sm:px-6 lg:px-8 py-3">
+        <div className="max-w-screen-2xl mx-auto flex items-center gap-3">
+          <div className="relative flex-1 max-w-xl">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+            <input
+              ref={searchRef}
+              type="text"
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              placeholder="Search movies, shows, actors, genres..."
+              className="w-full bg-card border border-border rounded-lg pl-10 pr-10 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary transition-colors"
             />
+            {query && (
+              <button
+                onClick={clearSearch}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
           </div>
-        )}
 
-        {/* Kids mode banner */}
-        {activeProfile?.restricted && (
-          <div className="mx-4 sm:mx-6 lg:mx-8 mb-6 flex items-center gap-2.5 bg-yellow-500/10 border border-yellow-500/25 rounded-xl px-4 py-2.5">
-            <span className="text-lg">🧒</span>
-            <p className="text-xs text-yellow-400 font-medium">
-              Kids mode — showing G &amp; PG rated content only
-            </p>
-          </div>
-        )}
+          {/* Filter toggle */}
+          <button
+            onClick={() => setShowFilters(v => !v)}
+            className={`flex items-center gap-1.5 px-3 py-2.5 rounded-lg border text-sm font-medium transition-colors ${
+              showFilters || genre !== 'All' || typeFilter !== 'all'
+                ? 'bg-primary/10 border-primary/30 text-primary'
+                : 'bg-card border-border text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <SlidersHorizontal className="w-4 h-4" />
+            <span className="hidden sm:inline">Filters</span>
+          </button>
 
-        <MediaCarousel title="Recently Added" items={recentlyAdded} />
-        <MediaCarousel title="Movies" items={movies} />
-        <MediaCarousel title="TV Shows & Series" items={series} />
-        {topRated.length > 0 && (
-          <MediaCarousel title="Top Rated" items={topRated} />
-        )}
-        {watchlist.length > 0 && (
-          <MediaCarousel
-            title="My List"
-            items={visibleLibrary.filter(m => watchlist.includes(m.id))}
-          />
-        )}
+          {/* My List shortcut */}
+          {myList.length > 0 && !isSearching && (
+            <button
+              onClick={() => { setTypeFilter('all'); setGenre('All'); setQuery(''); setShowFilters(false); }}
+              className="flex items-center gap-1.5 px-3 py-2.5 rounded-lg border border-border bg-card text-muted-foreground hover:text-foreground text-sm transition-colors"
+              title="My Watchlist"
+            >
+              <Bookmark className="w-4 h-4" />
+              <span className="hidden sm:inline">My List</span>
+              <span className="text-xs bg-primary text-white rounded-full px-1.5 py-0.5 leading-none">{myList.length}</span>
+            </button>
+          )}
+
+          {/* Clear all */}
+          {isSearching && (
+            <button onClick={clearSearch} className="text-xs text-muted-foreground hover:text-foreground transition-colors whitespace-nowrap">
+              Clear all
+            </button>
+          )}
+        </div>
+
+        {/* Expanded filters */}
+        <AnimatePresence>
+          {showFilters && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="overflow-hidden"
+            >
+              <div className="max-w-screen-2xl mx-auto pt-3 flex flex-wrap items-center gap-3">
+                {/* Type */}
+                <div className="flex gap-1">
+                  {(['all', 'movie', 'series'] as const).map(t => (
+                    <button
+                      key={t}
+                      onClick={() => setTypeFilter(t)}
+                      className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                        typeFilter === t ? 'bg-primary text-white' : 'bg-card text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      {t === 'all' ? 'All Types' : t === 'movie' ? 'Movies' : 'TV Shows'}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="w-px h-4 bg-border" />
+
+                {/* Genre chips */}
+                <div className="flex flex-wrap gap-1">
+                  {GENRES.map(g => (
+                    <button
+                      key={g}
+                      onClick={() => setGenre(g)}
+                      className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                        genre === g ? 'bg-primary text-white' : 'bg-card text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      {g}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Sort */}
+                <div className="ml-auto">
+                  <select
+                    value={sortBy}
+                    onChange={e => setSortBy(e.target.value)}
+                    className="bg-card border border-border rounded px-3 py-1.5 text-xs text-foreground focus:outline-none focus:border-primary"
+                  >
+                    {SORT_OPTIONS.map(o => (
+                      <option key={o.value} value={o.value}>{o.label}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
+
+      {/* ── Kids mode banner ── */}
+      {activeProfile?.restricted && (
+        <div className="mx-4 sm:mx-6 lg:mx-8 mt-4 flex items-center gap-2.5 bg-yellow-500/10 border border-yellow-500/25 rounded-xl px-4 py-2.5 w-fit">
+          <span className="text-lg">🧒</span>
+          <p className="text-xs text-yellow-400 font-medium">Kids mode — showing G &amp; PG rated content only</p>
+        </div>
+      )}
+
+      {/* ── Search results grid ── */}
+      <AnimatePresence mode="wait">
+        {isSearching ? (
+          <motion.div
+            key="search"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15 }}
+            className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-16"
+          >
+            <p className="text-sm text-muted-foreground mb-4">
+              {searchResults.length} title{searchResults.length !== 1 ? 's' : ''}
+              {query && <> matching <span className="text-foreground font-medium">"{query}"</span></>}
+            </p>
+
+            {searchResults.length === 0 ? (
+              <div className="text-center py-20">
+                <p className="text-muted-foreground text-lg">No titles found.</p>
+                <p className="text-muted-foreground text-sm mt-1">Try adjusting your search or filters.</p>
+                <button onClick={clearSearch} className="mt-4 text-primary text-sm hover:underline">Clear search</button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-7 xl:grid-cols-9 gap-4">
+                {searchResults.map(item => (
+                  <MediaCard key={item.id} item={item} size="md" />
+                ))}
+              </div>
+            )}
+          </motion.div>
+        ) : (
+          /* ── Carousels ── */
+          <motion.div
+            key="carousels"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15 }}
+            className="pt-6"
+          >
+            {continueWatchingItems.length > 0 && (
+              <MediaCarousel
+                title="Continue Watching"
+                items={continueWatchingItems}
+                showProgress
+                titleIcon={<Clock className="w-4 h-4 text-primary" />}
+              />
+            )}
+
+            {myList.length > 0 && (
+              <MediaCarousel
+                title="My List"
+                items={myList}
+                titleIcon={<Bookmark className="w-4 h-4 text-primary" />}
+              />
+            )}
+
+            <MediaCarousel title="Recently Added" items={recentlyAdded} />
+            <MediaCarousel title="Movies" items={movies} />
+            <MediaCarousel title="TV Shows & Series" items={series} />
+            {topRated.length > 0 && (
+              <MediaCarousel title="Top Rated" items={topRated} />
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

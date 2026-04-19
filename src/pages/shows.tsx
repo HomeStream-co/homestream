@@ -11,7 +11,7 @@ import { Tv2, Search, SlidersHorizontal } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useMedia } from '@/context/MediaContext';
 import { useProfile } from '@/context/ProfileContext';
-import ShowCard from '@/components/ShowCard';
+import MediaCard from '@/components/MediaCard';
 import { Skeleton } from '@/components/ui/skeleton';
 
 const GENRES = ['All', 'Drama', 'Comedy', 'Action', 'Sci-Fi', 'Thriller', 'Crime', 'Animation', 'Documentary', 'Fantasy', 'Horror', 'Romance', 'Family'];
@@ -184,7 +184,7 @@ export default function ShowsPage() {
             animate={{ opacity: 1 }}
           >
             {filtered.map(show => (
-              <ShowCard key={show.id} show={show} />
+              <MediaCard key={show.id} item={show} size="md" />
             ))}
           </motion.div>
         )}

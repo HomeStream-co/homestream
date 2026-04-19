@@ -11,7 +11,7 @@ import { Search, SlidersHorizontal, Film } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useMedia } from '@/context/MediaContext';
 import { useProfile } from '@/context/ProfileContext';
-import MovieCard from '@/components/MovieCard';
+import MediaCard from '@/components/MediaCard';
 import { Skeleton } from '@/components/ui/skeleton';
 
 const GENRES = ['All', 'Action', 'Comedy', 'Drama', 'Horror', 'Sci-Fi', 'Thriller', 'Animation', 'Documentary', 'Romance', 'Family', 'Crime', 'Adventure'];
@@ -162,7 +162,7 @@ export default function MoviesPage() {
             animate={{ opacity: 1 }}
           >
             {filtered.map(item => (
-              <MovieCard key={item.id} item={item} />
+              <MediaCard key={item.id} item={item} size="md" />
             ))}
           </motion.div>
         )}

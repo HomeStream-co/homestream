@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Search, Upload, Menu, X, Film, Bookmark, ChevronDown, Download } from 'lucide-react';
+import { Search, Upload, Menu, X, Film, Bookmark, ChevronDown } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useMedia } from '@/context/MediaContext';
 import { useProfile, PROFILES } from '@/context/ProfileContext';
@@ -69,20 +69,18 @@ export default function Header({ onChatOpen: _onChatOpen }: HeaderProps) {
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (searchQuery.trim()) {
-      navigate(`/browse?q=${encodeURIComponent(searchQuery.trim())}`);
+      // Navigate to home with ?q= so the inline search grid activates
+      navigate(`/?q=${encodeURIComponent(searchQuery.trim())}`);
       setSearchOpen(false);
       setSearchQuery('');
     }
   };
 
   const navLinks = [
-    { to: '/', label: 'Home' },
-    { to: '/browse', label: 'Browse' },
-    { to: '/movies', label: 'Movies' },
-    { to: '/shows', label: 'TV Shows' },
+    { to: '/',         label: 'Home' },
     { to: '/discover', label: 'Discover' },
-    { to: '/watchlist', label: 'Watchlist' },
-    { to: '/library', label: 'My Library' },
+    { to: '/downloads', label: 'Downloads' },
+    { to: '/library',  label: 'My Library' },
   ];
 
   return (
@@ -107,11 +105,16 @@ export default function Header({ onChatOpen: _onChatOpen }: HeaderProps) {
               <Link
                 key={link.to}
                 to={link.to}
-                className={`text-sm font-medium transition-colors hover:text-foreground ${
+                className={`relative text-sm font-medium transition-colors hover:text-foreground ${
                   location.pathname === link.to ? 'text-foreground' : 'text-muted-foreground'
                 }`}
               >
                 {link.label}
+                {link.to === '/downloads' && activeDownloads > 0 && (
+                  <span className="absolute -top-2 -right-3 min-w-[16px] h-4 bg-blue-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center px-0.5 animate-pulse">
+                    {activeDownloads > 9 ? '9+' : activeDownloads}
+                  </span>
+                )}
               </Link>
             ))}
           </nav>
@@ -169,20 +172,6 @@ export default function Header({ onChatOpen: _onChatOpen }: HeaderProps) {
               {watchlist.length > 0 && (
                 <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 bg-primary text-white text-[9px] font-bold rounded-full flex items-center justify-center px-0.5">
                   {watchlist.length > 99 ? '99+' : watchlist.length}
-                </span>
-              )}
-            </Link>
-
-            {/* Downloads shortcut */}
-            <Link
-              to="/downloads"
-              className="relative p-2 text-muted-foreground hover:text-foreground transition-colors"
-              title="Downloads"
-            >
-              <Download className={`w-5 h-5 transition-colors ${location.pathname === '/downloads' ? 'text-primary' : ''}`} />
-              {activeDownloads > 0 && (
-                <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 bg-blue-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center px-0.5 animate-pulse">
-                  {activeDownloads > 9 ? '9+' : activeDownloads}
                 </span>
               )}
             </Link>
@@ -305,19 +294,6 @@ export default function Header({ onChatOpen: _onChatOpen }: HeaderProps) {
               >
                 <Upload className="w-4 h-4" />
                 Upload Media
-              </Link>
-              <Link
-                to="/downloads"
-                onClick={() => setMobileOpen(false)}
-                className="relative flex items-center gap-1.5 text-sm font-medium text-muted-foreground"
-              >
-                <Download className="w-4 h-4" />
-                Downloads
-                {activeDownloads > 0 && (
-                  <span className="ml-1 px-1.5 py-0.5 bg-blue-500 text-white text-[9px] font-bold rounded-full">
-                    {activeDownloads}
-                  </span>
-                )}
               </Link>
               <Link
                 to="/watchlist"

@@ -37,5 +37,5 @@ export const routes: RouteObject[] = [
   { path: '*', element: <NotFoundPage /> },
 ];
 
-export type Path = '/' | '/browse' | '/movie/:id' | '/library' | '/shows' | '/watchlist' | '/player/:id' | '/profiles';
+export type Path = '/' | '/movie/:id' | '/show/:id' | '/library' | '/watchlist' | '/player/:id' | '/profiles' | '/discover' | '/downloads';
 export type Params = Record<string, string | undefined>;
