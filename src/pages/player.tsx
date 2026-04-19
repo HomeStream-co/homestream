@@ -4,6 +4,7 @@ import {
   ArrowLeft, Play, Pause, Volume2, VolumeX, Maximize, Minimize,
   Info, Star, RotateCcw, Sparkles, MessageCircle, SkipForward,
   CheckCircle2, FastForward, Rewind, Wand2, Loader2, Captions,
+  PictureInPicture2, Keyboard, X as XIcon,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useMedia } from '@/context/MediaContext';
@@ -11,6 +12,7 @@ import { useProfile } from '@/context/ProfileContext';
 import { useTheme } from '@/context/ThemeContext';
 import MediaCard from '@/components/MediaCard';
 import CastButton from '@/components/CastButton';
+import ChromecastButton from '@/components/ChromecastButton';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -114,6 +116,9 @@ export default function PlayerPage() {
   // Closed captions
   const [ccLang, setCcLang] = useState<'off' | 'en' | 'es'>('off');
   const [showCcMenu, setShowCcMenu] = useState(false);
+  // CC styling
+  const [ccFontSize, setCcFontSize] = useState<'small' | 'medium' | 'large'>('medium');
+  const [ccBgOpacity, setCcBgOpacity] = useState<'none' | 'low' | 'high'>('low');
   // Loading state — true until canplaythrough fires (enough buffered to play without stall)
   const [videoLoading, setVideoLoading] = useState(true);
   const resumeApplied = useRef(false);
@@ -149,6 +154,14 @@ export default function PlayerPage() {
   // ── AI Enrichment (on-demand from player page) ──
   const [enrichRunning, setEnrichRunning] = useState(false);
   const [enrichError, setEnrichError] = useState<string | null>(null);
+  // ── Picture-in-Picture ──
+  const [isPiP, setIsPiP] = useState(false);
+  // ── Keyboard shortcut overlay ──
+  const [showShortcuts, setShowShortcuts] = useState(false);
+  // ── Seek bar hover thumbnail ──
+  const [seekHover, setSeekHover] = useState<{ x: number; time: number; dataUrl: string } | null>(null);
+  const seekBarRef = useRef<HTMLInputElement>(null);
+  const thumbCanvasRef = useRef<HTMLCanvasElement>(null);
 
   const runEnrichment = useCallback(async () => {
     if (!id || enrichRunning) return;
@@ -273,7 +286,7 @@ export default function PlayerPage() {
             const m = t.match(/[Ss](\d+)[Ee](\d+)/);
             return m ? parseInt(m[1]) * 1000 + parseInt(m[2]) : 9999;
           };
-          return epNum(a.filename) - epNum(b.filename);
+          return epNum(a.filename ?? a.title) - epNum(b.filename ?? b.title);
         });
 
       if (sameShow.length > 0) return sameShow[0];
@@ -397,6 +410,66 @@ export default function PlayerPage() {
     return () => document.removeEventListener('fullscreenchange', onFsChange);
   }, []);
 
+  // ── Picture-in-Picture listener ──
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    const onEnter = () => setIsPiP(true);
+    const onLeave = () => setIsPiP(false);
+    video.addEventListener('enterpictureinpicture', onEnter);
+    video.addEventListener('leavepictureinpicture', onLeave);
+    return () => {
+      video.removeEventListener('enterpictureinpicture', onEnter);
+      video.removeEventListener('leavepictureinpicture', onLeave);
+    };
+  }, []);
+
+  const togglePiP = useCallback(async () => {
+    const video = videoRef.current;
+    if (!video) return;
+    try {
+      if (document.pictureInPictureElement) {
+        await document.exitPictureInPicture();
+      } else {
+        await video.requestPictureInPicture();
+      }
+    } catch { /* PiP not supported or denied */ }
+  }, []);
+
+  // ── Seek bar hover thumbnail capture ──
+  const handleSeekHover = useCallback((e: React.MouseEvent<HTMLInputElement>) => {
+    const video = videoRef.current;
+    const canvas = thumbCanvasRef.current;
+    if (!video || !canvas || duration <= 0) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    const hoverTime = pct * duration;
+    const x = e.clientX - rect.left;
+
+    // Seek the video to the hover time temporarily to capture frame
+    const prevTime = video.currentTime;
+    video.currentTime = hoverTime;
+
+    const captureFrame = () => {
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      canvas.width = 160;
+      canvas.height = 90;
+      ctx.drawImage(video, 0, 0, 160, 90);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+      setSeekHover({ x, time: hoverTime, dataUrl });
+      // Restore original time
+      video.currentTime = prevTime;
+    };
+
+    // Use seeked event to capture after seek completes
+    const onSeeked = () => {
+      captureFrame();
+      video.removeEventListener('seeked', onSeeked);
+    };
+    video.addEventListener('seeked', onSeeked);
+  }, [duration]);
+
   // ── Sync CC language → native TextTrack mode ──
   useEffect(() => {
     const video = videoRef.current;
@@ -412,6 +485,21 @@ export default function PlayerPage() {
       }
     });
   }, [ccLang]);
+
+  // ── Inject CC styling via ::cue pseudo-element ──
+  const ccStyleId = 'homestream-cc-style';
+  useEffect(() => {
+    const fontSize = ccFontSize === 'small' ? '0.8em' : ccFontSize === 'large' ? '1.4em' : '1em';
+    const bg = ccBgOpacity === 'none' ? 'transparent' : ccBgOpacity === 'high' ? 'rgba(0,0,0,0.85)' : 'rgba(0,0,0,0.5)';
+    let el = document.getElementById(ccStyleId) as HTMLStyleElement | null;
+    if (!el) {
+      el = document.createElement('style');
+      el.id = ccStyleId;
+      document.head.appendChild(el);
+    }
+    el.textContent = `::cue { font-size: ${fontSize}; background-color: ${bg}; color: white; }`;
+    return () => { /* keep style alive while player is mounted */ };
+  }, [ccFontSize, ccBgOpacity]);
 
   // ── Keyboard shortcuts + TV D-pad navigation ─────────────────────────────
   useEffect(() => {
@@ -603,11 +691,23 @@ export default function PlayerPage() {
           setShowInfo(prev => !prev);
           break;
 
+        // ── ? — keyboard shortcut help overlay ──
+        case '?':
+          setShowShortcuts(prev => !prev);
+          break;
+
+        // ── P — picture-in-picture ──
+        case 'p':
+        case 'P':
+          togglePiP();
+          break;
+
         // ── Escape — close menus / clear TV focus ──
         case 'Escape':
           if (tvFocus) { setTvFocus(null); break; }
           setShowEndOverlay(false);
           setShowInfo(false);
+          setShowShortcuts(false);
           setShowSpeedMenu(false);
           setShowCcMenu(false);
           break;
@@ -1076,21 +1176,38 @@ export default function PlayerPage() {
               <div className="bg-gradient-to-t from-black/80 to-transparent px-4 pb-4 pt-8">
                 {/* Seek bar */}
                 <div className="relative mb-3">
+                  {/* Hover thumbnail preview */}
+                  {seekHover && (
+                    <div
+                      className="absolute bottom-full mb-3 pointer-events-none z-10"
+                      style={{ left: Math.max(80, Math.min(seekHover.x, (seekBarRef.current?.offsetWidth ?? 400) - 80)), transform: 'translateX(-50%)' }}
+                    >
+                      <div className="bg-black/90 rounded-lg overflow-hidden border border-white/20 shadow-xl">
+                        <img src={seekHover.dataUrl} alt="" className="w-40 h-[90px] object-cover block" />
+                        <p className="text-white/70 text-[10px] text-center py-1 font-mono">{formatTime(seekHover.time)}</p>
+                      </div>
+                    </div>
+                  )}
                   <div
                     className="absolute top-1/2 -translate-y-1/2 h-1 bg-white/20 rounded-full"
                     style={{ width: duration > 0 ? `${(buffered / duration) * 100}%` : '0%' }}
                   />
                   <input
+                    ref={seekBarRef}
                     type="range"
                     min={0}
                     max={duration || 100}
                     value={currentTime}
                     onChange={handleSeek}
+                    onMouseMove={handleSeekHover}
+                    onMouseLeave={() => setSeekHover(null)}
                     className={`w-full h-1 appearance-none bg-white/20 rounded-full cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white ${tvFocus === 'seek' ? 'ring-2 ring-white/60 ring-offset-1 ring-offset-transparent' : ''}`}
                     style={{
                       background: `linear-gradient(to right, ${playerAccent} ${duration > 0 ? (currentTime / duration) * 100 : 0}%, rgba(255,255,255,0.2) 0%)`,
                     }}
                   />
+                  {/* Hidden canvas for frame capture */}
+                  <canvas ref={thumbCanvasRef} className="hidden" />
                 </div>
 
                 {/* tv-focus ring helper */}
@@ -1267,6 +1384,38 @@ export default function PlayerPage() {
                                     )}
                                   </button>
                                 ))}
+                                {/* CC Styling controls */}
+                                <div className="border-t border-white/10 px-3 py-2">
+                                  <p className="text-[10px] text-white/30 uppercase tracking-wider mb-2">Style</p>
+                                  <div className="flex items-center justify-between mb-1.5">
+                                    <span className="text-[11px] text-white/50">Size</span>
+                                    <div className="flex gap-1">
+                                      {(['small', 'medium', 'large'] as const).map(s => (
+                                        <button
+                                          key={s}
+                                          onClick={() => setCcFontSize(s)}
+                                          className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${ccFontSize === s ? 'bg-primary/30 text-primary' : 'text-white/40 hover:text-white/70'}`}
+                                        >
+                                          {s === 'small' ? 'S' : s === 'medium' ? 'M' : 'L'}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-[11px] text-white/50">Background</span>
+                                    <div className="flex gap-1">
+                                      {(['none', 'low', 'high'] as const).map(b => (
+                                        <button
+                                          key={b}
+                                          onClick={() => setCcBgOpacity(b)}
+                                          className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${ccBgOpacity === b ? 'bg-primary/30 text-primary' : 'text-white/40 hover:text-white/70'}`}
+                                        >
+                                          {b === 'none' ? 'Off' : b === 'low' ? '50%' : '85%'}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  </div>
+                                </div>
                               </motion.div>
                             )}
                           </AnimatePresence>
@@ -1280,12 +1429,44 @@ export default function PlayerPage() {
                           {fullscreen ? <Minimize className="w-5 h-5" /> : <Maximize className="w-5 h-5" />}
                         </button>
 
-                        {/* Cast */}
+                        {/* Picture-in-Picture */}
+                        {'pictureInPictureEnabled' in document && (
+                          <button
+                            onClick={e => { e.stopPropagation(); togglePiP(); }}
+                            className={`text-white/70 hover:text-white rounded transition-all ${isPiP ? 'text-primary' : ''}`}
+                            title="Picture-in-Picture (P)"
+                          >
+                            <PictureInPicture2 className="w-4 h-4" />
+                          </button>
+                        )}
+
+                        {/* Keyboard shortcuts help */}
+                        <button
+                          onClick={e => { e.stopPropagation(); setShowShortcuts(prev => !prev); }}
+                          className="text-white/50 hover:text-white/80 rounded transition-all"
+                          title="Keyboard shortcuts (?)"
+                        >
+                          <Keyboard className="w-4 h-4" />
+                        </button>
+
+                        {/* Cast — DLNA/UPnP */}
                         {item?.filename && (
                           <div className={`rounded transition-all ${tvRing('cast')}`}>
                             <CastButton
                               streamUrl={`/api/stream/${item.filename}`}
                               title={item.title ?? 'HomeStream'}
+                            />
+                          </div>
+                        )}
+
+                        {/* Chromecast */}
+                        {item?.filename && (
+                          <div className="relative">
+                            <ChromecastButton
+                              streamUrl={`/api/stream/${item.filename}`}
+                              title={item.title ?? 'HomeStream'}
+                              poster={item.poster}
+                              currentTime={currentTime}
                             />
                           </div>
                         )}
@@ -1540,6 +1721,62 @@ export default function PlayerPage() {
                   </div>
                 ))}
               </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* ── Keyboard Shortcut Help Overlay ── */}
+        <AnimatePresence>
+          {showShortcuts && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center px-4"
+              onClick={() => setShowShortcuts(false)}
+            >
+              <motion.div
+                initial={{ scale: 0.92, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.92, opacity: 0 }}
+                transition={{ type: 'spring', stiffness: 300, damping: 28 }}
+                onClick={e => e.stopPropagation()}
+                className="bg-black/95 border border-white/15 rounded-2xl p-6 w-full max-w-md shadow-2xl"
+              >
+                <div className="flex items-center justify-between mb-5">
+                  <div className="flex items-center gap-2">
+                    <Keyboard className="w-4 h-4 text-primary" />
+                    <h2 className="text-sm font-semibold text-white tracking-wide">Keyboard Shortcuts</h2>
+                  </div>
+                  <button onClick={() => setShowShortcuts(false)} className="text-white/40 hover:text-white transition-colors">
+                    <XIcon className="w-4 h-4" />
+                  </button>
+                </div>
+                <div className="grid grid-cols-2 gap-x-6 gap-y-2">
+                  {([
+                    ['Space / K', 'Play / Pause'],
+                    ['← / J', 'Rewind 10s'],
+                    ['→ / L', 'Forward 10s'],
+                    ['↑ / ↓', 'Volume ±10%'],
+                    ['M', 'Mute / Unmute'],
+                    ['F', 'Fullscreen'],
+                    ['P', 'Picture-in-Picture'],
+                    ['C', 'Cycle Captions'],
+                    ['S', 'Cycle Speed'],
+                    ['< / >', 'Speed Down / Up'],
+                    ['I', 'Info Panel'],
+                    ['?', 'This Help Overlay'],
+                    ['Tab', 'TV Remote Navigation'],
+                    ['Esc', 'Close Panels'],
+                  ] as [string, string][]).map(([key, label]) => (
+                    <div key={key} className="flex items-center justify-between gap-2 py-1 border-b border-white/5">
+                      <kbd className="text-[11px] text-white/60 bg-white/10 px-2 py-0.5 rounded font-mono flex-shrink-0">{key}</kbd>
+                      <span className="text-xs text-white/40 text-right">{label}</span>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-[10px] text-white/20 text-center mt-4">Press <kbd className="bg-white/10 px-1 rounded">?</kbd> or <kbd className="bg-white/10 px-1 rounded">Esc</kbd> to close</p>
+              </motion.div>
             </motion.div>
           )}
         </AnimatePresence>

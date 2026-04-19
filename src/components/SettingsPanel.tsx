@@ -12,11 +12,12 @@ import {
   Settings, Check, Palette, Play, Library,
   Monitor, Zap, SkipForward, RotateCcw, Tag, HardDrive,
   Compass, RefreshCw, Clock, WifiOff, KeyRound, Eye, EyeOff,
-  Loader2, CheckCircle2, XCircle, ScanLine, Database, ShieldCheck,
+  Loader2, CheckCircle2, XCircle, ScanLine, Database, ShieldCheck, LogOut,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTheme, THEMES, type AppSettings } from '@/context/ThemeContext';
 import { useProfile } from '@/context/ProfileContext';
+import { useAuth } from '@/context/AuthContext';
 
 // ── Format bytes helper ───────────────────────────────────────────────────────
 function fmtBytes(bytes: number): string {
@@ -167,6 +168,7 @@ function ApiKeyField({
 export default function SettingsPanel() {
   const { settings, activeTheme, setTheme, updateSetting } = useTheme();
   const { adultPinEnabled, setAdultPin, clearAdultPin } = useProfile();
+  const { requiresPassword, logout } = useAuth();
   const [open, setOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
 
@@ -757,6 +759,22 @@ export default function SettingsPanel() {
                   </div>
                 </div>
               </div>
+
+              {/* ── 9. Session ── */}
+              {requiresPassword && (
+                <div className="border-t border-border/50 px-4 py-4">
+                  <button
+                    onClick={async () => {
+                      await logout();
+                      toast.info('Signed out');
+                    }}
+                    className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold border border-destructive/30 text-destructive hover:bg-destructive/10 transition-colors"
+                  >
+                    <LogOut className="w-3.5 h-3.5" />
+                    Sign Out
+                  </button>
+                </div>
+              )}
 
             </div>
           </motion.div>

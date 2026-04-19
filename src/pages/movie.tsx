@@ -17,12 +17,13 @@ import { motion, AnimatePresence } from 'motion/react';
 import {
   Play, Plus, Check, Star, Clock, Calendar, Film,
   ArrowLeft, Tag, Zap, AlertTriangle, Users, ChevronRight,
-  BookOpen, Heart, Layers,
+  BookOpen, Heart, Layers, Download,
 } from 'lucide-react';
 import { useMedia } from '@/context/MediaContext';
 import { useProfile } from '@/context/ProfileContext';
 import { useTheme } from '@/context/ThemeContext';
 import MediaCard from '@/components/MediaCard';
+import TrailerButton from '@/components/TrailerButton';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -295,6 +296,19 @@ export default function MoviePage() {
                     <Play className="w-4 h-4 fill-current" />
                     {isResuming ? 'Resume' : 'Play'}
                   </button>
+
+                  <TrailerButton title={item.title} year={item.year} type={item.type} />
+
+                  {/* Download to device */}
+                  <a
+                    href={`/api/stream/${item.filename}`}
+                    download={item.filename ?? item.title}
+                    className="flex items-center gap-2 px-5 py-3 rounded-xl bg-card border border-border text-foreground font-semibold text-sm hover:bg-muted transition-colors"
+                    title="Download file to your device"
+                  >
+                    <Download className="w-4 h-4" />
+                    Download
+                  </a>
 
                   <button
                     onClick={handleWatchlist}

@@ -189,8 +189,10 @@ function Section({
   onRemoveFromWatchlist: (id: string) => void;
   onDownload: (movie: TMDBMovie) => void;
 }) {
-  const [showAll, setShowAll] = useState(false);
-  const visible = showAll ? movies : movies.slice(0, 12);
+  const PAGE_SIZE = 12;
+  const [page, setPage] = useState(1);
+  const visible = movies.slice(0, page * PAGE_SIZE);
+  const hasMore = visible.length < movies.length;
 
   if (movies.length === 0) return null;
 
@@ -202,13 +204,13 @@ function Section({
           <h2 className="text-lg font-heading font-bold text-foreground">{title}</h2>
           <span className="text-xs text-muted-foreground">({movies.length})</span>
         </div>
-        {movies.length > 12 && (
+        {page > 1 && (
           <button
-            onClick={() => setShowAll(v => !v)}
-            className="text-xs text-primary hover:text-primary/80 font-medium flex items-center gap-1"
+            onClick={() => setPage(1)}
+            className="text-xs text-muted-foreground hover:text-foreground font-medium flex items-center gap-1"
           >
-            {showAll ? 'Show less' : `Show all ${movies.length}`}
-            <ChevronDown className={`w-3 h-3 transition-transform ${showAll ? 'rotate-180' : ''}`} />
+            <ChevronDown className="w-3 h-3 rotate-180" />
+            Show less
           </button>
         )}
       </div>
@@ -228,6 +230,18 @@ function Section({
           ))}
         </AnimatePresence>
       </div>
+
+      {hasMore && (
+        <div className="flex justify-center mt-6">
+          <button
+            onClick={() => setPage(p => p + 1)}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl border border-border hover:border-primary/40 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <ChevronDown className="w-4 h-4" />
+            Load more ({movies.length - visible.length} remaining)
+          </button>
+        </div>
+      )}
     </section>
   );
 }

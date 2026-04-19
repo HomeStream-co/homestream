@@ -366,6 +366,7 @@ export default function LibraryPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
+  const [bulkEnriching, setBulkEnriching] = useState(false);
 
   const genId = () => Math.random().toString(36).slice(2);
 
@@ -654,6 +655,23 @@ export default function LibraryPage() {
     toast.success(`Removed ${deleted} item${deleted !== 1 ? 's' : ''} from library`);
   };
 
+  const handleBulkEnrich = async () => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    setBulkEnriching(true);
+    let enriched = 0;
+    for (const id of ids) {
+      try {
+        const res = await fetch(`/api/media/${id}/enrich`, { method: 'POST' });
+        if (res.ok) enriched++;
+      } catch { /* continue */ }
+    }
+    setBulkEnriching(false);
+    setSelectMode(false);
+    setSelectedIds(new Set());
+    toast.success(`Enrichment started for ${enriched} item${enriched !== 1 ? 's' : ''}`);
+  };
+
   const toggleSelect = (id: string) => {
     setSelectedIds(prev => {
       const next = new Set(prev);
@@ -906,13 +924,23 @@ export default function LibraryPage() {
                   Clear
                 </button>
                 {selectedIds.size > 0 && (
-                  <button
-                    onClick={() => setBulkDeleteConfirm(true)}
-                    className="flex items-center gap-1.5 text-xs bg-destructive/15 hover:bg-destructive/25 text-destructive border border-destructive/30 px-3 py-1.5 rounded-lg transition-colors"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    Delete {selectedIds.size}
-                  </button>
+                  <>
+                    <button
+                      onClick={handleBulkEnrich}
+                      disabled={bulkEnriching}
+                      className="flex items-center gap-1.5 text-xs bg-primary/10 hover:bg-primary/20 text-primary border border-primary/30 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50"
+                    >
+                      <Zap className="w-3.5 h-3.5" />
+                      {bulkEnriching ? 'Enriching…' : `Enrich ${selectedIds.size}`}
+                    </button>
+                    <button
+                      onClick={() => setBulkDeleteConfirm(true)}
+                      className="flex items-center gap-1.5 text-xs bg-destructive/15 hover:bg-destructive/25 text-destructive border border-destructive/30 px-3 py-1.5 rounded-lg transition-colors"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      Delete {selectedIds.size}
+                    </button>
+                  </>
                 )}
                 <button
                   onClick={() => { setSelectMode(false); setSelectedIds(new Set()); }}

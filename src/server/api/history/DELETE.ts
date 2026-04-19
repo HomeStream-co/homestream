@@ -14,9 +14,11 @@ export default async function handler(req: Request, res: Response) {
     await writeLibrary<Record<string, unknown>>(lib => {
       return lib.map(item => {
         if (id && item.id !== id) return item;
-        // Strip all watch-tracking fields
-        const { lastWatchedAt: _l, watchedAt: _w, watchProgress: _p, watchedSeconds: _s, ...rest } = item as Record<string, unknown>;
-        void _l; void _w; void _p; void _s;
+        // Only remove history-tracking fields (lastWatchedAt, watchedAt).
+        // Preserve watchProgress and watchedSeconds so the item still appears
+        // in Continue Watching and resumes from the correct position.
+        const { lastWatchedAt: _l, watchedAt: _w, ...rest } = item as Record<string, unknown>;
+        void _l; void _w;
         return rest;
       });
     });

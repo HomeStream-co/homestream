@@ -1,0 +1,61 @@
+# electron-builder configuration for HomeStream
+# Run: npx electron-builder --win --publish never
+# Output: dist-electron/HomeStream-Setup-x.x.x.exe
+
+appId: com.homestream.app
+productName: HomeStream
+copyright: Copyright © 2025 HomeStream
+
+# Directories
+directories:
+  output: dist-electron
+  buildResources: electron/assets
+
+# Files to include in the package
+files:
+  - dist/**/*          # Vite frontend build
+  - server/**/*        # Bundled Express server
+  - electron/main.js
+  - electron/tray-icon.png
+  - package.json
+
+# Extra resources (server bundle)
+extraResources:
+  - from: server-bundle
+    to: server
+
+# Windows NSIS installer
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  icon: electron/assets/icon.ico
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  installerIcon: electron/assets/icon.ico
+  uninstallerIcon: electron/assets/icon.ico
+  installerHeaderIcon: electron/assets/icon.ico
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: HomeStream
+  license: LICENSE
+
+# macOS (optional)
+mac:
+  target: dmg
+  icon: electron/assets/icon.icns
+  category: public.app-category.entertainment
+
+# Linux (optional)
+linux:
+  target: AppImage
+  icon: electron/assets/icon.png
+  category: AudioVideo
+
+# Auto-updater (GitHub Releases)
+publish:
+  provider: github
+  owner: your-github-username
+  repo: homestream

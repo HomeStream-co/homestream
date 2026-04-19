@@ -1,11 +1,13 @@
-import { Film, Heart, Library, Tv2, BookMarked, Home } from 'lucide-react';
+import { Film, Heart, Library, Compass, BookMarked, Home, Clock, Download } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 const NAV_LINKS = [
   { to: '/', label: 'Home', icon: Home },
-  { to: '/browse', label: 'Browse', icon: Tv2 },
+  { to: '/discover', label: 'Discover', icon: Compass },
   { to: '/library', label: 'My Library', icon: Library },
   { to: '/watchlist', label: 'Watchlist', icon: BookMarked },
+  { to: '/history', label: 'History', icon: Clock },
+  { to: '/downloads', label: 'Downloads', icon: Download },
 ];
 
 export default function Footer() {

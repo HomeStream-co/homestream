@@ -16,7 +16,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import {
   Play, Plus, Check, Star, Calendar, Tv2,
   ArrowLeft, Tag, Zap, AlertTriangle, Users, ChevronRight,
-  BookOpen, Heart, Layers, CheckCircle2, ListVideo,
+  BookOpen, Heart, Layers, CheckCircle2, ListVideo, Download,
 } from 'lucide-react';
 import { useMedia } from '@/context/MediaContext';
 import { useProfile } from '@/context/ProfileContext';
@@ -24,6 +24,7 @@ import { useTheme } from '@/context/ThemeContext';
 import EpisodeTracker from '@/components/EpisodeTracker';
 import { Progress } from '@/components/ui/progress';
 import type { MediaItem, Episode } from '@/types/media';
+import TrailerButton from '@/components/TrailerButton';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -104,6 +105,19 @@ export default function ShowPage() {
 
   const seasons = useMemo(() => groupSeasons(item?.episodes || []), [item]);
   const overallProgress = useMemo(() => item ? getShowProgress(item) : null, [item]);
+
+  // Find the last-watched episode to show a "Resume" button
+  const resumeEpisode = useMemo(() => {
+    if (!item?.episodes || item.episodes.length === 0) return null;
+    // Find the first unwatched episode after the last watched one
+    const sorted = [...item.episodes].sort((a, b) =>
+      a.season !== b.season ? a.season - b.season : a.episode - b.episode
+    );
+    const lastWatchedIdx = sorted.reduce((best, ep, idx) => ep.watched ? idx : best, -1);
+    if (lastWatchedIdx === -1) return sorted[0]; // nothing watched yet — start from S01E01
+    const next = sorted[lastWatchedIdx + 1];
+    return next ?? null; // null = all watched
+  }, [item]);
 
   // Similar shows in library (by genre)
   const similarInLibrary = useMemo(() => {
@@ -301,6 +315,18 @@ export default function ShowPage() {
                     Play
                   </button>
 
+                  {/* Resume / Continue button — shows next unwatched episode */}
+                  {resumeEpisode && (
+                    <button
+                      onClick={() => navigate(`/player/${item.id}`)}
+                      className="flex items-center gap-2 px-5 py-3 rounded-xl bg-card border border-primary/30 text-primary font-semibold text-sm hover:bg-primary/10 transition-colors"
+                      title={`Resume S${String(resumeEpisode.season).padStart(2,'0')}E${String(resumeEpisode.episode).padStart(2,'0')}: ${resumeEpisode.title}`}
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                      Resume S{String(resumeEpisode.season).padStart(2,'0')}E{String(resumeEpisode.episode).padStart(2,'0')}
+                    </button>
+                  )}
+
                   <button
                     onClick={() => inWatchlist ? removeFromWatchlist(item.id) : addToWatchlist(item.id)}
                     className={`flex items-center gap-2 px-5 py-3 rounded-xl border font-semibold text-sm transition-colors ${
@@ -312,6 +338,19 @@ export default function ShowPage() {
                     {inWatchlist ? <Check className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
                     {inWatchlist ? 'In Watchlist' : 'Add to Watchlist'}
                   </button>
+
+                  <TrailerButton title={item.title} year={item.year} type={item.type} />
+
+                  {/* Download to device */}
+                  <a
+                    href={`/api/stream/${item.filename}`}
+                    download={item.filename ?? item.title}
+                    className="flex items-center gap-2 px-5 py-3 rounded-xl bg-card border border-border text-foreground font-semibold text-sm hover:bg-muted transition-colors"
+                    title="Download file to your device"
+                  >
+                    <Download className="w-4 h-4" />
+                    Download
+                  </a>
                 </div>
 
                 {/* AI summary or plot */}
