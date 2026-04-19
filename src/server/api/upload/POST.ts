@@ -24,10 +24,15 @@ const storage = multer.diskStorage({
 const upload = multer({
   storage,
   fileFilter: (_req, file, cb) => {
-    const allowed = ['.mp4', '.mkv', '.avi', '.mov', '.wmv', '.m4v'];
+    // All containers FFmpeg can reliably transcode to H.264 MP4.
+    // .ts = MPEG transport stream (DVR recordings)
+    // .webm = VP8/VP9 web video (screen recordings, YouTube downloads)
+    // .flv = Flash video (legacy recordings)
+    // .3gp = Mobile video (older phones)
+    const allowed = ['.mp4', '.mkv', '.avi', '.mov', '.wmv', '.m4v', '.ts', '.webm', '.flv', '.3gp', '.ogv'];
     const ext = path.extname(file.originalname).toLowerCase();
     if (allowed.includes(ext)) cb(null, true);
-    else cb(new Error('Invalid file type. Allowed: mp4, mkv, avi, mov, wmv, m4v'));
+    else cb(new Error(`Invalid file type "${ext}". Allowed: mp4, mkv, avi, mov, wmv, m4v, ts, webm, flv, 3gp, ogv`));
   },
   limits: { fileSize: 200 * 1024 * 1024 * 1024 }, // 200GB max
 });

@@ -39,6 +39,15 @@ export const viteServerAfter = (server, viteServer) => {
 export const serverBefore = (server) => {
   normalizeCommerceApiBaseUrlEnv();
 
+  // ── Startup cleanup: reset any items stuck with transcoding:true ──
+  // Must be dynamic import so vite-plugin-api-routes doesn't try to resolve
+  // it at build time (same pattern used for the DB client below).
+  import('./startupCleanup.js').then(({ runStartupCleanup }) => {
+    runStartupCleanup();
+  }).catch(err => {
+    console.error('[startup] Cleanup failed:', err.message);
+  });
+
   const shutdown = async (signal) => {
     console.log(`Got ${signal}, shutting down gracefully...`);
 

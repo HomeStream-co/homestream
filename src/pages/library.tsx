@@ -214,6 +214,28 @@ function OfflineMetadataNotice({ mediaId, currentTitle, onSaved }: OfflineMetada
   );
 }
 
+// ─── PosterImage — img with icon+title fallback (no external placeholder URLs) ──
+
+function PosterImage({ poster, title }: { poster: string; title: string }) {
+  const [error, setError] = useState(false);
+  if (error) {
+    return (
+      <div className="w-full h-full flex flex-col items-center justify-center gap-2 bg-card p-2">
+        <Film className="w-8 h-8 text-muted-foreground/30" />
+        <p className="text-[10px] text-muted-foreground text-center line-clamp-3">{title}</p>
+      </div>
+    );
+  }
+  return (
+    <img
+      src={poster}
+      alt={title}
+      className="w-full h-full object-cover"
+      onError={() => setError(true)}
+    />
+  );
+}
+
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 type UploadPhase = 'uploading' | 'transcoding' | 'metadata' | 'done' | 'error';
@@ -568,7 +590,7 @@ export default function LibraryPage() {
             ref={fileInputRef}
             type="file"
             multiple
-            accept=".mp4,.mkv,.avi,.mov,.wmv,.m4v"
+            accept=".mp4,.mkv,.avi,.mov,.wmv,.m4v,.ts,.webm,.flv,.3gp,.ogv"
             className="hidden"
             onChange={e => handleFiles(e.target.files)}
           />
@@ -576,7 +598,7 @@ export default function LibraryPage() {
           <p className="text-lg font-medium text-foreground mb-1">Drop your video files here</p>
           <p className="text-sm text-muted-foreground mb-3">or click to browse</p>
           <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground">
-            <span>MP4 · MKV · AVI · MOV · WMV · M4V</span>
+            <span>MP4 · MKV · AVI · MOV · WMV · M4V · TS · WebM · FLV · 3GP</span>
             <span className="text-border">|</span>
             <span className="flex items-center gap-1"><Zap className="w-3 h-3 text-primary" /> Auto-transcoded to H.264 faststart</span>
           </div>
@@ -760,18 +782,18 @@ export default function LibraryPage() {
           </div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-            {library.map((item: MediaItem & { transcoding?: boolean; transcodeWarning?: string }) => (
+            {library.map((item: MediaItem & { transcoding?: boolean; transcodeWarning?: string; transcodeError?: string }) => (
               <div key={item.id} className="group relative">
                 <div className="aspect-[2/3] rounded-lg overflow-hidden bg-card relative">
-                  <img
-                    src={item.poster}
-                    alt={item.title}
-                    className="w-full h-full object-cover"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).src =
-                        `https://via.placeholder.com/300x450/141420/e50914?text=${encodeURIComponent(item.title)}`;
-                    }}
-                  />
+                  {/* Poster — with proper icon fallback (no external placeholder URLs) */}
+                  {item.poster ? (
+                    <PosterImage poster={item.poster} title={item.title} />
+                  ) : (
+                    <div className="w-full h-full flex flex-col items-center justify-center gap-2 bg-card p-2">
+                      <Film className="w-8 h-8 text-muted-foreground/30" />
+                      <p className="text-[10px] text-muted-foreground text-center line-clamp-3">{item.title}</p>
+                    </div>
+                  )}
 
                   {/* Transcoding overlay */}
                   {item.transcoding && (
@@ -781,8 +803,19 @@ export default function LibraryPage() {
                     </div>
                   )}
 
-                  {/* Actions overlay */}
-                  {!item.transcoding && (
+                  {/* Transcode error overlay — Option B: stays in grid, red badge, still playable */}
+                  {item.transcodeError && !item.transcoding && (
+                    <div className="absolute inset-0 bg-black/75 flex flex-col items-center justify-center gap-2 p-3">
+                      <div className="w-8 h-8 rounded-full bg-destructive/20 border border-destructive/50 flex items-center justify-center">
+                        <AlertCircle className="w-4 h-4 text-destructive" />
+                      </div>
+                      <p className="text-white text-[10px] font-semibold text-center leading-tight">Transcode Failed</p>
+                      <p className="text-white/50 text-[9px] text-center leading-tight line-clamp-3">{item.transcodeError}</p>
+                    </div>
+                  )}
+
+                  {/* Actions overlay — shown when not transcoding/errored */}
+                  {!item.transcoding && !item.transcodeError && (
                     <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                       <button
                         onClick={() => startEdit(item)}
@@ -800,21 +833,37 @@ export default function LibraryPage() {
                       </button>
                     </div>
                   )}
+
+                  {/* Error state — show delete button so user can remove and re-upload */}
+                  {item.transcodeError && !item.transcoding && (
+                    <div className="absolute top-1.5 right-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button
+                        onClick={() => setDeleteId(item.id)}
+                        className="p-1.5 bg-destructive/80 hover:bg-destructive rounded-full transition-colors"
+                        title="Remove and re-upload"
+                      >
+                        <Trash2 className="w-3 h-3 text-white" />
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 <div className="mt-1.5">
                   <p className="text-xs font-medium text-foreground truncate">{item.title}</p>
                   <div className="flex items-center justify-between">
                     <p className="text-[10px] text-muted-foreground">{item.year}</p>
-                    {item.imdbRating !== 'N/A' && (
+                    {item.imdbRating !== 'N/A' && !item.transcodeError && (
                       <p className="text-[10px] text-accent flex items-center gap-0.5">
                         <Star className="w-2.5 h-2.5 fill-accent" /> {item.imdbRating}
                       </p>
                     )}
+                    {item.transcodeError && (
+                      <p className="text-[9px] text-destructive font-medium">Re-upload to fix</p>
+                    )}
                   </div>
-                  {item.transcodeWarning && (
+                  {item.transcodeWarning && !item.transcodeError && (
                     <p className="text-[9px] text-yellow-500 mt-0.5 truncate" title={item.transcodeWarning}>
-                      ⚠ Transcode failed
+                      ⚠ {item.transcodeWarning}
                     </p>
                   )}
                 </div>
