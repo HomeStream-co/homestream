@@ -4,6 +4,7 @@ import { motion } from 'motion/react';
 import { Play, Plus, Check, Star, Film } from 'lucide-react';
 import type { MediaItem } from '@/types/media';
 import { useMedia } from '@/context/MediaContext';
+import { useTheme } from '@/context/ThemeContext';
 
 interface MediaCardProps {
   item: MediaItem;
@@ -42,6 +43,7 @@ function prefetchVideo(filename: string) {
 export default function MediaCard({ item, showProgress = false }: MediaCardProps) {
   const navigate = useNavigate();
   const { watchlist, addToWatchlist, removeFromWatchlist, continueWatching } = useMedia();
+  const { settings: appSettings } = useTheme();
   const [imgError, setImgError] = useState(false);
   const inWatchlist = watchlist.includes(item.id);
   const progress = continueWatching.find(c => c.id === item.id)?.progress || 0;
@@ -136,10 +138,25 @@ export default function MediaCard({ item, showProgress = false }: MediaCardProps
         )}
       </div>
 
-      {/* Title */}
+      {/* Title + meta */}
       <div className="mt-1.5 px-0.5">
         <p className="text-xs text-foreground font-medium truncate">{item.title}</p>
         <p className="text-[10px] text-muted-foreground">{item.year}</p>
+        {/* Enrichment tag pills — shown only when setting is on and AI data exists */}
+        {appSettings.showEnrichmentTags && (item.mood?.length || item.tags?.length) ? (
+          <div className="flex flex-wrap gap-0.5 mt-1">
+            {item.mood?.slice(0, 1).map(m => (
+              <span key={m} className="text-[9px] px-1 py-0.5 rounded bg-primary/20 text-primary font-medium leading-none truncate max-w-[60px]">
+                {m}
+              </span>
+            ))}
+            {item.tags?.slice(0, 2).map(t => (
+              <span key={t} className="text-[9px] px-1 py-0.5 rounded bg-muted text-muted-foreground font-medium leading-none truncate max-w-[60px]">
+                {t}
+              </span>
+            ))}
+          </div>
+        ) : null}
       </div>
     </motion.div>
   );

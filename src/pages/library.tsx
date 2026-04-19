@@ -6,6 +6,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'sonner';
 import { useMedia } from '@/context/MediaContext';
+import { useTheme } from '@/context/ThemeContext';
 import type { MediaItem } from '@/types/media';
 import { Skeleton } from '@/components/ui/skeleton';
 import EnrichmentWizard from '@/components/EnrichmentWizard';
@@ -343,6 +344,7 @@ function totalProgress(u: UploadingFile): number {
 
 export default function LibraryPage() {
   const { library, loading, refreshLibrary, deleteMedia, updateMedia } = useMedia();
+  const { settings: appSettings } = useTheme();
   const [uploading, setUploading] = useState<UploadingFile[]>([]);
   // Netflix-style reveal modal — pops up when AI enrichment finishes
   const [revealModal, setRevealModal] = useState<{
@@ -880,12 +882,27 @@ export default function LibraryPage() {
                     )}
                   </div>
                   {/* Storage savings badge — shown when encode saved meaningful space */}
-                  {!item.transcodeError && !item.transcoding && (item as MediaItem & { savedBytes?: number }).savedBytes != null && (item as MediaItem & { savedBytes?: number }).savedBytes! > 1_048_576 && (
+                  {appSettings.showStorageBadges && !item.transcodeError && !item.transcoding && (item as MediaItem & { savedBytes?: number }).savedBytes != null && (item as MediaItem & { savedBytes?: number }).savedBytes! > 1_048_576 && (
                     <StorageSavingsBadge
                       savedBytes={(item as MediaItem & { savedBytes?: number }).savedBytes!}
                       originalSize={(item as MediaItem & { originalSize?: number }).originalSize ?? 0}
                     />
                   )}
+                  {/* Enrichment tag pills */}
+                  {appSettings.showEnrichmentTags && (item.mood?.length || item.tags?.length) ? (
+                    <div className="flex flex-wrap gap-0.5 mt-1">
+                      {item.mood?.slice(0, 1).map(m => (
+                        <span key={m} className="text-[9px] px-1 py-0.5 rounded bg-primary/20 text-primary font-medium leading-none truncate max-w-[64px]">
+                          {m}
+                        </span>
+                      ))}
+                      {item.tags?.slice(0, 2).map(t => (
+                        <span key={t} className="text-[9px] px-1 py-0.5 rounded bg-muted text-muted-foreground font-medium leading-none truncate max-w-[64px]">
+                          {t}
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
                   {item.transcodeWarning && !item.transcodeError && (
                     <p className="text-[9px] text-yellow-500 mt-0.5 truncate" title={item.transcodeWarning}>
                       ⚠ {item.transcodeWarning}
