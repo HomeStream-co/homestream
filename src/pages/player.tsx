@@ -121,6 +121,31 @@ export default function PlayerPage() {
   const [showResumeBanner, setShowResumeBanner] = useState(false);
   const resumeBannerTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
+  // ── TV Remote / D-pad navigation ──────────────────────────────────────────
+  // Controls in tab order — matches left-to-right layout in the control bar
+  // 'seek' is the seek bar itself (arrow keys scrub when focused)
+  type TvControl =
+    | 'back' | 'rewind' | 'play' | 'forward'
+    | 'mute' | 'volume' | 'seek'
+    | 'speed' | 'cc' | 'fullscreen' | 'cast';
+
+  const TV_CONTROLS: TvControl[] = [
+    'back', 'rewind', 'play', 'forward',
+    'mute', 'volume', 'seek',
+    'speed', 'cc', 'fullscreen', 'cast',
+  ];
+
+  const [tvFocus, setTvFocus] = useState<TvControl | null>(null);
+  // On-screen action toast (speed change, CC change, etc.)
+  const [actionToast, setActionToast] = useState<string | null>(null);
+  const actionToastTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  const showActionToast = useCallback((msg: string) => {
+    setActionToast(msg);
+    clearTimeout(actionToastTimer.current);
+    actionToastTimer.current = setTimeout(() => setActionToast(null), 1800);
+  }, []);
+
   // ── AI Enrichment (on-demand from player page) ──
   const [enrichRunning, setEnrichRunning] = useState(false);
   const [enrichError, setEnrichError] = useState<string | null>(null);
@@ -351,89 +376,232 @@ export default function PlayerPage() {
     });
   }, [ccLang]);
 
-  // ── Keyboard shortcuts ──
+  // ── Keyboard shortcuts + TV D-pad navigation ─────────────────────────────
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      // Don't fire if typing in an input
       if (['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement).tagName)) return;
       const video = videoRef.current;
       if (!video) return;
 
+      const speeds = [0.5, 0.75, 1, 1.25, 1.5, 2, 3];
+      const CC_CYCLE: Array<'off' | 'en' | 'es'> = ['off', 'en', 'es'];
+
+      // ── D-pad: Tab / ArrowUp / ArrowDown move focus between controls ──
+      // When a control is focused, ArrowLeft/Right operate that control
+      // When no control is focused, ArrowLeft/Right seek as normal
+      const focusIdx = tvFocus ? TV_CONTROLS.indexOf(tvFocus) : -1;
+
+      // Tab / Shift+Tab — cycle through controls (TV remote OK button equivalent)
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        const next = e.shiftKey
+          ? (focusIdx <= 0 ? TV_CONTROLS.length - 1 : focusIdx - 1)
+          : (focusIdx >= TV_CONTROLS.length - 1 ? 0 : focusIdx + 1);
+        setTvFocus(TV_CONTROLS[next]);
+        setShowControls(true);
+        resetControlsTimer();
+        return;
+      }
+
       switch (e.key) {
+        // ── Play / Pause ──
         case ' ':
         case 'k':
+        case 'K':
           e.preventDefault();
           if (video.paused) video.play(); else video.pause();
           break;
-        case 'ArrowRight':
-        case 'l':
-          e.preventDefault();
-          video.currentTime = Math.min(video.currentTime + 10, video.duration);
-          setSeekFlash('forward');
-          setSeekFlashCount(10);
-          setTimeout(() => { setSeekFlash(null); setSeekFlashCount(0); }, 600);
-          break;
+
+        // ── Seek / D-pad left ──
         case 'ArrowLeft':
         case 'j':
+        case 'J':
           e.preventDefault();
-          video.currentTime = Math.max(video.currentTime - 10, 0);
-          setSeekFlash('back');
-          setSeekFlashCount(10);
-          setTimeout(() => { setSeekFlash(null); setSeekFlashCount(0); }, 600);
+          if (tvFocus === 'speed') {
+            // D-pad left on speed = slow down
+            const cur = video.playbackRate;
+            const idx = speeds.indexOf(cur);
+            const prev = speeds[Math.max(idx - 1, 0)];
+            video.playbackRate = prev;
+            setPlaybackRate(prev);
+            showActionToast(prev === 1 ? 'Speed: Normal' : `Speed: ${prev}×`);
+          } else if (tvFocus === 'volume') {
+            video.volume = Math.max(video.volume - 0.1, 0);
+            setVolume(Math.max(video.volume, 0));
+          } else {
+            // Default: seek back
+            video.currentTime = Math.max(video.currentTime - 10, 0);
+            setSeekFlash('back');
+            setSeekFlashCount(10);
+            setTimeout(() => { setSeekFlash(null); setSeekFlashCount(0); }, 600);
+          }
           break;
+
+        // ── Seek / D-pad right ──
+        case 'ArrowRight':
+        case 'l':
+        case 'L':
+          e.preventDefault();
+          if (tvFocus === 'speed') {
+            const cur = video.playbackRate;
+            const idx = speeds.indexOf(cur);
+            const next = speeds[Math.min(idx + 1, speeds.length - 1)];
+            video.playbackRate = next;
+            setPlaybackRate(next);
+            showActionToast(next === 1 ? 'Speed: Normal' : `Speed: ${next}×`);
+          } else if (tvFocus === 'volume') {
+            video.volume = Math.min(video.volume + 0.1, 1);
+            setVolume(Math.min(video.volume, 1));
+          } else {
+            video.currentTime = Math.min(video.currentTime + 10, video.duration);
+            setSeekFlash('forward');
+            setSeekFlashCount(10);
+            setTimeout(() => { setSeekFlash(null); setSeekFlashCount(0); }, 600);
+          }
+          break;
+
+        // ── D-pad up — move focus row up or raise volume ──
         case 'ArrowUp':
           e.preventDefault();
-          video.volume = Math.min(video.volume + 0.1, 1);
+          if (tvFocus === null) {
+            video.volume = Math.min(video.volume + 0.1, 1);
+            setVolume(Math.min(video.volume, 1));
+            showActionToast(`Volume ${Math.round(Math.min(video.volume, 1) * 100)}%`);
+          } else {
+            // Move focus to previous control
+            const prev = focusIdx <= 0 ? TV_CONTROLS.length - 1 : focusIdx - 1;
+            setTvFocus(TV_CONTROLS[prev]);
+          }
           break;
+
+        // ── D-pad down — move focus row down or lower volume ──
         case 'ArrowDown':
           e.preventDefault();
-          video.volume = Math.max(video.volume - 0.1, 0);
+          if (tvFocus === null) {
+            video.volume = Math.max(video.volume - 0.1, 0);
+            setVolume(Math.max(video.volume, 0));
+            showActionToast(`Volume ${Math.round(Math.max(video.volume, 0) * 100)}%`);
+          } else {
+            const next = focusIdx >= TV_CONTROLS.length - 1 ? 0 : focusIdx + 1;
+            setTvFocus(TV_CONTROLS[next]);
+          }
           break;
+
+        // ── Enter / OK — activate focused control ──
+        case 'Enter': {
+          e.preventDefault();
+          if (!tvFocus) { if (video.paused) video.play(); else video.pause(); break; }
+          switch (tvFocus) {
+            case 'back':        fadeAndNavigate('/'); break;
+            case 'play':        if (video.paused) video.play(); else video.pause(); break;
+            case 'rewind':      video.currentTime = Math.max(video.currentTime - 10, 0);
+                                setSeekFlash('back'); setSeekFlashCount(10);
+                                setTimeout(() => { setSeekFlash(null); setSeekFlashCount(0); }, 600); break;
+            case 'forward':     video.currentTime = Math.min(video.currentTime + 10, video.duration);
+                                setSeekFlash('forward'); setSeekFlashCount(10);
+                                setTimeout(() => { setSeekFlash(null); setSeekFlashCount(0); }, 600); break;
+            case 'mute':        video.muted = !video.muted; break;
+            case 'fullscreen':  if (!document.fullscreenElement) containerRef.current?.requestFullscreen();
+                                else document.exitFullscreen(); break;
+            case 'speed': {
+              const cur = video.playbackRate;
+              const idx = speeds.indexOf(cur);
+              const next = speeds[(idx + 1) % speeds.length];
+              video.playbackRate = next;
+              setPlaybackRate(next);
+              showActionToast(next === 1 ? 'Speed: Normal' : `Speed: ${next}×`);
+              break;
+            }
+            case 'cc': {
+              const curIdx = CC_CYCLE.indexOf(ccLang);
+              const nextCC = CC_CYCLE[(curIdx + 1) % CC_CYCLE.length];
+              setCcLang(nextCC);
+              showActionToast(nextCC === 'off' ? 'CC: Off' : nextCC === 'en' ? 'CC: English' : 'CC: Español');
+              break;
+            }
+          }
+          break;
+        }
+
+        // ── C — cycle CC (one-button like Netflix remote) ──
+        case 'c':
+        case 'C': {
+          const curIdx = CC_CYCLE.indexOf(ccLang);
+          const nextCC = CC_CYCLE[(curIdx + 1) % CC_CYCLE.length];
+          setCcLang(nextCC);
+          showActionToast(nextCC === 'off' ? 'CC: Off' : nextCC === 'en' ? 'CC: English' : 'CC: Español');
+          break;
+        }
+
+        // ── S — cycle speed ──
+        case 's':
+        case 'S': {
+          const cur = video.playbackRate;
+          const idx = speeds.indexOf(cur);
+          const next = speeds[(idx + 1) % speeds.length];
+          video.playbackRate = next;
+          setPlaybackRate(next);
+          showActionToast(next === 1 ? 'Speed: Normal' : `Speed: ${next}×`);
+          break;
+        }
+
+        // ── M — mute ──
         case 'm':
         case 'M':
           video.muted = !video.muted;
+          showActionToast(video.muted ? 'Muted' : 'Unmuted');
           break;
+
+        // ── F — fullscreen ──
         case 'f':
         case 'F':
           e.preventDefault();
           if (!document.fullscreenElement) containerRef.current?.requestFullscreen();
           else document.exitFullscreen();
           break;
+
+        // ── I — info panel ──
         case 'i':
         case 'I':
           setShowInfo(prev => !prev);
           break;
+
+        // ── Escape — close menus / clear TV focus ──
         case 'Escape':
+          if (tvFocus) { setTvFocus(null); break; }
           setShowEndOverlay(false);
           setShowInfo(false);
           setShowSpeedMenu(false);
           setShowCcMenu(false);
           break;
+
+        // ── Legacy speed keys < > ──
         case '>':
         case '.': {
-          const speeds = [0.5, 0.75, 1, 1.25, 1.5, 2, 3];
-          const cur = videoRef.current?.playbackRate ?? 1;
+          const cur = video.playbackRate;
           const idx = speeds.indexOf(cur);
           const next = speeds[Math.min(idx + 1, speeds.length - 1)];
-          if (videoRef.current) videoRef.current.playbackRate = next;
+          video.playbackRate = next;
           setPlaybackRate(next);
+          showActionToast(next === 1 ? 'Speed: Normal' : `Speed: ${next}×`);
           break;
         }
         case '<':
         case ',': {
-          const speeds = [0.5, 0.75, 1, 1.25, 1.5, 2, 3];
-          const cur = videoRef.current?.playbackRate ?? 1;
+          const cur = video.playbackRate;
           const idx = speeds.indexOf(cur);
           const prev = speeds[Math.max(idx - 1, 0)];
-          if (videoRef.current) videoRef.current.playbackRate = prev;
+          video.playbackRate = prev;
           setPlaybackRate(prev);
+          showActionToast(prev === 1 ? 'Speed: Normal' : `Speed: ${prev}×`);
           break;
         }
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tvFocus, ccLang, showActionToast]);
 
   // ── Volume fade helper ──
   const fadeAndNavigate = useCallback((to: string) => {
@@ -748,7 +916,40 @@ export default function PlayerPage() {
           <div className="relative overflow-hidden" />
         </div>
 
-        {/* ── Skip Intro Button ── */}
+        {/* ── Action Toast (speed / CC / volume feedback) ── */}
+        <AnimatePresence>
+          {actionToast && (
+            <motion.div
+              key={actionToast}
+              initial={{ opacity: 0, y: -8, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -8, scale: 0.95 }}
+              transition={{ duration: 0.15 }}
+              className="absolute top-20 left-1/2 -translate-x-1/2 pointer-events-none z-30"
+            >
+              <div className="bg-black/80 backdrop-blur-sm border border-white/20 text-white text-sm font-semibold px-5 py-2.5 rounded-full shadow-xl">
+                {actionToast}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* ── TV Focus Indicator label ── */}
+        <AnimatePresence>
+          {tvFocus && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute bottom-24 left-1/2 -translate-x-1/2 pointer-events-none z-20"
+            >
+              <div className="bg-black/60 border border-white/10 text-white/50 text-[10px] px-3 py-1 rounded-full">
+                Remote focus: <span className="text-white font-semibold uppercase">{tvFocus}</span>
+                <span className="ml-2 text-white/30">· Tab to move · Enter to activate · Esc to clear</span>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
         <AnimatePresence>
           {showSkipIntro && !showEndOverlay && (
             <motion.button
@@ -808,9 +1009,10 @@ export default function PlayerPage() {
                 <div className="hidden lg:flex items-center gap-1 text-white/30 text-[10px] mr-2">
                   <kbd className="bg-white/10 px-1 rounded">Space</kbd> play ·
                   <kbd className="bg-white/10 px-1 rounded">←→</kbd> seek ·
-                  <kbd className="bg-white/10 px-1 rounded">&lt; &gt;</kbd> speed ·
-                  <kbd className="bg-white/10 px-1 rounded">F</kbd> fullscreen ·
-                  <kbd className="bg-white/10 px-1 rounded">M</kbd> mute
+                  <kbd className="bg-white/10 px-1 rounded">C</kbd> CC ·
+                  <kbd className="bg-white/10 px-1 rounded">S</kbd> speed ·
+                  <kbd className="bg-white/10 px-1 rounded">Tab</kbd> remote nav ·
+                  <kbd className="bg-white/10 px-1 rounded">F</kbd> fullscreen
                 </div>
                 <button
                   onClick={() => setShowInfo(!showInfo)}
@@ -847,146 +1049,213 @@ export default function PlayerPage() {
                     max={duration || 100}
                     value={currentTime}
                     onChange={handleSeek}
-                    className="w-full h-1 appearance-none bg-white/20 rounded-full cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white"
+                    className={`w-full h-1 appearance-none bg-white/20 rounded-full cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white ${tvFocus === 'seek' ? 'ring-2 ring-white/60 ring-offset-1 ring-offset-transparent' : ''}`}
                     style={{
                       background: `linear-gradient(to right, ${playerAccent} ${duration > 0 ? (currentTime / duration) * 100 : 0}%, rgba(255,255,255,0.2) 0%)`,
                     }}
                   />
                 </div>
 
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <button onClick={togglePlay} className="text-white hover:text-white/80">
-                      {playing ? <Pause className="w-5 h-5 fill-white" /> : <Play className="w-5 h-5 fill-white ml-0.5" />}
-                    </button>
-                    <button onClick={toggleMute} className="text-white hover:text-white/80">
-                      {muted || volume === 0 ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
-                    </button>
-                    <input
-                      type="range"
-                      min={0}
-                      max={1}
-                      step={0.05}
-                      value={muted ? 0 : volume}
-                      onChange={handleVolumeChange}
-                      className="w-20 h-1 appearance-none bg-white/30 rounded-full cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white"
-                    />
-                    <span className="text-white/70 text-xs">
-                      {formatTime(currentTime)} / {formatTime(duration)}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {/* ── Playback Speed ── */}
-                    <div className="relative">
-                      <button
-                        onClick={e => { e.stopPropagation(); setShowSpeedMenu(prev => !prev); setShowCcMenu(false); }}
-                        className={`text-xs font-medium px-2 py-1 rounded transition-colors ${
-                          playbackRate !== 1
-                            ? 'text-primary bg-primary/20 border border-primary/40'
-                            : 'text-white/70 hover:text-white bg-white/10 hover:bg-white/20'
-                        }`}
-                        title="Playback speed (< >)"
-                      >
-                        {playbackRate === 1 ? '1×' : `${playbackRate}×`}
-                      </button>
-                      <AnimatePresence>
-                        {showSpeedMenu && (
-                          <motion.div
-                            initial={{ opacity: 0, y: 6, scale: 0.95 }}
-                            animate={{ opacity: 1, y: 0, scale: 1 }}
-                            exit={{ opacity: 0, y: 6, scale: 0.95 }}
-                            transition={{ duration: 0.12 }}
-                            className="absolute bottom-full right-0 mb-2 bg-black/90 border border-white/20 rounded-lg overflow-hidden shadow-xl backdrop-blur-sm z-20 min-w-[80px]"
-                            onClick={e => e.stopPropagation()}
-                          >
-                            <div className="px-3 py-1.5 border-b border-white/10">
-                              <p className="text-[10px] text-white/40 uppercase tracking-wider font-medium">Speed</p>
-                            </div>
-                            {SPEED_OPTIONS.map(rate => (
-                              <button
-                                key={rate}
-                                onClick={() => changeSpeed(rate)}
-                                className={`w-full text-left px-3 py-1.5 text-sm transition-colors flex items-center justify-between gap-3 ${
-                                  playbackRate === rate
-                                    ? 'text-primary bg-primary/20'
-                                    : 'text-white/80 hover:text-white hover:bg-white/10'
-                                }`}
-                              >
-                                <span>{rate === 1 ? 'Normal' : `${rate}×`}</span>
-                                {playbackRate === rate && (
-                                  <div className="w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0" />
-                                )}
-                              </button>
-                            ))}
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-                    </div>
-                    {/* ── Closed Captions ── */}
-                    <div className="relative">
-                      <button
-                        onClick={e => { e.stopPropagation(); setShowCcMenu(prev => !prev); setShowSpeedMenu(false); }}
-                        className={`flex items-center gap-1 text-xs font-medium px-2 py-1 rounded transition-colors ${
-                          ccLang !== 'off'
-                            ? 'text-primary bg-primary/20 border border-primary/40'
-                            : 'text-white/70 hover:text-white bg-white/10 hover:bg-white/20'
-                        }`}
-                        title="Closed captions"
-                      >
-                        <Captions className="w-4 h-4" />
-                        <span className="hidden sm:inline">
-                          {ccLang === 'off' ? 'CC' : ccLang === 'en' ? 'EN' : 'ES'}
+                {/* tv-focus ring helper */}
+                {(() => {
+                  const tvRing = (ctrl: typeof tvFocus) =>
+                    tvFocus === ctrl
+                      ? 'ring-2 ring-white ring-offset-1 ring-offset-black/60 scale-110'
+                      : '';
+                  return (
+                    <div className="flex items-center justify-between">
+                      {/* Left cluster */}
+                      <div className="flex items-center gap-2">
+                        {/* Play/Pause */}
+                        <button
+                          onClick={togglePlay}
+                          className={`text-white hover:text-white/80 rounded transition-all ${tvRing('play')}`}
+                        >
+                          {playing ? <Pause className="w-5 h-5 fill-white" /> : <Play className="w-5 h-5 fill-white ml-0.5" />}
+                        </button>
+
+                        {/* ±10s buttons */}
+                        <button
+                          onClick={() => {
+                            if (!videoRef.current) return;
+                            videoRef.current.currentTime = Math.max(videoRef.current.currentTime - 10, 0);
+                            setSeekFlash('back'); setSeekFlashCount(10);
+                            setTimeout(() => { setSeekFlash(null); setSeekFlashCount(0); }, 600);
+                          }}
+                          className={`text-white/70 hover:text-white rounded transition-all ${tvRing('rewind')}`}
+                          title="Rewind 10s (←)"
+                        >
+                          <Rewind className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (!videoRef.current) return;
+                            videoRef.current.currentTime = Math.min(videoRef.current.currentTime + 10, videoRef.current.duration);
+                            setSeekFlash('forward'); setSeekFlashCount(10);
+                            setTimeout(() => { setSeekFlash(null); setSeekFlashCount(0); }, 600);
+                          }}
+                          className={`text-white/70 hover:text-white rounded transition-all ${tvRing('forward')}`}
+                          title="Forward 10s (→)"
+                        >
+                          <FastForward className="w-4 h-4" />
+                        </button>
+
+                        {/* Mute */}
+                        <button
+                          onClick={toggleMute}
+                          className={`text-white hover:text-white/80 rounded transition-all ${tvRing('mute')}`}
+                        >
+                          {muted || volume === 0 ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
+                        </button>
+
+                        {/* Volume slider */}
+                        <input
+                          type="range"
+                          min={0}
+                          max={1}
+                          step={0.05}
+                          value={muted ? 0 : volume}
+                          onChange={handleVolumeChange}
+                          className={`w-20 h-1 appearance-none bg-white/30 rounded-full cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white ${tvFocus === 'volume' ? 'ring-2 ring-white/60' : ''}`}
+                        />
+
+                        <span className="text-white/70 text-xs">
+                          {formatTime(currentTime)} / {formatTime(duration)}
                         </span>
-                      </button>
-                      <AnimatePresence>
-                        {showCcMenu && (
-                          <motion.div
-                            initial={{ opacity: 0, y: 6, scale: 0.95 }}
-                            animate={{ opacity: 1, y: 0, scale: 1 }}
-                            exit={{ opacity: 0, y: 6, scale: 0.95 }}
-                            transition={{ duration: 0.12 }}
-                            className="absolute bottom-full right-0 mb-2 bg-black/90 border border-white/20 rounded-lg overflow-hidden shadow-xl backdrop-blur-sm z-20 min-w-[130px]"
-                            onClick={e => e.stopPropagation()}
+                      </div>
+
+                      {/* Right cluster */}
+                      <div className="flex items-center gap-2">
+                        {/* ── Playback Speed ── */}
+                        <div className="relative">
+                          <button
+                            onClick={e => { e.stopPropagation(); setShowSpeedMenu(prev => !prev); setShowCcMenu(false); }}
+                            className={`text-xs font-medium px-2 py-1 rounded transition-all ${
+                              playbackRate !== 1
+                                ? 'text-primary bg-primary/20 border border-primary/40'
+                                : 'text-white/70 hover:text-white bg-white/10 hover:bg-white/20'
+                            } ${tvRing('speed')}`}
+                            title="Playback speed (S or < >)"
                           >
-                            <div className="px-3 py-1.5 border-b border-white/10">
-                              <p className="text-[10px] text-white/40 uppercase tracking-wider font-medium">Subtitles / CC</p>
-                            </div>
-                            {([
-                              { value: 'off', label: 'Off' },
-                              { value: 'en',  label: 'English' },
-                              { value: 'es',  label: 'Español' },
-                            ] as const).map(opt => (
-                              <button
-                                key={opt.value}
-                                onClick={() => { setCcLang(opt.value); setShowCcMenu(false); }}
-                                className={`w-full text-left px-3 py-1.5 text-sm transition-colors flex items-center justify-between gap-3 ${
-                                  ccLang === opt.value
-                                    ? 'text-primary bg-primary/20'
-                                    : 'text-white/80 hover:text-white hover:bg-white/10'
-                                }`}
+                            {playbackRate === 1 ? '1×' : `${playbackRate}×`}
+                          </button>
+                          <AnimatePresence>
+                            {showSpeedMenu && (
+                              <motion.div
+                                initial={{ opacity: 0, y: 6, scale: 0.95 }}
+                                animate={{ opacity: 1, y: 0, scale: 1 }}
+                                exit={{ opacity: 0, y: 6, scale: 0.95 }}
+                                transition={{ duration: 0.12 }}
+                                className="absolute bottom-full right-0 mb-2 bg-black/90 border border-white/20 rounded-lg overflow-hidden shadow-xl backdrop-blur-sm z-20 min-w-[80px]"
+                                onClick={e => e.stopPropagation()}
                               >
-                                <span>{opt.label}</span>
-                                {ccLang === opt.value && (
-                                  <div className="w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0" />
-                                )}
-                              </button>
-                            ))}
-                          </motion.div>
+                                <div className="px-3 py-1.5 border-b border-white/10">
+                                  <p className="text-[10px] text-white/40 uppercase tracking-wider font-medium">Speed</p>
+                                </div>
+                                {SPEED_OPTIONS.map(rate => (
+                                  <button
+                                    key={rate}
+                                    onClick={() => changeSpeed(rate)}
+                                    className={`w-full text-left px-3 py-1.5 text-sm transition-colors flex items-center justify-between gap-3 ${
+                                      playbackRate === rate
+                                        ? 'text-primary bg-primary/20'
+                                        : 'text-white/80 hover:text-white hover:bg-white/10'
+                                    }`}
+                                  >
+                                    <span>{rate === 1 ? 'Normal' : `${rate}×`}</span>
+                                    {playbackRate === rate && (
+                                      <div className="w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0" />
+                                    )}
+                                  </button>
+                                ))}
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                        </div>
+
+                        {/* ── Closed Captions ── */}
+                        <div className="relative">
+                          <button
+                            onClick={e => {
+                              e.stopPropagation();
+                              setShowCcMenu(prev => !prev);
+                              setShowSpeedMenu(false);
+                            }}
+                            className={`flex items-center gap-1 text-xs font-medium px-2 py-1 rounded transition-all ${
+                              ccLang !== 'off'
+                                ? 'text-primary bg-primary/20 border border-primary/40'
+                                : 'text-white/70 hover:text-white bg-white/10 hover:bg-white/20'
+                            } ${tvRing('cc')}`}
+                            title="Closed captions (C to cycle)"
+                          >
+                            <Captions className="w-4 h-4" />
+                            <span className="hidden sm:inline">
+                              {ccLang === 'off' ? 'CC' : ccLang === 'en' ? 'EN' : 'ES'}
+                            </span>
+                          </button>
+                          <AnimatePresence>
+                            {showCcMenu && (
+                              <motion.div
+                                initial={{ opacity: 0, y: 6, scale: 0.95 }}
+                                animate={{ opacity: 1, y: 0, scale: 1 }}
+                                exit={{ opacity: 0, y: 6, scale: 0.95 }}
+                                transition={{ duration: 0.12 }}
+                                className="absolute bottom-full right-0 mb-2 bg-black/90 border border-white/20 rounded-lg overflow-hidden shadow-xl backdrop-blur-sm z-20 min-w-[130px]"
+                                onClick={e => e.stopPropagation()}
+                              >
+                                <div className="px-3 py-1.5 border-b border-white/10">
+                                  <p className="text-[10px] text-white/40 uppercase tracking-wider font-medium">Subtitles / CC</p>
+                                </div>
+                                {([
+                                  { value: 'off', label: 'Off' },
+                                  { value: 'en',  label: 'English' },
+                                  { value: 'es',  label: 'Español' },
+                                ] as const).map(opt => (
+                                  <button
+                                    key={opt.value}
+                                    onClick={() => {
+                                      setCcLang(opt.value);
+                                      setShowCcMenu(false);
+                                      showActionToast(opt.value === 'off' ? 'CC: Off' : opt.value === 'en' ? 'CC: English' : 'CC: Español');
+                                    }}
+                                    className={`w-full text-left px-3 py-1.5 text-sm transition-colors flex items-center justify-between gap-3 ${
+                                      ccLang === opt.value
+                                        ? 'text-primary bg-primary/20'
+                                        : 'text-white/80 hover:text-white hover:bg-white/10'
+                                    }`}
+                                  >
+                                    <span>{opt.label}</span>
+                                    {ccLang === opt.value && (
+                                      <div className="w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0" />
+                                    )}
+                                  </button>
+                                ))}
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                        </div>
+
+                        {/* Fullscreen */}
+                        <button
+                          onClick={toggleFullscreen}
+                          className={`text-white hover:text-white/80 rounded transition-all ${tvRing('fullscreen')}`}
+                        >
+                          {fullscreen ? <Minimize className="w-5 h-5" /> : <Maximize className="w-5 h-5" />}
+                        </button>
+
+                        {/* Cast */}
+                        {item?.filename && (
+                          <div className={`rounded transition-all ${tvRing('cast')}`}>
+                            <CastButton
+                              streamUrl={`/api/stream/${item.filename}`}
+                              title={item.title ?? 'HomeStream'}
+                            />
+                          </div>
                         )}
-                      </AnimatePresence>
+                      </div>
                     </div>
-                    <button onClick={toggleFullscreen} className="text-white hover:text-white/80">
-                      {fullscreen ? <Minimize className="w-5 h-5" /> : <Maximize className="w-5 h-5" />}
-                    </button>
-                    {/* ── Cast to TV ── */}
-                    {item?.filename && (
-                      <CastButton
-                        streamUrl={`/api/stream/${item.filename}`}
-                        title={item.title ?? 'HomeStream'}
-                      />
-                    )}
-                  </div>
-                </div>
+                  );
+                })()}
               </div>
             </motion.div>
           )}
