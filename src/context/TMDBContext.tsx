@@ -17,6 +17,7 @@ import type { TMDBMovie } from '@/server/tmdbCache';
 export interface TMDBState {
   upcoming: TMDBMovie[];
   trending: TMDBMovie[];
+  trendingShows: TMDBMovie[];
   recommended: TMDBMovie[];
   fetchedAt: number;
   stale: boolean;
@@ -66,6 +67,7 @@ export function TMDBProvider({ children, libraryGenres = [] }: TMDBProviderProps
   const [state, setState] = useState<Omit<TMDBState, 'refresh'>>({
     upcoming: cached?.upcoming ?? [],
     trending: cached?.trending ?? [],
+    trendingShows: cached?.trendingShows ?? [],
     recommended: cached?.recommended ?? [],
     fetchedAt: cached?.fetchedAt ?? 0,
     stale: cached?.stale ?? false,
@@ -92,6 +94,7 @@ export function TMDBProvider({ children, libraryGenres = [] }: TMDBProviderProps
       const next = {
         upcoming: data.upcoming ?? [],
         trending: data.trending ?? [],
+        trendingShows: data.trendingShows ?? [],
         recommended: data.recommended ?? [],
         fetchedAt: data.fetchedAt,
         stale: data.stale ?? false,

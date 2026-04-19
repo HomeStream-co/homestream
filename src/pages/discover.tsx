@@ -720,7 +720,7 @@ export default function DiscoverPage() {
   const [directLoading, setDirectLoading] = useState(false);
   const [directError, setDirectError] = useState('');
 
-  const { upcoming, trending, recommended, loading, stale, error, refresh, lastRefreshed } = useTMDBContext();
+  const { upcoming, trending, trendingShows, recommended, loading, stale, error, refresh, lastRefreshed } = useTMDBContext();
 
   const libraryTitles = useMemo(
     () => new Set(library.map(m => m.title.toLowerCase())),
@@ -741,8 +741,8 @@ export default function DiscoverPage() {
   const filteredTrending = filterMovies(trending);
   const filteredRecommended = filterMovies(recommended);
 
-  // TV shows from TMDB trending (filter by media_type if available, else show all trending)
-  const trendingShows = useMemo(() => trending.filter(m => (m as TMDBMovie & { media_type?: string }).media_type === 'tv'), [trending]);
+  // TV shows from dedicated TMDB /trending/tv/week endpoint
+  const filteredShows = useMemo(() => filterMovies(trendingShows), [trendingShows, searchQuery]);
 
   const handleTMDBDownload = useCallback((movie: TMDBMovie) => {
     setDownloadTarget({ title: movie.title, posterUrl: movie.posterUrl, release_date: movie.release_date, type: 'movie' });
@@ -893,12 +893,17 @@ export default function DiscoverPage() {
           {/* ── TV Shows tab ── */}
           {activeTab === 'shows' && (
             <div>
-              {trendingShows.length > 0 ? (
-                <Section key={`shows-${searchQuery}`} title="Trending TV Shows" icon={Tv2} movies={trendingShows} libraryTitles={libraryTitles} watchlist={watchlist} onAddToWatchlist={addToWatchlist} onRemoveFromWatchlist={removeFromWatchlist} onDownload={handleTMDBDownload} />
+              {filteredShows.length > 0 ? (
+                <Section key={`shows-${searchQuery}`} title="Trending TV Shows" icon={Tv2} movies={filteredShows} libraryTitles={libraryTitles} watchlist={watchlist} onAddToWatchlist={addToWatchlist} onRemoveFromWatchlist={removeFromWatchlist} onDownload={handleTMDBDownload} />
+              ) : loading ? (
+                <div className="text-center py-16">
+                  <Loader2 className="w-8 h-8 text-primary animate-spin mx-auto mb-4" />
+                  <p className="text-muted-foreground text-sm">Loading TV shows…</p>
+                </div>
               ) : (
                 <div className="text-center py-16">
                   <Tv2 className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
-                  <p className="text-muted-foreground text-sm mb-2">TMDB trending data doesn't include TV shows separately.</p>
+                  <p className="text-muted-foreground text-sm mb-2">No TV shows found.</p>
                   <p className="text-muted-foreground text-xs">Use the <button onClick={() => setActiveTab('search')} className="text-primary hover:underline">Search & Download</button> tab to find any TV show by name.</p>
                 </div>
               )}

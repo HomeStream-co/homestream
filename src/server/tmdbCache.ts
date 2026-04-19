@@ -42,6 +42,7 @@ export interface TMDBCacheEntry {
   fetchedAt: number;        // Unix ms
   upcoming: TMDBMovie[];
   trending: TMDBMovie[];
+  trendingShows: TMDBMovie[];
   stale?: boolean;
 }
 
@@ -125,7 +126,7 @@ async function fetchFresh(): Promise<TMDBCacheEntry> {
   const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
   const lastDay = new Date(now.getFullYear(), now.getMonth() + 2, 0).toISOString().slice(0, 10);
 
-  const [upcomingRaw, trendingRaw] = await Promise.all([
+  const [upcomingRaw, trendingRaw, trendingShowsRaw] = await Promise.all([
     tmdbGet('/discover/movie', {
       sort_by: 'popularity.desc',
       'primary_release_date.gte': firstDay,
@@ -133,6 +134,7 @@ async function fetchFresh(): Promise<TMDBCacheEntry> {
       'vote_count.gte': '10',
     }),
     tmdbGet('/trending/movie/week'),
+    tmdbGet('/trending/tv/week'),
   ]);
 
   const upcoming = attachGenres(
@@ -145,8 +147,13 @@ async function fetchFresh(): Promise<TMDBCacheEntry> {
       .slice(0, 30)
       .map(normaliseMovie)
   );
+  const trendingShows = attachGenres(
+    ((trendingShowsRaw as { results: Record<string, unknown>[] }).results ?? [])
+      .slice(0, 30)
+      .map(normaliseMovie)
+  );
 
-  return { fetchedAt: Date.now(), upcoming, trending };
+  return { fetchedAt: Date.now(), upcoming, trending, trendingShows };
 }
 
 // ── Recommendations based on library genres/actors ────────────────────────────
@@ -197,7 +204,7 @@ export async function getTMDBData(forceRefresh = false): Promise<TMDBCacheEntry 
     console.warn('[tmdbCache] Network fetch failed, serving stale cache:', err);
     // Return stale cache if available, otherwise empty
     if (cached) return { ...cached, stale: true };
-    return { fetchedAt: 0, upcoming: [], trending: [], stale: true };
+    return { fetchedAt: 0, upcoming: [], trending: [], trendingShows: [], stale: true };
   }
 }
 

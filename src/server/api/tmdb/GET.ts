@@ -42,6 +42,7 @@ export default async function handler(req: Request, res: Response) {
     res.json({
       upcoming: data.upcoming,
       trending: data.trending,
+      trendingShows: data.trendingShows ?? [],
       recommended,
       fetchedAt: data.fetchedAt,
       stale: data.stale ?? false,
@@ -52,6 +53,7 @@ export default async function handler(req: Request, res: Response) {
     res.status(200).json({
       upcoming: [],
       trending: [],
+      trendingShows: [],
       recommended: [],
       fetchedAt: 0,
       stale: true,

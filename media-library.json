@@ -23,12 +23,12 @@
       "Big Buck Bunny"
     ],
     "transcoding": false,
-    "watchProgress": 1.508906742023839,
+    "watchProgress": 13.78463732520273,
     "profileProgress": {
       "adult": {
-        "progress": 1.508906742023839,
-        "lastWatchedAt": "2026-04-19T21:34:14.303Z",
-        "watchedSeconds": 9,
+        "progress": 13.78463732520273,
+        "lastWatchedAt": "2026-04-19T21:42:15.209Z",
+        "watchedSeconds": 82.219618,
         "totalSeconds": 596.458333
       },
       "kids": 0
@@ -36,8 +36,8 @@
     "isDemo": true,
     "importedFrom": "demo",
     "addedAt": "2026-04-19T21:23:12.953Z",
-    "lastWatchedAt": "2026-04-19T21:34:14.303Z",
-    "watchedSeconds": 9,
+    "lastWatchedAt": "2026-04-19T21:42:15.209Z",
+    "watchedSeconds": 82.219618,
     "totalSeconds": 596.458333
   }
 ]
