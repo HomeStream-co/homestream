@@ -1490,9 +1490,39 @@ export default function SetupPage() {
                 </div>
 
                 <div className="bg-primary/10 border border-primary/20 rounded-xl p-3 text-xs text-muted-foreground leading-relaxed">
-                  <strong className="text-foreground">Next step:</strong> Open Jellyfin at{' '}
+                  <strong className="text-foreground">Jellyfin tip:</strong> Open Jellyfin at{' '}
                   <a href={form.jellyfinUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">{form.jellyfinUrl}</a>{' '}
                   and add <code className="bg-muted px-1 rounded">{form.mediaDir}/library</code> as a media library.
+                </div>
+
+                {/* ── HTTPS next-step card ── */}
+                <div className="rounded-xl border border-blue-500/30 bg-blue-500/5 p-4">
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-blue-500/15 flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <Lock className="w-4 h-4 text-blue-400" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-foreground mb-1">
+                        Recommended next step: Enable HTTPS
+                      </p>
+                      <p className="text-xs text-muted-foreground mb-3 leading-relaxed">
+                        HomeStream is running on plain HTTP right now — fine for home use, but HTTPS is required to unlock <strong className="text-foreground">Chromecast casting</strong>, the <strong className="text-foreground">PWA install prompt</strong>, and <strong className="text-foreground">streaming outside your home network</strong>. Setup takes about 5 minutes with Caddy.
+                      </p>
+                      <div className="flex flex-wrap gap-2 mb-3">
+                        {['Chromecast casting', 'PWA install', 'Remote streaming', 'Jellyfin iOS/Android'].map(f => (
+                          <span key={f} className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-300 font-medium">{f}</span>
+                        ))}
+                      </div>
+                      <button
+                        onClick={() => navigate('/https-setup')}
+                        className="flex items-center gap-1.5 text-xs font-medium text-blue-400 hover:text-blue-300 transition-colors"
+                      >
+                        <Globe className="w-3.5 h-3.5" />
+                        Open HTTPS Setup guide
+                        <ChevronRight className="w-3 h-3" />
+                      </button>
+                    </div>
+                  </div>
                 </div>
 
                 <div className="flex gap-3">
