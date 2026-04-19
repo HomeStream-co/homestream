@@ -1,58 +1,105 @@
-# HomeStream — Windows Electron Installer
+# HomeStream — Electron Desktop App
 
-This directory contains the Electron wrapper for building a native Windows `.exe` installer.
+Wraps the HomeStream server + React UI in a native desktop app for Windows, macOS, and Linux.
+No auto-updater — users download new versions manually.
+
+## What it does
+
+- **Control Panel window** — shows server status, LAN URL, start/stop button, live log viewer
+- **System tray icon** — runs in the background; right-click for quick access
+- **Opens in browser** — clicking "Open HomeStream" launches `http://localhost:3000` in the default browser
+- **Phone remote** — LAN URL shown in the control panel; scan the QR code from `/remote`
 
 ## Prerequisites
 
-```bash
-npm install --save-dev electron electron-builder electron-updater
-```
+- Node.js 22+
+- npm dependencies installed (`npm install`)
+- FFmpeg on PATH (for transcoding features)
 
 ## Build Steps
 
-### 1. Build the frontend
+### 1. Build the web app
+
 ```bash
 npm run build
 ```
 
-### 2. Bundle the server
+This produces `dist/` (frontend) and `dist/server.bundle.mjs` (backend).
+
+### 2. Build the Electron installer
+
 ```bash
-npx esbuild src/server/index.ts \
-  --bundle \
-  --platform=node \
-  --target=node18 \
-  --outfile=server-bundle/index.js \
-  --external:better-sqlite3 \
-  --external:fsevents
+# Current platform only:
+npm run electron:build
+
+# Specific platform:
+npm run electron:win    # Windows .exe (NSIS installer)
+npm run electron:mac    # macOS .dmg
+npm run electron:linux  # Linux .AppImage + .deb
 ```
 
-### 3. Build the Electron installer
+Output goes to `dist-electron/`.
+
+## Development (no packaging)
+
+Run the Vite dev server first, then launch Electron pointing at it:
+
 ```bash
-npx electron-builder --win --config electron/electron-builder.yml
+# Terminal 1
+npm run dev
+
+# Terminal 2
+npm run electron:dev
 ```
 
-Output: `dist-electron/HomeStream-Setup-x.x.x.exe`
+In dev mode the control panel shows "Development mode — use npm run dev to start the server".
+The server is already running via Vite, so just click "Open HomeStream".
 
-## What the installer does
+## Icons
 
-- Installs HomeStream to `C:\Program Files\HomeStream\`
-- Creates a Desktop shortcut
-- Creates a Start Menu entry
-- Adds an uninstaller
-- On first launch: starts the HomeStream server on port 3000 and opens the UI
+Icons are pre-generated in `electron/assets/`. To regenerate:
 
-## Auto-updates
+```bash
+node electron/create-icons.mjs
+```
 
-Set `publish.owner` and `publish.repo` in `electron-builder.yml` to your GitHub repo.
-Upload the installer to a GitHub Release — the app will auto-update silently.
+For production `.ico` (Windows) and `.icns` (macOS), electron-builder auto-converts
+`icon.png` on the respective platform. Alternatively:
 
-## Tray icon
+- **Windows .ico**: `magick convert icon.png -resize 256x256 icon.ico`
+- **macOS .icns**: Use `iconutil` on macOS or `electron-icon-maker`
 
-The app runs in the system tray when the window is closed.
-Double-click the tray icon to reopen the window.
-Right-click for: Open, Open in Browser, Quit.
+## Architecture
 
-## Media directory
+```
+electron/
+├── main.js          — Electron main process (control panel, tray, server spawn)
+├── preload.js       — IPC bridge (contextBridge → window.electronAPI)
+├── electron-builder.yml
+├── tray-icon.png    — 16×16 system tray icon
+├── create-icons.mjs — Icon generator script
+└── assets/
+    ├── icon.png     — 512×512 app icon (source for all platforms)
+    └── icon-256.png — 256×256 variant
+```
 
-On Windows, the default media directory is `%USERPROFILE%\Videos\HomeStream`.
-Users can change this in Settings → Setup Wizard.
+### Server spawn
+
+In packaged mode, `main.js` spawns `resources/server/server.bundle.mjs` as a child process
+using the bundled Node.js runtime. The server listens on port 3000.
+
+### Data directories
+
+The server stores data in the user's home directory:
+- **Media library**: configured via Setup Wizard (default: `~/Videos/HomeStream`)
+- **Config**: `homestream-config.json` next to the server bundle
+- **Watchlist / progress**: `watchlist.json`, `media-library.json`
+
+## Installer output
+
+| Platform | File                              |
+|----------|-----------------------------------|
+| Windows  | `HomeStream-Setup-1.0.0.exe`      |
+| macOS    | `HomeStream-1.0.0.dmg`            |
+| Linux    | `HomeStream-1.0.0.AppImage`       |
+| Linux    | `homestream_1.0.0_amd64.deb`      |

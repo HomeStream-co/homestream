@@ -1,14 +1,15 @@
 # electron-builder configuration for HomeStream
 #
-# Build commands:
-#   Windows:  npx electron-builder --win   --publish never
-#   macOS:    npx electron-builder --mac   --publish never
-#   Linux:    npx electron-builder --linux --publish never
+# Build commands (run from project root):
+#   All platforms:  npm run electron:build
+#   Windows only:   npm run electron:win
+#   macOS only:     npm run electron:mac
+#   Linux only:     npm run electron:linux
 #
 # Output: dist-electron/
 #   Windows → HomeStream-Setup-x.x.x.exe  (NSIS installer)
 #   macOS   → HomeStream-x.x.x.dmg
-#   Linux   → HomeStream-x.x.x.AppImage
+#   Linux   → HomeStream-x.x.x.AppImage + .deb
 
 appId: com.homestream.app
 productName: HomeStream
@@ -29,26 +30,22 @@ files:
   - electron/tray-icon.png
   - package.json
 
-# Server bundle shipped as an extra resource
+# Server bundle shipped as an extra resource (loaded at runtime by main.js)
 extraResources:
   - from: dist/server.bundle.mjs
     to: server/server.bundle.mjs
-  - from: dist/server.bundle.mjs.map
-    to: server/server.bundle.mjs.map
-    filter: ["**/*"]
 
 # ── Windows ───────────────────────────────────────────────────────────────────
 win:
   target:
     - target: nsis
       arch: [x64, ia32]
-  icon: electron/assets/icon.ico
+  # electron-builder auto-converts icon.png → .ico if no .ico is provided
+  icon: electron/assets/icon.png
 
 nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
-  installerIcon: electron/assets/icon.ico
-  uninstallerIcon: electron/assets/icon.ico
   createDesktopShortcut: true
   createStartMenuShortcut: true
   shortcutName: HomeStream
@@ -59,13 +56,13 @@ mac:
   target:
     - target: dmg
       arch: [x64, arm64]
-  icon: electron/assets/icon.icns
+  # electron-builder auto-converts icon.png → .icns on macOS
+  icon: electron/assets/icon.png
   category: public.app-category.entertainment
   darkModeSupport: true
 
 dmg:
   title: HomeStream
-  background: electron/assets/dmg-background.png
   window:
     width: 540
     height: 380

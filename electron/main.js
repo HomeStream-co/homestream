@@ -69,7 +69,7 @@ function startServer() {
   const serverPath = path.join(process.resourcesPath, 'server', 'server.bundle.mjs');
   pushLog(`Starting server: ${serverPath}`);
 
-  serverProcess = spawn(process.execPath, ['--experimental-vm-modules', serverPath], {
+  serverProcess = spawn(process.execPath, [serverPath], {
     env: {
       ...process.env,
       PORT: String(SERVER_PORT),
@@ -117,7 +117,7 @@ function waitForServer(timeout = SERVER_READY_TIMEOUT) {
   return new Promise((resolve, reject) => {
     const start = Date.now();
     const check = () => {
-      http.get(`http://localhost:${SERVER_PORT}/api/health`, res => {
+      http.get(`http://localhost:${SERVER_PORT}/api/media`, res => {
         if (res.statusCode === 200) resolve(true);
         else retry();
       }).on('error', retry);
