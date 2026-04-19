@@ -18,6 +18,20 @@
  */
 
 import { spawn, type ChildProcess } from 'child_process';
+
+// Resolve FFmpeg binary: prefer FFMPEG_PATH env var (set by Electron when
+// bundling ffmpeg-static), then try ffmpeg-static directly, then fall back
+// to a system 'ffmpeg' on PATH.
+function resolveFfmpeg(): string {
+  if (process.env.FFMPEG_PATH) return process.env.FFMPEG_PATH;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const p = require('ffmpeg-static') as string | null;
+    if (p) return p;
+  } catch { /* not installed */ }
+  return 'ffmpeg';
+}
+const FFMPEG = resolveFfmpeg();
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
@@ -166,7 +180,7 @@ export async function startHlsJob(mediaId: string, sourceFilePath: string): Prom
 
   console.log(`[hls] Starting transcode for ${mediaId}: ${path.basename(sourceFilePath)}`);
 
-  const ff = spawn('ffmpeg', args, { stdio: ['ignore', 'ignore', 'pipe'] });
+  const ff = spawn(FFMPEG, args, { stdio: ['ignore', 'ignore', 'pipe'] });
   job.process = ff;
 
   // Watch for the playlist file to appear — that means the first segment is ready

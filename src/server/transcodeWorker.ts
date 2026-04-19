@@ -38,6 +38,20 @@ import { updateJob, broadcast, getJob } from './transcodeStore.js';
 
 const UPLOADS_DIR = path.resolve('./uploads');
 
+// Resolve FFmpeg binary: prefer FFMPEG_PATH env var (set by Electron when
+// bundling ffmpeg-static), then try ffmpeg-static directly, then fall back
+// to a system 'ffmpeg' on PATH.
+function resolveFfmpeg(): string {
+  if (process.env.FFMPEG_PATH) return process.env.FFMPEG_PATH;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const p = require('ffmpeg-static') as string | null;
+    if (p) return p;
+  } catch { /* not installed */ }
+  return 'ffmpeg';
+}
+const FFMPEG = resolveFfmpeg();
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface TranscodeResult {
@@ -189,7 +203,7 @@ function parseProgress(line: string, durationSecs: number): {
 
 function runFFmpeg(args: string[], mediaId: string, durationSecs: number): Promise<void> {
   return new Promise((resolve, reject) => {
-    const ff = spawn('ffmpeg', args);
+    const ff = spawn(FFMPEG, args);
     let stderrBuf = '';
 
     ff.stderr.on('data', (data: Buffer) => {
@@ -218,7 +232,7 @@ function runFFmpeg(args: string[], mediaId: string, durationSecs: number): Promi
 
     ff.on('error', err => {
       const msg = err.message.includes('ENOENT')
-        ? 'FFmpeg not found. Install FFmpeg on your server: sudo apt install ffmpeg'
+        ? `FFmpeg not found at "${FFMPEG}". The bundled ffmpeg-static binary may be missing — try reinstalling HomeStream.`
         : err.message;
       reject(new Error(msg));
     });

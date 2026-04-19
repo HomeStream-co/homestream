@@ -19,6 +19,19 @@ const { spawn } = require('child_process');
 const http = require('http');
 const os = require('os');
 
+// Resolve the bundled ffmpeg binary path.
+// ffmpeg-static ships a pre-built binary for the current platform.
+// In a packaged Electron app the node_modules tree is included, so this
+// resolves correctly at runtime without the user installing FFmpeg manually.
+function getFfmpegPath() {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    return require('ffmpeg-static');
+  } catch {
+    return null; // Fall back to system FFmpeg if somehow not bundled
+  }
+}
+
 // ── Config ────────────────────────────────────────────────────────────────────
 
 const SERVER_PORT = 3000;
@@ -75,6 +88,9 @@ function startServer() {
       PORT: String(SERVER_PORT),
       NODE_ENV: 'production',
       ELECTRON: '1',
+      // Inject the bundled ffmpeg path so the server uses it automatically.
+      // This means users do NOT need to install FFmpeg manually.
+      FFMPEG_PATH: getFfmpegPath() ?? 'ffmpeg',
     },
     stdio: 'pipe',
   });

@@ -418,7 +418,7 @@ export default function SetupPage() {
   const currentStep = STEPS[step];
 
   return (
-    <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
+    <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4 py-8">
       <title>Setup — HomeStream</title>
 
       {/* Logo */}
@@ -430,18 +430,21 @@ export default function SetupPage() {
       </div>
 
       {/* Step indicator */}
-      <div className="flex items-center gap-1 mb-8">
+      <div className="flex items-center gap-1 mb-8 flex-wrap justify-center">
         {STEPS.map((s, i) => (
           <div key={s.id} className="flex items-center gap-1">
-            <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
-              i < step ? 'bg-green-500 text-white' :
-              i === step ? 'bg-primary text-primary-foreground' :
-              'bg-muted text-muted-foreground'
-            }`}>
+            <div
+              title={s.label}
+              className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all cursor-default ${
+                i < step ? 'bg-green-500 text-white' :
+                i === step ? 'bg-primary text-primary-foreground ring-2 ring-primary/30' :
+                'bg-muted text-muted-foreground'
+              }`}
+            >
               {i < step ? <CheckCircle2 className="w-4 h-4" /> : i + 1}
             </div>
             {i < STEPS.length - 1 && (
-              <div className={`w-6 h-0.5 transition-all ${i < step ? 'bg-green-500' : 'bg-muted'}`} />
+              <div className={`w-4 h-0.5 transition-all ${i < step ? 'bg-green-500' : 'bg-muted'}`} />
             )}
           </div>
         ))}
@@ -456,7 +459,7 @@ export default function SetupPage() {
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -20 }}
             transition={{ duration: 0.2 }}
-            className="bg-card border border-border rounded-2xl p-8 shadow-2xl"
+            className="bg-card border border-border rounded-2xl p-8 shadow-2xl max-h-[80vh] overflow-y-auto"
           >
 
             {/* ── STEP 0: Welcome ── */}
@@ -1346,7 +1349,7 @@ export default function SetupPage() {
                 </div>
 
                 <div className="flex gap-3">
-                  <button onClick={() => setStep(3)} className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-border text-muted-foreground hover:text-foreground text-sm transition-colors">
+                  <button onClick={() => setStep(4)} className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-border text-muted-foreground hover:text-foreground text-sm transition-colors">
                     <ChevronLeft className="w-4 h-4" />Back
                   </button>
                   <button onClick={saveApiKeys}

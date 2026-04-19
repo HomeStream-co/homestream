@@ -213,9 +213,10 @@ If you want to run without Docker:
 
 ### Requirements
 
-- Node.js ≥ 20
+- Node.js ≥ 22
 - npm ≥ 10
-- FFmpeg (for transcoding) — `sudo apt install ffmpeg` / `brew install ffmpeg`
+
+> **FFmpeg is bundled automatically.** The `ffmpeg-static` package ships a pre-built FFmpeg binary for your platform — no manual install needed. If you prefer to use a system FFmpeg instead, set the `FFMPEG_PATH` environment variable to its path.
 
 ### Steps
 
