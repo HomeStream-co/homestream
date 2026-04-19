@@ -32,6 +32,7 @@ export interface AppConfig {
   watchFolderEnabled: boolean;
   autoTranscode: boolean;
   preferredQuality: '720p' | '1080p' | '4k' | 'best';
+  virusTotalApiKey: string;   // optional — activates Layer 2 hash lookup
   setupCompletedAt?: string;
 }
 
@@ -55,6 +56,7 @@ const DEFAULTS: AppConfig = {
   watchFolderEnabled: true,
   autoTranscode: true,
   preferredQuality: '1080p',
+  virusTotalApiKey: process.env.VIRUSTOTAL_API_KEY || '',
 };
 
 export function readConfig(): AppConfig {

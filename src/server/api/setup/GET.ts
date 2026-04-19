@@ -32,6 +32,7 @@ export default function handler(_req: Request, res: Response) {
       omdbApiKey: mask(config.omdbApiKey),
       googleAiApiKey: mask(config.googleAiApiKey),
       tmdbApiKey: mask(config.tmdbApiKey),
+      virusTotalApiKey: mask(config.virusTotalApiKey),
     },
   };
   res.json(response);

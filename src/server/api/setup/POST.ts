@@ -47,7 +47,7 @@ export default async function handler(req: Request, res: Response) {
         const allowed = [
           'mediaDir', 'qbitUrl', 'qbitUsername', 'qbitPassword',
           'jellyfinUrl', 'jellyfinApiKey', 'adminPassword',
-          'omdbApiKey', 'googleAiApiKey', 'tmdbApiKey',
+          'omdbApiKey', 'googleAiApiKey', 'tmdbApiKey', 'virusTotalApiKey',
           'aiProvider', 'ollamaUrl', 'ollamaModel',
           'preferredQuality', 'watchFolderEnabled', 'autoTranscode',
         ];

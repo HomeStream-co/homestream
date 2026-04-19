@@ -1,12 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Search, Upload, Menu, X, Film, Bookmark, ChevronDown, Wrench } from 'lucide-react';
+import { Search, Upload, Menu, X, Film, Bookmark, ChevronDown, Wrench, ShieldCheck } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useMedia } from '@/context/MediaContext';
 import { useProfile, PROFILES } from '@/context/ProfileContext';
 import SettingsPanel from '@/components/SettingsPanel';
 import DebugPanel from '@/components/DebugPanel';
 import StremioPanel from '@/components/StremioPanel';
+import SecurityPanel from '@/components/SecurityPanel';
 
 interface HeaderProps {
   onChatOpen?: () => void;
@@ -48,6 +49,7 @@ export default function Header({ onChatOpen: _onChatOpen }: HeaderProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [debugOpen, setDebugOpen] = useState(false);
+  const [securityOpen, setSecurityOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
   const { watchlist } = useMedia();
@@ -187,10 +189,20 @@ export default function Header({ onChatOpen: _onChatOpen }: HeaderProps) {
               <Wrench className="w-4 h-4" />
             </button>
 
+            {/* ── Security shield ── */}
+            <button
+              onClick={() => setSecurityOpen(true)}
+              className="p-2 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+              title="Security Center"
+            >
+              <ShieldCheck className="w-4 h-4" />
+            </button>
+
             {/* ── Settings cog ── */}
             <SettingsPanel />
 
             <DebugPanel open={debugOpen} onClose={() => setDebugOpen(false)} />
+            <SecurityPanel open={securityOpen} onClose={() => setSecurityOpen(false)} />
 
             {/* ── Stremio ── */}
             <StremioPanel />

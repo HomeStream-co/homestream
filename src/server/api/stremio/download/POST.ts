@@ -2,6 +2,7 @@ import type { Request, Response } from 'express';
 import { pickBestStream } from '../../../torrentManager.js';
 import { addMagnet, isReachable } from '../../../qbittorrentClient.js';
 import { readConfig } from '../../../configStore.js';
+import { runPreDownloadScan } from '../../../security/threatScanner.js';
 
 /**
  * POST /api/stremio/download
@@ -233,13 +234,37 @@ export default async function handler(req: Request, res: Response) {
       }
 
       if (useQbit) {
+        // ── Security scan before queuing ──────────────────────────────────────
+        const scan = await runPreDownloadScan({ infoHash: best.infoHash, title });
+        if (!scan.allowed) {
+          res.status(403).json({
+            error: 'Download blocked by security scan',
+            reason: scan.reason,
+            layer: scan.layer,
+            details: scan.details,
+            threatLevel: scan.threatLevel,
+          });
+          return;
+        }
         const job = await queueViaQbit({ infoHash: best.infoHash, magnet: best.magnet, quality: best.quality, type: 'movie', title, imdbId, poster });
-        res.json({ queued: 1, jobs: [job], backend: 'qbittorrent' });
+        res.json({ queued: 1, jobs: [job], backend: 'qbittorrent', securityScan: scan });
       } else {
+        // ── Security scan before queuing ──────────────────────────────────────
+        const scan = await runPreDownloadScan({ infoHash: best.infoHash, title });
+        if (!scan.allowed) {
+          res.status(403).json({
+            error: 'Download blocked by security scan',
+            reason: scan.reason,
+            layer: scan.layer,
+            details: scan.details,
+            threatLevel: scan.threatLevel,
+          });
+          return;
+        }
         // Fallback to WebTorrent
         const { queueDownload } = await import('../../../torrentManager.js');
         const job = queueDownload({ infoHash: best.infoHash, magnet: best.magnet, quality: best.quality, type: 'movie', title, imdbId, poster, year });
-        res.json({ queued: 1, jobs: [job], backend: 'webtorrent' });
+        res.json({ queued: 1, jobs: [job], backend: 'webtorrent', securityScan: scan });
       }
 
     } else {
@@ -280,9 +305,19 @@ export default async function handler(req: Request, res: Response) {
           const epTitle = `${title} S${String(s).padStart(2, '0')}E${String(ep).padStart(2, '0')}`;
 
           if (useQbit) {
+            const scan = await runPreDownloadScan({ infoHash: best.infoHash, title: epTitle });
+            if (!scan.allowed) {
+              console.warn(`[security] Blocked episode ${epTitle}: ${scan.reason}`);
+              continue; // skip this episode, continue with others
+            }
             const job = await queueViaQbit({ infoHash: best.infoHash, magnet: best.magnet, quality: best.quality, title: epTitle, type: 'series', season: s, episode: ep, imdbId, poster });
             queuedJobs.push(job);
           } else {
+            const scan = await runPreDownloadScan({ infoHash: best.infoHash, title: epTitle });
+            if (!scan.allowed) {
+              console.warn(`[security] Blocked episode ${epTitle}: ${scan.reason}`);
+              continue;
+            }
             const { queueDownload } = await import('../../../torrentManager.js');
             const job = queueDownload({ infoHash: best.infoHash, magnet: best.magnet, quality: best.quality, title: epTitle, type: 'series', season: s, episode: ep, imdbId, poster, year });
             queuedJobs.push(job);
