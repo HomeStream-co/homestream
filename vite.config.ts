@@ -10,17 +10,6 @@ import { errorInterceptorPlugin } from "./dev-tools/src/vite-error-interceptor";
 import { mediaVersionsPlugin } from "./dev-tools/src/vite-media-versions-plugin";
 import apiRoutes from "vite-plugin-api-routes";
 
-function extractHostname(value: string): string {
-	try {
-		if (value.includes("://")) {
-			return new URL(value).hostname;
-		}
-		return value;
-	} catch {
-		return value;
-	}
-}
-
 function serverBundlePlugin(): Plugin {
 	let built = false;
 	return {
