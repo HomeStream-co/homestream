@@ -1,0 +1,1300 @@
+{
+  "fetchedAt": 1776635308691,
+  "upcoming": [
+    {
+      "id": 1226863,
+      "title": "The Super Mario Galaxy Movie",
+      "overview": "Having thwarted Bowser's previous plot to marry Princess Peach, Mario and Luigi now face a fresh threat in Bowser Jr., who is determined to liberate his father from captivity and restore the family legacy. Alongside companions new and old, the brothers travel across the stars to stop the young heir's crusade.",
+      "poster_path": "/eJGWx219ZcEMVQJhAgMiqo8tYY.jpg",
+      "backdrop_path": "/kxQiIJ4gVcD3K6o14MJ72p5yRcE.jpg",
+      "release_date": "2026-04-01",
+      "vote_average": 6.793,
+      "vote_count": 518,
+      "genre_ids": [
+        10751,
+        35,
+        12,
+        14,
+        16
+      ],
+      "popularity": 780.1539,
+      "posterUrl": "https://image.tmdb.org/t/p/w500/eJGWx219ZcEMVQJhAgMiqo8tYY.jpg",
+      "backdropUrl": "https://image.tmdb.org/t/p/original/kxQiIJ4gVcD3K6o14MJ72p5yRcE.jpg",
+      "genres": [
+        "Family",
+        "Comedy",
+        "Adventure",
+        "Fantasy",
+        "Animation"
+      ]
+    },
+    {
+      "id": 1290417,
+      "title": "Thrash",
+      "overview": "When a Category 5 hurricane decimates a coastal town, the storm surge brings devastation, chaos, and something far more frightening onto shore: hungry sharks.",
+      "poster_path": "/adk8weka3O5648g3de4z3y4aE7G.jpg",
+      "backdrop_path": "/3ooXDVaz4xHKtwe4lkmF1gNopOC.jpg",
+      "release_date": "2026-04-10",
+      "vote_average": 5.993,
+      "vote_count": 339,
+      "genre_ids": [
+        27,
+        53
+      ],
+      "popularity": 212.0369,
+      "posterUrl": "https://image.tmdb.org/t/p/w500/adk8weka3O5648g3de4z3y4aE7G.jpg",
+      "backdropUrl": "https://image.tmdb.org/t/p/original/3ooXDVaz4xHKtwe4lkmF1gNopOC.jpg",
+      "genres": [
+        "Horror",
+        "Thriller"
+      ]
+    },
+    {
+      "id": 1084577,
+      "title": "Balls Up",
+      "overview": "Two marketing executives go \"balls out\" and pitch a bold full‑coverage condom sponsorship with the World Cup. After their drunken celebration in Brazil sparks a global scandal, they must outrun furious fans, criminals, and power-hungry officials to salvage their careers and make it home alive.",
+      "poster_path": "/xwvJ3WzdJ1OCuDoY8LAxBUlQyig.jpg",
+      "backdrop_path": "/jRsjWwZzI39bTm44FNhRtiICd9k.jpg",
+      "release_date": "2026-04-15",
+      "vote_average": 5.428,
+      "vote_count": 76,
+      "genre_ids": [
+        35,
+        28,
+        12
+      ],
+      "popularity": 203.8693,
+      "posterUrl": "https://image.tmdb.org/t/p/w500/xwvJ3WzdJ1OCuDoY8LAxBUlQyig.jpg",
+      "backdropUrl": "https://image.tmdb.org/t/p/original/jRsjWwZzI39bTm44FNhRtiICd9k.jpg",
+      "genres": [
+        "Comedy",
+        "Action",
+        "Adventure"
+      ]
+    },
+    {
+      "id": 1641319,
+      "title": "Sniper: No Nation",
+      "overview": "Brandon Beckett and Agent Zero lead a rescue mission in Venezuela when their friends are taken hostage.",
+      "poster_path": "/3T9nAX0jAp0iT18ex25BlZEpRDb.jpg",
+      "backdrop_path": "/7lizs4SuEU2ihkkAa0SZ66NtHbl.jpg",
+      "release_date": "2026-04-07",
+      "vote_average": 6.2,
+      "vote_count": 30,
+      "genre_ids": [
+        28,
+        53
+      ],
+      "popularity": 178.3401,
+      "posterUrl": "https://image.tmdb.org/t/p/w500/3T9nAX0jAp0iT18ex25BlZEpRDb.jpg",
+      "backdropUrl": "https://image.tmdb.org/t/p/original/7lizs4SuEU2ihkkAa0SZ66NtHbl.jpg",
+      "genres": [
+        "Action",
+        "Thriller"
+      ]
+    },
+    {
+      "id": 1304313,
+      "title": "Lee Cronin's The Mummy",
+      "overview": "The young daughter of a journalist disappears into the desert without a trace—eight years later, the broken family is shocked when she is returned to them, as what should be a joyful reunion turns into a living nightmare.",
+      "poster_path": "/8L8efNkz8rUmwR7sV0g3vnC9yjn.jpg",
+      "backdrop_path": "/zc08qkHtWfZ2cQGQBK1S5yafJmR.jpg",
+      "release_date": "2026-04-15",
+      "vote_average": 6.75,
+      "vote_count": 89,
+      "genre_ids": [
+        27,
+        9648
+      ],
+      "popularity": 161.4338,
+      "posterUrl": "https://image.tmdb.org/t/p/w500/8L8efNkz8rUmwR7sV0g3vnC9yjn.jpg",
+      "backdropUrl": "https://image.tmdb.org/t/p/original/zc08qkHtWfZ2cQGQBK1S5yafJmR.jpg",
+      "genres": [
+        "Horror",
+        "Mystery"
+      ]
+    },
+    {
+      "id": 1418657,
+      "title": "The Yeti",
+      "overview": "When an oil tycoon and a famous adventurer vanish into the harsh winter of remote northern Alaska, a hand-picked rescue team endeavors to bring them home. What they don’t know is that they are trespassing on The Yeti’s territory, and the elements are the least of their worries.",
+      "poster_path": "/zaqEfoKcWkVni2eONhJ7DRhMO8Q.jpg",
+      "backdrop_path": "/1ytf7rzkZ7RLlMnBdGggQ0ENe6z.jpg",
+      "release_date": "2026-04-04",
+      "vote_average": 6.823,
+      "vote_count": 31,
+      "genre_ids": [
+        27,
+        53
+      ],
+      "popularity": 106.3625,
+      "posterUrl": "https://image.tmdb.org/t/p/w500/zaqEfoKcWkVni2eONhJ7DRhMO8Q.jpg",
+      "backdropUrl": "https://image.tmdb.org/t/p/original/1ytf7rzkZ7RLlMnBdGggQ0ENe6z.jpg",
+      "genres": [
+        "Horror",
+        "Thriller"
+      ]
+    },
+    {
+      "id": 1049471,
+      "title": "Outcome",
+      "overview": "Reef Hawk, Hollywood's poster child since age six, is not okay. When he learns about an extortion plot tied to a mysterious video, Reef preemptively sets out on a redemption tour to make amends, confront his demons, and avoid getting canceled.",
+      "poster_path": "/kSzcpfbTy2pXHGvrVU2WhQTo6oU.jpg",
+      "backdrop_path": "/avwIERZtWiWa34qShf5biDzAVaF.jpg",
+      "release_date": "2026-04-06",
+      "vote_average": 5.338,
+      "vote_count": 117,
+      "genre_ids": [
+        35,
+        18
+      ],
+      "popularity": 96.5143,
+      "posterUrl": "https://image.tmdb.org/t/p/w500/kSzcpfbTy2pXHGvrVU2WhQTo6oU.jpg",
+      "backdropUrl": "https://image.tmdb.org/t/p/original/avwIERZtWiWa34qShf5biDzAVaF.jpg",
+      "genres": [
+        "Comedy",
+        "Drama"
+      ]
+    },
+    {
+      "id": 1511057,
+      "title": "Roommates",
+      "overview": "When shy college freshman Devon asks cool-girl Celeste to be her roommate, a blossoming friendship quickly spirals into a war of passive aggression.",
+      "poster_path": "/eW1s6omXIfVkTlmKVe9y9Dwwt4u.jpg",
+      "backdrop_path": "/cW8iKmWA6JAHgvNMyvrjqWd1dNp.jpg",
+      "release_date": "2026-04-13",
+      "vote_average": 6.5,
+      "vote_count": 33,
+      "genre_ids": [
+        35
+      ],
+      "popularity": 66.8245,
+      "posterUrl": "https://image.tmdb.org/t/p/w500/eW1s6omXIfVkTlmKVe9y9Dwwt4u.jpg",
+      "backdropUrl": "https://image.tmdb.org/t/p/original/cW8iKmWA6JAHgvNMyvrjqWd1dNp.jpg",
+      "genres": [
+        "Comedy"
+      ]
+    },
+    {
+      "id": 1659087,
+      "title": "180",
+      "overview": "When an unexpected road rage incident puts his son in critical condition, an enraged father spirals down a dark path of emotional turmoil and vengeance.",
+      "poster_path": "/9ISjrhA38HpSSGtfiCk8lpziC3K.jpg",
+      "backdrop_path": "/iQSXJs6RbTumcwxMjCedDoK99rx.jpg",
+      "release_date": "2026-04-16",
+      "vote_average": 5.1,
+      "vote_count": 14,
+      "genre_ids": [
+        53,
+        80,
+        18
+      ],
+      "popularity": 59.8316,
+      "posterUrl": "https://image.tmdb.org/t/p/w500/9ISjrhA38HpSSGtfiCk8lpziC3K.jpg",
+      "backdropUrl": "https://image.tmdb.org/t/p/original/iQSXJs6RbTumcwxMjCedDoK99rx.jpg",
+      "genres": [
+        "Thriller",
+        "Crime",
+        "Drama"
+      ]
+    },
+    {
+      "id": 1243741,
+      "title": "Ballistic",
+      "overview": "When a soldier's mother discovers the bullet that killed her son in Afghanistan was made at the factory where she works, she sets out on a path of revenge against those responsible.",
+      "poster_path": "/mTcXNQHnabavseapSfcAKhTnC3V.jpg",
+      "backdrop_path": "/hC11CgiCUdpCwG1I6dSY18nJXrP.jpg",
+      "release_date": "2026-04-17",
+      "vote_average": 7.091,
+      "vote_count": 11,
+      "genre_ids": [
+        28,
+        53
+      ],
+      "popularity": 27.7141,
+      "posterUrl": "https://image.tmdb.org/t/p/w500/mTcXNQHnabavseapSfcAKhTnC3V.jpg",
+      "backdropUrl": "https://image.tmdb.org/t/p/original/hC11CgiCUdpCwG1I6dSY18nJXrP.jpg",
+      "genres": [
+        "Action",
+        "Thriller"
+      ]
+    },
+    {
+      "id": 1242332,
+      "title": "Normal",
+      "overview": "Interim sheriff Ulysses, called to the snowbound town of Normal, MN, uncovers an international criminal conspiracy at the heart of the seemingly quaint whistle-stop when he comes to the aid of a bank-robbing couple caught up in a deadly mess.",
+      "poster_path": "/dHP7nurzOYGHNcNK1O4naVzsGCv.jpg",
+      "backdrop_path": "/1nHaO4rTv1E6xVJYIMGP9nmLxE9.jpg",
+      "release_date": "2026-04-16",
+      "vote_average": 7.25,
+      "vote_count": 16,
+      "genre_ids": [
+        28,
+        80,
+        53
+      ],
+      "popularity": 19.9852,
+      "posterUrl": "https://image.tmdb.org/t/p/w500/dHP7nurzOYGHNcNK1O4naVzsGCv.jpg",
+      "backdropUrl": "https://image.tmdb.org/t/p/original/1nHaO4rTv1E6xVJYIMGP9nmLxE9.jpg",
+      "genres": [
+        "Action",
+        "Crime",
+        "Thriller"
+      ]
+    },
+    {
+      "id": 1620551,
+      "title": "Feel My Voice",
+      "overview": "A teenager, the only hearing member of a deaf family, finds her voice and learns to believe in herself through her passion for singing.",
+      "poster_path": "/4Tf0qTA73XLhBnfP6YgvqtLZBnt.jpg",
+      "backdrop_path": "/Ary1sG0AHn4V1DFrwV7g72Fomq0.jpg",
+      "release_date": "2026-04-03",
+      "vote_average": 6.5,
+      "vote_count": 82,
+      "genre_ids": [
+        10402,
+        18,
+        35
+      ],
+      "popularity": 16.6224,
+      "posterUrl": "https://image.tmdb.org/t/p/w500/4Tf0qTA73XLhBnfP6YgvqtLZBnt.jpg",
+      "backdropUrl": "https://image.tmdb.org/t/p/original/Ary1sG0AHn4V1DFrwV7g72Fomq0.jpg",
+      "genres": [
+        "Music",
+        "Drama",
+        "Comedy"
+      ]
+    },
+    {
+      "id": 1631917,
+      "title": "18th Rose",
+      "overview": "A spirited teen dreaming of the perfect debut makes a deal with a lonely newcomer, but unexpected feelings and revelations may shatter their plans.",
+      "poster_path": "/6pUwaXT6tdA6sek8o6SdFYudJDj.jpg",
+      "backdrop_path": "/21YKck5bSRcvRIXlVg6ZaV0k0sj.jpg",
+      "release_date": "2026-04-09",
+      "vote_average": 6,
+      "vote_count": 10,
+      "genre_ids": [
+        18,
+        10749
+      ],
+      "popularity": 16.604,
+      "posterUrl": "https://image.tmdb.org/t/p/w500/6pUwaXT6tdA6sek8o6SdFYudJDj.jpg",
+      "backdropUrl": "https://image.tmdb.org/t/p/original/21YKck5bSRcvRIXlVg6ZaV0k0sj.jpg",
+      "genres": [
+        "Drama",
+        "Romance"
+      ]
+    },
+    {
+      "id": 1455079,
+      "title": "You, Me & Tuscany",
+      "overview": "When a woman crashes at an empty Italian villa, posing as the owner's fiancée, she discovers an unexpected romance that could transform her life.",
+      "poster_path": "/mJS0IF7Af3WpPRhSTDT6rGpiLzw.jpg",
+      "backdrop_path": "/2TWIlmhE06ghspeQLEX1VmnEBiE.jpg",
+      "release_date": "2026-04-09",
+      "vote_average": 4.833,
+      "vote_count": 12,
+      "genre_ids": [
+        10749,
+        35
+      ],
+      "popularity": 15.1415,
+      "posterUrl": "https://image.tmdb.org/t/p/w500/mJS0IF7Af3WpPRhSTDT6rGpiLzw.jpg",
+      "backdropUrl": "https://image.tmdb.org/t/p/original/2TWIlmhE06ghspeQLEX1VmnEBiE.jpg",
+      "genres": [
+        "Romance",
+        "Comedy"
+      ]
+    },
+    {
+      "id": 1487320,
+      "title": "The Giant Falls",
+      "overview": "Follows Boris, a charismatic tour guide who unexpectedly reunites with his estranged father Julián. Their tense and emotional encounters explore past wounds and the possibility of forgiveness.",
+      "poster_path": "/lARMzlnHtusEnY8LrTmNID92CJo.jpg",
+      "backdrop_path": "/2VMkpRFGCupBmAJlZiDzlAjxYL1.jpg",
+      "release_date": "2026-04-01",
+      "vote_average": 6.889,
+      "vote_count": 18,
+      "genre_ids": [
+        18
+      ],
+      "popularity": 12.2727,
+      "posterUrl": "https://image.tmdb.org/t/p/w500/lARMzlnHtusEnY8LrTmNID92CJo.jpg",
+      "backdropUrl": "https://image.tmdb.org/t/p/original/2VMkpRFGCupBmAJlZiDzlAjxYL1.jpg",
+      "genres": [
+        "Drama"
+      ]
+    },
+    {
+      "id": 1635276,
+      "title": "Eat Pray Bark",
+      "overview": "In this tumultuous comedy, five eccentric dog owners seek help in dealing with their four-legged friends. Their last hope: an intensive course with the charismatic and legendary dog trainer Nodon in the Tyrolean mountains.",
+      "poster_path": "/kZ0ntedjG2X6hZ7upzupeUe2g5n.jpg",
+      "backdrop_path": "/7weSO3kEzMpMgdmte4AasS0tbeV.jpg",
+      "release_date": "2026-04-01",
+      "vote_average": 5.66,
+      "vote_count": 75,
+      "genre_ids": [
+        35
+      ],
+      "popularity": 11.753,
+      "posterUrl": "https://image.tmdb.org/t/p/w500/kZ0ntedjG2X6hZ7upzupeUe2g5n.jpg",
+      "backdropUrl": "https://image.tmdb.org/t/p/original/7weSO3kEzMpMgdmte4AasS0tbeV.jpg",
+      "genres": [
+        "Comedy"
+      ]
+    },
+    {
+      "id": 1662432,
+      "title": "Finding Harry: The Craft Behind the Magic",
+      "overview": "Featuring interviews from members of the casting, production design, costume design, and creature effects teams, follow the behind-the-scenes journey of bringing the Harry Potter books to the small screen. Find out how the new Golden Trio were found, and celebrate the commitment to detail of the artists, craftspeople, and technicians who have come together to bring the wizarding world to life.",
+      "poster_path": "/aq8jKIfASiOR6wz9FCeeCH90xZq.jpg",
+      "backdrop_path": "/3S2YwyacgPspDSHbUhnApjEx2Wp.jpg",
+      "release_date": "2026-04-05",
+      "vote_average": 7.712,
+      "vote_count": 26,
+      "genre_ids": [
+        99
+      ],
+      "popularity": 8.0115,
+      "posterUrl": "https://image.tmdb.org/t/p/w500/aq8jKIfASiOR6wz9FCeeCH90xZq.jpg",
+      "backdropUrl": "https://image.tmdb.org/t/p/original/3S2YwyacgPspDSHbUhnApjEx2Wp.jpg",
+      "genres": [
+        "Documentary"
+      ]
+    },
+    {
+      "id": 1561758,
+      "title": "It Takes a Village",
+      "overview": "When financial trouble forces Halina to call off her wedding, her friends and family decide to hatch a wild plan to bring in tourist money.",
+      "poster_path": "/znUVVJh0WSCHAhiJ6Att5qhmAzG.jpg",
+      "backdrop_path": "/8PK61ixYoSX3kXWyCMH4ats79k4.jpg",
+      "release_date": "2026-04-01",
+      "vote_average": 4.722,
+      "vote_count": 10,
+      "genre_ids": [
+        10749,
+        35
+      ],
+      "popularity": 7.1927,
+      "posterUrl": "https://image.tmdb.org/t/p/w500/znUVVJh0WSCHAhiJ6Att5qhmAzG.jpg",
+      "backdropUrl": "https://image.tmdb.org/t/p/original/8PK61ixYoSX3kXWyCMH4ats79k4.jpg",
+      "genres": [
+        "Romance",
+        "Comedy"
+      ]
+    },
+    {
+      "id": 1404684,
+      "title": "Juste une illusion",
+      "overview": "1985. Vincent, almost 13, lives in the suburbs of Paris in a middle-class family, between a distant older brother and parents in constant conflict. Although he is no longer a child and not yet an adult, the film follows his reflections and doubts about identity, friendship, family, and his questions about religion, desire, and love.",
+      "poster_path": "/my4QdEBuhYpYLR4M7AkJWJGcxxx.jpg",
+      "backdrop_path": "/jCCqS6qKVhofuQCKBfsRvP3zP7R.jpg",
+      "release_date": "2026-04-15",
+      "vote_average": 7,
+      "vote_count": 36,
+      "genre_ids": [
+        35,
+        18
+      ],
+      "popularity": 6.2247,
+      "posterUrl": "https://image.tmdb.org/t/p/w500/my4QdEBuhYpYLR4M7AkJWJGcxxx.jpg",
+      "backdropUrl": "https://image.tmdb.org/t/p/original/jCCqS6qKVhofuQCKBfsRvP3zP7R.jpg",
+      "genres": [
+        "Comedy",
+        "Drama"
+      ]
+    },
+    {
+      "id": 1462146,
+      "title": "S4: The Bob Lazar Story",
+      "overview": "Over 35 years after Bob Lazar's revelations, this documentary exposes secrets of a facility the government still denies. Featuring Lazar's testimony, recreations, and new evidence, it reopens a case that continues to spark global curiosity",
+      "poster_path": "/cHWXWjUQg5mjuvQDimllZxusjD6.jpg",
+      "backdrop_path": "/pxpzRmzbOywu1sHCT8oSOScsQJ.jpg",
+      "release_date": "2026-04-03",
+      "vote_average": 8.042,
+      "vote_count": 12,
+      "genre_ids": [
+        99
+      ],
+      "popularity": 5.547,
+      "posterUrl": "https://image.tmdb.org/t/p/w500/cHWXWjUQg5mjuvQDimllZxusjD6.jpg",
+      "backdropUrl": "https://image.tmdb.org/t/p/original/pxpzRmzbOywu1sHCT8oSOScsQJ.jpg",
+      "genres": [
+        "Documentary"
+      ]
+    }
+  ],
+  "trending": [
+    {
+      "id": 687163,
+      "title": "Project Hail Mary",
+      "overview": "Science teacher Ryland Grace wakes up on a spaceship light years from home with no recollection of who he is or how he got there. As his memory returns, he begins to uncover his mission: solve the riddle of the mysterious substance causing the sun to die out. He must call on his scientific knowledge and unorthodox ideas to save everything on Earth from extinction… but an unexpected friendship means he may not have to do it alone.",
+      "poster_path": "/yihdXomYb5kTeSivtFndMy5iDmf.jpg",
+      "backdrop_path": "/8Tfys3mDZVp4tNoH2ktm06a0Tau.jpg",
+      "release_date": "2026-03-15",
+      "vote_average": 8.217,
+      "vote_count": 1558,
+      "genre_ids": [
+        878,
+        12
+      ],
+      "popularity": 269.6938,
+      "posterUrl": "https://image.tmdb.org/t/p/w500/yihdXomYb5kTeSivtFndMy5iDmf.jpg",
+      "backdropUrl": "https://image.tmdb.org/t/p/original/8Tfys3mDZVp4tNoH2ktm06a0Tau.jpg",
+      "genres": [
+        "Sci-Fi",
+        "Adventure"
+      ]
+    },
+    {
+      "id": 1226863,
+      "title": "The Super Mario Galaxy Movie",
+      "overview": "Having thwarted Bowser's previous plot to marry Princess Peach, Mario and Luigi now face a fresh threat in Bowser Jr., who is determined to liberate his father from captivity and restore the family legacy. Alongside companions new and old, the brothers travel across the stars to stop the young heir's crusade.",
+      "poster_path": "/eJGWx219ZcEMVQJhAgMiqo8tYY.jpg",
+      "backdrop_path": "/kxQiIJ4gVcD3K6o14MJ72p5yRcE.jpg",
+      "release_date": "2026-04-01",
+      "vote_average": 6.791,
+      "vote_count": 517,
+      "genre_ids": [
+        10751,
+        35,
+        12,
+        14,
+        16
+      ],
+      "popularity": 780.1539,
+      "posterUrl": "https://image.tmdb.org/t/p/w500/eJGWx219ZcEMVQJhAgMiqo8tYY.jpg",
+      "backdropUrl": "https://image.tmdb.org/t/p/original/kxQiIJ4gVcD3K6o14MJ72p5yRcE.jpg",
+      "genres": [
+        "Family",
+        "Comedy",
+        "Adventure",
+        "Fantasy",
+        "Animation"
+      ]
+    },
+    {
+      "id": 980431,
+      "title": "Avatar: Aang, The Last Airbender",
+      "overview": "Avatar Aang, the world's last Airbender, learns of an ancient power that could save his culture from extinction. With the help of his friends, he embarks on a global quest to find it before it falls into the wrong hands and threatens to upend the peace they sacrificed everything to achieve.",
+      "poster_path": "/oS9LQQjVVAwTVcSye9rndcK6BNC.jpg",
+      "backdrop_path": "/sS3zGYFPcfM5pArVNWl6qLyaSmU.jpg",
+      "release_date": "2026-10-09",
+      "vote_average": 0,
+      "vote_count": 0,
+      "genre_ids": [
+        16,
+        28,
+        12,
+        14
+      ],
+      "popularity": 269.687,
+      "posterUrl": "https://image.tmdb.org/t/p/w500/oS9LQQjVVAwTVcSye9rndcK6BNC.jpg",
+      "backdropUrl": "https://image.tmdb.org/t/p/original/sS3zGYFPcfM5pArVNWl6qLyaSmU.jpg",
+      "genres": [
+        "Animation",
+        "Action",
+        "Adventure",
+        "Fantasy"
+      ]
+    },
+    {
+      "id": 1304313,
+      "title": "Lee Cronin's The Mummy",
+      "overview": "The young daughter of a journalist disappears into the desert without a trace—eight years later, the broken family is shocked when she is returned to them, as what should be a joyful reunion turns into a living nightmare.",
+      "poster_path": "/8L8efNkz8rUmwR7sV0g3vnC9yjn.jpg",
+      "backdrop_path": "/zc08qkHtWfZ2cQGQBK1S5yafJmR.jpg",
+      "release_date": "2026-04-15",
+      "vote_average": 6.8,
+      "vote_count": 88,
+      "genre_ids": [
+        27,
+        9648
+      ],
+      "popularity": 161.4338,
+      "posterUrl": "https://image.tmdb.org/t/p/w500/8L8efNkz8rUmwR7sV0g3vnC9yjn.jpg",
+      "backdropUrl": "https://image.tmdb.org/t/p/original/zc08qkHtWfZ2cQGQBK1S5yafJmR.jpg",
+      "genres": [
+        "Horror",
+        "Mystery"
+      ]
+    },
+    {
+      "id": 83533,
+      "title": "Avatar: Fire and Ash",
+      "overview": "In the wake of the devastating war against the RDA and the loss of their eldest son, Jake Sully and Neytiri face a new threat on Pandora: the Ash People, a violent and power-hungry Na'vi tribe led by the ruthless Varang. Jake's family must fight for their survival and the future of Pandora in a conflict that pushes them to their emotional and physical limits.",
+      "poster_path": "/aabwWZWx6z1aYP4PX2ADvbDKktd.jpg",
+      "backdrop_path": "/u8DU5fkLoM5tTRukzPC31oGPxaQ.jpg",
+      "release_date": "2025-12-17",
+      "vote_average": 7.4,
+      "vote_count": 2643,
+      "genre_ids": [
+        878,
+        12,
+        14
+      ],
+      "popularity": 315.4011,
+      "posterUrl": "https://image.tmdb.org/t/p/w500/aabwWZWx6z1aYP4PX2ADvbDKktd.jpg",
+      "backdropUrl": "https://image.tmdb.org/t/p/original/u8DU5fkLoM5tTRukzPC31oGPxaQ.jpg",
+      "genres": [
+        "Sci-Fi",
+        "Adventure",
+        "Fantasy"
+      ]
+    },
+    {
+      "id": 1084577,
+      "title": "Balls Up",
+      "overview": "Two marketing executives go \"balls out\" and pitch a bold full‑coverage condom sponsorship with the World Cup. After their drunken celebration in Brazil sparks a global scandal, they must outrun furious fans, criminals, and power-hungry officials to salvage their careers and make it home alive.",
+      "poster_path": "/xwvJ3WzdJ1OCuDoY8LAxBUlQyig.jpg",
+      "backdrop_path": "/jRsjWwZzI39bTm44FNhRtiICd9k.jpg",
+      "release_date": "2026-04-15",
+      "vote_average": 5.428,
+      "vote_count": 76,
+      "genre_ids": [
+        35,
+        28,
+        12
+      ],
+      "popularity": 203.8693,
+      "posterUrl": "https://image.tmdb.org/t/p/w500/xwvJ3WzdJ1OCuDoY8LAxBUlQyig.jpg",
+      "backdropUrl": "https://image.tmdb.org/t/p/original/jRsjWwZzI39bTm44FNhRtiICd9k.jpg",
+      "genres": [
+        "Comedy",
+        "Action",
+        "Adventure"
+      ]
+    },
+    {
+      "id": 936075,
+      "title": "Michael",
+      "overview": "Discover the story of Michael Jackson, one of the most influential artists the world has ever known, and his life beyond the music, tracing his journey from the discovery of his extraordinary talent as the lead of the Jackson Five, to the visionary artist whose creative ambition fueled a relentless pursuit to become the biggest entertainer in the world, highlighting both his life off-stage and some of the most iconic performances from his early solo career.",
+      "poster_path": "/3Qud19bBUrrJAzy0Ilm8gRJlJXP.jpg",
+      "backdrop_path": "/xBT0oNq6rsTFv4SxG5uGRIEOrq6.jpg",
+      "release_date": "2026-04-22",
+      "vote_average": 7.5,
+      "vote_count": 5,
+      "genre_ids": [
+        10402,
+        18
+      ],
+      "popularity": 50.0502,
+      "posterUrl": "https://image.tmdb.org/t/p/w500/3Qud19bBUrrJAzy0Ilm8gRJlJXP.jpg",
+      "backdropUrl": "https://image.tmdb.org/t/p/original/xBT0oNq6rsTFv4SxG5uGRIEOrq6.jpg",
+      "genres": [
+        "Music",
+        "Drama"
+      ]
+    },
+    {
+      "id": 1290417,
+      "title": "Thrash",
+      "overview": "When a Category 5 hurricane decimates a coastal town, the storm surge brings devastation, chaos, and something far more frightening onto shore: hungry sharks.",
+      "poster_path": "/adk8weka3O5648g3de4z3y4aE7G.jpg",
+      "backdrop_path": "/3ooXDVaz4xHKtwe4lkmF1gNopOC.jpg",
+      "release_date": "2026-04-10",
+      "vote_average": 5.993,
+      "vote_count": 339,
+      "genre_ids": [
+        27,
+        53
+      ],
+      "popularity": 212.0369,
+      "posterUrl": "https://image.tmdb.org/t/p/w500/adk8weka3O5648g3de4z3y4aE7G.jpg",
+      "backdropUrl": "https://image.tmdb.org/t/p/original/3ooXDVaz4xHKtwe4lkmF1gNopOC.jpg",
+      "genres": [
+        "Horror",
+        "Thriller"
+      ]
+    },
+    {
+      "id": 1266127,
+      "title": "Ready or Not: Here I Come",
+      "overview": "Moments after surviving an all-out attack from the Le Domas family, Grace discovers she’s reached the next level of the nightmarish game — and this time with her estranged sister Faith at her side. Grace has one chance to survive, keep her sister alive, and claim the High Seat of the Council that controls the world. Four rival families are hunting her for the throne, and whoever wins rules it all.",
+      "poster_path": "/jRf89HVEtBZiSnOXXWDhZOfuTwW.jpg",
+      "backdrop_path": "/jSxeFrFCajefwka3TTRY4k8XVEX.jpg",
+      "release_date": "2026-03-19",
+      "vote_average": 6.939,
+      "vote_count": 236,
+      "genre_ids": [
+        27,
+        35
+      ],
+      "popularity": 76.0164,
+      "posterUrl": "https://image.tmdb.org/t/p/w500/jRf89HVEtBZiSnOXXWDhZOfuTwW.jpg",
+      "backdropUrl": "https://image.tmdb.org/t/p/original/jSxeFrFCajefwka3TTRY4k8XVEX.jpg",
+      "genres": [
+        "Horror",
+        "Comedy"
+      ]
+    },
+    {
+      "id": 1613798,
+      "title": "Vengeance",
+      "overview": "The brutal murder of the wife of “Toro,” a military hero in the special forces, turns him into a man with a single purpose: revenge. After a stroke of fate makes him a millionaire, Carlos transforms his fortune into an arsenal and, together with his closest soldiers, sets out to hunt down those responsible.",
+      "poster_path": "/ygWXPL0RS91JyJPNOfK34eV3bRE.jpg",
+      "backdrop_path": "/jJmlCFi5EjpH5vHmOczRiVDm0qS.jpg",
+      "release_date": "2026-02-26",
+      "vote_average": 6.238,
+      "vote_count": 21,
+      "genre_ids": [
+        28,
+        53
+      ],
+      "popularity": 76.1661,
+      "posterUrl": "https://image.tmdb.org/t/p/w500/ygWXPL0RS91JyJPNOfK34eV3bRE.jpg",
+      "backdropUrl": "https://image.tmdb.org/t/p/original/jJmlCFi5EjpH5vHmOczRiVDm0qS.jpg",
+      "genres": [
+        "Action",
+        "Thriller"
+      ]
+    },
+    {
+      "id": 1325734,
+      "title": "The Drama",
+      "overview": "A happily engaged couple is put to the test when an unexpected turn sends their wedding week off the rails.",
+      "poster_path": "/ikcNOWB6Qo1ER1H1BJL6Vf0W22s.jpg",
+      "backdrop_path": "/1oKLEA9JOhvaBwLpqjROisvWMy7.jpg",
+      "release_date": "2026-03-26",
+      "vote_average": 7.035,
+      "vote_count": 460,
+      "genre_ids": [
+        10749,
+        35,
+        18
+      ],
+      "popularity": 48.929,
+      "posterUrl": "https://image.tmdb.org/t/p/w500/ikcNOWB6Qo1ER1H1BJL6Vf0W22s.jpg",
+      "backdropUrl": "https://image.tmdb.org/t/p/original/1oKLEA9JOhvaBwLpqjROisvWMy7.jpg",
+      "genres": [
+        "Romance",
+        "Comedy",
+        "Drama"
+      ]
+    },
+    {
+      "id": 1367642,
+      "title": "Reminders of Him",
+      "overview": "When Diem's custodial grandparents adamantly refuse Kenna's attempts to see her daughter, Kenna discovers unexpected compassion, and then something truer and deeper, with former NFL player and local bar owner Ledger. As their secret romance develops, so do the dangers for both of them, leading Kenna toward heartbreak and, ultimately, the hope for a second chance.",
+      "poster_path": "/7L6rceYgzQ0NeHD7PRDNrRoQ291.jpg",
+      "backdrop_path": "/5rxEnsgriw8z065q51lrvPKYmCL.jpg",
+      "release_date": "2026-03-11",
+      "vote_average": 7.1,
+      "vote_count": 128,
+      "genre_ids": [
+        10749,
+        18
+      ],
+      "popularity": 64.1082,
+      "posterUrl": "https://image.tmdb.org/t/p/w500/7L6rceYgzQ0NeHD7PRDNrRoQ291.jpg",
+      "backdropUrl": "https://image.tmdb.org/t/p/original/5rxEnsgriw8z065q51lrvPKYmCL.jpg",
+      "genres": [
+        "Romance",
+        "Drama"
+      ]
+    },
+    {
+      "id": 1480387,
+      "title": "undertone",
+      "overview": "The host of a popular paranormal podcast becomes haunted by terrifying recordings mysteriously sent her way.",
+      "poster_path": "/2PFgFMnrdCPXWiZl1PUvky7Mo9D.jpg",
+      "backdrop_path": "/qXxFWyur7jFkg2aQgENcXuyYeHF.jpg",
+      "release_date": "2026-03-12",
+      "vote_average": 6.611,
+      "vote_count": 73,
+      "genre_ids": [
+        27,
+        9648
+      ],
+      "popularity": 119.4522,
+      "posterUrl": "https://image.tmdb.org/t/p/w500/2PFgFMnrdCPXWiZl1PUvky7Mo9D.jpg",
+      "backdropUrl": "https://image.tmdb.org/t/p/original/qXxFWyur7jFkg2aQgENcXuyYeHF.jpg",
+      "genres": [
+        "Horror",
+        "Mystery"
+      ]
+    },
+    {
+      "id": 1171145,
+      "title": "Crime 101",
+      "overview": "When an elusive thief whose high-stakes heists unfold along the iconic 101 freeway in Los Angeles eyes the score of a lifetime, with hopes of this being his final job, his path collides with a disillusioned insurance broker who is facing her own crossroads. Determined to crack the case, a relentless detective closes in on the operation, raising the stakes even higher.",
+      "poster_path": "/tVvpFIoteRHNnoZMhdnwIVwJpCA.jpg",
+      "backdrop_path": "/vG42HeYtoTFflqwP42wYD7tBuNr.jpg",
+      "release_date": "2026-02-11",
+      "vote_average": 6.99,
+      "vote_count": 722,
+      "genre_ids": [
+        80,
+        53
+      ],
+      "popularity": 167.3887,
+      "posterUrl": "https://image.tmdb.org/t/p/w500/tVvpFIoteRHNnoZMhdnwIVwJpCA.jpg",
+      "backdropUrl": "https://image.tmdb.org/t/p/original/vG42HeYtoTFflqwP42wYD7tBuNr.jpg",
+      "genres": [
+        "Crime",
+        "Thriller"
+      ]
+    },
+    {
+      "id": 1198994,
+      "title": "Send Help",
+      "overview": "Two colleagues become stranded on a deserted island, the only survivors of a plane crash. On the island, they must overcome past grievances and work together to survive, but ultimately, it's a battle of wills and wits to make it out alive.",
+      "poster_path": "/mjkS2iAgWj3ik1DTjvI15nHZ7yl.jpg",
+      "backdrop_path": "/gCmfeKmEAZBP5gcXpiqb0gii9rS.jpg",
+      "release_date": "2026-01-22",
+      "vote_average": 7.034,
+      "vote_count": 1025,
+      "genre_ids": [
+        27,
+        53,
+        35
+      ],
+      "popularity": 191.8247,
+      "posterUrl": "https://image.tmdb.org/t/p/w500/mjkS2iAgWj3ik1DTjvI15nHZ7yl.jpg",
+      "backdropUrl": "https://image.tmdb.org/t/p/original/gCmfeKmEAZBP5gcXpiqb0gii9rS.jpg",
+      "genres": [
+        "Horror",
+        "Thriller",
+        "Comedy"
+      ]
+    },
+    {
+      "id": 1049471,
+      "title": "Outcome",
+      "overview": "Reef Hawk, Hollywood's poster child since age six, is not okay. When he learns about an extortion plot tied to a mysterious video, Reef preemptively sets out on a redemption tour to make amends, confront his demons, and avoid getting canceled.",
+      "poster_path": "/kSzcpfbTy2pXHGvrVU2WhQTo6oU.jpg",
+      "backdrop_path": "/avwIERZtWiWa34qShf5biDzAVaF.jpg",
+      "release_date": "2026-04-06",
+      "vote_average": 5.309,
+      "vote_count": 116,
+      "genre_ids": [
+        35,
+        18
+      ],
+      "popularity": 96.5143,
+      "posterUrl": "https://image.tmdb.org/t/p/w500/kSzcpfbTy2pXHGvrVU2WhQTo6oU.jpg",
+      "backdropUrl": "https://image.tmdb.org/t/p/original/avwIERZtWiWa34qShf5biDzAVaF.jpg",
+      "genres": [
+        "Comedy",
+        "Drama"
+      ]
+    },
+    {
+      "id": 1159559,
+      "title": "Scream 7",
+      "overview": "When a new Ghostface killer emerges in the quiet town where Sidney Prescott has built a new life, her darkest fears are realized as her daughter becomes the next target. Determined to protect her family, Sidney must face the horrors of her past to put an end to the bloodshed once and for all.",
+      "poster_path": "/jjyuk0edLiW8vOSnlfwWCCLpbh5.jpg",
+      "backdrop_path": "/t9J2HXaDuJR7bvIG9XF7mttn4VY.jpg",
+      "release_date": "2026-02-25",
+      "vote_average": 6.031,
+      "vote_count": 765,
+      "genre_ids": [
+        27,
+        9648,
+        80
+      ],
+      "popularity": 127.1298,
+      "posterUrl": "https://image.tmdb.org/t/p/w500/jjyuk0edLiW8vOSnlfwWCCLpbh5.jpg",
+      "backdropUrl": "https://image.tmdb.org/t/p/original/t9J2HXaDuJR7bvIG9XF7mttn4VY.jpg",
+      "genres": [
+        "Horror",
+        "Mystery",
+        "Crime"
+      ]
+    },
+    {
+      "id": 1314481,
+      "title": "The Devil Wears Prada 2",
+      "overview": "Miranda Priestly navigates her career amid the decline of traditional magazine publishing. She faces off against Emily Charlton, her one-time assistant, now a high-powered executive for a luxury group, with advertising dollars that Priestly desperately needs.",
+      "poster_path": "/p35IoKfBtJDNiWJMO8ZEtIMZSfW.jpg",
+      "backdrop_path": "/2cr7imTLVSSrzgL3bFKAMCMdgKw.jpg",
+      "release_date": "2026-04-29",
+      "vote_average": 0,
+      "vote_count": 0,
+      "genre_ids": [
+        18,
+        35
+      ],
+      "popularity": 20.4021,
+      "posterUrl": "https://image.tmdb.org/t/p/w500/p35IoKfBtJDNiWJMO8ZEtIMZSfW.jpg",
+      "backdropUrl": "https://image.tmdb.org/t/p/original/2cr7imTLVSSrzgL3bFKAMCMdgKw.jpg",
+      "genres": [
+        "Drama",
+        "Comedy"
+      ]
+    },
+    {
+      "id": 1327819,
+      "title": "Hoppers",
+      "overview": "Scientists have discovered how to 'hop' human consciousness into lifelike robotic animals, allowing people to communicate with animals as animals. Animal lover Mabel seizes an opportunity to use the technology, uncovering mysteries within the animal world beyond anything she could have imagined.",
+      "poster_path": "/xjtWQ2CL1mpmMNwuU5HeS4Iuwuu.jpg",
+      "backdrop_path": "/u53UYu5XG2hNgWGvs3xGhAVzypl.jpg",
+      "release_date": "2026-03-04",
+      "vote_average": 7.581,
+      "vote_count": 480,
+      "genre_ids": [
+        16,
+        10751,
+        878,
+        35,
+        12
+      ],
+      "popularity": 219.481,
+      "posterUrl": "https://image.tmdb.org/t/p/w500/xjtWQ2CL1mpmMNwuU5HeS4Iuwuu.jpg",
+      "backdropUrl": "https://image.tmdb.org/t/p/original/u53UYu5XG2hNgWGvs3xGhAVzypl.jpg",
+      "genres": [
+        "Animation",
+        "Family",
+        "Sci-Fi",
+        "Comedy",
+        "Adventure"
+      ]
+    },
+    {
+      "id": 1159831,
+      "title": "The Bride!",
+      "overview": "A lonely Frankenstein travels to 1930s Chicago to ask groundbreaking scientist Dr. Euphronious to create a companion for him. The two revive a murdered young woman and The Bride is born. But what ensues is beyond what either of them imagined.",
+      "poster_path": "/lV8YHwGkYZsm6EfIqnhaSz2avKt.jpg",
+      "backdrop_path": "/l8rKKMU2M9dDULO9CEtDNdWAEUJ.jpg",
+      "release_date": "2026-03-04",
+      "vote_average": 6.225,
+      "vote_count": 333,
+      "genre_ids": [
+        878,
+        27,
+        14
+      ],
+      "popularity": 89.911,
+      "posterUrl": "https://image.tmdb.org/t/p/w500/lV8YHwGkYZsm6EfIqnhaSz2avKt.jpg",
+      "backdropUrl": "https://image.tmdb.org/t/p/original/l8rKKMU2M9dDULO9CEtDNdWAEUJ.jpg",
+      "genres": [
+        "Sci-Fi",
+        "Horror",
+        "Fantasy"
+      ]
+    }
+  ],
+  "trendingShows": [
+    {
+      "id": 85552,
+      "title": "Euphoria",
+      "overview": "A group of high school students navigate love and friendships in a world of drugs, sex, trauma, and social media.",
+      "poster_path": "/aJrG7OkoTMPWG5c8opz8a93AZPY.jpg",
+      "backdrop_path": "/GN2KFXiHPVV6sIw4v2P2pqCJty.jpg",
+      "release_date": "2019-06-16",
+      "vote_average": 8.282,
+      "vote_count": 10408,
+      "genre_ids": [
+        18
+      ],
+      "popularity": 394.5648,
+      "posterUrl": "https://image.tmdb.org/t/p/w500/aJrG7OkoTMPWG5c8opz8a93AZPY.jpg",
+      "backdropUrl": "https://image.tmdb.org/t/p/original/GN2KFXiHPVV6sIw4v2P2pqCJty.jpg",
+      "genres": [
+        "Drama"
+      ]
+    },
+    {
+      "id": 76479,
+      "title": "The Boys",
+      "overview": "A group of vigilantes known informally as “The Boys” set out to take down corrupt superheroes with no more than blue-collar grit and a willingness to fight dirty.",
+      "poster_path": "/in1R2dDc421JxsoRWaIIAqVI2KE.jpg",
+      "backdrop_path": "/bq28ajZaoMyzEIm6REelqyqtEDZ.jpg",
+      "release_date": "2019-07-25",
+      "vote_average": 8.4,
+      "vote_count": 11904,
+      "genre_ids": [
+        10765,
+        10759
+      ],
+      "popularity": 646.578,
+      "posterUrl": "https://image.tmdb.org/t/p/w500/in1R2dDc421JxsoRWaIIAqVI2KE.jpg",
+      "backdropUrl": "https://image.tmdb.org/t/p/original/bq28ajZaoMyzEIm6REelqyqtEDZ.jpg",
+      "genres": []
+    },
+    {
+      "id": 124364,
+      "title": "FROM",
+      "overview": "Unravel the mystery of a nightmarish town in middle America that traps all those who enter. As the unwilling residents fight to keep a sense of normalcy and search for a way out, they must also survive the threats of the surrounding forest – including the terrifying creatures that come out when the sun goes down.",
+      "poster_path": "/pRtJagIxpfODzzb0T0NAvZSzErC.jpg",
+      "backdrop_path": "/6gN8DYnIEln8v7OhRy61c57w0Xy.jpg",
+      "release_date": "2022-02-20",
+      "vote_average": 8.2,
+      "vote_count": 2562,
+      "genre_ids": [
+        9648,
+        18,
+        10765
+      ],
+      "popularity": 175.2807,
+      "posterUrl": "https://image.tmdb.org/t/p/w500/pRtJagIxpfODzzb0T0NAvZSzErC.jpg",
+      "backdropUrl": "https://image.tmdb.org/t/p/original/6gN8DYnIEln8v7OhRy61c57w0Xy.jpg",
+      "genres": [
+        "Mystery",
+        "Drama"
+      ]
+    },
+    {
+      "id": 37854,
+      "title": "One Piece",
+      "overview": "Years ago, the fearsome Pirate King, Gol D. Roger was executed leaving a huge pile of treasure and the famous \"One Piece\" behind. Whoever claims the \"One Piece\" will be named the new King of the Pirates.\n\nMonkey D. Luffy, a boy who consumed a \"Devil Fruit,\" decides to follow in the footsteps of his idol, the pirate Shanks, and find the One Piece. It helps, of course, that his body has the properties of rubber and that he's surrounded by a bevy of skilled fighters and thieves to help him along the way.\n\nLuffy will do anything to get the One Piece and become King of the Pirates!",
+      "poster_path": "/uiIB9ctqZFbfRXXimtpmZb5dusi.jpg",
+      "backdrop_path": "/2rmK7mnchw9Xr3XdiTFSxTTLXqv.jpg",
+      "release_date": "1999-10-20",
+      "vote_average": 8.7,
+      "vote_count": 5218,
+      "genre_ids": [
+        10759,
+        35,
+        16
+      ],
+      "popularity": 47.468,
+      "posterUrl": "https://image.tmdb.org/t/p/w500/uiIB9ctqZFbfRXXimtpmZb5dusi.jpg",
+      "backdropUrl": "https://image.tmdb.org/t/p/original/2rmK7mnchw9Xr3XdiTFSxTTLXqv.jpg",
+      "genres": [
+        "Comedy",
+        "Animation"
+      ]
+    },
+    {
+      "id": 95557,
+      "title": "INVINCIBLE",
+      "overview": "Mark Grayson is a normal teenager except for the fact that his father is the most powerful superhero on the planet. Shortly after his seventeenth birthday, Mark begins to develop powers of his own and enters into his father's tutelage.",
+      "poster_path": "/4tblBrslcKSifMVZ3TmtT2ukMor.jpg",
+      "backdrop_path": "/9qrroces8C6R9aKr08hACNPVXdZ.jpg",
+      "release_date": "2021-03-25",
+      "vote_average": 8.628,
+      "vote_count": 5567,
+      "genre_ids": [
+        16,
+        18,
+        10765,
+        10759
+      ],
+      "popularity": 238.8614,
+      "posterUrl": "https://image.tmdb.org/t/p/w500/4tblBrslcKSifMVZ3TmtT2ukMor.jpg",
+      "backdropUrl": "https://image.tmdb.org/t/p/original/9qrroces8C6R9aKr08hACNPVXdZ.jpg",
+      "genres": [
+        "Animation",
+        "Drama"
+      ]
+    },
+    {
+      "id": 250307,
+      "title": "The Pitt",
+      "overview": "The staff of Pittsburgh's Trauma Medical Center work around the clock to save lives in an overcrowded and underfunded emergency department.",
+      "poster_path": "/kvFSpESyBZMjaeOJDx7RS3P1jey.jpg",
+      "backdrop_path": "/z3BkMbCy5ajZPMyKEUwsPHuz2cV.jpg",
+      "release_date": "2025-01-09",
+      "vote_average": 8.721,
+      "vote_count": 652,
+      "genre_ids": [
+        18
+      ],
+      "popularity": 142.1153,
+      "posterUrl": "https://image.tmdb.org/t/p/w500/kvFSpESyBZMjaeOJDx7RS3P1jey.jpg",
+      "backdropUrl": "https://image.tmdb.org/t/p/original/z3BkMbCy5ajZPMyKEUwsPHuz2cV.jpg",
+      "genres": [
+        "Drama"
+      ]
+    },
+    {
+      "id": 209867,
+      "title": "Frieren: Beyond Journey's End",
+      "overview": "Decades after her party defeated the Demon King, an old friend's funeral launches the elf wizard Frieren on a journey of self-discovery.",
+      "poster_path": "/dqZENchTd7lp5zht7BdlqM7RBhD.jpg",
+      "backdrop_path": "/rBOnrVlck7BIlGeWVlzYiZeg4l2.jpg",
+      "release_date": "2023-09-29",
+      "vote_average": 8.806,
+      "vote_count": 780,
+      "genre_ids": [
+        16,
+        10759,
+        18,
+        10765
+      ],
+      "popularity": 85.9914,
+      "posterUrl": "https://image.tmdb.org/t/p/w500/dqZENchTd7lp5zht7BdlqM7RBhD.jpg",
+      "backdropUrl": "https://image.tmdb.org/t/p/original/rBOnrVlck7BIlGeWVlzYiZeg4l2.jpg",
+      "genres": [
+        "Animation",
+        "Drama"
+      ]
+    },
+    {
+      "id": 202555,
+      "title": "Daredevil: Born Again",
+      "overview": "Matt Murdock, a blind lawyer with heightened abilities, is fighting for justice through his bustling law firm, while former mob boss Wilson Fisk pursues his own political endeavors in New York. When their past identities begin to emerge, both men find themselves on an inevitable collision course.",
+      "poster_path": "/xDUoAsU8lQHOOoRkFiBuarmACDN.jpg",
+      "backdrop_path": "/qrTAc0ZtQ859Qu5O8cixJzNJpQs.jpg",
+      "release_date": "2025-03-04",
+      "vote_average": 8,
+      "vote_count": 751,
+      "genre_ids": [
+        18,
+        10759,
+        80
+      ],
+      "popularity": 95.1212,
+      "posterUrl": "https://image.tmdb.org/t/p/w500/xDUoAsU8lQHOOoRkFiBuarmACDN.jpg",
+      "backdropUrl": "https://image.tmdb.org/t/p/original/qrTAc0ZtQ859Qu5O8cixJzNJpQs.jpg",
+      "genres": [
+        "Drama",
+        "Crime"
+      ]
+    },
+    {
+      "id": 154385,
+      "title": "BEEF",
+      "overview": "A road rage incident between two strangers — a failing contractor and an unfulfilled entrepreneur — sparks a feud that brings out their darkest impulses.",
+      "poster_path": "/25ih0Xq2zWbxhhKxwhvswKYQyEr.jpg",
+      "backdrop_path": "/2VHbof9yaNhovEnaancBkXEULCT.jpg",
+      "release_date": "2023-04-06",
+      "vote_average": 7.8,
+      "vote_count": 893,
+      "genre_ids": [
+        35,
+        18
+      ],
+      "popularity": 70.9801,
+      "posterUrl": "https://image.tmdb.org/t/p/w500/25ih0Xq2zWbxhhKxwhvswKYQyEr.jpg",
+      "backdropUrl": "https://image.tmdb.org/t/p/original/2VHbof9yaNhovEnaancBkXEULCT.jpg",
+      "genres": [
+        "Comedy",
+        "Drama"
+      ]
+    },
+    {
+      "id": 95479,
+      "title": "JUJUTSU KAISEN",
+      "overview": "Yuji Itadori is a boy with tremendous physical strength, though he lives a completely ordinary high school life. One day, to save a classmate who has been attacked by curses, he eats the finger of Ryomen Sukuna, taking the curse into his own soul. From then on, he shares one body with Ryomen Sukuna. Guided by the most powerful of sorcerers, Satoru Gojo, Itadori is admitted to Tokyo Jujutsu High School, an organization that fights the curses... and thus begins the heroic tale of a boy who became a curse to exorcise a curse, a life from which he could never turn back.",
+      "poster_path": "/6qQzMJG27XOJsyAEEIisoJB45j2.jpg",
+      "backdrop_path": "/qpin8cASXEVtwhzNsprHYFiOAGk.jpg",
+      "release_date": "2020-10-03",
+      "vote_average": 8.558,
+      "vote_count": 4325,
+      "genre_ids": [
+        16,
+        10759,
+        10765
+      ],
+      "popularity": 155.3905,
+      "posterUrl": "https://image.tmdb.org/t/p/w500/6qQzMJG27XOJsyAEEIisoJB45j2.jpg",
+      "backdropUrl": "https://image.tmdb.org/t/p/original/qpin8cASXEVtwhzNsprHYFiOAGk.jpg",
+      "genres": [
+        "Animation"
+      ]
+    },
+    {
+      "id": 279471,
+      "title": "Malcolm in the Middle: Life's Still Unfair",
+      "overview": "After shielding himself and his daughter from his family for over a decade, Malcolm is dragged back into their orbit when Hal and Lois demand his presence at their 40th anniversary party.",
+      "poster_path": "/4uXAZRYtcMfoX2XtY1gcUxLHhjj.jpg",
+      "backdrop_path": "/uekZzyLReK777QKO9xKwiPOelCQ.jpg",
+      "release_date": "2026-04-10",
+      "vote_average": 8.1,
+      "vote_count": 230,
+      "genre_ids": [
+        35,
+        18
+      ],
+      "popularity": 139.7337,
+      "posterUrl": "https://image.tmdb.org/t/p/w500/4uXAZRYtcMfoX2XtY1gcUxLHhjj.jpg",
+      "backdropUrl": "https://image.tmdb.org/t/p/original/uekZzyLReK777QKO9xKwiPOelCQ.jpg",
+      "genres": [
+        "Comedy",
+        "Drama"
+      ]
+    },
+    {
+      "id": 79744,
+      "title": "The Rookie",
+      "overview": "Starting over isn't easy, especially for small-town guy John Nolan who, after a life-altering incident, is pursuing his dream of being an LAPD officer. As the force's oldest rookie, he's met with skepticism from some higher-ups who see him as just a walking midlife crisis.",
+      "poster_path": "/70kTz0OmjjZe7zHvIDrq2iKW7PJ.jpg",
+      "backdrop_path": "/6iNWfGVCEfASDdlNb05TP5nG0ll.jpg",
+      "release_date": "2018-10-16",
+      "vote_average": 8.5,
+      "vote_count": 3115,
+      "genre_ids": [
+        80,
+        18,
+        35
+      ],
+      "popularity": 266.5502,
+      "posterUrl": "https://image.tmdb.org/t/p/w500/70kTz0OmjjZe7zHvIDrq2iKW7PJ.jpg",
+      "backdropUrl": "https://image.tmdb.org/t/p/original/6iNWfGVCEfASDdlNb05TP5nG0ll.jpg",
+      "genres": [
+        "Crime",
+        "Drama",
+        "Comedy"
+      ]
+    },
+    {
+      "id": 295778,
+      "title": "Scrubs",
+      "overview": "J.D. & Turk scrub in together for the first time in a long time–medicine has changed, interns have changed, but their bromance has stood the test of time. Characters new and old navigate the waters of Sacred Heart with laughter, heart and some surprises along the way.",
+      "poster_path": "/nNNM50G7p9C3n4vgidCiybsIdHA.jpg",
+      "backdrop_path": "/kz1ceDJ7e8z8zIQNURJcGOoQ8WY.jpg",
+      "release_date": "2026-02-25",
+      "vote_average": 8.155,
+      "vote_count": 42,
+      "genre_ids": [
+        35
+      ],
+      "popularity": 31.5206,
+      "posterUrl": "https://image.tmdb.org/t/p/w500/nNNM50G7p9C3n4vgidCiybsIdHA.jpg",
+      "backdropUrl": "https://image.tmdb.org/t/p/original/kz1ceDJ7e8z8zIQNURJcGOoQ8WY.jpg",
+      "genres": [
+        "Comedy"
+      ]
+    },
+    {
+      "id": 202411,
+      "title": "Monarch: Legacy of Monsters",
+      "overview": "After surviving Godzilla's attack on San Francisco, Cate is shaken yet again by a shocking secret. Amid monstrous threats, she embarks on a globetrotting adventure to learn the truth about her family—and the mysterious organization known as Monarch.",
+      "poster_path": "/7LBbaEaLSbqdviBYaSS1rRPMnrs.jpg",
+      "backdrop_path": "/7IY4wELVMvtUc78vPiuL8kQV2iA.jpg",
+      "release_date": "2023-11-16",
+      "vote_average": 7.704,
+      "vote_count": 1159,
+      "genre_ids": [
+        10765,
+        18,
+        10759
+      ],
+      "popularity": 125.8214,
+      "posterUrl": "https://image.tmdb.org/t/p/w500/7LBbaEaLSbqdviBYaSS1rRPMnrs.jpg",
+      "backdropUrl": "https://image.tmdb.org/t/p/original/7IY4wELVMvtUc78vPiuL8kQV2iA.jpg",
+      "genres": [
+        "Drama"
+      ]
+    },
+    {
+      "id": 245318,
+      "title": "Margo's Got Money Troubles",
+      "overview": "The daughter of a former Hooter's waitress and an ex-pro wrestler, Margo is a recent college dropout and aspiring writer. Faced with a new baby, mounting pile of bills, and dwindling number of ways to pay them, Margo must find a way forward.",
+      "poster_path": "/5iVWUVfxOS1JFudntvPcLyHBw9y.jpg",
+      "backdrop_path": "/yZjaZJSW2Fbm4Hi1Y8p8f4FGCJw.jpg",
+      "release_date": "2026-04-14",
+      "vote_average": 8.208,
+      "vote_count": 12,
+      "genre_ids": [
+        18,
+        35
+      ],
+      "popularity": 108.8908,
+      "posterUrl": "https://image.tmdb.org/t/p/w500/5iVWUVfxOS1JFudntvPcLyHBw9y.jpg",
+      "backdropUrl": "https://image.tmdb.org/t/p/original/yZjaZJSW2Fbm4Hi1Y8p8f4FGCJw.jpg",
+      "genres": [
+        "Drama",
+        "Comedy"
+      ]
+    },
+    {
+      "id": 65942,
+      "title": "Re:ZERO -Starting Life in Another World-",
+      "overview": "Natsuki Subaru, an ordinary high school  student, is on his way home from the convenience store when he finds  himself transported to another world. As he's lost and confused in a new  world where he doesn't even know left from right, the only person to  reach out to him was a beautiful girl with silver hair. Determined to  repay her somehow for saving him from his own despair, Subaru agrees to  help the girl find something she's looking for.",
+      "poster_path": "/aRwmcX36r1ZpR5Xq5mmFcpUDQ8J.jpg",
+      "backdrop_path": "/x6y59dJBE1o0r4YRsWVQXE2nnlB.jpg",
+      "release_date": "2016-04-04",
+      "vote_average": 7.846,
+      "vote_count": 599,
+      "genre_ids": [
+        16,
+        10759,
+        10765,
+        9648
+      ],
+      "popularity": 53.711,
+      "posterUrl": "https://image.tmdb.org/t/p/w500/aRwmcX36r1ZpR5Xq5mmFcpUDQ8J.jpg",
+      "backdropUrl": "https://image.tmdb.org/t/p/original/x6y59dJBE1o0r4YRsWVQXE2nnlB.jpg",
+      "genres": [
+        "Animation",
+        "Mystery"
+      ]
+    },
+    {
+      "id": 289219,
+      "title": "Star Wars: Maul - Shadow Lord",
+      "overview": "After the Clone Wars, Maul plots to rebuild his criminal syndicate on a planet untouched by the Empire.",
+      "poster_path": "/fTfLd3s9yBNOzbFHD2aXvwEs93H.jpg",
+      "backdrop_path": "/5SrsdKcN9Flvccq59sIfJbhq1Fk.jpg",
+      "release_date": "2026-04-06",
+      "vote_average": 7.64,
+      "vote_count": 43,
+      "genre_ids": [
+        16,
+        10765,
+        10759
+      ],
+      "popularity": 46.7935,
+      "posterUrl": "https://image.tmdb.org/t/p/w500/fTfLd3s9yBNOzbFHD2aXvwEs93H.jpg",
+      "backdropUrl": "https://image.tmdb.org/t/p/original/5SrsdKcN9Flvccq59sIfJbhq1Fk.jpg",
+      "genres": [
+        "Animation"
+      ]
+    },
+    {
+      "id": 87917,
+      "title": "For All Mankind",
+      "overview": "Explore an aspirational world where NASA and the space program remained a priority and a focal point of our hopes and dreams as told through the lives of NASA astronauts, engineers, and their families.",
+      "poster_path": "/JP3DItWMbrrLiKR5AYUfpsNf2b.jpg",
+      "backdrop_path": "/9OQ5BIITkJwRJo9JA6AlCfJIGBQ.jpg",
+      "release_date": "2019-11-01",
+      "vote_average": 7.7,
+      "vote_count": 904,
+      "genre_ids": [
+        18,
+        10765,
+        10768
+      ],
+      "popularity": 56.0794,
+      "posterUrl": "https://image.tmdb.org/t/p/w500/JP3DItWMbrrLiKR5AYUfpsNf2b.jpg",
+      "backdropUrl": "https://image.tmdb.org/t/p/original/9OQ5BIITkJwRJo9JA6AlCfJIGBQ.jpg",
+      "genres": [
+        "Drama"
+      ]
+    },
+    {
+      "id": 287527,
+      "title": "The Testaments",
+      "overview": "Growing up in Gilead is all they have ever known. As a new generation of young women grapple with the bleak future that awaits them, they will be forced to search for allies, new and old, to help in their fight for freedom.",
+      "poster_path": "/xVsFopLisBoiKdXXecaNTN4pJ9A.jpg",
+      "backdrop_path": "/n8fffwUPi9DMxtwDIR6xoGx9ItP.jpg",
+      "release_date": "2026-04-08",
+      "vote_average": 6.7,
+      "vote_count": 20,
+      "genre_ids": [
+        18
+      ],
+      "popularity": 35.9779,
+      "posterUrl": "https://image.tmdb.org/t/p/w500/xVsFopLisBoiKdXXecaNTN4pJ9A.jpg",
+      "backdropUrl": "https://image.tmdb.org/t/p/original/n8fffwUPi9DMxtwDIR6xoGx9ItP.jpg",
+      "genres": [
+        "Drama"
+      ]
+    },
+    {
+      "id": 56570,
+      "title": "Outlander",
+      "overview": "The story of Claire Randall, a married combat nurse from 1945 who is mysteriously swept back in time to 1743, where she is immediately thrown into an unknown world where her life is threatened. When she is forced to marry Jamie, a chivalrous and romantic young Scottish warrior, a passionate affair is ignited that tears Claire's heart between two vastly different men in two irreconcilable lives.",
+      "poster_path": "/bxBmfyzK0ARF9hqf2pbFWsddH14.jpg",
+      "backdrop_path": "/nf3Vlxm3C9U1aKUUQHmKFZmxPSc.jpg",
+      "release_date": "2014-08-09",
+      "vote_average": 8.176,
+      "vote_count": 2808,
+      "genre_ids": [
+        18,
+        10765
+      ],
+      "popularity": 100.117,
+      "posterUrl": "https://image.tmdb.org/t/p/w500/bxBmfyzK0ARF9hqf2pbFWsddH14.jpg",
+      "backdropUrl": "https://image.tmdb.org/t/p/original/nf3Vlxm3C9U1aKUUQHmKFZmxPSc.jpg",
+      "genres": [
+        "Drama"
+      ]
+    }
+  ]
+}
