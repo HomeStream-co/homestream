@@ -98,6 +98,33 @@ async function getVideoCodec(filePath: string): Promise<string> {
   });
 }
 
+/**
+ * Check how many audio streams a file has.
+ * Returns 0 if none — we must omit -c:a args entirely or FFmpeg errors.
+ */
+async function getAudioStreamCount(filePath: string): Promise<number> {
+  return new Promise(resolve => {
+    const probe = spawn('ffprobe', [
+      '-v', 'quiet',
+      '-print_format', 'json',
+      '-show_streams',
+      '-select_streams', 'a',
+      filePath,
+    ]);
+    let out = '';
+    probe.stdout.on('data', (d: Buffer) => { out += d.toString(); });
+    probe.on('close', () => {
+      try {
+        const json = JSON.parse(out);
+        resolve((json.streams as unknown[])?.length ?? 0);
+      } catch {
+        resolve(0);
+      }
+    });
+    probe.on('error', () => resolve(0));
+  });
+}
+
 export async function transcodeFile(
   mediaId: string,
   inputFilename: string,
@@ -116,12 +143,21 @@ export async function transcodeFile(
   const codec = await getVideoCodec(inputPath);
   const isH264 = codec === 'h264';
 
+  // Check for audio streams — files with no audio need different FFmpeg args
+  // (passing -c:a aac on a file with no audio causes FFmpeg to error out)
+  const audioStreams = await getAudioStreamCount(inputPath);
+  const hasAudio = audioStreams > 0;
+
+  // Audio args — omit entirely if no audio track present
+  const audioArgs: string[] = hasAudio
+    ? ['-c:a', 'aac', '-b:a', '192k', '-ac', '2']
+    : ['-an']; // -an = no audio output (avoids "no audio stream" error)
+
   const ffmpegArgs = isH264
     ? [
         '-i', inputPath,
         '-c:v', 'copy',          // Copy video stream (no re-encode)
-        '-c:a', 'aac',           // Re-encode audio to AAC just in case
-        '-b:a', '192k',
+        ...audioArgs,
         '-movflags', '+faststart', // Move moov atom to front
         '-y',                    // Overwrite output
         outputPath,
@@ -133,9 +169,7 @@ export async function transcodeFile(
         '-preset', 'fast',       // Fast preset — good balance on home server
         '-profile:v', 'high',
         '-level', '4.1',
-        '-c:a', 'aac',
-        '-b:a', '192k',
-        '-ac', '2',              // Stereo
+        ...audioArgs,
         '-movflags', '+faststart',
         '-y',
         outputPath,

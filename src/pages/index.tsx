@@ -39,13 +39,18 @@ export default function HomePage() {
         </div>
       ) : featured ? (
         <div className="relative h-[70vh] overflow-hidden">
-          {/* Background poster */}
-          <img
-            src={featured.poster}
-            alt={featured.title}
-            className="absolute inset-0 w-full h-full object-cover scale-110 blur-sm"
-            style={{ filter: 'blur(2px) brightness(0.4)' }}
-          />
+          {/* Background poster — graceful fallback to gradient if poster missing/broken */}
+          {featured.poster ? (
+            <img
+              src={featured.poster}
+              alt={featured.title}
+              className="absolute inset-0 w-full h-full object-cover scale-110"
+              style={{ filter: 'blur(2px) brightness(0.4)' }}
+              onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+            />
+          ) : null}
+          {/* Fallback gradient when no poster */}
+          <div className="absolute inset-0 bg-gradient-to-br from-primary/20 via-background/60 to-background" />
           {/* Gradient overlays */}
           <div className="absolute inset-0 bg-gradient-to-r from-background via-background/60 to-transparent" />
           <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-transparent" />

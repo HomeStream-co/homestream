@@ -98,7 +98,7 @@ export default async function handler(req: Request, res: Response) {
       poster: (omdb.Poster && omdb.Poster !== 'N/A') ? omdb.Poster : item.poster,
       type: omdb.Type === 'series' ? 'series' : 'movie',
       runtime: omdb.Runtime && omdb.Runtime !== 'N/A' ? omdb.Runtime : item.runtime,
-      rated: omdb.Rated && omdb.Rated !== 'N/A' ? omdb.Rated : item.rated,
+      rated: omdb.Rated && omdb.Rated !== 'N/A' && omdb.Rated.trim() !== '' ? omdb.Rated.trim() : item.rated || 'NR',
       // Clear the offline flags now that we have real data
       needsMetadata: false,
       metadataAvailable: true,

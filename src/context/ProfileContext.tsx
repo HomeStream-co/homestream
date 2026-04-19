@@ -89,8 +89,10 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
    */
   const isAllowed = useCallback((rated?: string): boolean => {
     if (!activeProfile || !activeProfile.restricted) return true;
-    if (!rated || rated === 'N/A' || rated === 'Unknown' || rated === 'NR') return false;
-    return activeProfile.allowedRatings.includes(rated.trim().toUpperCase());
+    // Empty string, undefined, N/A, NR, Unknown — all treated as unrated → blocked for Kids
+    const normalized = (rated ?? '').trim().toUpperCase();
+    if (!normalized || normalized === 'N/A' || normalized === 'UNKNOWN' || normalized === 'NR') return false;
+    return activeProfile.allowedRatings.includes(normalized);
   }, [activeProfile]);
 
   return (

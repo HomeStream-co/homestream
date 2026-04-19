@@ -175,7 +175,7 @@ export default function handler(req: Request, res: Response) {
       poster: (omdb?.Poster && omdb.Poster !== 'N/A') ? omdb.Poster : '',
       type: omdb?.Type === 'series' ? 'series' : 'movie',
       runtime: omdb?.Runtime || 'Unknown',
-      rated: omdb?.Rated || 'NR',
+      rated: omdb?.Rated && omdb.Rated !== 'N/A' && omdb.Rated.trim() !== '' ? omdb.Rated.trim() : 'NR',
       addedAt: new Date().toISOString(),
       watchProgress: 0,
       fileSize: req.file.size,

@@ -390,6 +390,60 @@ export default function PlayerPage() {
     );
   }
 
+  // ── Still transcoding — show a friendly holding screen instead of blank video ──
+  if (item.transcoding) {
+    return (
+      <div className="min-h-screen bg-black flex flex-col items-center justify-center gap-6 px-6">
+        <title>{item.title} — HomeStream</title>
+        {/* Poster or placeholder */}
+        <div className="w-32 aspect-[2/3] rounded-xl overflow-hidden bg-card flex-shrink-0 shadow-2xl">
+          {item.poster ? (
+            <img src={item.poster} alt={item.title} className="w-full h-full object-cover" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center bg-card">
+              <svg className="w-10 h-10 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 4v16M17 4v16M3 8h4m10 0h4M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z" /></svg>
+            </div>
+          )}
+        </div>
+        <div className="text-center max-w-sm">
+          <h2 className="text-white text-xl font-heading mb-1">{item.title}</h2>
+          <p className="text-white/50 text-sm mb-6">{item.year}{item.genre[0] !== 'Unknown' ? ` · ${item.genre.slice(0, 2).join(', ')}` : ''}</p>
+          {/* Animated processing indicator */}
+          <div className="flex items-center justify-center gap-2 mb-3">
+            <div className="flex gap-1">
+              {[0, 1, 2].map(i => (
+                <div
+                  key={i}
+                  className="w-2 h-2 rounded-full bg-primary animate-bounce"
+                  style={{ animationDelay: `${i * 0.15}s` }}
+                />
+              ))}
+            </div>
+            <span className="text-white/60 text-sm">Optimizing for playback…</span>
+          </div>
+          <p className="text-white/30 text-xs">
+            HomeStream is converting this file to H.264 for instant streaming.<br />
+            This usually takes a few minutes. Come back soon.
+          </p>
+        </div>
+        <div className="flex gap-3 mt-2">
+          <button
+            onClick={() => navigate('/')}
+            className="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-white text-sm transition-colors"
+          >
+            ← Back to Home
+          </button>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 rounded-lg bg-primary hover:bg-primary/80 text-white text-sm transition-colors"
+          >
+            Check Again
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-black">
       <title>{item.title} — HomeStream</title>
@@ -694,13 +748,19 @@ export default function PlayerPage() {
                   <div className="flex gap-4 items-center bg-white/5 rounded-xl p-3 border border-white/10">
                     {/* Poster with countdown ring */}
                     <div className="relative flex-shrink-0 w-16">
-                      <div className="aspect-[2/3] rounded-lg overflow-hidden">
-                        <img
-                          src={nextItem.poster}
-                          alt={nextItem.title}
-                          className="w-full h-full object-cover"
-                          onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                        />
+                      <div className="aspect-[2/3] rounded-lg overflow-hidden bg-white/10">
+                        {nextItem.poster ? (
+                          <img
+                            src={nextItem.poster}
+                            alt={nextItem.title}
+                            className="w-full h-full object-cover"
+                            onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <svg className="w-6 h-6 text-white/30" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 4v16M17 4v16M3 8h4m10 0h4M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z" /></svg>
+                          </div>
+                        )}
                       </div>
                       {!autoplayCancelled && (
                         <div className="absolute -inset-1 flex items-center justify-center">

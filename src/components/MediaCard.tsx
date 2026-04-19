@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
-import { Play, Plus, Check, Star } from 'lucide-react';
+import { Play, Plus, Check, Star, Film } from 'lucide-react';
 import type { MediaItem } from '@/types/media';
 import { useMedia } from '@/context/MediaContext';
 
@@ -83,7 +83,7 @@ export default function MediaCard({ item, showProgress = false }: MediaCardProps
     >
       {/* Poster */}
       <div className="relative aspect-[2/3] rounded-lg overflow-hidden bg-card">
-        {!imgError ? (
+        {!imgError && item.poster ? (
           <img
             src={item.poster}
             alt={item.title}
@@ -92,8 +92,9 @@ export default function MediaCard({ item, showProgress = false }: MediaCardProps
             onError={() => setImgError(true)}
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center bg-card text-muted-foreground text-xs text-center p-2">
-            {item.title}
+          <div className="w-full h-full flex flex-col items-center justify-center gap-2 bg-card p-2">
+            <Film className="w-7 h-7 text-muted-foreground/40 flex-shrink-0" />
+            <p className="text-[10px] text-muted-foreground text-center leading-tight line-clamp-3">{item.title}</p>
           </div>
         )}
 
