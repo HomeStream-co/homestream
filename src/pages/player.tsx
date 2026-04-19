@@ -1001,7 +1001,7 @@ export default function PlayerPage() {
     if (videoRef.current) videoRef.current.currentTime = SKIP_INTRO_END;
   };
 
-  const SPEED_OPTIONS = [0.5, 0.75, 1, 1.25, 1.5, 2, 3];
+  const SPEED_OPTIONS = [3, 2, 1.5, 1.25, 1, 0.75, 0.5];
 
   const changeSpeed = (rate: number) => {
     if (videoRef.current) videoRef.current.playbackRate = rate;
@@ -1461,8 +1461,8 @@ export default function PlayerPage() {
                     </div>
                   )}
                   <div
-                    className="absolute top-1/2 -translate-y-1/2 h-1 bg-white/20 rounded-full"
-                    style={{ width: duration > 0 ? `${(buffered / duration) * 100}%` : '0%' }}
+                    className="absolute top-1/2 -translate-y-1/2 h-1 rounded-full opacity-40"
+                    style={{ width: duration > 0 ? `${(buffered / duration) * 100}%` : '0%', background: playerAccent }}
                   />
                   <input
                     ref={seekBarRef}
@@ -1473,7 +1473,7 @@ export default function PlayerPage() {
                     onChange={handleSeek}
                     onMouseMove={handleSeekHover}
                     onMouseLeave={() => setSeekHover(null)}
-                    className={`w-full h-1 appearance-none bg-white/20 rounded-full cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white ${tvFocus === 'seek' ? 'ring-2 ring-white/60 ring-offset-1 ring-offset-transparent' : ''}`}
+                    className={`w-full h-1 appearance-none bg-white/20 rounded-full cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary ${tvFocus === 'seek' ? 'ring-2 ring-white/60 ring-offset-1 ring-offset-transparent' : ''}`}
                     style={{
                       background: `linear-gradient(to right, ${playerAccent} ${duration > 0 ? (currentTime / duration) * 100 : 0}%, rgba(255,255,255,0.2) 0%)`,
                     }}
@@ -1584,13 +1584,14 @@ export default function PlayerPage() {
                                     onClick={() => changeSpeed(rate)}
                                     className={`w-full text-left px-3 py-1.5 text-sm transition-colors flex items-center justify-between gap-3 ${
                                       playbackRate === rate
-                                        ? 'text-primary bg-primary/20'
+                                        ? 'bg-primary/20 font-semibold'
                                         : 'text-white/80 hover:text-white hover:bg-white/10'
                                     }`}
+                                    style={playbackRate === rate ? { color: 'hsl(var(--primary))' } : undefined}
                                   >
-                                    <span>{rate === 1 ? 'Normal' : `${rate}×`}</span>
+                                    <span>{rate === 1 ? '1×  Normal' : `${rate}×`}</span>
                                     {playbackRate === rate && (
-                                      <div className="w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0" />
+                                      <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: 'hsl(var(--primary))' }} />
                                     )}
                                   </button>
                                 ))}
