@@ -21,7 +21,7 @@ const DEMO_ITEM = {
   year: '2008',
   filename: '__demo__big-buck-bunny.mp4',
   filePath: '__demo__',
-  demoStreamUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+  demoStreamUrl: 'https://download.blender.org/peach/bigbuckbunny_movies/BigBuckBunny_320x180.mp4',
   poster: 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/Big_buck_bunny_poster_big.jpg/800px-Big_buck_bunny_poster_big.jpg',
   backdrop: 'https://peach.blender.org/wp-content/uploads/bbb-splash.png',
   plot: 'A large and lovable rabbit deals with three bullying rodents who want to steal his berries. Freely licensed under Creative Commons by the Blender Foundation.',
@@ -39,18 +39,24 @@ const DEMO_ITEM = {
   addedAt: new Date().toISOString(),
 };
 
-// Seed once per process lifetime — avoids a write on every request
+// Seed once at module load — fires as soon as the API route is first imported,
+// which happens on the first request to any /api/* endpoint.
 let demoSeeded = false;
 
 function ensureDemoSeeded() {
   if (demoSeeded) return;
   demoSeeded = true;
-  const library = readLibrary<Record<string, unknown>>();
-  if (library.find(m => m.id === 'demo-bbb')) return;
-  writeLibrary(lib => {
-    lib.unshift(DEMO_ITEM as unknown as Record<string, unknown>);
-    return lib;
-  }).catch(err => console.warn('[demo] Seed failed:', err));
+  try {
+    const library = readLibrary<Record<string, unknown>>();
+    if (library.find(m => m.id === 'demo-bbb')) return;
+    writeLibrary(lib => {
+      lib.unshift(DEMO_ITEM as unknown as Record<string, unknown>);
+      return lib;
+    }).catch(err => console.warn('[demo] Seed failed:', err));
+    console.log('[demo] Big Buck Bunny seeded into library');
+  } catch (err) {
+    console.warn('[demo] Seed error (non-fatal):', err);
+  }
 }
 
 type ProfileId = 'adult' | 'kids';
