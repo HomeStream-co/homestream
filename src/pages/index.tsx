@@ -30,6 +30,7 @@ import MediaCard from '@/components/MediaCard';
 import HeroBanner from '@/components/HeroBanner';
 import OfflineBanner from '@/components/OfflineBanner';
 import LazySection from '@/components/LazySection';
+import HomePageSkeleton from '@/components/HomePageSkeleton';
 import { Skeleton } from '@/components/ui/skeleton';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -54,6 +55,11 @@ export default function HomePage() {
   const { isAllowed, activeProfile } = useProfile();
   const { upcoming, loading: tmdbLoading, stale: tmdbStale, error: tmdbError } = useTMDBContext();
   const navigate = useNavigate();
+
+  // ── Show skeleton on first load (library not yet fetched) ──
+  if (loading && library.length === 0) {
+    return <HomePageSkeleton />;
+  }
   const [searchParams, setSearchParams] = useSearchParams();
 
   // ── Search / filter state ──

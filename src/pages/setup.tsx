@@ -43,7 +43,8 @@ interface FormData {
   vpnProtocol: 'wireguard' | 'openvpn';
   vpnProvider: string;
   vpnConfigContent: string;
-  vpnKillSwitch: boolean;
+  vpnUsername: string;
+  vpnPassword: string;
   vpnAutoConnect: boolean;
 }
 
@@ -96,9 +97,10 @@ export default function SetupPage() {
     // VPN defaults
     vpnEnabled: false,
     vpnProtocol: 'wireguard',
-    vpnProvider: 'Custom',
+    vpnProvider: 'custom',
     vpnConfigContent: '',
-    vpnKillSwitch: false,
+    vpnUsername: '',
+    vpnPassword: '',
     vpnAutoConnect: false,
   });
   const [status, setStatus] = useState<StepStatus>({
@@ -746,171 +748,260 @@ export default function SetupPage() {
             )}
 
             {/* ── STEP 4: VPN ── */}
-            {step === 4 && (
-              <div className="flex flex-col gap-6">
-                <div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <Lock className="w-5 h-5 text-primary" />
-                    <h2 className="text-xl font-heading font-bold text-foreground">VPN Protection</h2>
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    Route torrent traffic through a VPN to prevent ISP throttling and DMCA notices.
-                    Requires WireGuard or OpenVPN installed on your server.
-                  </p>
-                </div>
+            {step === 4 && (() => {
+              // Provider metadata (mirrors vpnService.ts VPN_PROVIDERS)
+              type ProviderAuthType = 'config_file' | 'credentials';
+              interface ProviderMeta {
+                id: string; name: string; authType: ProviderAuthType;
+                protocol: 'wireguard' | 'openvpn'; configUrl?: string;
+              }
+              const PROVIDERS: ProviderMeta[] = [
+                { id: 'mullvad',    name: 'Mullvad',                  authType: 'config_file',  protocol: 'wireguard', configUrl: 'https://mullvad.net/en/account/wireguard-config' },
+                { id: 'protonvpn',  name: 'ProtonVPN',                authType: 'config_file',  protocol: 'wireguard', configUrl: 'https://account.proton.me/u/0/vpn/WireGuard' },
+                { id: 'surfshark',  name: 'Surfshark',                authType: 'config_file',  protocol: 'wireguard', configUrl: 'https://my.surfshark.com/vpn/manual-setup/main/wireguard' },
+                { id: 'nordvpn',    name: 'NordVPN',                  authType: 'credentials',  protocol: 'openvpn',   configUrl: 'https://downloads.nordcdn.com/configs/archives/servers/ovpn_udp.zip' },
+                { id: 'expressvpn', name: 'ExpressVPN',               authType: 'credentials',  protocol: 'openvpn',   configUrl: 'https://www.expressvpn.com/setup#manual' },
+                { id: 'norton',     name: 'Norton VPN',               authType: 'credentials',  protocol: 'openvpn',   configUrl: 'https://support.norton.com/sp/en/us/home/current/solutions/v134005887' },
+                { id: 'pia',        name: 'Private Internet Access',  authType: 'config_file',  protocol: 'openvpn',   configUrl: 'https://www.privateinternetaccess.com/openvpn/openvpn.zip' },
+                { id: 'ipvanish',   name: 'IPVanish',                 authType: 'credentials',  protocol: 'openvpn',   configUrl: 'https://www.ipvanish.com/software/configs/' },
+                { id: 'ivpn',       name: 'IVPN',                     authType: 'config_file',  protocol: 'wireguard', configUrl: 'https://www.ivpn.net/account/wireguard' },
+                { id: 'airvpn',     name: 'AirVPN',                   authType: 'config_file',  protocol: 'openvpn',   configUrl: 'https://airvpn.org/generator/' },
+                { id: 'custom',     name: 'Custom / Other',           authType: 'config_file',  protocol: 'wireguard' },
+              ];
 
-                {/* Enable toggle */}
-                <div className="flex items-center justify-between p-4 bg-muted/30 rounded-xl border border-border">
-                  <div className="flex items-center gap-3">
-                    <Globe className="w-5 h-5 text-primary" />
-                    <div>
-                      <p className="text-sm font-semibold text-foreground">Enable VPN</p>
-                      <p className="text-xs text-muted-foreground">Protect download traffic with a VPN tunnel</p>
+              const selectedProvider = PROVIDERS.find(p => p.id === form.vpnProvider) ?? PROVIDERS[PROVIDERS.length - 1];
+              const needsCredentials = selectedProvider.authType === 'credentials';
+
+              return (
+                <div className="flex flex-col gap-5">
+                  {/* Header */}
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <Lock className="w-5 h-5 text-primary" />
+                      <h2 className="text-xl font-heading font-bold text-foreground">VPN Protection</h2>
+                    </div>
+                    <p className="text-sm text-muted-foreground leading-relaxed">
+                      Protects your downloads from ISP throttling and DMCA notices.
+                    </p>
+                    {/* Download-only callout */}
+                    <div className="mt-3 flex items-start gap-2.5 p-3 bg-primary/5 border border-primary/20 rounded-xl">
+                      <Shield className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
+                      <div>
+                        <p className="text-xs font-semibold text-foreground">Downloads only — streaming is never slowed down</p>
+                        <p className="text-[11px] text-muted-foreground mt-0.5">
+                          The VPN tunnel activates automatically when a torrent starts and disconnects when it finishes.
+                          Video playback always uses your direct connection for full speed.
+                        </p>
+                      </div>
                     </div>
                   </div>
-                  <button
+
+                  {/* Enable toggle */}
+                  <div
                     onClick={() => set('vpnEnabled', !form.vpnEnabled)}
-                    className="text-primary"
+                    className={`flex items-center justify-between p-4 rounded-xl border cursor-pointer transition-colors ${
+                      form.vpnEnabled ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/30 bg-muted/20'
+                    }`}
                   >
+                    <div className="flex items-center gap-3">
+                      <Globe className={`w-5 h-5 ${form.vpnEnabled ? 'text-primary' : 'text-muted-foreground'}`} />
+                      <div>
+                        <p className="text-sm font-semibold text-foreground">Enable VPN for Downloads</p>
+                        <p className="text-xs text-muted-foreground">Automatically tunnel torrent traffic</p>
+                      </div>
+                    </div>
                     {form.vpnEnabled
-                      ? <ToggleRight className="w-8 h-8" />
+                      ? <ToggleRight className="w-8 h-8 text-primary" />
                       : <ToggleLeft className="w-8 h-8 text-muted-foreground" />}
-                  </button>
-                </div>
+                  </div>
 
-                {form.vpnEnabled && (
-                  <div className="flex flex-col gap-4">
-                    {/* Protocol */}
-                    <div>
-                      <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 block">Protocol</label>
-                      <div className="grid grid-cols-2 gap-2">
-                        {(['wireguard', 'openvpn'] as const).map(proto => (
-                          <button
-                            key={proto}
-                            onClick={() => set('vpnProtocol', proto)}
-                            className={`p-3 rounded-xl border text-sm font-semibold transition-colors ${
-                              form.vpnProtocol === proto
-                                ? 'border-primary bg-primary/10 text-primary'
-                                : 'border-border text-muted-foreground hover:border-primary/40'
-                            }`}
-                          >
-                            {proto === 'wireguard' ? '⚡ WireGuard' : '🔒 OpenVPN'}
-                            {proto === 'wireguard' && (
-                              <span className="block text-[10px] font-normal mt-0.5 opacity-70">Faster, recommended</span>
-                            )}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Provider name */}
-                    <div>
-                      <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1 block">
-                        Provider Name <span className="font-normal normal-case">(for display only)</span>
-                      </label>
-                      <input
-                        type="text"
-                        value={form.vpnProvider}
-                        onChange={e => set('vpnProvider', e.target.value)}
-                        placeholder="e.g. Mullvad, ProtonVPN, NordVPN, Custom"
-                        className="w-full px-3 py-2 text-sm bg-card border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary"
-                      />
-                    </div>
-
-                    {/* Config file */}
-                    <div>
-                      <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1 block">
-                        {form.vpnProtocol === 'wireguard' ? 'WireGuard Config (.conf)' : 'OpenVPN Config (.ovpn)'}
-                      </label>
-                      <div className="relative">
-                        <textarea
-                          value={form.vpnConfigContent}
-                          onChange={e => set('vpnConfigContent', e.target.value)}
-                          placeholder={form.vpnProtocol === 'wireguard'
-                            ? '[Interface]\nPrivateKey = ...\nAddress = ...\n\n[Peer]\nPublicKey = ...\nEndpoint = ...'
-                            : 'client\ndev tun\nproto udp\nremote vpn.example.com 1194\n...'
-                          }
-                          rows={8}
-                          className="w-full px-3 py-2 text-xs font-mono bg-card border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary resize-none"
-                        />
-                        <label className="absolute bottom-2 right-2 cursor-pointer">
-                          <input
-                            type="file"
-                            accept=".conf,.ovpn,.txt"
-                            className="hidden"
-                            onChange={async e => {
-                              const file = e.target.files?.[0];
-                              if (!file) return;
-                              const text = await file.text();
-                              set('vpnConfigContent', text);
-                            }}
-                          />
-                          <span className="flex items-center gap-1 text-[10px] text-primary hover:text-primary/80 bg-card border border-border rounded px-2 py-1">
-                            <Upload className="w-3 h-3" />
-                            Upload file
-                          </span>
+                  {form.vpnEnabled && (
+                    <div className="flex flex-col gap-4">
+                      {/* Provider grid */}
+                      <div>
+                        <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 block">
+                          Your VPN Provider
                         </label>
-                      </div>
-                    </div>
-
-                    {/* Test config */}
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={async () => {
-                          setVpnTestState('testing');
-                          setVpnTestMsg('');
-                          try {
-                            const res = await fetch('/api/vpn', {
-                              method: 'POST',
-                              headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({
-                                action: 'test',
-                                protocol: form.vpnProtocol,
-                                configContent: form.vpnConfigContent,
-                              }),
-                            });
-                            const data = await res.json() as { ok: boolean; error?: string };
-                            setVpnTestState(data.ok ? 'ok' : 'error');
-                            setVpnTestMsg(data.error ?? 'Config looks valid!');
-                          } catch {
-                            setVpnTestState('error');
-                            setVpnTestMsg('Could not reach VPN API');
-                          }
-                        }}
-                        disabled={!form.vpnConfigContent.trim() || vpnTestState === 'testing'}
-                        className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-muted hover:bg-muted/80 text-sm font-medium text-foreground disabled:opacity-50 transition-colors"
-                      >
-                        {vpnTestState === 'testing'
-                          ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                          : vpnTestState === 'ok'
-                            ? <CheckCircle className="w-3.5 h-3.5 text-green-500" />
-                            : vpnTestState === 'error'
-                              ? <XCircleIcon className="w-3.5 h-3.5 text-red-400" />
-                              : <Shield className="w-3.5 h-3.5" />
-                        }
-                        Validate Config
-                      </button>
-                      {vpnTestMsg && (
-                        <span className={`text-xs ${vpnTestState === 'ok' ? 'text-green-500' : 'text-red-400'}`}>
-                          {vpnTestMsg}
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Kill switch + auto-connect */}
-                    <div className="grid grid-cols-2 gap-3">
-                      <div
-                        onClick={() => set('vpnKillSwitch', !form.vpnKillSwitch)}
-                        className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${
-                          form.vpnKillSwitch ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/40'
-                        }`}
-                      >
-                        <Shield className={`w-4 h-4 ${form.vpnKillSwitch ? 'text-primary' : 'text-muted-foreground'}`} />
-                        <div>
-                          <p className="text-xs font-semibold text-foreground">Kill Switch</p>
-                          <p className="text-[10px] text-muted-foreground">Block all traffic if VPN drops</p>
+                        <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-4">
+                          {PROVIDERS.map(p => (
+                            <button
+                              key={p.id}
+                              onClick={() => {
+                                set('vpnProvider', p.id);
+                                set('vpnProtocol', p.protocol);
+                              }}
+                              className={`flex flex-col items-center justify-center gap-1 p-2.5 rounded-xl border text-center transition-all ${
+                                form.vpnProvider === p.id
+                                  ? 'border-primary bg-primary/10 text-primary'
+                                  : 'border-border text-muted-foreground hover:border-primary/40 hover:text-foreground'
+                              }`}
+                            >
+                              <span className="text-[11px] font-semibold leading-tight">{p.name}</span>
+                              <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-medium ${
+                                p.protocol === 'wireguard'
+                                  ? 'bg-green-500/10 text-green-500'
+                                  : 'bg-blue-500/10 text-blue-400'
+                              }`}>
+                                {p.protocol === 'wireguard' ? 'WireGuard' : 'OpenVPN'}
+                              </span>
+                            </button>
+                          ))}
                         </div>
                       </div>
+
+                      {/* Config file — for config_file providers */}
+                      {!needsCredentials && (
+                        <div>
+                          <div className="flex items-center justify-between mb-1">
+                            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                              {selectedProvider.protocol === 'wireguard' ? 'WireGuard Config (.conf)' : 'OpenVPN Config (.ovpn)'}
+                            </label>
+                            {selectedProvider.configUrl && (
+                              <a href={selectedProvider.configUrl} target="_blank" rel="noopener noreferrer"
+                                className="text-[10px] text-primary hover:underline flex items-center gap-0.5">
+                                Get config from {selectedProvider.name} <ExternalLink className="w-2.5 h-2.5" />
+                              </a>
+                            )}
+                          </div>
+                          <div className="relative">
+                            <textarea
+                              value={form.vpnConfigContent}
+                              onChange={e => set('vpnConfigContent', e.target.value)}
+                              placeholder={selectedProvider.protocol === 'wireguard'
+                                ? '[Interface]\nPrivateKey = ...\nAddress = 10.x.x.x/32\nDNS = 1.1.1.1\n\n[Peer]\nPublicKey = ...\nEndpoint = vpn.example.com:51820\nAllowedIPs = 0.0.0.0/0'
+                                : 'client\ndev tun\nproto udp\nremote vpn.example.com 1194\n...'
+                              }
+                              rows={7}
+                              className="w-full px-3 py-2 text-xs font-mono bg-card border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary resize-none"
+                            />
+                            <label className="absolute bottom-2 right-2 cursor-pointer">
+                              <input type="file" accept=".conf,.ovpn,.txt" className="hidden"
+                                onChange={async e => {
+                                  const file = e.target.files?.[0];
+                                  if (!file) return;
+                                  set('vpnConfigContent', await file.text());
+                                }}
+                              />
+                              <span className="flex items-center gap-1 text-[10px] text-primary hover:text-primary/80 bg-card border border-border rounded px-2 py-1">
+                                <Upload className="w-3 h-3" /> Upload file
+                              </span>
+                            </label>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Credentials — for credential-based providers */}
+                      {needsCredentials && (
+                        <div className="flex flex-col gap-3">
+                          <div className="p-3 bg-muted/30 rounded-xl border border-border">
+                            <p className="text-xs text-muted-foreground leading-relaxed">
+                              <span className="font-semibold text-foreground">{selectedProvider.name}</span> uses username + password authentication.
+                              Enter your VPN credentials below. You'll also need to{' '}
+                              {selectedProvider.configUrl ? (
+                                <a href={selectedProvider.configUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                                  download a server config file <ExternalLink className="w-2.5 h-2.5 inline" />
+                                </a>
+                              ) : 'download a server config file'}{' '}
+                              and paste it in the Config field below.
+                            </p>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1 block">Username</label>
+                              <input
+                                type="text"
+                                value={form.vpnUsername}
+                                onChange={e => set('vpnUsername', e.target.value)}
+                                placeholder="VPN username"
+                                className="w-full px-3 py-2 text-sm bg-card border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1 block">Password</label>
+                              <input
+                                type="password"
+                                value={form.vpnPassword}
+                                onChange={e => set('vpnPassword', e.target.value)}
+                                placeholder="VPN password"
+                                className="w-full px-3 py-2 text-sm bg-card border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary"
+                              />
+                            </div>
+                          </div>
+                          {/* Config file still needed for server address */}
+                          <div>
+                            <div className="flex items-center justify-between mb-1">
+                              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                                Server Config (.ovpn)
+                              </label>
+                            </div>
+                            <div className="relative">
+                              <textarea
+                                value={form.vpnConfigContent}
+                                onChange={e => set('vpnConfigContent', e.target.value)}
+                                placeholder={'client\ndev tun\nproto udp\nremote vpn.example.com 1194\nauth-user-pass\n...'}
+                                rows={5}
+                                className="w-full px-3 py-2 text-xs font-mono bg-card border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary resize-none"
+                              />
+                              <label className="absolute bottom-2 right-2 cursor-pointer">
+                                <input type="file" accept=".conf,.ovpn,.txt" className="hidden"
+                                  onChange={async e => {
+                                    const file = e.target.files?.[0];
+                                    if (!file) return;
+                                    set('vpnConfigContent', await file.text());
+                                  }}
+                                />
+                                <span className="flex items-center gap-1 text-[10px] text-primary hover:text-primary/80 bg-card border border-border rounded px-2 py-1">
+                                  <Upload className="w-3 h-3" /> Upload .ovpn
+                                </span>
+                              </label>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Validate config */}
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={async () => {
+                            setVpnTestState('testing');
+                            setVpnTestMsg('');
+                            try {
+                              const r = await fetch('/api/vpn', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                  action: 'test',
+                                  protocol: form.vpnProtocol,
+                                  configContent: form.vpnConfigContent,
+                                  username: form.vpnUsername || undefined,
+                                  password: form.vpnPassword || undefined,
+                                }),
+                              });
+                              const data = await r.json() as { ok: boolean; error?: string };
+                              setVpnTestState(data.ok ? 'ok' : 'error');
+                              setVpnTestMsg(data.error ?? 'Config looks valid!');
+                            } catch {
+                              setVpnTestState('error');
+                              setVpnTestMsg('Could not reach VPN API');
+                            }
+                          }}
+                          disabled={!form.vpnConfigContent.trim() || vpnTestState === 'testing'}
+                          className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-muted hover:bg-muted/80 text-sm font-medium text-foreground disabled:opacity-50 transition-colors"
+                        >
+                          {vpnTestState === 'testing' ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            : vpnTestState === 'ok' ? <CheckCircle className="w-3.5 h-3.5 text-green-500" />
+                            : vpnTestState === 'error' ? <XCircleIcon className="w-3.5 h-3.5 text-red-400" />
+                            : <Shield className="w-3.5 h-3.5" />}
+                          Validate Config
+                        </button>
+                        {vpnTestMsg && (
+                          <span className={`text-xs ${vpnTestState === 'ok' ? 'text-green-500' : 'text-red-400'}`}>
+                            {vpnTestMsg}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Auto-connect toggle */}
                       <div
                         onClick={() => set('vpnAutoConnect', !form.vpnAutoConnect)}
                         className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${
@@ -918,73 +1009,58 @@ export default function SetupPage() {
                         }`}
                       >
                         <Zap className={`w-4 h-4 ${form.vpnAutoConnect ? 'text-primary' : 'text-muted-foreground'}`} />
-                        <div>
-                          <p className="text-xs font-semibold text-foreground">Auto-Connect</p>
-                          <p className="text-[10px] text-muted-foreground">Connect on startup</p>
+                        <div className="flex-1">
+                          <p className="text-xs font-semibold text-foreground">Auto-Connect on Download</p>
+                          <p className="text-[10px] text-muted-foreground">Tunnel activates automatically when any download starts</p>
                         </div>
+                        {form.vpnAutoConnect
+                          ? <ToggleRight className="w-6 h-6 text-primary" />
+                          : <ToggleLeft className="w-6 h-6 text-muted-foreground" />}
                       </div>
                     </div>
+                  )}
 
-                    {/* Provider quick-start links */}
-                    <div className="p-3 bg-muted/30 rounded-xl border border-border">
-                      <p className="text-xs font-semibold text-foreground mb-2">Get a VPN config file:</p>
-                      <div className="flex flex-wrap gap-2">
-                        {[
-                          { name: 'Mullvad', url: 'https://mullvad.net/en/account/wireguard-config' },
-                          { name: 'ProtonVPN', url: 'https://account.proton.me/u/0/vpn/WireGuard' },
-                          { name: 'IVPN', url: 'https://www.ivpn.net/account/wireguard' },
-                          { name: 'AirVPN', url: 'https://airvpn.org/generator/' },
-                        ].map(p => (
-                          <a key={p.name} href={p.url} target="_blank" rel="noopener noreferrer"
-                            className="text-[10px] text-primary hover:underline flex items-center gap-0.5">
-                            {p.name} <ExternalLink className="w-2.5 h-2.5" />
-                          </a>
-                        ))}
-                      </div>
+                  {!form.vpnEnabled && (
+                    <div className="p-4 bg-muted/20 rounded-xl border border-dashed border-border text-center">
+                      <p className="text-sm text-muted-foreground">
+                        No VPN — you can add one later in Settings → VPN.
+                      </p>
                     </div>
-                  </div>
-                )}
+                  )}
 
-                {!form.vpnEnabled && (
-                  <div className="p-4 bg-muted/20 rounded-xl border border-dashed border-border text-center">
-                    <p className="text-sm text-muted-foreground">
-                      Skip this step — you can configure VPN later in Settings.
-                    </p>
+                  {/* Navigation */}
+                  <div className="flex gap-2 mt-1">
+                    <button onClick={() => setStep(3)} className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-border text-muted-foreground hover:text-foreground text-sm transition-colors">
+                      <ChevronLeft className="w-4 h-4" /> Back
+                    </button>
+                    <button
+                      onClick={async () => {
+                        if (form.vpnEnabled) {
+                          await fetch('/api/vpn', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              action: 'save',
+                              enabled: true,
+                              protocol: form.vpnProtocol,
+                              provider: form.vpnProvider,
+                              configContent: form.vpnConfigContent,
+                              username: form.vpnUsername || undefined,
+                              password: form.vpnPassword || undefined,
+                              autoConnect: form.vpnAutoConnect,
+                            }),
+                          }).catch(() => {});
+                        }
+                        setStep(5);
+                      }}
+                      className="flex-1 flex items-center justify-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground py-2.5 rounded-xl font-semibold text-sm transition-colors"
+                    >
+                      {form.vpnEnabled ? 'Save & Continue' : 'Skip'} <ChevronRight className="w-4 h-4" />
+                    </button>
                   </div>
-                )}
-
-                {/* Navigation */}
-                <div className="flex gap-2 mt-2">
-                  <button onClick={() => setStep(3)} className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-border text-muted-foreground hover:text-foreground text-sm transition-colors">
-                    <ChevronLeft className="w-4 h-4" /> Back
-                  </button>
-                  <button
-                    onClick={async () => {
-                      if (form.vpnEnabled && form.vpnConfigContent.trim()) {
-                        // Save VPN config
-                        await fetch('/api/vpn', {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({
-                            action: 'save',
-                            enabled: form.vpnEnabled,
-                            protocol: form.vpnProtocol,
-                            provider: form.vpnProvider,
-                            configContent: form.vpnConfigContent,
-                            killSwitch: form.vpnKillSwitch,
-                            autoConnect: form.vpnAutoConnect,
-                          }),
-                        }).catch(() => {});
-                      }
-                      setStep(5);
-                    }}
-                    className="flex-1 flex items-center justify-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground py-2.5 rounded-xl font-semibold text-sm transition-colors"
-                  >
-                    {form.vpnEnabled ? 'Save & Continue' : 'Skip'} <ChevronRight className="w-4 h-4" />
-                  </button>
                 </div>
-              </div>
-            )}
+              );
+            })()}
 
             {/* ── STEP 5: API Keys ── */}
             {step === 5 && (

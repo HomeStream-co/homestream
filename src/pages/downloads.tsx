@@ -20,6 +20,7 @@ import {
   RefreshCw, X, ChevronDown, ChevronUp, Activity,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import VPNPanel from '@/components/VPNPanel';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -551,6 +552,11 @@ export default function DownloadsPage() {
                 <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
               </button>
             </div>
+          </div>
+
+          {/* ── VPN Panel ── */}
+          <div className="mb-6">
+            <VPNPanel />
           </div>
 
           {/* ── Global transfer stats bar ── */}

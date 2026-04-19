@@ -1,6 +1,7 @@
 import { useRef } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import MediaCard from '@/components/MediaCard';
+import TrailerHover from '@/components/TrailerHover';
 import type { MediaItem } from '@/types/media';
 
 interface MediaCarouselProps {
@@ -8,9 +9,17 @@ interface MediaCarouselProps {
   items: MediaItem[];
   showProgress?: boolean;
   titleIcon?: React.ReactNode;
+  /** Enable trailer-on-hover previews (default: true) */
+  trailerPreview?: boolean;
 }
 
-export default function MediaCarousel({ title, items, showProgress, titleIcon }: MediaCarouselProps) {
+export default function MediaCarousel({
+  title,
+  items,
+  showProgress,
+  titleIcon,
+  trailerPreview = true,
+}: MediaCarouselProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   if (items.length === 0) return null;
@@ -43,7 +52,13 @@ export default function MediaCarousel({ title, items, showProgress, titleIcon }:
           style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
         >
           {items.map(item => (
-            <MediaCard key={item.id} item={item} showProgress={showProgress} />
+            trailerPreview ? (
+              <TrailerHover key={item.id} item={item}>
+                <MediaCard item={item} showProgress={showProgress} />
+              </TrailerHover>
+            ) : (
+              <MediaCard key={item.id} item={item} showProgress={showProgress} />
+            )
           ))}
         </div>
 

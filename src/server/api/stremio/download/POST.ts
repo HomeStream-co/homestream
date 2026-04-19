@@ -3,6 +3,8 @@ import { pickBestStream } from '../../../torrentManager.js';
 import { addMagnet, isReachable } from '../../../qbittorrentClient.js';
 import { readConfig } from '../../../configStore.js';
 import { runPreDownloadScan } from '../../../security/threatScanner.js';
+import { connectForDownload, disconnectAfterDownload } from '../../../vpnService.js';
+import type { VPNConfig } from '../../../vpnService.js';
 
 /**
  * POST /api/stremio/download
@@ -221,6 +223,28 @@ export default async function handler(req: Request, res: Response) {
   const useQbit = await isReachable();
   console.log(`[download] Backend: ${useQbit ? 'qBittorrent' : 'WebTorrent (fallback)'}`);
 
+  // ── VPN: connect before download (download-only, never affects streaming) ──
+  const fullConfig = readConfig() as unknown as Record<string, unknown>;
+  const vpnCfg = fullConfig.vpn as VPNConfig | undefined;
+  let vpnConnected = false;
+
+  if (vpnCfg?.enabled) {
+    const vpnResult = await connectForDownload(vpnCfg);
+    if (!vpnResult.ok) {
+      console.warn(`[vpn] Failed to connect: ${vpnResult.error} — proceeding without VPN`);
+    } else {
+      vpnConnected = true;
+      console.log(`[vpn] Tunnel up (${vpnCfg.protocol}) — download traffic protected`);
+    }
+  }
+
+  // Helper to disconnect VPN after all downloads are queued
+  const releaseVPN = async () => {
+    if (vpnConnected && vpnCfg) {
+      await disconnectAfterDownload(vpnCfg);
+    }
+  };;
+
   try {
     if (type === 'movie') {
       let streams = preloadedStreams;
@@ -229,6 +253,7 @@ export default async function handler(req: Request, res: Response) {
       }
       const best = pickBestStream(streams ?? []);
       if (!best) {
+        await releaseVPN();
         res.status(404).json({ error: 'No suitable streams found for this title' });
         return;
       }
@@ -237,6 +262,7 @@ export default async function handler(req: Request, res: Response) {
         // ── Security scan before queuing ──────────────────────────────────────
         const scan = await runPreDownloadScan({ infoHash: best.infoHash, title });
         if (!scan.allowed) {
+          await releaseVPN();
           res.status(403).json({
             error: 'Download blocked by security scan',
             reason: scan.reason,
@@ -247,11 +273,13 @@ export default async function handler(req: Request, res: Response) {
           return;
         }
         const job = await queueViaQbit({ infoHash: best.infoHash, magnet: best.magnet, quality: best.quality, type: 'movie', title, imdbId, poster });
-        res.json({ queued: 1, jobs: [job], backend: 'qbittorrent', securityScan: scan });
+        await releaseVPN();
+        res.json({ queued: 1, jobs: [job], backend: 'qbittorrent', securityScan: scan, vpnUsed: vpnConnected });
       } else {
         // ── Security scan before queuing ──────────────────────────────────────
         const scan = await runPreDownloadScan({ infoHash: best.infoHash, title });
         if (!scan.allowed) {
+          await releaseVPN();
           res.status(403).json({
             error: 'Download blocked by security scan',
             reason: scan.reason,
@@ -264,7 +292,8 @@ export default async function handler(req: Request, res: Response) {
         // Fallback to WebTorrent
         const { queueDownload } = await import('../../../torrentManager.js');
         const job = queueDownload({ infoHash: best.infoHash, magnet: best.magnet, quality: best.quality, type: 'movie', title, imdbId, poster, year });
-        res.json({ queued: 1, jobs: [job], backend: 'webtorrent', securityScan: scan });
+        await releaseVPN();
+        res.json({ queued: 1, jobs: [job], backend: 'webtorrent', securityScan: scan, vpnUsed: vpnConnected });
       }
 
     } else {
@@ -330,13 +359,16 @@ export default async function handler(req: Request, res: Response) {
       }
 
       if (queuedJobs.length === 0) {
+        await releaseVPN();
         res.status(404).json({ error: 'No episodes found to download' });
         return;
       }
 
-      res.json({ queued: queuedJobs.length, jobs: queuedJobs, backend: useQbit ? 'qbittorrent' : 'webtorrent' });
+      await releaseVPN();
+      res.json({ queued: queuedJobs.length, jobs: queuedJobs, backend: useQbit ? 'qbittorrent' : 'webtorrent', vpnUsed: vpnConnected });
     }
   } catch (err) {
+    await releaseVPN();
     res.status(500).json({ error: 'Download queue failed', message: String(err) });
   }
 }
