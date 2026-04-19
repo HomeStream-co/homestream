@@ -12,7 +12,46 @@
  * top-level fields are always kept in sync for backwards compat).
  */
 import type { Request, Response } from 'express';
-import { readLibrary } from '../../libraryStore.js';
+import { readLibrary, writeLibrary } from '../../libraryStore.js';
+
+const DEMO_ITEM = {
+  id: 'demo-bbb',
+  title: 'Big Buck Bunny',
+  type: 'movie',
+  year: '2008',
+  filename: '__demo__big-buck-bunny.mp4',
+  filePath: '__demo__',
+  demoStreamUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+  poster: 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/Big_buck_bunny_poster_big.jpg/800px-Big_buck_bunny_poster_big.jpg',
+  backdrop: 'https://peach.blender.org/wp-content/uploads/bbb-splash.png',
+  plot: 'A large and lovable rabbit deals with three bullying rodents who want to steal his berries. Freely licensed under Creative Commons by the Blender Foundation.',
+  rating: 'G',
+  imdbRating: '7.8',
+  genre: ['Animation', 'Short', 'Comedy'],
+  runtime: '9 min',
+  director: 'Sacha Goedegebure',
+  actors: ['Big Buck Bunny'],
+  transcoding: false,
+  watchProgress: 0,
+  profileProgress: { adult: 0, kids: 0 },
+  isDemo: true,
+  importedFrom: 'demo',
+  addedAt: new Date().toISOString(),
+};
+
+// Seed once per process lifetime — avoids a write on every request
+let demoSeeded = false;
+
+function ensureDemoSeeded() {
+  if (demoSeeded) return;
+  demoSeeded = true;
+  const library = readLibrary<Record<string, unknown>>();
+  if (library.find(m => m.id === 'demo-bbb')) return;
+  writeLibrary(lib => {
+    lib.unshift(DEMO_ITEM as unknown as Record<string, unknown>);
+    return lib;
+  }).catch(err => console.warn('[demo] Seed failed:', err));
+}
 
 type ProfileId = 'adult' | 'kids';
 
@@ -26,6 +65,7 @@ interface ProfileProgressEntry {
 
 export default function handler(req: Request, res: Response) {
   try {
+    ensureDemoSeeded();
     const library = readLibrary<Record<string, unknown>>();
 
     const profileId = req.query.profile as ProfileId | undefined;

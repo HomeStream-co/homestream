@@ -74,6 +74,42 @@ export const serverBefore = (server) => {
     console.error('[startup] Cleanup failed:', err.message);
   });
 
+  // Auto-seed demo item (Big Buck Bunny) so it always appears as a
+  // clickable card in the library — idempotent, skips if already present.
+  import('./libraryStore.js').then(({ readLibrary, writeLibrary }) => {
+    const library = readLibrary();
+    if (library.find(m => m.id === 'demo-bbb')) return;
+    const demoItem = {
+      id: 'demo-bbb',
+      title: 'Big Buck Bunny',
+      type: 'movie',
+      year: '2008',
+      filename: '__demo__big-buck-bunny.mp4',
+      filePath: '__demo__',
+      demoStreamUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+      poster: 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/Big_buck_bunny_poster_big.jpg/800px-Big_buck_bunny_poster_big.jpg',
+      backdrop: 'https://peach.blender.org/wp-content/uploads/bbb-splash.png',
+      plot: 'A large and lovable rabbit deals with three bullying rodents who want to steal his berries. Freely licensed under Creative Commons by the Blender Foundation.',
+      rating: 'G',
+      imdbRating: '7.8',
+      genre: ['Animation', 'Short', 'Comedy'],
+      runtime: '9 min',
+      director: 'Sacha Goedegebure',
+      actors: ['Big Buck Bunny'],
+      transcoding: false,
+      watchProgress: 0,
+      profileProgress: { adult: 0, kids: 0 },
+      isDemo: true,
+      importedFrom: 'demo',
+      addedAt: new Date().toISOString(),
+    };
+    writeLibrary(lib => { lib.unshift(demoItem); return lib; })
+      .then(() => console.log('[demo] Big Buck Bunny seeded into library'))
+      .catch(err => console.warn('[demo] Seed failed (non-fatal):', err.message));
+  }).catch(err => {
+    console.warn('[demo] Could not seed demo item (non-fatal):', err.message);
+  });
+
   // Resume folder watcher if setup was already completed before this restart
   import('./configStore.js').then(({ isSetupComplete, readConfig }) => {
     if (!isSetupComplete()) return;
@@ -157,5 +193,43 @@ export const serverListening = (server) => {
     console.log('[remote] WebSocket remote control attached at /ws/remote');
   }).catch(err => {
     console.warn('[remote] Failed to attach remote control (non-fatal):', err.message);
+  });
+
+  // Auto-seed demo item so Big Buck Bunny always appears as a clickable
+  // card in the library for player testing — idempotent, skips if already present.
+  import('./libraryStore.js').then(({ readLibrary, writeLibrary }) => {
+    const library = readLibrary();
+    if (library.find(m => m.id === 'demo-bbb')) return; // already seeded
+
+    const demoItem = {
+      id: 'demo-bbb',
+      title: 'Big Buck Bunny',
+      type: 'movie',
+      year: '2008',
+      filename: '__demo__big-buck-bunny.mp4',
+      filePath: '__demo__',
+      demoStreamUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+      poster: 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/Big_buck_bunny_poster_big.jpg/800px-Big_buck_bunny_poster_big.jpg',
+      backdrop: 'https://peach.blender.org/wp-content/uploads/bbb-splash.png',
+      plot: 'A large and lovable rabbit deals with three bullying rodents who want to steal his berries. Freely licensed under Creative Commons by the Blender Foundation.',
+      rating: 'G',
+      imdbRating: '7.8',
+      genre: ['Animation', 'Short', 'Comedy'],
+      runtime: '9 min',
+      director: 'Sacha Goedegebure',
+      actors: ['Big Buck Bunny'],
+      transcoding: false,
+      watchProgress: 0,
+      profileProgress: { adult: 0, kids: 0 },
+      isDemo: true,
+      importedFrom: 'demo',
+      addedAt: new Date().toISOString(),
+    };
+
+    writeLibrary(lib => { lib.unshift(demoItem); return lib; })
+      .then(() => console.log('[demo] Big Buck Bunny seeded into library'))
+      .catch(err => console.warn('[demo] Seed failed (non-fatal):', err.message));
+  }).catch(err => {
+    console.warn('[demo] Could not import libraryStore (non-fatal):', err.message);
   });
 };
