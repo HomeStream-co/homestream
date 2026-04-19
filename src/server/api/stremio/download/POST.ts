@@ -1,32 +1,17 @@
 import type { Request, Response } from 'express';
-import { queueDownload, pickBestStream } from '../../../torrentManager.js';
+import { pickBestStream } from '../../../torrentManager.js';
+import { addMagnet, isReachable } from '../../../qbittorrentClient.js';
+import { readConfig } from '../../../configStore.js';
 
 /**
  * POST /api/stremio/download
  *
- * Queues a server-side torrent download for a movie or TV series.
+ * Routes magnet links to the best available download backend:
+ *   1. qBittorrent (preferred) — full BitTorrent swarm, resume on restart
+ *   2. WebTorrent (fallback)   — built-in, works without qBittorrent
  *
- * For MOVIES: picks the best single stream (≥720p, not 4K, most seeds)
- * and queues one download job.
- *
- * For SERIES: fetches streams for every episode in the requested season
- * (or all seasons if none specified), picks the best stream per episode,
- * and queues one download job per episode. All run concurrently.
- *
- * Body:
- *   {
- *     imdbId: string,
- *     type: 'movie' | 'series',
- *     title: string,
- *     poster?: string,
- *     year?: string,
- *     // For series:
- *     season?: number,          // specific season, or omit for all
- *     totalSeasons?: number,    // how many seasons to fetch (default 1)
- *     totalEpisodes?: number,   // episodes per season (default 10, we probe)
- *     // Pre-fetched streams (optional — if already fetched by UI):
- *     streams?: StreamResult[],
- *   }
+ * For MOVIES: picks the best single stream and queues one download.
+ * For SERIES: fetches streams per episode, picks best, queues all.
  */
 
 interface StreamResult {
@@ -113,6 +98,72 @@ async function fetchStreamsForEpisode(
   }
 }
 
+// ─── qBittorrent job tracker (in-memory, mirrors torrentManager shape) ────────
+
+interface QbitJob {
+  jobId: string;
+  infoHash: string;
+  title: string;
+  quality: string;
+  type: 'movie' | 'series';
+  season?: number;
+  episode?: number;
+  status: 'queued' | 'downloading' | 'done' | 'error';
+  addedAt: string;
+  poster?: string;
+  imdbId: string;
+  backend: 'qbittorrent';
+}
+
+const qbitJobs = new Map<string, QbitJob>();
+
+export function getQbitJobs(): QbitJob[] {
+  return Array.from(qbitJobs.values());
+}
+
+async function queueViaQbit(params: {
+  magnet: string;
+  infoHash: string;
+  title: string;
+  quality: string;
+  type: 'movie' | 'series';
+  season?: number;
+  episode?: number;
+  imdbId: string;
+  poster?: string;
+}): Promise<QbitJob> {
+  const config = readConfig();
+  const savePath = config.mediaDir
+    ? `${config.mediaDir}/downloads`
+    : '/downloads';
+
+  const hash = await addMagnet(params.magnet, {
+    savepath: savePath,
+    category: 'homestream',
+    tags: params.type,
+  });
+
+  const job: QbitJob = {
+    jobId: hash || params.infoHash,
+    infoHash: hash || params.infoHash,
+    title: params.title,
+    quality: params.quality,
+    type: params.type,
+    season: params.season,
+    episode: params.episode,
+    status: 'queued',
+    addedAt: new Date().toISOString(),
+    poster: params.poster,
+    imdbId: params.imdbId,
+    backend: 'qbittorrent',
+  };
+
+  qbitJobs.set(job.jobId, job);
+  return job;
+}
+
+// ─── Handler ──────────────────────────────────────────────────────────────────
+
 export default async function handler(req: Request, res: Response) {
   const {
     imdbId,
@@ -141,9 +192,12 @@ export default async function handler(req: Request, res: Response) {
     return;
   }
 
+  // Determine backend
+  const useQbit = await isReachable();
+  console.log(`[download] Backend: ${useQbit ? 'qBittorrent' : 'WebTorrent (fallback)'}`);
+
   try {
     if (type === 'movie') {
-      // ── Movie: single download ──
       let streams = preloadedStreams;
       if (!streams || streams.length === 0) {
         streams = await fetchStreamsForEpisode(imdbId, 'movie');
@@ -153,21 +207,19 @@ export default async function handler(req: Request, res: Response) {
         res.status(404).json({ error: 'No suitable streams found for this title' });
         return;
       }
-      const job = queueDownload({
-        infoHash: best.infoHash,
-        magnet: best.magnet,
-        title,
-        quality: best.quality,
-        type: 'movie',
-        imdbId,
-        poster,
-        year,
-      });
-      res.json({ queued: 1, jobs: [job] });
+
+      if (useQbit) {
+        const job = await queueViaQbit({ infoHash: best.infoHash, magnet: best.magnet, quality: best.quality, type: 'movie', title, imdbId, poster });
+        res.json({ queued: 1, jobs: [job], backend: 'qbittorrent' });
+      } else {
+        // Fallback to WebTorrent
+        const { queueDownload } = await import('../../../torrentManager.js');
+        const job = queueDownload({ infoHash: best.infoHash, magnet: best.magnet, quality: best.quality, type: 'movie', title, imdbId, poster, year });
+        res.json({ queued: 1, jobs: [job], backend: 'webtorrent' });
+      }
 
     } else {
-      // ── Series: download all episodes ──
-      // Determine which seasons to fetch
+      // Series — batch fetch all episodes
       const seasonsToFetch: number[] = [];
       if (season != null) {
         seasonsToFetch.push(season);
@@ -175,16 +227,13 @@ export default async function handler(req: Request, res: Response) {
         for (let s = 1; s <= totalSeasons; s++) seasonsToFetch.push(s);
       }
 
-      // Probe each season: try episodes 1..totalEpisodes, stop when no streams found
       const episodeTasks: Array<{ season: number; episode: number }> = [];
-
       for (const s of seasonsToFetch) {
         for (let ep = 1; ep <= totalEpisodes; ep++) {
           episodeTasks.push({ season: s, episode: ep });
         }
       }
 
-      // Fetch streams for all episodes in parallel (batched to avoid hammering Torrentio)
       const BATCH = 5;
       const queuedJobs = [];
 
@@ -199,33 +248,23 @@ export default async function handler(req: Request, res: Response) {
         for (let j = 0; j < batch.length; j++) {
           const { season: s, episode: ep } = batch[j];
           const epStreams = batchResults[j];
-
-          if (epStreams.length === 0) {
-            // No streams for this episode — likely past the end of the season
-            console.log(`[stremio/download] No streams for S${s}E${ep} — skipping`);
-            continue;
-          }
+          if (epStreams.length === 0) continue;
 
           const best = pickBestStream(epStreams);
           if (!best) continue;
 
           const epTitle = `${title} S${String(s).padStart(2, '0')}E${String(ep).padStart(2, '0')}`;
-          const job = queueDownload({
-            infoHash: best.infoHash,
-            magnet: best.magnet,
-            title: epTitle,
-            quality: best.quality,
-            type: 'series',
-            season: s,
-            episode: ep,
-            imdbId,
-            poster,
-            year,
-          });
-          queuedJobs.push(job);
+
+          if (useQbit) {
+            const job = await queueViaQbit({ infoHash: best.infoHash, magnet: best.magnet, quality: best.quality, title: epTitle, type: 'series', season: s, episode: ep, imdbId, poster });
+            queuedJobs.push(job);
+          } else {
+            const { queueDownload } = await import('../../../torrentManager.js');
+            const job = queueDownload({ infoHash: best.infoHash, magnet: best.magnet, quality: best.quality, title: epTitle, type: 'series', season: s, episode: ep, imdbId, poster, year });
+            queuedJobs.push(job);
+          }
         }
 
-        // Small delay between batches to be polite to Torrentio
         if (i + BATCH < episodeTasks.length) {
           await new Promise(r => setTimeout(r, 500));
         }
@@ -236,7 +275,7 @@ export default async function handler(req: Request, res: Response) {
         return;
       }
 
-      res.json({ queued: queuedJobs.length, jobs: queuedJobs });
+      res.json({ queued: queuedJobs.length, jobs: queuedJobs, backend: useQbit ? 'qbittorrent' : 'webtorrent' });
     }
   } catch (err) {
     res.status(500).json({ error: 'Download queue failed', message: String(err) });

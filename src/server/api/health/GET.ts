@@ -1,9 +1,6 @@
-import type { Request, Response } from "express";
+import type { Request, Response } from 'express';
+import { isSetupComplete } from '../../configStore.js';
 
-export default async function handler(_req: Request, res: Response) {
-	res.json({
-		status: "ok",
-		timestamp: new Date().toISOString(),
-		message: "Hello World!",
-	});
+export default function handler(_req: Request, res: Response) {
+  res.json({ ok: true, setupComplete: isSetupComplete(), ts: Date.now() });
 }
