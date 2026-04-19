@@ -20,7 +20,7 @@
 
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Play, Plus, Check, Star, Upload, Clock, Search, X, SlidersHorizontal, Bookmark } from 'lucide-react';
+import { Play, Plus, Check, Star, Upload, Clock, Search, X, SlidersHorizontal, Bookmark, FlaskConical } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useMedia } from '@/context/MediaContext';
 import { useProfile } from '@/context/ProfileContext';
@@ -252,13 +252,31 @@ export default function HomePage() {
           <p className="text-muted-foreground mb-6 max-w-sm">
             Upload your first movie or show to get started. We'll automatically fetch the poster and info.
           </p>
-          <button
-            onClick={() => navigate('/library')}
-            className="flex items-center gap-2 bg-primary hover:bg-primary/80 text-white px-6 py-3 rounded font-medium transition-colors"
-          >
-            <Upload className="w-4 h-4" />
-            Upload Your First Movie
-          </button>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <button
+              onClick={() => navigate('/library')}
+              className="flex items-center gap-2 bg-primary hover:bg-primary/80 text-white px-6 py-3 rounded font-medium transition-colors"
+            >
+              <Upload className="w-4 h-4" />
+              Upload Your First Movie
+            </button>
+            <button
+              onClick={async () => {
+                try {
+                  const res = await fetch('/api/demo/seed', { method: 'POST' });
+                  const data = await res.json() as { ok: boolean; id: string };
+                  if (data.ok) navigate(`/player/${data.id}`);
+                } catch { /* ignore */ }
+              }}
+              className="flex items-center gap-2 bg-card hover:bg-card/80 border border-border text-foreground px-6 py-3 rounded font-medium transition-colors"
+            >
+              <FlaskConical className="w-4 h-4 text-primary" />
+              Try Demo Player
+            </button>
+          </div>
+          <p className="text-xs text-muted-foreground mt-4 max-w-xs">
+            Demo loads Big Buck Bunny (CC-licensed) to test the player — no files needed.
+          </p>
         </div>
       ) : null}
 

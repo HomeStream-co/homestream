@@ -17,6 +17,8 @@
 import type { Request, Response } from 'express';
 import fs from 'fs';
 import path from 'path';
+import http from 'http';
+import https from 'https';
 import { requireAuth } from '../../../authMiddleware.js';
 import { readLibrary } from '../../../libraryStore.js';
 
@@ -85,6 +87,40 @@ export default function handler(req: Request, res: Response) {
   if (!requireAuth(req, res)) return;
   try {
     const { filename } = req.params;
+
+    // ── Demo mode: proxy CDN stream for demo items ──────────────────────────
+    if (filename.startsWith('__demo__')) {
+      try {
+        const library = readLibrary<{
+          filename?: string;
+          demoStreamUrl?: string;
+        }>();
+        const item = library.find(m => m.filename === filename);
+        if (item?.demoStreamUrl) {
+          const cdnUrl = item.demoStreamUrl;
+          const proto = cdnUrl.startsWith('https') ? https : http;
+          const options: https.RequestOptions = {
+            headers: req.headers.range ? { Range: req.headers.range } : {},
+          };
+          const proxyReq = proto.get(cdnUrl, options, (proxyRes) => {
+            res.writeHead(proxyRes.statusCode ?? 200, {
+              'Content-Type': proxyRes.headers['content-type'] ?? 'video/mp4',
+              'Content-Length': proxyRes.headers['content-length'] ?? '',
+              'Content-Range': proxyRes.headers['content-range'] ?? '',
+              'Accept-Ranges': 'bytes',
+              'Cache-Control': 'no-store',
+            });
+            proxyRes.pipe(res);
+          });
+          proxyReq.on('error', (err) => {
+            if (!res.headersSent) res.status(502).json({ error: 'Demo proxy error', message: String(err) });
+          });
+          return;
+        }
+      } catch { /* fall through */ }
+      return res.status(404).json({ error: 'Demo item not found' });
+    }
+
     const filePath = resolveFilePath(filename);
 
     if (!filePath) {
