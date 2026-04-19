@@ -3,6 +3,10 @@ import fs from 'fs';
 import { writeConfig, readConfig } from '../../configStore.js';
 import { testConnection as testQbit } from '../../qbittorrentClient.js';
 import { startWatcher, stopWatcher } from '../../folderWatcher.js';
+import { scanExistingMedia, importExistingMedia, type ScannedFile } from '../../existingMediaScanner.js';
+
+// In-memory store for scan results so import can reference them
+let lastScanFiles: ScannedFile[] = [];
 
 /**
  * POST /api/setup
@@ -107,6 +111,54 @@ export default async function handler(req: Request, res: Response) {
         }
 
         res.json({ ok: true, message: 'Setup complete! HomeStream is ready.' });
+        break;
+      }
+
+      case 'scan_existing': {
+        // Scan mediaDir for video files not yet in the library
+        const config = readConfig();
+        const scanDir = fields.mediaDir || config.mediaDir;
+        if (!scanDir) {
+          res.status(400).json({ error: 'No media directory configured' });
+          return;
+        }
+        const result = scanExistingMedia(scanDir);
+        lastScanFiles = result.files;
+        // Return file list with sizes for display (cap at 200 for response size)
+        res.json({
+          found: result.found,
+          skipped: result.skipped,
+          files: result.files.slice(0, 200).map(f => ({
+            name: f.name,
+            size: f.size,
+            path: f.path,
+          })),
+          truncated: result.files.length > 200,
+        });
+        break;
+      }
+
+      case 'import_existing': {
+        // Import previously scanned files into the library
+        // Uses SSE-style chunked response for progress
+        const filesToImport = lastScanFiles;
+        if (filesToImport.length === 0) {
+          res.json({ imported: 0, failed: 0, titles: [] });
+          return;
+        }
+
+        // Run import in background, return immediately
+        res.json({ ok: true, total: filesToImport.length, message: 'Import started' });
+
+        // Fire and forget — progress tracked server-side
+        importExistingMedia(filesToImport, (done, total, title) => {
+          console.log(`[scanner] Imported ${done}/${total}: ${title}`);
+        }).then(result => {
+          console.log(`[scanner] Import complete: ${result.imported} imported, ${result.failed} failed`);
+          lastScanFiles = [];
+        }).catch(err => {
+          console.error('[scanner] Import error:', err);
+        });
         break;
       }
 
