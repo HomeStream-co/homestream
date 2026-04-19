@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Play, Trash2, Star, Bookmark, SortAsc, Filter } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useMedia } from '@/context/MediaContext';
+import { useProfile } from '@/context/ProfileContext';
 import type { MediaItem } from '@/types/media';
 
 type SortKey = 'added' | 'title' | 'rating' | 'year';
@@ -10,12 +11,14 @@ type FilterType = 'all' | 'movie' | 'series';
 
 export default function WatchlistPage() {
   const { library, watchlist, removeFromWatchlist } = useMedia();
+  const { isAllowed } = useProfile();
   const navigate = useNavigate();
   const [sort, setSort] = useState<SortKey>('added');
   const [filter, setFilter] = useState<FilterType>('all');
   const [removingId, setRemovingId] = useState<string | null>(null);
 
-  const watchlistItems = library.filter(m => watchlist.includes(m.id));
+  // Apply Kids filter before building watchlist
+  const watchlistItems = library.filter(m => watchlist.includes(m.id) && isAllowed(m.rated));
 
   const filtered = watchlistItems.filter(m => {
     if (filter === 'movie') return m.type === 'movie';

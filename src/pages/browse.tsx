@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { Search, SlidersHorizontal } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useMedia } from '@/context/MediaContext';
+import { useProfile } from '@/context/ProfileContext';
 import MediaCard from '@/components/MediaCard';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -16,6 +17,7 @@ const SORT_OPTIONS = [
 
 export default function BrowsePage() {
   const { library, loading } = useMedia();
+  const { isAllowed, activeProfile } = useProfile();
   const [searchParams] = useSearchParams();
   const [query, setQuery] = useState(searchParams.get('q') || '');
   const [selectedGenre, setSelectedGenre] = useState('All');
@@ -23,7 +25,8 @@ export default function BrowsePage() {
   const [typeFilter, setTypeFilter] = useState<'all' | 'movie' | 'series'>('all');
 
   const filtered = useMemo(() => {
-    let items = [...library];
+    // Apply Kids profile filter first
+    let items = library.filter(m => isAllowed(m.rated));
 
     // Search
     if (query.trim()) {
@@ -69,7 +72,13 @@ export default function BrowsePage() {
     <div className="min-h-screen bg-background pt-20 pb-16">
       <title>Browse — HomeStream</title>
       <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8">
-        <h1 className="text-4xl font-heading text-foreground mb-6">Browse</h1>
+        <h1 className="text-4xl font-heading text-foreground mb-4">Browse</h1>
+        {activeProfile?.restricted && (
+          <div className="mb-6 flex items-center gap-2.5 bg-yellow-500/10 border border-yellow-500/25 rounded-xl px-4 py-2.5 w-fit">
+            <span className="text-base">🧒</span>
+            <p className="text-xs text-yellow-400 font-medium">Kids mode — G &amp; PG only</p>
+          </div>
+        )}
 
         {/* Search */}
         <div className="relative mb-6">

@@ -2,24 +2,29 @@ import { useNavigate } from 'react-router-dom';
 import { Play, Plus, Check, Star, Upload } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useMedia } from '@/context/MediaContext';
+import { useProfile } from '@/context/ProfileContext';
 import MediaCarousel from '@/components/MediaCarousel';
 import { Skeleton } from '@/components/ui/skeleton';
 
 export default function HomePage() {
   const { library, loading, watchlist, addToWatchlist, removeFromWatchlist, continueWatching } = useMedia();
+  const { isAllowed, activeProfile } = useProfile();
   const navigate = useNavigate();
 
-  const featured = library[0];
+  // Apply Kids filter to the entire library before building any carousel
+  const visibleLibrary = library.filter(m => isAllowed(m.rated));
+
+  const featured = visibleLibrary[0];
   const inWatchlist = featured ? watchlist.includes(featured.id) : false;
 
-  const recentlyAdded = [...library].slice(0, 20);
-  const movies = library.filter(m => m.type === 'movie');
-  const series = library.filter(m => m.type === 'series');
-  const topRated = [...library]
+  const recentlyAdded = [...visibleLibrary].slice(0, 20);
+  const movies = visibleLibrary.filter(m => m.type === 'movie');
+  const series = visibleLibrary.filter(m => m.type === 'series');
+  const topRated = [...visibleLibrary]
     .filter(m => m.imdbRating !== 'N/A')
     .sort((a, b) => parseFloat(b.imdbRating) - parseFloat(a.imdbRating))
     .slice(0, 20);
-  const continueWatchingItems = library.filter(m =>
+  const continueWatchingItems = visibleLibrary.filter(m =>
     continueWatching.some(c => c.id === m.id && c.progress > 0)
   );
 
@@ -122,6 +127,15 @@ export default function HomePage() {
 
       {/* Carousels */}
       <div className="pt-8">
+        {/* Kids mode banner */}
+        {activeProfile?.restricted && (
+          <div className="mx-4 sm:mx-6 lg:mx-8 mb-6 flex items-center gap-2.5 bg-yellow-500/10 border border-yellow-500/25 rounded-xl px-4 py-2.5">
+            <span className="text-lg">🧒</span>
+            <p className="text-xs text-yellow-400 font-medium">
+              Kids mode — showing G &amp; PG rated content only
+            </p>
+          </div>
+        )}
         {continueWatchingItems.length > 0 && (
           <MediaCarousel title="Continue Watching" items={continueWatchingItems} showProgress />
         )}
@@ -131,12 +145,10 @@ export default function HomePage() {
         {topRated.length > 0 && (
           <MediaCarousel title="Top Rated" items={topRated} />
         )}
-
-        {/* Watchlist */}
         {watchlist.length > 0 && (
           <MediaCarousel
             title="My List"
-            items={library.filter(m => watchlist.includes(m.id))}
+            items={visibleLibrary.filter(m => watchlist.includes(m.id))}
           />
         )}
       </div>

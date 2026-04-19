@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useMedia } from '@/context/MediaContext';
+import { useProfile } from '@/context/ProfileContext';
 import MediaCard from '@/components/MediaCard';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -52,7 +53,15 @@ export default function PlayerPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { library, updateProgress, triggerPostWatchRecommendation, continueWatching } = useMedia();
+  const { isAllowed } = useProfile();
   const item = library.find(m => m.id === id);
+
+  // ── Kids profile block — redirect if content not allowed ──
+  useEffect(() => {
+    if (item && !isAllowed(item.rated)) {
+      navigate('/', { replace: true });
+    }
+  }, [item, isAllowed, navigate]);
 
   // ── Refs ──
   const videoRef = useRef<HTMLVideoElement>(null);

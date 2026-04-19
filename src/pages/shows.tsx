@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Play, Tv2, ChevronLeft, Star } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useMedia } from '@/context/MediaContext';
+import { useProfile } from '@/context/ProfileContext';
 import EpisodeTracker from '@/components/EpisodeTracker';
 import type { MediaItem, Episode } from '@/types/media';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -10,10 +11,12 @@ import { Progress } from '@/components/ui/progress';
 
 export default function ShowsPage() {
   const { library, loading, updateMedia } = useMedia();
+  const { isAllowed } = useProfile();
   const navigate = useNavigate();
   const [selectedShow, setSelectedShow] = useState<MediaItem | null>(null);
 
-  const shows = library.filter(m => m.type === 'series');
+  // Apply Kids filter
+  const shows = library.filter(m => m.type === 'series' && isAllowed(m.rated));
 
   const getShowProgress = (show: MediaItem) => {
     const eps = show.episodes || [];
