@@ -77,6 +77,9 @@ export default function PlayerPage() {
   const [autoplayCancelled, setAutoplayCancelled] = useState(false);
   const [showSkipIntro, setShowSkipIntro] = useState(false);
   const [seekFlash, setSeekFlash] = useState<'forward' | 'back' | null>(null);
+  // Loading state — true until canplaythrough fires (enough buffered to play without stall)
+  const [videoLoading, setVideoLoading] = useState(true);
+  const resumeApplied = useRef(false);
 
   // ── Derived ──
   const resumeItems = continueWatching
@@ -312,6 +315,10 @@ export default function PlayerPage() {
           ref={videoRef}
           src={`/api/stream/${item.filename}`}
           className="w-full h-full"
+          // preload=auto tells the browser to start filling its decode buffer
+          // immediately on page load — by the time the user hits Play the first
+          // several seconds are already decoded and ready to render instantly.
+          preload="auto"
           onPlay={() => setPlaying(true)}
           onPause={() => setPlaying(false)}
           onTimeUpdate={() => {
@@ -322,8 +329,23 @@ export default function PlayerPage() {
             }
           }}
           onLoadedMetadata={() => {
-            if (videoRef.current) setDuration(videoRef.current.duration);
+            const video = videoRef.current;
+            if (!video) return;
+            setDuration(video.duration);
+            // Restore resume position exactly once, as soon as we know duration
+            if (!resumeApplied.current && item.watchProgress && item.watchProgress > 2 && item.watchProgress < 95) {
+              const resumeAt = (item.watchProgress / 100) * video.duration;
+              video.currentTime = resumeAt;
+              resumeApplied.current = true;
+            }
           }}
+          onCanPlayThrough={() => {
+            // Browser has buffered enough to play all the way through without stalling.
+            // Hide the loading spinner — this is the true "ready" signal.
+            setVideoLoading(false);
+          }}
+          onWaiting={() => setVideoLoading(true)}
+          onPlaying={() => setVideoLoading(false)}
           onVolumeChange={() => {
             if (videoRef.current) {
               setVolume(videoRef.current.volume);
@@ -331,6 +353,21 @@ export default function PlayerPage() {
             }
           }}
         />
+
+        {/* ── Loading Spinner — only shown while buffering ── */}
+        <AnimatePresence>
+          {videoLoading && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.15 }}
+              className="absolute inset-0 flex items-center justify-center pointer-events-none"
+            >
+              <div className="w-14 h-14 rounded-full border-4 border-white/20 border-t-white animate-spin" />
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* ── Seek Flash Indicator ── */}
         <AnimatePresence>

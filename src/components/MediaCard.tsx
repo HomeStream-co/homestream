@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { Play, Plus, Check, Star } from 'lucide-react';
@@ -10,12 +10,56 @@ interface MediaCardProps {
   showProgress?: boolean;
 }
 
+// How long the user must hover before we prefetch (ms).
+// 300ms filters out accidental mouse-overs while scrolling.
+const PREFETCH_DELAY_MS = 300;
+
+// How many bytes to prefetch — 4MB fills the browser's initial decode buffer.
+// On gigabit LAN this transfers in ~32ms, so by the time the player opens
+// the first several seconds are already decoded and play is truly instant.
+const PREFETCH_BYTES = 4 * 1024 * 1024;
+
+// Track which filenames we've already prefetched so we don't repeat
+const prefetchedFiles = new Set<string>();
+
+function prefetchVideo(filename: string) {
+  if (prefetchedFiles.has(filename)) return;
+  prefetchedFiles.add(filename);
+
+  // Fetch only the first PREFETCH_BYTES using a Range request.
+  // The browser caches this response, so when the player opens and the
+  // <video> element requests the same range, it gets it from cache instantly.
+  fetch(`/api/stream/${filename}`, {
+    headers: { Range: `bytes=0-${PREFETCH_BYTES - 1}` },
+    // 'no-store' would bypass cache — we want 'default' so it IS cached
+    cache: 'default',
+  }).catch(() => {
+    // Silently ignore — prefetch is best-effort
+    prefetchedFiles.delete(filename);
+  });
+}
+
 export default function MediaCard({ item, showProgress = false }: MediaCardProps) {
   const navigate = useNavigate();
   const { watchlist, addToWatchlist, removeFromWatchlist, continueWatching } = useMedia();
   const [imgError, setImgError] = useState(false);
   const inWatchlist = watchlist.includes(item.id);
   const progress = continueWatching.find(c => c.id === item.id)?.progress || 0;
+
+  // Hover prefetch timer
+  const hoverTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  const handleMouseEnter = useCallback(() => {
+    // Only prefetch if we have a filename to stream
+    if (!item.filename) return;
+    hoverTimerRef.current = setTimeout(() => {
+      prefetchVideo(item.filename);
+    }, PREFETCH_DELAY_MS);
+  }, [item.filename]);
+
+  const handleMouseLeave = useCallback(() => {
+    clearTimeout(hoverTimerRef.current);
+  }, []);
 
   const handlePlay = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -33,6 +77,8 @@ export default function MediaCard({ item, showProgress = false }: MediaCardProps
       className="relative flex-shrink-0 w-36 sm:w-44 cursor-pointer group"
       whileHover={{ scale: 1.05, zIndex: 10 }}
       transition={{ duration: 0.2 }}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
       onClick={() => navigate(`/player/${item.id}`)}
     >
       {/* Poster */}

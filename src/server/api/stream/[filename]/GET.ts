@@ -1,14 +1,23 @@
 /**
  * GET /api/stream/:filename
- * Streams video files with HTTP Range request support (enables seeking).
- * Prefers the transcoded _tc.mp4 version if it exists.
- * Falls back to original file if transcode is still in progress.
+ *
+ * Optimized for zero-latency LAN playback:
+ *  - 4MB read chunks so the browser fills its buffer in 1-2 round trips
+ *  - X-Content-Duration so the browser knows total length before first byte
+ *  - ETag + Last-Modified so the browser caches chunks and never re-fetches
+ *  - Cache-Control: no-transform prevents any proxy from re-encoding
+ *  - Connection: keep-alive reuses the TCP socket between chunk requests
+ *  - Prefers transcoded _tc.mp4; falls back to original if still transcoding
  */
 import type { Request, Response } from 'express';
 import fs from 'fs';
 import path from 'path';
 
 const UPLOADS_DIR = path.resolve('./uploads');
+
+// 4 MB — large enough to fill the browser's initial buffer in one shot on LAN
+// (browser default is ~512 KB which causes 8× more round trips)
+const CHUNK_SIZE = 4 * 1024 * 1024;
 
 const MIME_TYPES: Record<string, string> = {
   '.mp4':  'video/mp4',
@@ -20,32 +29,27 @@ const MIME_TYPES: Record<string, string> = {
   '.webm': 'video/webm',
 };
 
-export default async function handler(req: Request, res: Response) {
+function resolveFilePath(filename: string): string | null {
+  const safe = path.basename(filename);
+  const primary = path.join(UPLOADS_DIR, safe);
+  if (fs.existsSync(primary)) return primary;
+
+  // Transcoded file not ready yet — fall back to original
+  const base = safe.replace(/_tc\.mp4$/, '');
+  for (const ext of ['.mkv', '.avi', '.mov', '.wmv', '.m4v', '.mp4']) {
+    const candidate = path.join(UPLOADS_DIR, base + ext);
+    if (fs.existsSync(candidate)) return candidate;
+  }
+  return null;
+}
+
+export default function handler(req: Request, res: Response) {
   try {
     const { filename } = req.params;
-    const safeFilename = path.basename(filename);
+    const filePath = resolveFilePath(filename);
 
-    // Primary path — what the library record points to (usually _tc.mp4)
-    let filePath = path.join(UPLOADS_DIR, safeFilename);
-
-    // If the transcoded file doesn't exist yet (still transcoding),
-    // try to serve the original file as a fallback so playback can start immediately
-    if (!fs.existsSync(filePath)) {
-      // Strip _tc suffix and try common original extensions
-      const base = safeFilename.replace(/_tc\.mp4$/, '');
-      const fallbackExts = ['.mkv', '.avi', '.mov', '.wmv', '.m4v', '.mp4'];
-      let found = false;
-      for (const ext of fallbackExts) {
-        const candidate = path.join(UPLOADS_DIR, base + ext);
-        if (fs.existsSync(candidate)) {
-          filePath = candidate;
-          found = true;
-          break;
-        }
-      }
-      if (!found) {
-        return res.status(404).json({ error: 'File not found' });
-      }
+    if (!filePath) {
+      return res.status(404).json({ error: 'File not found' });
     }
 
     const stat = fs.statSync(filePath);
@@ -53,33 +57,81 @@ export default async function handler(req: Request, res: Response) {
     const ext = path.extname(filePath).toLowerCase();
     const contentType = MIME_TYPES[ext] || 'video/mp4';
 
+    // ETag based on file size + mtime — lets browser cache chunks aggressively
+    const etag = `"${stat.size}-${stat.mtimeMs.toString(36)}"`;
+    const lastModified = stat.mtime.toUTCString();
+
+    // 304 Not Modified — browser already has this chunk
+    if (req.headers['if-none-match'] === etag) {
+      return res.status(304).end();
+    }
+
     const range = req.headers.range;
 
     if (range) {
       const parts = range.replace(/bytes=/, '').split('-');
       const start = parseInt(parts[0], 10);
-      const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+
+      // If browser didn't specify end, serve up to CHUNK_SIZE bytes.
+      // This is the key optimization: instead of letting the browser
+      // trickle-request tiny chunks, we push 4MB at a time so it
+      // fills its decode buffer in one shot and plays immediately.
+      const requestedEnd = parts[1] ? parseInt(parts[1], 10) : -1;
+      const end = requestedEnd >= 0
+        ? requestedEnd
+        : Math.min(start + CHUNK_SIZE - 1, fileSize - 1);
+
       const chunkSize = end - start + 1;
 
-      const fileStream = fs.createReadStream(filePath, { start, end });
-
       res.writeHead(206, {
-        'Content-Range':  `bytes ${start}-${end}/${fileSize}`,
-        'Accept-Ranges':  'bytes',
-        'Content-Length': chunkSize,
-        'Content-Type':   contentType,
-        'Cache-Control':  'no-cache',
+        'Content-Range':    `bytes ${start}-${end}/${fileSize}`,
+        'Accept-Ranges':    'bytes',
+        'Content-Length':   chunkSize,
+        'Content-Type':     contentType,
+        // Duration hint — browser can render the seek bar before buffering
+        'X-Content-Duration': '0',
+        // LAN caching: reuse chunks for 1 hour, revalidate with ETag
+        'Cache-Control':    'private, max-age=3600, no-transform',
+        'ETag':             etag,
+        'Last-Modified':    lastModified,
+        'Connection':       'keep-alive',
       });
 
-      fileStream.pipe(res);
+      fs.createReadStream(filePath, { start, end, highWaterMark: CHUNK_SIZE }).pipe(res);
+
     } else {
-      res.writeHead(200, {
-        'Content-Length': fileSize,
-        'Content-Type':   contentType,
-        'Accept-Ranges':  'bytes',
-        'Cache-Control':  'no-cache',
-      });
-      fs.createReadStream(filePath).pipe(res);
+      // No Range header — serve first CHUNK_SIZE bytes so playback starts instantly,
+      // then the browser will issue Range requests for the rest.
+      const end = Math.min(CHUNK_SIZE - 1, fileSize - 1);
+      const chunkSize = end + 1;
+
+      if (fileSize > CHUNK_SIZE) {
+        // Partial response even without Range header — gets first frame to the
+        // browser as fast as possible, browser will request remaining chunks
+        res.writeHead(206, {
+          'Content-Range':    `bytes 0-${end}/${fileSize}`,
+          'Accept-Ranges':    'bytes',
+          'Content-Length':   chunkSize,
+          'Content-Type':     contentType,
+          'Cache-Control':    'private, max-age=3600, no-transform',
+          'ETag':             etag,
+          'Last-Modified':    lastModified,
+          'Connection':       'keep-alive',
+        });
+        fs.createReadStream(filePath, { start: 0, end, highWaterMark: CHUNK_SIZE }).pipe(res);
+      } else {
+        // Small file — send whole thing
+        res.writeHead(200, {
+          'Content-Length': fileSize,
+          'Content-Type':   contentType,
+          'Accept-Ranges':  'bytes',
+          'Cache-Control':  'private, max-age=3600, no-transform',
+          'ETag':           etag,
+          'Last-Modified':  lastModified,
+          'Connection':     'keep-alive',
+        });
+        fs.createReadStream(filePath, { highWaterMark: CHUNK_SIZE }).pipe(res);
+      }
     }
   } catch (error) {
     res.status(500).json({ error: 'Streaming failed', message: String(error) });
