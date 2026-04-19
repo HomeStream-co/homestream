@@ -80,6 +80,24 @@ export default function PlayerPage() {
     setShowEndOverlay(false);
     setAutoplayCancelled(false);
     setVideoLoading(true);
+    setVideoError(null);
+    setAudioTracks([]);
+    setActiveAudioTrack(0);
+  }, [id]);
+
+  // ── Fetch audio tracks for this media item ──
+  useEffect(() => {
+    if (!id) return;
+    fetch(`/api/media/${id}/tracks`)
+      .then(r => r.json())
+      .then((data: { audio?: AudioTrack[] }) => {
+        if (data.audio && data.audio.length > 1) {
+          setAudioTracks(data.audio);
+          const def = data.audio.findIndex(t => t.isDefault);
+          setActiveAudioTrack(def >= 0 ? def : 0);
+        }
+      })
+      .catch(() => {}); // non-fatal
   }, [id]);
 
   // ── Refs ──
@@ -158,6 +176,12 @@ export default function PlayerPage() {
   const [enrichError, setEnrichError] = useState<string | null>(null);
   // ── Picture-in-Picture ──
   const [isPiP, setIsPiP] = useState(false);
+  // ── Audio track switcher ──
+  interface AudioTrack { index: number; streamIndex: number; language: string; label: string; codec: string; channels: number; isDefault: boolean; }
+  const [audioTracks, setAudioTracks] = useState<AudioTrack[]>([]);
+  const [activeAudioTrack, setActiveAudioTrack] = useState(0);
+  const [showAudioMenu, setShowAudioMenu] = useState(false);
+
   // ── Keyboard shortcut overlay ──
   const [showShortcuts, setShowShortcuts] = useState(false);
   // ── Seek bar hover thumbnail ──
@@ -670,6 +694,23 @@ export default function PlayerPage() {
           const nextCC = CC_CYCLE[(curIdx + 1) % CC_CYCLE.length];
           setCcLang(nextCC);
           showActionToast(nextCC === 'off' ? 'CC: Off' : nextCC === 'en' ? 'CC: English' : 'CC: Español');
+          break;
+        }
+
+        // ── A — cycle audio tracks ──
+        case 'a':
+        case 'A': {
+          if (audioTracks.length > 1) {
+            const nextAudio = (activeAudioTrack + 1) % audioTracks.length;
+            setActiveAudioTrack(nextAudio);
+            const tracks = (video as HTMLVideoElement & { audioTracks?: { [k: number]: { enabled: boolean } } }).audioTracks;
+            if (tracks) {
+              for (let j = 0; j < audioTracks.length; j++) {
+                tracks[j].enabled = j === nextAudio;
+              }
+            }
+            showActionToast(`Audio: ${audioTracks[nextAudio]?.label ?? 'Track ' + (nextAudio + 1)}`);
+          }
           break;
         }
 
@@ -1394,6 +1435,81 @@ export default function PlayerPage() {
                           </AnimatePresence>
                         </div>
 
+                        {/* ── Audio Track Switcher (only shown when multiple tracks exist) ── */}
+                        {audioTracks.length > 1 && (
+                          <div className="relative">
+                            <button
+                              onClick={e => {
+                                e.stopPropagation();
+                                setShowAudioMenu(prev => !prev);
+                                setShowSpeedMenu(false);
+                                setShowCcMenu(false);
+                              }}
+                              className="flex items-center gap-1 text-xs font-medium px-2 py-1 rounded transition-all text-white/70 hover:text-white bg-white/10 hover:bg-white/20"
+                              title="Audio track"
+                            >
+                              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M9 18V5l12-2v13" /><circle cx="6" cy="18" r="3" /><circle cx="18" cy="16" r="3" />
+                              </svg>
+                              <span className="hidden sm:inline uppercase text-[10px] font-bold tracking-wide">
+                                {audioTracks[activeAudioTrack]?.language?.slice(0,3).toUpperCase() ?? 'AUD'}
+                              </span>
+                            </button>
+                            <AnimatePresence>
+                              {showAudioMenu && (
+                                <motion.div
+                                  initial={{ opacity: 0, y: 6, scale: 0.95 }}
+                                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                                  exit={{ opacity: 0, y: 6, scale: 0.95 }}
+                                  transition={{ duration: 0.12 }}
+                                  className="absolute bottom-full right-0 mb-2 bg-black/90 border border-white/20 rounded-lg overflow-hidden shadow-xl backdrop-blur-sm z-20 min-w-[180px]"
+                                  onClick={e => e.stopPropagation()}
+                                >
+                                  <div className="px-3 py-1.5 border-b border-white/10">
+                                    <p className="text-[10px] text-white/40 uppercase tracking-wider font-medium">Audio Track</p>
+                                  </div>
+                                  {audioTracks.map((track, i) => (
+                                    <button
+                                      key={track.index}
+                                      onClick={() => {
+                                        setActiveAudioTrack(i);
+                                        setShowAudioMenu(false);
+                                        // Switch audio track via MSE if supported, else show toast
+                                        // Native browser audio track switching
+                                        const video = videoRef.current;
+                                        if (video) {
+                                          const tracks = (video as HTMLVideoElement & { audioTracks?: { [k: number]: { enabled: boolean } } }).audioTracks;
+                                          if (tracks) {
+                                            for (let j = 0; j < audioTracks.length; j++) {
+                                              tracks[j].enabled = j === i;
+                                            }
+                                          }
+                                        }
+                                        showActionToast(`Audio: ${track.label}`);
+                                      }}
+                                      className={`w-full text-left px-3 py-2 text-sm transition-colors flex items-center justify-between gap-3 ${
+                                        activeAudioTrack === i
+                                          ? 'text-primary bg-primary/20'
+                                          : 'text-white/80 hover:text-white hover:bg-white/10'
+                                      }`}
+                                    >
+                                      <div>
+                                        <span className="block">{track.label}</span>
+                                        <span className="text-[10px] text-white/40 uppercase">
+                                          {track.codec} · {track.channels}ch
+                                        </span>
+                                      </div>
+                                      {activeAudioTrack === i && (
+                                        <div className="w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0" />
+                                      )}
+                                    </button>
+                                  ))}
+                                </motion.div>
+                              )}
+                            </AnimatePresence>
+                          </div>
+                        )}
+
                         {/* ── Closed Captions ── */}
                         <div className="relative">
                           <button
@@ -1834,6 +1950,7 @@ export default function PlayerPage() {
                     ['F', 'Fullscreen'],
                     ['P', 'Picture-in-Picture'],
                     ['C', 'Cycle Captions'],
+                    ['A', 'Cycle Audio Track'],
                     ['S', 'Cycle Speed'],
                     ['< / >', 'Speed Down / Up'],
                     ['I', 'Info Panel'],

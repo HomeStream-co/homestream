@@ -29,6 +29,7 @@ import MediaCarousel from '@/components/MediaCarousel';
 import MediaCard from '@/components/MediaCard';
 import HeroBanner from '@/components/HeroBanner';
 import OfflineBanner from '@/components/OfflineBanner';
+import LazySection from '@/components/LazySection';
 import { Skeleton } from '@/components/ui/skeleton';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -439,10 +440,17 @@ export default function HomePage() {
             )}
 
             <MediaCarousel title="Recently Added" items={recentlyAdded} />
-            <MediaCarousel title="Movies" items={movies} />
-            <MediaCarousel title="TV Shows & Series" items={series} />
+
+            <LazySection skeletonHeight={220}>
+              <MediaCarousel title="Movies" items={movies} />
+            </LazySection>
+            <LazySection skeletonHeight={220}>
+              <MediaCarousel title="TV Shows & Series" items={series} />
+            </LazySection>
             {topRated.length > 0 && (
-              <MediaCarousel title="Top Rated" items={topRated} />
+              <LazySection skeletonHeight={220}>
+                <MediaCarousel title="Top Rated" items={topRated} />
+              </LazySection>
             )}
           </motion.div>
         )}
