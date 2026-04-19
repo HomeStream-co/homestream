@@ -1240,7 +1240,7 @@ export default function PlayerPage() {
               </div>
 
               {/* Bottom controls */}
-              <div className="bg-gradient-to-t from-black/80 to-transparent px-4 pb-4 pt-8">
+              <div className="bg-gradient-to-t from-black/80 to-transparent px-2 sm:px-4 pb-safe pb-4 pt-8">
                 {/* Seek bar */}
                 <div className="relative mb-3">
                   {/* Hover thumbnail preview */}
@@ -1284,9 +1284,9 @@ export default function PlayerPage() {
                       ? 'ring-2 ring-white ring-offset-1 ring-offset-black/60 scale-110'
                       : '';
                   return (
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between gap-1">
                       {/* Left cluster */}
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1 sm:gap-2">
                         {/* Play/Pause */}
                         <button
                           onClick={togglePlay}
@@ -1329,7 +1329,7 @@ export default function PlayerPage() {
                           {muted || volume === 0 ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
                         </button>
 
-                        {/* Volume slider */}
+                        {/* Volume slider — hidden on small screens */}
                         <input
                           type="range"
                           min={0}
@@ -1337,16 +1337,16 @@ export default function PlayerPage() {
                           step={0.05}
                           value={muted ? 0 : volume}
                           onChange={handleVolumeChange}
-                          className={`w-20 h-1 appearance-none bg-white/30 rounded-full cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white ${tvFocus === 'volume' ? 'ring-2 ring-white/60' : ''}`}
+                          className={`hidden sm:block w-20 h-1 appearance-none bg-white/30 rounded-full cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white ${tvFocus === 'volume' ? 'ring-2 ring-white/60' : ''}`}
                         />
 
-                        <span className="text-white/70 text-xs">
+                        <span className="text-white/70 text-[10px] sm:text-xs whitespace-nowrap">
                           {formatTime(currentTime)} / {formatTime(duration)}
                         </span>
                       </div>
 
                       {/* Right cluster */}
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1 sm:gap-2">
                         {/* ── Playback Speed ── */}
                         <div className="relative">
                           <button
@@ -1496,21 +1496,25 @@ export default function PlayerPage() {
                           {fullscreen ? <Minimize className="w-5 h-5" /> : <Maximize className="w-5 h-5" />}
                         </button>
 
-                        {/* Picture-in-Picture */}
+                        {/* Picture-in-Picture — hidden on small screens */}
                         {'pictureInPictureEnabled' in document && (
                           <button
                             onClick={e => { e.stopPropagation(); togglePiP(); }}
-                            className={`text-white/70 hover:text-white rounded transition-all ${isPiP ? 'text-primary' : ''}`}
-                            title="Picture-in-Picture (P)"
+                            className={`hidden sm:block rounded transition-all ${
+                              isPiP
+                                ? 'text-primary bg-primary/20 p-1'
+                                : 'text-white/70 hover:text-white'
+                            }`}
+                            title={isPiP ? 'Exit Picture-in-Picture (P)' : 'Picture-in-Picture (P)'}
                           >
                             <PictureInPicture2 className="w-4 h-4" />
                           </button>
                         )}
 
-                        {/* Keyboard shortcuts help */}
+                        {/* Keyboard shortcuts help — hidden on small screens */}
                         <button
                           onClick={e => { e.stopPropagation(); setShowShortcuts(prev => !prev); }}
-                          className="text-white/50 hover:text-white/80 rounded transition-all"
+                          className="hidden sm:block text-white/50 hover:text-white/80 rounded transition-all"
                           title="Keyboard shortcuts (?)"
                         >
                           <Keyboard className="w-4 h-4" />
@@ -1801,6 +1805,7 @@ export default function PlayerPage() {
               exit={{ opacity: 0 }}
               className="absolute inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center px-4"
               onClick={() => setShowShortcuts(false)}
+              onKeyDown={e => { if (e.key === 'Escape') setShowShortcuts(false); }}
             >
               <motion.div
                 initial={{ scale: 0.92, opacity: 0 }}

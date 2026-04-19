@@ -651,10 +651,10 @@ export default function DiscoverPage() {
               )}
               {(!loading || upcoming.length > 0) && (
                 <>
-                  <Section title="New This Month" icon={Calendar} movies={filteredUpcoming} libraryTitles={libraryTitles} watchlist={watchlist} onAddToWatchlist={addToWatchlist} onRemoveFromWatchlist={removeFromWatchlist} onDownload={handleTMDBDownload} />
-                  <Section title="Trending This Week" icon={TrendingUp} movies={filteredTrending} libraryTitles={libraryTitles} watchlist={watchlist} onAddToWatchlist={addToWatchlist} onRemoveFromWatchlist={removeFromWatchlist} onDownload={handleTMDBDownload} />
+                  <Section key={`upcoming-${searchQuery}`} title="New This Month" icon={Calendar} movies={filteredUpcoming} libraryTitles={libraryTitles} watchlist={watchlist} onAddToWatchlist={addToWatchlist} onRemoveFromWatchlist={removeFromWatchlist} onDownload={handleTMDBDownload} />
+                  <Section key={`trending-${searchQuery}`} title="Trending This Week" icon={TrendingUp} movies={filteredTrending} libraryTitles={libraryTitles} watchlist={watchlist} onAddToWatchlist={addToWatchlist} onRemoveFromWatchlist={removeFromWatchlist} onDownload={handleTMDBDownload} />
                   {recommended.length > 0 && (
-                    <Section title="Recommended For You" icon={Sparkles} movies={filteredRecommended} libraryTitles={libraryTitles} watchlist={watchlist} onAddToWatchlist={addToWatchlist} onRemoveFromWatchlist={removeFromWatchlist} onDownload={handleTMDBDownload} />
+                    <Section key={`recommended-${searchQuery}`} title="Recommended For You" icon={Sparkles} movies={filteredRecommended} libraryTitles={libraryTitles} watchlist={watchlist} onAddToWatchlist={addToWatchlist} onRemoveFromWatchlist={removeFromWatchlist} onDownload={handleTMDBDownload} />
                   )}
                   {filteredUpcoming.length === 0 && filteredTrending.length === 0 && filteredRecommended.length === 0 && searchQuery && (
                     <div className="text-center py-16 text-muted-foreground text-sm">No results for "{searchQuery}"</div>
@@ -668,7 +668,7 @@ export default function DiscoverPage() {
           {activeTab === 'shows' && (
             <div>
               {trendingShows.length > 0 ? (
-                <Section title="Trending TV Shows" icon={Tv2} movies={trendingShows} libraryTitles={libraryTitles} watchlist={watchlist} onAddToWatchlist={addToWatchlist} onRemoveFromWatchlist={removeFromWatchlist} onDownload={handleTMDBDownload} />
+                <Section key={`shows-${searchQuery}`} title="Trending TV Shows" icon={Tv2} movies={trendingShows} libraryTitles={libraryTitles} watchlist={watchlist} onAddToWatchlist={addToWatchlist} onRemoveFromWatchlist={removeFromWatchlist} onDownload={handleTMDBDownload} />
               ) : (
                 <div className="text-center py-16">
                   <Tv2 className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
