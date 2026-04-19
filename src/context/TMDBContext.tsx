@@ -27,6 +27,8 @@ export interface TMDBState {
   refresh: () => void;
 }
 
+// Bump SESSION_VERSION whenever the session shape changes to bust stale caches.
+const SESSION_VERSION = 2;
 const SESSION_KEY = 'homestream-tmdb-session';
 
 const GENRE_MAP: Record<string, number> = {
@@ -45,12 +47,16 @@ function genreNamesToIds(names: string[]): number[] {
 function loadSession() {
   try {
     const raw = sessionStorage.getItem(SESSION_KEY);
-    return raw ? JSON.parse(raw) : null;
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    // Invalidate sessions from before trendingShows was added
+    if ((parsed._v ?? 1) < SESSION_VERSION) return null;
+    return parsed;
   } catch { return null; }
 }
 
 function saveSession(data: object) {
-  try { sessionStorage.setItem(SESSION_KEY, JSON.stringify(data)); } catch { /* quota */ }
+  try { sessionStorage.setItem(SESSION_KEY, JSON.stringify({ ...data, _v: SESSION_VERSION })); } catch { /* quota */ }
 }
 
 const TMDBContext = createContext<TMDBState | null>(null);
@@ -114,7 +120,8 @@ export function TMDBProvider({ children, libraryGenres = [] }: TMDBProviderProps
     if (hasFetched.current) return;
     hasFetched.current = true;
     const s = loadSession();
-    if (s && s.upcoming?.length > 0) return; // session cache is good
+    // Session is good only if it has both movies AND shows (v2+ shape)
+    if (s && s.upcoming?.length > 0 && s.trendingShows?.length > 0) return;
     fetchData(false);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
