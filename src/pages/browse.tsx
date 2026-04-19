@@ -69,7 +69,7 @@ export default function BrowsePage() {
   }, [library, query, selectedGenre, sortBy, typeFilter]);
 
   return (
-    <div className="min-h-screen bg-background pt-20 pb-16">
+    <div className="bg-background pt-20 pb-16">
       <title>Browse — HomeStream</title>
       <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8">
         <h1 className="text-4xl font-heading text-foreground mb-4">Browse</h1>

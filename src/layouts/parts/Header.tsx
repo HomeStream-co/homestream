@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useMedia } from '@/context/MediaContext';
 import { useProfile, PROFILES } from '@/context/ProfileContext';
 import SettingsPanel from '@/components/SettingsPanel';
+import StremioPanel from '@/components/StremioPanel';
 
 interface HeaderProps {
   onChatOpen?: () => void;
@@ -142,6 +143,9 @@ export default function Header({ onChatOpen: _onChatOpen }: HeaderProps) {
 
             {/* ── Settings cog ── */}
             <SettingsPanel />
+
+            {/* ── Stremio ── */}
+            <StremioPanel />
 
             {/* ── Profile Switcher ── */}
             {activeProfile && (

@@ -46,7 +46,7 @@ export default function WatchlistPage() {
   const shows = watchlistItems.filter(m => m.type === 'series').length;
 
   return (
-    <div className="min-h-screen bg-background pt-20 pb-16">
+    <div className="bg-background pt-20 pb-16">
       <title>My Watchlist — HomeStream</title>
 
       <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8">

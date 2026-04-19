@@ -29,7 +29,7 @@ export default function HomePage() {
   );
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="bg-background">
       <title>HomeStream — Your Personal Cinema</title>
 
       {/* Hero Section */}
