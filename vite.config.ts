@@ -42,10 +42,13 @@ function serverBundlePlugin(): Plugin {
 				},
 				// node-datachannel is a native addon — keep external so it resolves
 				// from node_modules at runtime (installed alongside the app).
-				external: ["node-datachannel"],
+				// webtorrent uses top-level await and complex ESM internals that
+				// conflict with esbuild's bundling — keep external so it resolves
+				// from node_modules at runtime.
+				external: ["node-datachannel", "webtorrent"],
 				banner: {
-					js: `import { createRequire } from 'module';
-const require = createRequire(import.meta.url);`,
+					js: `import { createRequire as __createRequire } from 'module';
+const require = __createRequire(import.meta.url);`,
 				},
 			});
 			console.log("Server bundle created at dist/server.bundle.mjs");
