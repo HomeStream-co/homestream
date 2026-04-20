@@ -7,8 +7,10 @@
 import type { Request, Response } from 'express';
 import { getSecret } from '#airo/secrets';
 import { readConfig } from '../../../configStore.js';
+import { requireAuth } from '../../../authMiddleware.js';
 
 export default async function handler(req: Request, res: Response) {
+  if (!requireAuth(req, res)) return;
   const { title, year, type = 'movie' } = req.query as Record<string, string>;
   if (!title) return res.status(400).json({ error: 'title required' });
 

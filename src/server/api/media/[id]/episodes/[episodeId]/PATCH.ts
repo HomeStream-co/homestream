@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express';
 import fs from 'fs/promises';
 import path from 'path';
+import { requireAuth } from '../../../../../authMiddleware.js';
 
 const LIBRARY_PATH = path.join(process.cwd(), 'media-library.json');
 
@@ -18,6 +19,7 @@ async function writeLibrary(library: unknown[]) {
 }
 
 export default async function handler(req: Request, res: Response) {
+  if (!requireAuth(req, res)) return;
   try {
     const { id, episodeId } = req.params;
     const { watched } = req.body as { watched: boolean };

@@ -11,8 +11,10 @@
  */
 import type { Request, Response } from 'express';
 import QRCode from 'qrcode';
+import { requireAuth } from '../../../authMiddleware.js';
 
 export default async function handler(req: Request, res: Response) {
+  if (!requireAuth(req, res)) return;
   try {
     const host = req.headers.host ?? `localhost:${process.env.PORT ?? 3000}`;
     const protocol = req.headers['x-forwarded-proto'] ?? (req.secure ? 'https' : 'http');

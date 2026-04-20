@@ -20,8 +20,10 @@
  */
 import type { Request, Response } from 'express';
 import { getTMDBData, getRecommendations, getCacheAge } from '../../tmdbCache.js';
+import { requireAuth } from '../../authMiddleware.js';
 
 export default async function handler(req: Request, res: Response) {
+  if (!requireAuth(req, res)) return;
   const forceRefresh = req.query.refresh === '1';
   const genreParam = (req.query.genres as string) ?? '';
   const excludeParam = (req.query.exclude as string) ?? '';

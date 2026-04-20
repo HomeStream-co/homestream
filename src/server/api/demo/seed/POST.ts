@@ -12,6 +12,7 @@
  */
 import type { Request, Response } from 'express';
 import { readLibrary, writeLibrary } from '../../../libraryStore.js';
+import { requireAuth } from '../../../authMiddleware.js';
 
 const DEMO_ITEM = {
   id: 'demo-bbb',
@@ -42,6 +43,7 @@ const DEMO_ITEM = {
 };
 
 export default async function handler(_req: Request, res: Response) {
+  if (!requireAuth(_req, res)) return;
   try {
     // Check if already seeded
     const library = readLibrary<typeof DEMO_ITEM>();

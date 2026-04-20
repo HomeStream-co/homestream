@@ -9,8 +9,10 @@ import type { Request, Response } from 'express';
 import { readConfig, writeConfig } from '../../configStore.js';
 import { connectVPN, disconnectVPN, testVPNConfig } from '../../vpnService.js';
 import type { VPNConfig, VPNProtocol, VPNProviderType } from '../../vpnService.js';
+import { requireAuth } from '../../authMiddleware.js';
 
 export default async function handler(req: Request, res: Response) {
+  if (!requireAuth(req, res)) return;
   try {
     const { action, ...payload } = req.body as {
       action: 'connect' | 'disconnect' | 'save' | 'test';

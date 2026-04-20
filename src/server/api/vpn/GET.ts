@@ -6,8 +6,10 @@ import type { Request, Response } from 'express';
 import { readConfig } from '../../configStore.js';
 import { getVPNStatus, VPN_PROVIDERS } from '../../vpnService.js';
 import type { VPNConfig } from '../../vpnService.js';
+import { requireAuth } from '../../authMiddleware.js';
 
 export default async function handler(_req: Request, res: Response) {
+  if (!requireAuth(_req, res)) return;
   try {
     const config = await readConfig();
     const vpnCfg = (config as unknown as Record<string, unknown>).vpn as VPNConfig | undefined;
