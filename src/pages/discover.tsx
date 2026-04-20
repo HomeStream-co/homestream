@@ -727,7 +727,7 @@ export default function DiscoverPage() {
     [library]
   );
 
-  const filterMovies = (movies: TMDBMovie[]) => {
+  const filterMovies = useCallback((movies: TMDBMovie[]) => {
     if (!searchQuery.trim()) return movies;
     const q = searchQuery.toLowerCase();
     return movies.filter(m =>
@@ -735,7 +735,7 @@ export default function DiscoverPage() {
       (m.overview ?? '').toLowerCase().includes(q) ||
       (m.genres ?? []).some(g => g.toLowerCase().includes(q))
     );
-  };
+  }, [searchQuery]);
 
   const filteredUpcoming = filterMovies(upcoming);
   const filteredTrending = filterMovies(trending);
