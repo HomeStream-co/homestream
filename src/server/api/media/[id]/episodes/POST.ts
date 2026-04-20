@@ -1,29 +1,30 @@
 import type { Request, Response } from 'express';
-import fs from 'fs/promises';
-import path from 'path';
+import { readLibrary, writeLibrary } from '../../../../libraryStore.js';
 import { requireAuth } from '../../../../authMiddleware.js';
 
-const LIBRARY_PATH = path.join(process.cwd(), 'media-library.json');
-
-async function readLibrary() {
-  try {
-    const data = await fs.readFile(LIBRARY_PATH, 'utf-8');
-    return JSON.parse(data);
-  } catch {
-    return [];
-  }
+interface Episode {
+  id: string;
+  season: number;
+  episode: number;
+  title: string;
+  watched: boolean;
+  watchedAt?: string;
+  runtime?: string;
+  plot?: string;
 }
 
-async function writeLibrary(library: unknown[]) {
-  await fs.writeFile(LIBRARY_PATH, JSON.stringify(library, null, 2));
+interface SeriesItem {
+  id: string;
+  type: string;
+  episodes?: Episode[];
 }
 
 export default async function handler(req: Request, res: Response) {
   try {
     if (!requireAuth(req, res)) return;
     const { id } = req.params;
-    const library = await readLibrary();
-    const idx = library.findIndex((m: { id: string }) => m.id === id);
+    const library = readLibrary<SeriesItem>();
+    const idx = library.findIndex(m => m.id === id);
 
     if (idx === -1) {
       return res.status(404).json({ error: 'Media item not found' });
@@ -38,7 +39,7 @@ export default async function handler(req: Request, res: Response) {
     const body = req.body;
     const episodes = Array.isArray(body) ? body : [body];
 
-    const newEpisodes = episodes.map((ep: {
+    const newEpisodes: Episode[] = episodes.map((ep: {
       season: number;
       episode: number;
       title?: string;
@@ -56,22 +57,21 @@ export default async function handler(req: Request, res: Response) {
     }));
 
     // Merge with existing, avoid duplicates by season+episode
-    const existing: { season: number; episode: number }[] = item.episodes || [];
+    const existing: Episode[] = item.episodes || [];
     const merged = [...existing];
     for (const ep of newEpisodes) {
-      const dup = merged.findIndex(
-        (e: { season: number; episode: number }) => e.season === ep.season && e.episode === ep.episode
-      );
+      const dup = merged.findIndex(e => e.season === ep.season && e.episode === ep.episode);
       if (dup === -1) merged.push(ep);
     }
 
     // Sort by season then episode
-    merged.sort((a: { season: number; episode: number }, b: { season: number; episode: number }) =>
-      a.season !== b.season ? a.season - b.season : a.episode - b.episode
-    );
+    merged.sort((a, b) => a.season !== b.season ? a.season - b.season : a.episode - b.episode);
 
-    library[idx] = { ...item, episodes: merged };
-    await writeLibrary(library);
+    await writeLibrary<SeriesItem>(lib => {
+      const i = lib.findIndex(m => m.id === id);
+      if (i !== -1) lib[i] = { ...lib[i], episodes: merged };
+      return lib;
+    });
 
     return res.json(merged);
   } catch (error) {

@@ -28,26 +28,16 @@ interface MediaItem {
   [key: string]: unknown;
 }
 
-function readLibraryLocal(): MediaItem[] {
-  return readLibrary<MediaItem>();
-}
-
-function writeLibraryLocal(data: MediaItem[]) {
-  writeLibrary(() => data);
-}
-
 export default async function handler(req: Request, res: Response) {
   try {
     if (!requireAuth(req, res)) return;
     const { id } = req.params;
-    const lib = readLibraryLocal();
-    const idx = lib.findIndex(m => m.id === id);
+    const lib = readLibrary<MediaItem>();
+    const item = lib.find(m => m.id === id);
 
-    if (idx === -1) {
+    if (!item) {
       return res.status(404).json({ error: 'Media item not found' });
     }
-
-    const item = lib[idx];
 
     // Try OMDB with the current title (may have been manually corrected)
     const omdb = await fetchOMDB(item.title, item.year);
@@ -83,8 +73,12 @@ export default async function handler(req: Request, res: Response) {
       metadataAvailable: true,
     };
 
-    lib[idx] = updated;
-    writeLibraryLocal(lib);
+    // Use the updater pattern so concurrent writes are not clobbered
+    await writeLibrary<MediaItem>(items => {
+      const idx = items.findIndex(m => m.id === id);
+      if (idx !== -1) items[idx] = updated;
+      return items;
+    });
 
     res.json({ success: true, item: updated });
   } catch (error) {

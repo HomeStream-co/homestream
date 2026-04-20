@@ -1,21 +1,16 @@
 import type { Request, Response } from 'express';
-import fs from 'fs/promises';
-import path from 'path';
+import { readLibrary, writeLibrary } from '../../../../../libraryStore.js';
 import { requireAuth } from '../../../../../authMiddleware.js';
 
-const LIBRARY_PATH = path.join(process.cwd(), 'media-library.json');
-
-async function readLibrary() {
-  try {
-    const data = await fs.readFile(LIBRARY_PATH, 'utf-8');
-    return JSON.parse(data);
-  } catch {
-    return [];
-  }
+interface Episode {
+  id: string;
+  watched: boolean;
+  watchedAt?: string;
 }
 
-async function writeLibrary(library: unknown[]) {
-  await fs.writeFile(LIBRARY_PATH, JSON.stringify(library, null, 2));
+interface SeriesItem {
+  id: string;
+  episodes?: Episode[];
 }
 
 export default async function handler(req: Request, res: Response) {
@@ -24,31 +19,37 @@ export default async function handler(req: Request, res: Response) {
     const { id, episodeId } = req.params;
     const { watched } = req.body as { watched: boolean };
 
-    const library = await readLibrary();
-    const idx = library.findIndex((m: { id: string }) => m.id === id);
+    const library = readLibrary<SeriesItem>();
+    const idx = library.findIndex(m => m.id === id);
 
     if (idx === -1) {
       return res.status(404).json({ error: 'Media item not found' });
     }
 
     const item = library[idx];
-    const episodes: { id: string; watched: boolean; watchedAt?: string }[] = item.episodes || [];
+    const episodes: Episode[] = item.episodes || [];
     const epIdx = episodes.findIndex(e => e.id === episodeId);
 
     if (epIdx === -1) {
       return res.status(404).json({ error: 'Episode not found' });
     }
 
-    episodes[epIdx] = {
+    const updatedEpisode: Episode = {
       ...episodes[epIdx],
       watched,
       watchedAt: watched ? new Date().toISOString() : undefined,
     };
 
-    library[idx] = { ...item, episodes };
-    await writeLibrary(library);
+    const updatedEpisodes = [...episodes];
+    updatedEpisodes[epIdx] = updatedEpisode;
 
-    return res.json(episodes[epIdx]);
+    await writeLibrary<SeriesItem>(lib => {
+      const i = lib.findIndex(m => m.id === id);
+      if (i !== -1) lib[i] = { ...lib[i], episodes: updatedEpisodes };
+      return lib;
+    });
+
+    return res.json(updatedEpisode);
   } catch (error) {
     return res.status(500).json({ error: 'Failed to update episode', message: String(error) });
   }
