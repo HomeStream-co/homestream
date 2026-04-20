@@ -13,7 +13,7 @@
  */
 import type { Request, Response } from 'express';
 import { readLibrary, writeLibrary } from '../../libraryStore.js';
-import { DEMO_ITEM } from '../../demoItem.js';
+import { ALL_DEMO_ITEMS } from '../../demoLibrary.js';
 import { requireAuth } from '../../authMiddleware.js';
 
 // Seed once at module load — fires as soon as the API route is first imported,
@@ -25,12 +25,15 @@ function ensureDemoSeeded() {
   demoSeeded = true;
   try {
     const library = readLibrary<Record<string, unknown>>();
-    if (library.find(m => m.id === 'demo-bbb')) return;
+    const existingIds = new Set(library.map(m => m.id as string));
+    const toAdd = ALL_DEMO_ITEMS.filter(d => !existingIds.has(d.id));
+    if (toAdd.length === 0) return;
     writeLibrary(lib => {
-      lib.unshift(DEMO_ITEM as unknown as Record<string, unknown>);
+      // Prepend new demo items (newest first so they appear at top)
+      lib.unshift(...(toAdd as unknown as Record<string, unknown>[]));
       return lib;
     }).catch(err => console.warn('[demo] Seed failed:', err));
-    console.log('[demo] Big Buck Bunny seeded into library');
+    console.log(`[demo] Seeded ${toAdd.length} demo items`);
   } catch (err) {
     console.warn('[demo] Seed error (non-fatal):', err);
   }

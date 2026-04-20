@@ -21,6 +21,7 @@ import http from 'http';
 import https from 'https';
 import { requireAuth } from '../../../authMiddleware.js';
 import { readLibrary } from '../../../libraryStore.js';
+import { DEMO_CDN_URLS as DEMO_CDN_STATIC } from '../../../demoLibrary.js';
 
 const UPLOADS_DIR = path.resolve('./uploads');
 
@@ -89,20 +90,16 @@ export default function handler(req: Request, res: Response) {
     const { filename } = req.params;
 
     // ── Demo mode: proxy CDN stream for demo items ──────────────────────────
-    // Works even if the library hasn't been seeded yet — the CDN URL is
-    // hardcoded here as a fallback so the player always works on first load.
-    const DEMO_CDN_URLS: Record<string, string> = {
-      '__demo__big-buck-bunny.mp4': 'https://download.blender.org/peach/bigbuckbunny_movies/BigBuckBunny_320x180.mp4',
-    };
-
+    // Uses the static map from demoLibrary as the authoritative source,
+    // then falls back to any demoStreamUrl stored in the library JSON.
     if (filename.startsWith('__demo__')) {
-      // Try library first (allows overriding the CDN URL), fall back to hardcoded map
-      let cdnUrl: string | undefined;
-      try {
-        const library = readLibrary<{ filename?: string; demoStreamUrl?: string }>();
-        cdnUrl = library.find(m => m.filename === filename)?.demoStreamUrl;
-      } catch { /* ignore */ }
-      cdnUrl = cdnUrl ?? DEMO_CDN_URLS[filename];
+      let cdnUrl: string | undefined = DEMO_CDN_STATIC[filename];
+      if (!cdnUrl) {
+        try {
+          const library = readLibrary<{ filename?: string; demoStreamUrl?: string }>();
+          cdnUrl = library.find(m => m.filename === filename)?.demoStreamUrl;
+        } catch { /* ignore */ }
+      }
 
       if (!cdnUrl) return res.status(404).json({ error: 'Demo item not found', filename });
 

@@ -52,11 +52,13 @@ function gzipMiddleware(req, res, next) {
 async function seedDemoItem() {
   try {
     const { readLibrary, writeLibrary } = await import('./libraryStore.js');
-    const { DEMO_ITEM } = await import('./demoItem.js');
+    const { ALL_DEMO_ITEMS } = await import('./demoLibrary.js');
     const library = readLibrary();
-    if (library.find(m => m.id === 'demo-bbb')) return; // already seeded
-    await writeLibrary(lib => { lib.unshift(DEMO_ITEM); return lib; });
-    console.log('[demo] Big Buck Bunny seeded into library');
+    const existingIds = new Set(library.map(m => m.id));
+    const toAdd = ALL_DEMO_ITEMS.filter(d => !existingIds.has(d.id));
+    if (toAdd.length === 0) return;
+    await writeLibrary(lib => { lib.unshift(...toAdd); return lib; });
+    console.log(`[demo] Seeded ${toAdd.length} demo items into library`);
   } catch (err) {
     console.warn('[demo] Seed failed (non-fatal):', err.message);
   }
