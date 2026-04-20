@@ -28,8 +28,10 @@ export function useHlsSetup(
 
     fetch(`/api/hls/${id}/probe`)
       .then(r => r.json())
-      .then(async (data: { needsHls?: boolean; codec?: string; hlsUrl?: string }) => {
-        if (cancelled || !data.needsHls || !data.hlsUrl) return;
+      .then(async (data: { needsTranscode?: boolean; needsHls?: boolean; codec?: string; hlsUrl?: string }) => {
+        // API returns `needsTranscode`; `needsHls` kept as fallback for older responses
+        const shouldUseHls = data.needsTranscode ?? data.needsHls;
+        if (cancelled || !shouldUseHls || !data.hlsUrl) return;
 
         const url = data.hlsUrl;
         const codec = data.codec ?? 'hevc';
