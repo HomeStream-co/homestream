@@ -29,6 +29,7 @@ import { Button } from '@/components/ui/button';
 import { useMedia } from '@/context/MediaContext';
 import { useProfile } from '@/context/ProfileContext';
 import { useTheme } from '@/context/ThemeContext';
+import { toActorsString } from '@/lib/utils';
 import EpisodeTracker from '@/components/EpisodeTracker';
 import { Progress } from '@/components/ui/progress';
 import type { MediaItem, Episode } from '@/types/media';
@@ -494,7 +495,7 @@ export default function ShowPage() {
                   {item.actors && item.actors !== 'N/A' && (
                     <div>
                       <p className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">Cast</p>
-                      <p className="text-sm text-foreground line-clamp-2">{item.actors}</p>
+                      <p className="text-sm text-foreground line-clamp-2">{toActorsString(item.actors)}</p>
                     </div>
                   )}
                 </div>

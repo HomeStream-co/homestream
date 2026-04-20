@@ -6,6 +6,7 @@
 
 import { motion } from 'motion/react';
 import { Star } from 'lucide-react';
+import { toActorsString } from '@/lib/utils';
 
 interface Enrichment {
   whyWatch?: string;
@@ -23,7 +24,7 @@ interface MediaItem {
   imdbRating?: string;
   plot?: string;
   director?: string;
-  actors?: string;
+  actors?: string | string[];
   poster?: string;
   enrichment?: Enrichment;
 }
@@ -65,7 +66,7 @@ export default function PlayerInfoPanel({ item }: Props) {
         <p className="text-xs text-white/50"><span className="text-white/70">Director:</span> {item.director}</p>
       )}
       {item.actors !== 'Unknown' && (
-        <p className="text-xs text-white/50 mt-1"><span className="text-white/70">Cast:</span> {item.actors}</p>
+        <p className="text-xs text-white/50 mt-1"><span className="text-white/70">Cast:</span> {toActorsString(item.actors)}</p>
       )}
       <div className="mt-4 pt-4 border-t border-white/10">
         <p className="text-white/30 text-[10px] uppercase tracking-widest mb-2">Keyboard Shortcuts</p>

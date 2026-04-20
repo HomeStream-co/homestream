@@ -54,7 +54,7 @@ function toJellyfinItem(item: LibraryItem, baseUrl: string) {
     People: [
       ...(item.director ? [{ Name: item.director, Type: 'Director' }] : []),
       ...(item.actors
-        ? item.actors.split(',').slice(0, 5).map(a => ({ Name: a.trim(), Type: 'Actor' }))
+        ? (Array.isArray(item.actors) ? item.actors : item.actors.split(',')).slice(0, 5).map((a: string) => ({ Name: a.trim(), Type: 'Actor' }))
         : []),
     ],
     UserData: {

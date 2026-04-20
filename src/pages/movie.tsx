@@ -20,6 +20,7 @@ import {
   BookOpen, Heart, Layers, Download,
 } from 'lucide-react';
 import { useMedia } from '@/context/MediaContext';
+import { toActorsString } from '@/lib/utils';
 import { useProfile } from '@/context/ProfileContext';
 import { useTheme } from '@/context/ThemeContext';
 import MediaCard from '@/components/MediaCard';
@@ -351,7 +352,7 @@ export default function MoviePage() {
                   {item.actors && item.actors !== 'N/A' && (
                     <div>
                       <p className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">Cast</p>
-                      <p className="text-sm text-foreground line-clamp-2">{item.actors}</p>
+                      <p className="text-sm text-foreground line-clamp-2">{toActorsString(item.actors)}</p>
                     </div>
                   )}
                 </div>

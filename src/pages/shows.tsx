@@ -13,6 +13,7 @@ import { useMedia } from '@/context/MediaContext';
 import { useProfile } from '@/context/ProfileContext';
 import MediaCard from '@/components/MediaCard';
 import { Skeleton } from '@/components/ui/skeleton';
+import { toActorsString } from '@/lib/utils';
 
 const GENRES = ['All', 'Drama', 'Comedy', 'Action', 'Sci-Fi', 'Thriller', 'Crime', 'Animation', 'Documentary', 'Fantasy', 'Horror', 'Romance', 'Family'];
 const SORT_OPTIONS = [
@@ -46,7 +47,7 @@ export default function ShowsPage() {
       items = items.filter(m =>
         m.title.toLowerCase().includes(q) ||
         m.plot?.toLowerCase().includes(q) ||
-        m.actors?.toLowerCase().includes(q) ||
+        toActorsString(m.actors).toLowerCase().includes(q) ||
         m.genre.some(g => g.toLowerCase().includes(q))
       );
     }

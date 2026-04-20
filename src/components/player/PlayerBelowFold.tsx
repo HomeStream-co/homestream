@@ -12,6 +12,7 @@
 import { Loader2, Wand2, Star, Sparkles, MessageCircle, CheckCircle2 } from 'lucide-react';
 import MediaCard from '@/components/MediaCard';
 import type { MediaItem } from '@/types/media';
+import { toActorsString } from '@/lib/utils';
 
 interface Props {
   item: MediaItem;
@@ -123,7 +124,7 @@ export default function PlayerBelowFold({
           )}
           {item.actors !== 'Unknown' && (
             <p className="text-sm text-muted-foreground mt-1">
-              <span className="text-foreground">Cast:</span> {item.actors}
+              <span className="text-foreground">Cast:</span> {toActorsString(item.actors)}
             </p>
           )}
         </div>

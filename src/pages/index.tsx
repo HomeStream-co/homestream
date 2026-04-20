@@ -28,6 +28,7 @@ import { useTMDBContext } from '@/context/TMDBContext';
 import MediaCarousel from '@/components/MediaCarousel';
 import MediaCard from '@/components/MediaCard';
 import HeroBanner from '@/components/HeroBanner';
+import { toActorsString } from '@/lib/utils';
 import OfflineBanner from '@/components/OfflineBanner';
 import LazySection from '@/components/LazySection';
 import HomePageSkeleton from '@/components/HomePageSkeleton';
@@ -130,7 +131,7 @@ export default function HomePage() {
       items = items.filter(m =>
         m.title.toLowerCase().includes(q) ||
         m.plot?.toLowerCase().includes(q) ||
-        m.actors?.toLowerCase().includes(q) ||
+        toActorsString(m.actors).toLowerCase().includes(q) ||
         m.director?.toLowerCase().includes(q) ||
         m.genre.some(g => g.toLowerCase().includes(q))
       );
