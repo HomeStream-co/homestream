@@ -29,12 +29,12 @@ directories:
   output: dist-electron
   buildResources: electron/assets
 
-# Files to include in the package
-# electron-builder automatically includes all package.json "dependencies" in the
-# asar archive. We list the explicit app files here; node_modules for dependencies
-# are handled automatically by electron-builder.
+# Files to include in the asar package (the Electron app itself).
+# NOTE: Do NOT include dist/ here — the client bundle (dist/) and server bundle
+# (dist/server.bundle.mjs) are both shipped via extraResources below, which puts
+# them outside the asar at resources/client/ and resources/server/. Including
+# dist/ here would double-ship ~10MB of client assets inside the asar for no benefit.
 files:
-  - dist/**/*
   - electron/main.js
   - electron/preload.js
   - electron/tray-icon.png

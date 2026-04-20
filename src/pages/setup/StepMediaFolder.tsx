@@ -6,7 +6,7 @@ import { HardDrive, FolderOpen, ChevronLeft, ChevronRight, Loader2 } from 'lucid
 import type { SetupStepProps } from './types';
 import { apiPost } from './types';
 
-export default function StepMediaFolder({ form, set, status, setStatus, onNext, onBack }: SetupStepProps) {
+export default function StepMediaFolder({ form, set, status, setStatus, onNext, onBack, platformDefaultsReady }: SetupStepProps) {
   const saveMediaDir = async () => {
     setStatus(s => ({ ...s, mediaDir: 'saving' }));
     try {
@@ -106,10 +106,12 @@ export default function StepMediaFolder({ form, set, status, setStatus, onNext, 
         </button>
         <button
           onClick={saveMediaDir}
-          disabled={!form.mediaDir || status.mediaDir === 'saving'}
+          disabled={!form.mediaDir || status.mediaDir === 'saving' || !platformDefaultsReady}
           className="flex-1 flex items-center justify-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground py-2.5 rounded-xl font-semibold text-sm transition-colors disabled:opacity-60"
         >
-          {status.mediaDir === 'saving'
+          {!platformDefaultsReady
+            ? <><Loader2 className="w-4 h-4 animate-spin" />Loading defaults…</>
+            : status.mediaDir === 'saving'
             ? <><Loader2 className="w-4 h-4 animate-spin" />Saving…</>
             : <>Save &amp; Continue <ChevronRight className="w-4 h-4" /></>}
         </button>

@@ -127,6 +127,11 @@ export default function SetupPage() {
   const [vpnTestState, setVpnTestState]   = useState<'idle' | 'testing' | 'ok' | 'error'>('idle');
   const [vpnTestMsg, setVpnTestMsg]       = useState('');
 
+  // Track whether the Electron platform defaults have been fetched.
+  // StepMediaFolder disables its "Save & Continue" button until this resolves
+  // so the user can't accidentally save the hardcoded fallback path.
+  const [platformDefaultsReady, setPlatformDefaultsReady] = useState(false);
+
   // ── Redirect if already set up ──
   useEffect(() => {
     fetch('/api/setup').then(r => r.json()).then((data: { setupComplete?: boolean }) => {
@@ -143,7 +148,8 @@ export default function SetupPage() {
           setForm(f => ({ ...f, mediaDir: data.defaultMediaDir! }));
         }
       })
-      .catch(() => {/* non-fatal — keep the optimistic default */});
+      .catch(() => {/* non-fatal — keep the optimistic default */})
+      .finally(() => setPlatformDefaultsReady(true));
   }, []);
 
   // ── Auto-scan when reaching finish step ──
@@ -221,6 +227,7 @@ export default function SetupPage() {
     importExisting, setImportExisting,
     vpnTestState, setVpnTestState,
     vpnTestMsg, setVpnTestMsg,
+    platformDefaultsReady,
   };
 
   const currentStep = STEPS[step];

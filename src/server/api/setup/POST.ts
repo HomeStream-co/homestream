@@ -1,5 +1,6 @@
 import type { Request, Response } from 'express';
 import fs from 'fs';
+import path from 'path';
 import bcrypt from 'bcryptjs';
 import { writeConfig, readConfig, isSetupComplete } from '../../configStore.js';
 import { testConnection as testQbit } from '../../qbittorrentClient.js';
@@ -76,18 +77,23 @@ export default async function handler(req: Request, res: Response) {
 
         // Create media directories if mediaDir provided
         if (fields.mediaDir) {
+          // Normalise path separators — users may type either / or \ on Windows
+          const mediaDir = fields.mediaDir.replace(/\\/g, path.sep).replace(/\//g, path.sep);
+          const downloadsDir = path.join(mediaDir, 'downloads');
+          const libraryDir   = path.join(mediaDir, 'library');
           const dirs = [
-            fields.mediaDir,
-            `${fields.mediaDir}/downloads`,
-            `${fields.mediaDir}/library`,
-            `${fields.mediaDir}/library/movies`,
-            `${fields.mediaDir}/library/tv`,
+            mediaDir,
+            downloadsDir,
+            libraryDir,
+            path.join(libraryDir, 'movies'),
+            path.join(libraryDir, 'tv'),
           ];
           for (const dir of dirs) {
             try { fs.mkdirSync(dir, { recursive: true }); } catch { /* ignore */ }
           }
-          updates.downloadsDir = `${fields.mediaDir}/downloads`;
-          updates.libraryDir = `${fields.mediaDir}/library`;
+          updates.mediaDir     = mediaDir;
+          updates.downloadsDir = downloadsDir;
+          updates.libraryDir   = libraryDir;
         }
 
         const config = writeConfig(updates);

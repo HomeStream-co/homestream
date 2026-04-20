@@ -23,6 +23,23 @@ export default function StepFinish({
   const completeSetup = async () => {
     setStatus(s => ({ ...s, complete: 'saving' }));
     try {
+      // Re-save the full form state before completing — the user may have gone
+      // Back and changed API keys or other settings without clicking "Save & Continue"
+      // again. This ensures the final config always reflects what's shown on screen.
+      await apiPost('save', {
+        adminPassword:   form.adminPassword,
+        omdbApiKey:      form.omdbApiKey,
+        googleAiApiKey:  form.googleAiApiKey,
+        tmdbApiKey:      form.tmdbApiKey,
+        aiProvider:      form.aiProvider,
+        ollamaUrl:       form.ollamaUrl,
+        ollamaModel:     form.ollamaModel,
+        mediaDir:        form.mediaDir,
+        preferredQuality: form.preferredQuality,
+        watchFolderEnabled: String(form.watchFolderEnabled),
+        autoTranscode:   String(form.autoTranscode),
+      });
+
       if (importExisting && scanFound > 0) {
         setScanState('importing');
         await fetch('/api/setup', {
@@ -142,11 +159,14 @@ export default function StepFinish({
         )}
       </div>
 
-      <div className="bg-primary/10 border border-primary/20 rounded-xl p-3 text-xs text-muted-foreground leading-relaxed">
-        <strong className="text-foreground">Jellyfin tip:</strong> Open Jellyfin at{' '}
-        <a href={form.jellyfinUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">{form.jellyfinUrl}</a>{' '}
-        and add <code className="bg-muted px-1 rounded">{form.mediaDir}/library</code> as a media library.
-      </div>
+      {/* Jellyfin tip — only shown when Jellyfin was successfully connected */}
+      {status.jellyfin === 'ok' && (
+        <div className="bg-primary/10 border border-primary/20 rounded-xl p-3 text-xs text-muted-foreground leading-relaxed">
+          <strong className="text-foreground">Jellyfin tip:</strong> Open Jellyfin at{' '}
+          <a href={form.jellyfinUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">{form.jellyfinUrl}</a>{' '}
+          and add <code className="bg-muted px-1 rounded">{form.mediaDir}/library</code> as a media library.
+        </div>
+      )}
 
       <div className="flex gap-3">
         <button onClick={onBack} className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-border text-muted-foreground hover:text-foreground text-sm transition-colors">

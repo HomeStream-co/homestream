@@ -10,6 +10,7 @@
  */
 
 import fs from 'fs';
+import path from 'path';
 
 import { dataPath } from './dataDir.js';
 const CONFIG_PATH = dataPath('homestream-config.json');
@@ -45,7 +46,10 @@ export interface AppConfig {
 
 const DEFAULTS: AppConfig = {
   setupComplete: false,
-  mediaDir: process.env.MEDIA_DIR || '/media',
+  // Default mediaDir: use MEDIA_DIR env var if set (Docker/cloud), otherwise
+  // leave empty so the setup wizard always prompts. Do NOT default to '/media'
+  // in the packaged .exe — that's a Linux path that doesn't exist on Windows.
+  mediaDir: process.env.MEDIA_DIR || '',
   downloadsDir: '',
   libraryDir: '',
   qbitUrl: process.env.QBIT_URL || 'http://localhost:8080',
@@ -92,10 +96,10 @@ export function writeConfig(updates: Partial<AppConfig>): AppConfig {
   const current = readConfig();
   const next: AppConfig = { ...current, ...updates };
 
-  // Auto-derive sub-directories
+  // Auto-derive sub-directories using path.join for cross-platform correctness
   if (updates.mediaDir) {
-    next.downloadsDir = next.downloadsDir || `${updates.mediaDir}/downloads`;
-    next.libraryDir = next.libraryDir || `${updates.mediaDir}/library`;
+    next.downloadsDir = next.downloadsDir || path.join(updates.mediaDir, 'downloads');
+    next.libraryDir = next.libraryDir || path.join(updates.mediaDir, 'library');
   }
 
   // Enqueue the write — non-blocking, returns the computed next config immediately

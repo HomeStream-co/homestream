@@ -124,9 +124,21 @@ function pushLog(line, level = 'info') {
   controlWindow?.webContents.send('log', entry);
 }
 
+// ── Port availability check ───────────────────────────────────────────────────
+// Checks if a port is already in use before spawning the server.
+// Returns a promise that resolves to true if the port is free, false if busy.
+function isPortFree(port) {
+  return new Promise(resolve => {
+    const server = require('net').createServer();
+    server.once('error', () => resolve(false));
+    server.once('listening', () => { server.close(); resolve(true); });
+    server.listen(port, '127.0.0.1');
+  });
+}
+
 // ── Server management ─────────────────────────────────────────────────────────
 
-function startServer() {
+async function startServer() {
   if (serverProcess) return;
 
   // In packaged app: server bundle is in resources/server/server.bundle.mjs
@@ -135,6 +147,16 @@ function startServer() {
   if (isDev) {
     pushLog('Development mode — use npm run dev to start the server', 'warn');
     serverRunning = true;
+    sendStatus();
+    return;
+  }
+
+  // Pre-check: is port 3000 already in use?
+  const portFree = await isPortFree(SERVER_PORT);
+  if (!portFree) {
+    pushLog(`ERROR: Port ${SERVER_PORT} is already in use by another application.`, 'error');
+    pushLog(`Close the app using port ${SERVER_PORT} and restart HomeStream, or change the port in settings.`, 'warn');
+    serverRunning = false;
     sendStatus();
     return;
   }
@@ -205,10 +227,28 @@ function startServer() {
 function stopServer() {
   if (!serverProcess) return;
   pushLog('Stopping server…', 'warn');
-  serverProcess.kill('SIGTERM');
+  // On Windows, SIGTERM is mapped to an immediate kill (no graceful shutdown).
+  // We send a graceful shutdown request via HTTP first, then kill after a timeout.
+  // This gives the server a chance to clean up HLS temp segments.
+  const proc = serverProcess;
   serverProcess = null;
   serverRunning = false;
   sendStatus();
+
+  // Try graceful HTTP shutdown first (server listens for this)
+  const gracefulReq = http.get(`http://localhost:${SERVER_PORT}/api/shutdown`, () => {
+    // Server acknowledged — give it 3 seconds to clean up then kill
+    setTimeout(() => { try { proc.kill(); } catch { /* already dead */ } }, 3000);
+  });
+  gracefulReq.setTimeout(1000, () => {
+    gracefulReq.destroy();
+    // No response — kill immediately
+    try { proc.kill(); } catch { /* already dead */ }
+  });
+  gracefulReq.on('error', () => {
+    // Server not responding — kill immediately
+    try { proc.kill(); } catch { /* already dead */ }
+  });
 }
 
 function waitForServer(timeout = SERVER_READY_TIMEOUT) {
@@ -216,13 +256,22 @@ function waitForServer(timeout = SERVER_READY_TIMEOUT) {
     const start = Date.now();
     const check = () => {
       // /api/health is intentionally open (no auth required) — safe to poll here
-      http.get(`http://localhost:${SERVER_PORT}/api/health`, res => {
+      const req = http.get(`http://localhost:${SERVER_PORT}/api/health`, res => {
         if (res.statusCode === 200) resolve(true);
         else retry();
-      }).on('error', retry);
+        // Consume response body so the socket is released
+        res.resume();
+      });
+      // Per-request timeout: if the server accepts the connection but hangs,
+      // destroy the socket after 2 seconds so we retry rather than freezing.
+      req.setTimeout(2000, () => {
+        req.destroy();
+        retry();
+      });
+      req.on('error', retry);
     };
     const retry = () => {
-      if (Date.now() - start > timeout) return reject(new Error('Server startup timeout'));
+      if (Date.now() - start > timeout) return reject(new Error(`Server startup timeout after ${timeout / 1000}s — port ${SERVER_PORT} may be in use by another app`));
       setTimeout(check, 500);
     };
     check();
@@ -329,7 +378,7 @@ function createTray() {
 
 // ── IPC handlers ──────────────────────────────────────────────────────────────
 
-ipcMain.on('start-server',      () => startServer());
+ipcMain.on('start-server',      () => startServer().catch(err => pushLog(`Start failed: ${err.message}`, 'error')));
 ipcMain.on('stop-server',       () => stopServer());
 ipcMain.on('open-browser',      () => shell.openExternal(`http://localhost:${SERVER_PORT}`));
 ipcMain.on('open-browser-lan',  (_, url)  => shell.openExternal(url));
@@ -338,10 +387,10 @@ ipcMain.on('request-status',    () => sendStatus());
 
 // ── App lifecycle ─────────────────────────────────────────────────────────────
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   createControlWindow();
   createTray();
-  startServer();
+  await startServer();
 
   // Set up auto-updater after window exists so it can send IPC events to it.
   // Passes a getter (not the window directly) so it always uses the current

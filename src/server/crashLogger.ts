@@ -24,18 +24,34 @@ import os from 'os';
 
 // ── Storage path ──────────────────────────────────────────────────────────────
 // Use persistent storage so crashes survive server restarts.
-// Falls back to local ./crash-log.json if persistent storage isn't available.
-const PERSISTENT_DIR = '/shared-storage/public/assets';
-const LOCAL_FALLBACK  = path.resolve('./crash-log.json');
+// Priority:
+//   1. HOMESTREAM_DATA env var — set by Electron to app.getPath('userData')
+//      e.g. C:\Users\<user>\AppData\Roaming\HomeStream on Windows
+//      This is always writable and is the correct location for the .exe.
+//   2. /shared-storage/public/assets — cloud/container environment (Airo platform)
+//   3. ./crash-log.json — local dev fallback (process.cwd() = project root)
+//
+// IMPORTANT: Do NOT use process.cwd() as the primary fallback for the packaged
+// .exe — on Windows, process.cwd() resolves to the install directory
+// (C:\Program Files\HomeStream\) which is write-protected for normal users.
 
 function getCrashLogPath(): string {
+  // 1. Electron userData (always writable on all platforms)
+  if (process.env.HOMESTREAM_DATA) {
+    return path.join(process.env.HOMESTREAM_DATA, 'crash-log.json');
+  }
+  // 2. Cloud persistent storage
   try {
     if (fs.existsSync(PERSISTENT_DIR)) {
       return path.join(PERSISTENT_DIR, 'crash-log.json');
     }
   } catch { /* ignore */ }
+  // 3. Local dev — project root (writable in dev mode)
   return LOCAL_FALLBACK;
 }
+
+const PERSISTENT_DIR = '/shared-storage/public/assets';
+const LOCAL_FALLBACK  = path.resolve('./crash-log.json');
 
 const MAX_ENTRIES = 100;
 
