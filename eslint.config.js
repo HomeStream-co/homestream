@@ -136,7 +136,7 @@ const sharedGlobals = {
 
 export default [
   {
-    ignores: ['dist', 'node_modules', '.next', '.vite', 'dev-tools', 'source-mapper', 'airo-secrets'],
+    ignores: ['dist', 'node_modules', '.next', '.vite', 'dev-tools', 'source-mapper', 'airo-secrets', 'electron'],
   },
   {
     files: ['**/*.{ts,tsx}'],

@@ -197,7 +197,6 @@ export function runStartupCleanup(): void {
     if (tcExists) {
       // Transcode finished before the restart — clear the flag
       console.log(`[startup]   ✓ "${item.title}" — _tc.mp4 found, clearing transcoding flag`);
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { transcoding: _transcoding, transcodeError: _transcodeError, ...rest } = result;
       return { ...rest, filename: tcFilename };
     }
