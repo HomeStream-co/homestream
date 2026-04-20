@@ -12,34 +12,8 @@
  * top-level fields are always kept in sync for backwards compat).
  */
 import type { Request, Response } from 'express';
-import { readLibrary, writeLibrary } from '../../libraryStore.js';
-import { ALL_DEMO_ITEMS } from '../../demoLibrary.js';
+import { readLibrary } from '../../libraryStore.js';
 import { requireAuth } from '../../authMiddleware.js';
-
-// Seed once at module load — fires as soon as the API route is first imported,
-// which happens on the first request to any /api/* endpoint.
-let demoSeeded = false;
-
-function ensureDemoSeeded() {
-  if (demoSeeded) return;
-  demoSeeded = true;
-  try {
-    const library = readLibrary<Record<string, unknown>>();
-    const demoIds = new Set(ALL_DEMO_ITEMS.map(d => d.id));
-
-    // Remove stale demo items so we can re-insert fresh ones
-    const nonDemo = library.filter(m => !demoIds.has(m.id as string));
-    const toAdd = ALL_DEMO_ITEMS as unknown as Record<string, unknown>[];
-
-    writeLibrary(() => {
-      // Demo items at the front, user content after
-      return [...toAdd, ...nonDemo];
-    }).catch(err => console.warn('[demo] Seed failed:', err));
-    console.log(`[demo] Synced ${ALL_DEMO_ITEMS.length} demo items`);
-  } catch (err) {
-    console.warn('[demo] Seed error (non-fatal):', err);
-  }
-}
 
 interface ProfileProgressEntry {
   progress: number;
@@ -52,7 +26,6 @@ interface ProfileProgressEntry {
 export default function handler(req: Request, res: Response) {
   try {
     if (!requireAuth(req, res)) return;
-    ensureDemoSeeded();
     const library = readLibrary<Record<string, unknown>>();
 
     const profileId = (req.query.profile as string | undefined)?.trim();

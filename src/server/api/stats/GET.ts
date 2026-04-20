@@ -77,8 +77,7 @@ export default async function handler(_req: Request, res: Response) {
     const library = readLibrary<LibraryItem>();
     const cfg = readConfig();
 
-    // Exclude demo-only items from stats
-    const real = library.filter(item => !item.demoStream && !item.isDemo);
+    const real = library;
 
     // ── Storage ───────────────────────────────────────────────────────────────
     let libraryBytes = 0;

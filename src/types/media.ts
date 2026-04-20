@@ -33,7 +33,7 @@ export interface MediaItem {
   genre: string[];
   plot: string;
   director: string;
-  actors: string | string[];  // string[] for demo items, comma-separated string for OMDB items
+  actors: string | string[];  // string[] when parsed from array sources, comma-separated string from OMDB
   imdbRating: string;
   poster: string;
   type: 'movie' | 'series';
@@ -68,11 +68,6 @@ export interface MediaItem {
   // Top-level watchProgress / watchedSeconds / lastWatchedAt mirror the adult profile
   // for backwards compatibility with Jellyfin API and legacy code.
   profileProgress?: Record<string, ProfileProgressEntry>;
-  // Demo content flags
-  isDemo?: boolean;             // true for built-in demo items (Big Buck Bunny)
-  requiresInternet?: boolean;   // true if the item streams from the internet (demo only)
-  importedFrom?: string;        // 'demo' | 'upload' | 'scan' | 'qbittorrent'
-  demoStreamUrl?: string;       // CDN URL for demo items
   // TV show episode tracking
   totalSeasons?: number;
   episodes?: Episode[];

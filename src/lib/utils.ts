@@ -5,7 +5,7 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-/** Normalise actors field — handles both string[] (demo) and comma-string (OMDB). */
+/** Normalise actors field — handles both string[] and comma-separated string (OMDB). */
 export function toActorsArray(actors: string | string[] | undefined): string[] {
   if (!actors) return [];
   if (Array.isArray(actors)) return actors.filter(Boolean);

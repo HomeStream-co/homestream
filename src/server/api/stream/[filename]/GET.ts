@@ -17,16 +17,12 @@
 import type { Request, Response } from 'express';
 import fs from 'fs';
 import path from 'path';
-import http from 'http';
-import https from 'https';
 import { requireAuth } from '../../../authMiddleware.js';
 import { readLibrary } from '../../../libraryStore.js';
-import { DEMO_CDN_URLS as DEMO_CDN_STATIC } from '../../../demoLibrary.js';
 
 const UPLOADS_DIR = path.resolve('./uploads');
 
 // 4 MB — large enough to fill the browser's initial buffer in one shot on LAN
-// (browser default is ~512 KB which causes 8× more round trips)
 const CHUNK_SIZE = 4 * 1024 * 1024;
 
 const MIME_TYPES: Record<string, string> = {
@@ -89,39 +85,6 @@ export default function handler(req: Request, res: Response) {
   try {
     const { filename } = req.params;
 
-    // ── Demo mode: proxy CDN stream for demo items ──────────────────────────
-    // Uses the static map from demoLibrary as the authoritative source,
-    // then falls back to any demoStreamUrl stored in the library JSON.
-    if (filename.startsWith('__demo__')) {
-      let cdnUrl: string | undefined = DEMO_CDN_STATIC[filename];
-      if (!cdnUrl) {
-        try {
-          const library = readLibrary<{ filename?: string; demoStreamUrl?: string }>();
-          cdnUrl = library.find(m => m.filename === filename)?.demoStreamUrl;
-        } catch { /* ignore */ }
-      }
-
-      if (!cdnUrl) return res.status(404).json({ error: 'Demo item not found', filename });
-
-      const proto = cdnUrl.startsWith('https') ? https : http;
-      const proxyReq = proto.get(cdnUrl, {
-        headers: req.headers.range ? { Range: req.headers.range } : {},
-      }, (proxyRes) => {
-        res.writeHead(proxyRes.statusCode ?? 200, {
-          'Content-Type':   proxyRes.headers['content-type']   ?? 'video/mp4',
-          'Content-Length': proxyRes.headers['content-length'] ?? '',
-          'Content-Range':  proxyRes.headers['content-range']  ?? '',
-          'Accept-Ranges':  'bytes',
-          'Cache-Control':  'no-store',
-        });
-        proxyRes.pipe(res);
-      });
-      proxyReq.on('error', (err) => {
-        if (!res.headersSent) res.status(502).json({ error: 'Demo proxy error', message: String(err) });
-      });
-      return;
-    }
-
     const filePath = resolveFilePath(filename);
 
     if (!filePath) {
@@ -148,10 +111,6 @@ export default function handler(req: Request, res: Response) {
       const parts = range.replace(/bytes=/, '').split('-');
       const start = parseInt(parts[0], 10);
 
-      // If browser didn't specify end, serve up to CHUNK_SIZE bytes.
-      // This is the key optimization: instead of letting the browser
-      // trickle-request tiny chunks, we push 4MB at a time so it
-      // fills its decode buffer in one shot and plays immediately.
       const requestedEnd = parts[1] ? parseInt(parts[1], 10) : -1;
       const end = requestedEnd >= 0
         ? requestedEnd
@@ -160,43 +119,36 @@ export default function handler(req: Request, res: Response) {
       const chunkSize = end - start + 1;
 
       res.writeHead(206, {
-        'Content-Range':    `bytes ${start}-${end}/${fileSize}`,
-        'Accept-Ranges':    'bytes',
-        'Content-Length':   chunkSize,
-        'Content-Type':     contentType,
-        // LAN caching: reuse chunks for 1 hour, revalidate with ETag
-        'Cache-Control':    'private, max-age=3600, no-transform',
-        'ETag':             etag,
-        'Last-Modified':    lastModified,
-        'Connection':       'keep-alive',
-        // Hint total duration so seek bar is accurate before full download
+        'Content-Range':      `bytes ${start}-${end}/${fileSize}`,
+        'Accept-Ranges':      'bytes',
+        'Content-Length':     chunkSize,
+        'Content-Type':       contentType,
+        'Cache-Control':      'private, max-age=3600, no-transform',
+        'ETag':               etag,
+        'Last-Modified':      lastModified,
+        'Connection':         'keep-alive',
         'X-Content-Duration': String(stat.size),
       });
 
       fs.createReadStream(filePath, { start, end, highWaterMark: CHUNK_SIZE }).pipe(res);
 
     } else {
-      // No Range header — serve first CHUNK_SIZE bytes so playback starts instantly,
-      // then the browser will issue Range requests for the rest.
       const end = Math.min(CHUNK_SIZE - 1, fileSize - 1);
       const chunkSize = end + 1;
 
       if (fileSize > CHUNK_SIZE) {
-        // Partial response even without Range header — gets first frame to the
-        // browser as fast as possible, browser will request remaining chunks
         res.writeHead(206, {
-          'Content-Range':    `bytes 0-${end}/${fileSize}`,
-          'Accept-Ranges':    'bytes',
-          'Content-Length':   chunkSize,
-          'Content-Type':     contentType,
-          'Cache-Control':    'private, max-age=3600, no-transform',
-          'ETag':             etag,
-          'Last-Modified':    lastModified,
-          'Connection':       'keep-alive',
+          'Content-Range':  `bytes 0-${end}/${fileSize}`,
+          'Accept-Ranges':  'bytes',
+          'Content-Length': chunkSize,
+          'Content-Type':   contentType,
+          'Cache-Control':  'private, max-age=3600, no-transform',
+          'ETag':           etag,
+          'Last-Modified':  lastModified,
+          'Connection':     'keep-alive',
         });
         fs.createReadStream(filePath, { start: 0, end, highWaterMark: CHUNK_SIZE }).pipe(res);
       } else {
-        // Small file — send whole thing
         res.writeHead(200, {
           'Content-Length': fileSize,
           'Content-Type':   contentType,
