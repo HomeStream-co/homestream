@@ -34,6 +34,7 @@ import { Progress } from '@/components/ui/progress';
 import type { MediaItem, Episode } from '@/types/media';
 import TrailerButton from '@/components/TrailerButton';
 import RestrictedContentGuard from '@/components/RestrictedContentGuard';
+import ShowDownloadDialog from '@/components/ShowDownloadDialog';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -176,6 +177,9 @@ export default function ShowPage() {
     }
   };
 
+  // ── Download dialog state ────────────────────────────────────────────────
+  const [dlDialogOpen, setDlDialogOpen] = useState(false);
+
   const seasons = useMemo(() => groupSeasons(item?.episodes || []), [item]);
   const overallProgress = useMemo(() => item ? getShowProgress(item) : null, [item]);
 
@@ -239,8 +243,8 @@ export default function ShowPage() {
     'text-red-400 border-red-400/40';
 
   return (
-    <RestrictedContentGuard rated={item.rated} contentTitle={item.title}>
     <>
+    <RestrictedContentGuard rated={item.rated} contentTitle={item.title}>
       <title>{item.title} — HomeStream</title>
       <meta name="description" content={item.plot || `Watch ${item.title} on HomeStream.`} />
 
@@ -418,16 +422,15 @@ export default function ShowPage() {
 
                   <TrailerButton title={item.title} year={item.year} type={item.type} />
 
-                  {/* Download to device */}
-                  <a
-                    href={`/api/stream/${item.filename}`}
-                    download={item.filename ?? item.title}
+                  {/* Download episodes */}
+                  <button
+                    onClick={() => setDlDialogOpen(true)}
                     className="flex items-center gap-2 px-5 py-3 rounded-xl bg-card border border-border text-foreground font-semibold text-sm hover:bg-muted transition-colors"
-                    title="Download file to your device"
+                    title="Download episodes to your library"
                   >
                     <Download className="w-4 h-4" />
                     Download
-                  </a>
+                  </button>
 
                   {/* Auto-download subscription */}
                   {subStatus === 'subscribed' ? (
@@ -663,8 +666,15 @@ export default function ShowPage() {
           )}
         </div>
       </div>
-    </>
     </RestrictedContentGuard>
+
+    {/* ── Download selector dialog ─────────────────────────────────────── */}
+    <DownloadDialog
+      open={dlDialogOpen}
+      onOpenChange={setDlDialogOpen}
+      item={item}
+      seasons={seasons}
+    />
 
     {/* ── Subscribe dialog ─────────────────────────────────────────────── */}
     <Dialog open={subDialogOpen} onOpenChange={setSubDialogOpen}>
@@ -711,5 +721,6 @@ export default function ShowPage() {
         </DialogFooter>
       </DialogContent>
     </Dialog>
+    </>
   );
 }

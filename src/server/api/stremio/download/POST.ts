@@ -243,6 +243,7 @@ export default async function handler(req: Request, res: Response) {
     poster,
     year,
     season,
+    episode,
     totalSeasons = 1,
     streams: preloadedStreams,
   } = req.body as {
@@ -252,6 +253,7 @@ export default async function handler(req: Request, res: Response) {
     poster?: string;
     year?: string;
     season?: number;
+    episode?: number;
     totalSeasons?: number;
     streams?: StreamResult[];
   };
@@ -339,6 +341,37 @@ export default async function handler(req: Request, res: Response) {
       }
 
     } else {
+      // ── Single episode fast path ─────────────────────────────────────────
+      // When both season AND episode are specified, skip the probe loop and
+      // just fetch + queue that one episode directly.
+      if (season != null && episode != null) {
+        const epTitle = `${title} S${String(season).padStart(2, '0')}E${String(episode).padStart(2, '0')}`;
+        const streams = await fetchStreamsForEpisode(imdbId, 'series', season, episode);
+        const best = pickBestStream(streams);
+        if (!best) {
+          await releaseVPN();
+          res.status(404).json({ error: `No streams found for ${epTitle}` });
+          return;
+        }
+        const scan = await runPreDownloadScan({ infoHash: best.infoHash, title: epTitle });
+        if (!scan.allowed) {
+          await releaseVPN();
+          res.status(403).json({ error: 'Download blocked by security scan', reason: scan.reason });
+          return;
+        }
+        if (useQbit) {
+          const job = await queueViaQbit({ infoHash: best.infoHash, magnet: best.magnet, quality: best.quality, title: epTitle, type: 'series', season, episode, imdbId, poster });
+          await releaseVPN();
+          res.json({ queued: 1, jobs: [job], backend: 'qbittorrent', vpnUsed: vpnConnected });
+        } else {
+          const { queueDownload } = await import('../../../torrentManager.js');
+          const job = queueDownload({ infoHash: best.infoHash, magnet: best.magnet, quality: best.quality, title: epTitle, type: 'series', season, episode, imdbId, poster, year });
+          await releaseVPN();
+          res.json({ queued: 1, jobs: [job], backend: 'webtorrent', vpnUsed: vpnConnected });
+        }
+        return;
+      }
+
       // Series — probe each season dynamically to find real episode counts.
       // We fetch episodes one-by-one and stop when Torrentio returns nothing,
       // which is the natural signal that the season has ended. This avoids
