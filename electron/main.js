@@ -19,6 +19,7 @@ const { spawn } = require('child_process');
 const http = require('http');
 const os = require('os');
 const fs = require('fs');
+const { setupAutoUpdater, teardown: teardownUpdater } = require('./updater');
 
 // ── Electron-side crash logger ────────────────────────────────────────────────
 // Captures crashes in the Electron main process itself (not the server child).
@@ -315,6 +316,14 @@ app.whenReady().then(() => {
   createControlWindow();
   createTray();
   startServer();
+
+  // Set up auto-updater after window exists so it can send IPC events to it.
+  // Passes a getter (not the window directly) so it always uses the current
+  // window reference even if the window is recreated.
+  setupAutoUpdater({
+    controlWindowGetter: () => controlWindow,
+    pushLog,
+  });
 });
 
 app.on('window-all-closed', () => {
@@ -327,6 +336,7 @@ app.on('activate', () => {
 
 app.on('before-quit', () => {
   app.isQuitting = true;
+  teardownUpdater();
   stopServer();
 });
 
@@ -368,7 +378,9 @@ const CONTROL_PANEL_HTML = `<!DOCTYPE html>
     font-size: 0.65rem; color: #444; background: #141414;
     border: 1px solid #222; border-radius: 4px; padding: 2px 7px;
     -webkit-app-region: no-drag;
+    cursor: pointer; transition: border-color 0.2s, color 0.2s;
   }
+  .version-badge:hover { border-color: #444; color: #888; }
 
   /* ── Status row ── */
   .status-bar {
@@ -523,6 +535,66 @@ const CONTROL_PANEL_HTML = `<!DOCTYPE html>
   .log-line.warn { color: #f59e0b; }
   .log-line.error { color: #ef4444; }
   .empty-log { color: #2a2a2a; font-style: italic; }
+
+  /* ── Update panel ── */
+  .update-panel {
+    margin: 0 20px 0;
+    border-radius: 8px;
+    padding: 11px 14px;
+    display: none;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+  }
+  .update-panel.visible { display: flex; }
+  .update-panel.state-available {
+    background: linear-gradient(135deg, #0f1a2e, #0a1520);
+    border: 1px solid #1e4a7a;
+  }
+  .update-panel.state-downloading {
+    background: linear-gradient(135deg, #0f1a2e, #0a1520);
+    border: 1px solid #1e4a7a;
+  }
+  .update-panel.state-ready {
+    background: linear-gradient(135deg, #0f2e1a, #0a1510);
+    border: 1px solid #1e7a3a;
+  }
+  .update-panel.state-error {
+    background: linear-gradient(135deg, #2e0f0f, #1a0a0a);
+    border: 1px solid #7a1e1e;
+  }
+  .update-icon { font-size: 1.1rem; flex-shrink: 0; }
+  .update-body { flex: 1; min-width: 0; }
+  .update-title {
+    font-size: 0.78rem; font-weight: 600; margin-bottom: 3px;
+  }
+  .state-available  .update-title { color: #60a5fa; }
+  .state-downloading .update-title { color: #60a5fa; }
+  .state-ready      .update-title { color: #4ade80; }
+  .state-error      .update-title { color: #f87171; }
+  .update-sub { font-size: 0.68rem; color: #666; }
+  .update-progress {
+    height: 3px; background: #1a2a3a; border-radius: 2px;
+    margin-top: 6px; overflow: hidden;
+  }
+  .update-progress-bar {
+    height: 100%; background: #3b82f6; border-radius: 2px;
+    transition: width 0.3s ease;
+  }
+  .update-actions { display: flex; gap: 6px; flex-shrink: 0; }
+  .btn-update {
+    padding: 5px 12px; border-radius: 6px; border: none;
+    font-size: 0.72rem; font-weight: 600; cursor: pointer;
+    transition: opacity 0.15s; -webkit-app-region: no-drag;
+  }
+  .btn-update-primary { background: #3b82f6; color: #fff; }
+  .btn-update-primary:hover { background: #2563eb; }
+  .btn-update-success { background: #22c55e; color: #fff; }
+  .btn-update-success:hover { background: #16a34a; }
+  .btn-update-dismiss {
+    background: transparent; color: #444; border: 1px solid #222;
+  }
+  .btn-update-dismiss:hover { color: #888; border-color: #444; }
 </style>
 </head>
 <body>
@@ -533,7 +605,7 @@ const CONTROL_PANEL_HTML = `<!DOCTYPE html>
     <div class="logo">HOME<span>STREAM</span></div>
     <div class="subtitle">Control Panel</div>
   </div>
-  <div class="version-badge">v1.0.0</div>
+  <div class="version-badge" id="version-badge" onclick="checkForUpdate()" title="Click to check for updates">v1.0.0</div>
 </div>
 
 <!-- Status row -->
@@ -575,6 +647,19 @@ const CONTROL_PANEL_HTML = `<!DOCTYPE html>
     <li>Add your TMDB API key for movie/show artwork (free)</li>
     <li>Come back here anytime — this window stays in your system tray</li>
   </ul>
+</div>
+
+<!-- Update notification panel (hidden until an update event fires) -->
+<div class="update-panel" id="update-panel">
+  <div class="update-icon" id="update-icon">⬆️</div>
+  <div class="update-body">
+    <div class="update-title" id="update-title">Update available</div>
+    <div class="update-sub"  id="update-sub"></div>
+    <div class="update-progress" id="update-progress" style="display:none">
+      <div class="update-progress-bar" id="update-progress-bar" style="width:0%"></div>
+    </div>
+  </div>
+  <div class="update-actions" id="update-actions"></div>
 </div>
 
 <!-- Action buttons -->
@@ -716,6 +801,105 @@ const CONTROL_PANEL_HTML = `<!DOCTYPE html>
   window.electronAPI?.onStatus(updateStatus);
   window.electronAPI?.onLog(appendLog);
   window.electronAPI?.requestStatus();
+
+  // ── Auto-updater UI ────────────────────────────────────────────────────────
+
+  let updateState = 'idle';
+
+  function checkForUpdate() {
+    window.electronAPI?.checkForUpdate();
+    // Show a brief "checking" indicator on the version badge
+    const badge = document.getElementById('version-badge');
+    if (badge) { badge.textContent = 'Checking…'; setTimeout(() => { badge.textContent = 'v1.0.0'; }, 4000); }
+  }
+
+  function handleUpdateStatus(data) {
+    updateState = data.state;
+    const panel    = document.getElementById('update-panel');
+    const title    = document.getElementById('update-title');
+    const sub      = document.getElementById('update-sub');
+    const icon     = document.getElementById('update-icon');
+    const progress = document.getElementById('update-progress');
+    const bar      = document.getElementById('update-progress-bar');
+    const actions  = document.getElementById('update-actions');
+
+    // Reset panel classes
+    panel.className = 'update-panel';
+    progress.style.display = 'none';
+    actions.innerHTML = '';
+
+    switch (data.state) {
+      case 'checking':
+        panel.classList.add('visible', 'state-available');
+        icon.textContent = '🔄';
+        title.textContent = 'Checking for updates…';
+        sub.textContent = '';
+        break;
+
+      case 'available':
+        panel.classList.add('visible', 'state-available');
+        icon.textContent = '⬆️';
+        title.textContent = \`Update available — v\${data.version}\`;
+        sub.textContent = 'A new version of HomeStream is ready to download.';
+        actions.innerHTML =
+          '<button class="btn-update btn-update-primary" onclick="window.electronAPI?.downloadUpdate()">Download</button>' +
+          '<button class="btn-update btn-update-dismiss" onclick="dismissUpdate()">Later</button>';
+        break;
+
+      case 'downloading': {
+        panel.classList.add('visible', 'state-downloading');
+        icon.textContent = '⬇️';
+        const pct = data.percent ?? 0;
+        title.textContent = \`Downloading update — \${pct}%\`;
+        const mbps = data.bytesPerSecond ? (data.bytesPerSecond / 1_048_576).toFixed(1) + ' MB/s' : '';
+        sub.textContent = mbps ? \`Downloading at \${mbps}\` : 'Downloading…';
+        progress.style.display = 'block';
+        bar.style.width = pct + '%';
+        break;
+      }
+
+      case 'ready':
+        panel.classList.add('visible', 'state-ready');
+        icon.textContent = '✅';
+        title.textContent = \`v\${data.version} ready to install\`;
+        sub.textContent = 'HomeStream will restart to apply the update.';
+        actions.innerHTML =
+          '<button class="btn-update btn-update-success" onclick="window.electronAPI?.installUpdate()">Restart & Install</button>' +
+          '<button class="btn-update btn-update-dismiss" onclick="dismissUpdate()">Later</button>';
+        break;
+
+      case 'not-available':
+        panel.classList.add('visible', 'state-available');
+        icon.textContent = '✓';
+        title.textContent = 'HomeStream is up to date';
+        sub.textContent = '';
+        // Auto-dismiss after 4 seconds
+        setTimeout(dismissUpdate, 4_000);
+        break;
+
+      case 'error':
+        panel.classList.add('visible', 'state-error');
+        icon.textContent = '⚠️';
+        title.textContent = 'Update check failed';
+        sub.textContent = data.error ?? 'Could not reach update server.';
+        actions.innerHTML =
+          '<button class="btn-update btn-update-dismiss" onclick="dismissUpdate()">Dismiss</button>';
+        break;
+
+      case 'idle':
+      default:
+        // Hide panel
+        break;
+    }
+  }
+
+  function dismissUpdate() {
+    const panel = document.getElementById('update-panel');
+    panel.className = 'update-panel'; // remove 'visible'
+    updateState = 'idle';
+  }
+
+  window.electronAPI?.onUpdateStatus(handleUpdateStatus);
 </script>
 </body>
 </html>`;

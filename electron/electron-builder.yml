@@ -15,7 +15,14 @@ appId: com.homestream.app
 productName: HomeStream
 copyright: Copyright © 2026 HomeStream
 
-# No auto-updater — users download new versions manually
+# ── Auto-updater (electron-updater via GitHub Releases) ───────────────────────
+# Set GH_TOKEN env var when publishing: npm run electron:publish
+# Users get notified of new releases automatically; they choose when to install.
+publish:
+  provider: github
+  owner: homestream-app       # ← replace with your GitHub org/username
+  repo: homestream            # ← replace with your GitHub repo name
+  releaseType: release        # only stable releases trigger updates (not pre-releases)
 
 # Directories
 directories:

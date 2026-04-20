@@ -19,4 +19,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Event listeners
   onStatus: (callback) => ipcRenderer.on('status', (_event, data)  => callback(data)),
   onLog:    (callback) => ipcRenderer.on('log',    (_event, entry) => callback(entry)),
+
+  // ── Auto-updater ────────────────────────────────────────────────────────────
+  // Actions
+  checkForUpdate:  () => ipcRenderer.send('check-for-update'),
+  downloadUpdate:  () => ipcRenderer.send('download-update'),
+  installUpdate:   () => ipcRenderer.send('install-update'),
+
+  // Event listener — receives { state, version?, percent?, error? }
+  onUpdateStatus: (callback) => ipcRenderer.on('update-status', (_event, data) => callback(data)),
 });
