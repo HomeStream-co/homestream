@@ -8,7 +8,7 @@
  * Response: { valid: boolean }
  */
 import type { Request, Response } from 'express';
-import { verifyPin } from '../../../../../profilesStore.js';
+import { verifyPin } from '../../../../profilesStore.js';
 
 export default async function handler(req: Request, res: Response) {
   try {

@@ -150,46 +150,8 @@ export default defineConfig(({ mode }) => ({
 		rollupOptions: {
 			output: {
 				manualChunks: {
-					// Core React runtime — tiny, cached forever
 					"react-vendor": ["react", "react-dom", "react-router-dom"],
-					// Radix UI — large but stable, rarely changes
-					"radix-ui": [
-						"@radix-ui/react-accordion",
-						"@radix-ui/react-alert-dialog",
-						"@radix-ui/react-aspect-ratio",
-						"@radix-ui/react-avatar",
-						"@radix-ui/react-checkbox",
-						"@radix-ui/react-collapsible",
-						"@radix-ui/react-context-menu",
-						"@radix-ui/react-dialog",
-						"@radix-ui/react-dropdown-menu",
-						"@radix-ui/react-hover-card",
-						"@radix-ui/react-label",
-						"@radix-ui/react-menubar",
-						"@radix-ui/react-navigation-menu",
-						"@radix-ui/react-popover",
-						"@radix-ui/react-progress",
-						"@radix-ui/react-scroll-area",
-						"@radix-ui/react-select",
-						"@radix-ui/react-separator",
-						"@radix-ui/react-slider",
-						"@radix-ui/react-slot",
-						"@radix-ui/react-switch",
-						"@radix-ui/react-tabs",
-						"@radix-ui/react-toast",
-						"@radix-ui/react-toggle",
-						"@radix-ui/react-toggle-group",
-						"@radix-ui/react-tooltip",
-					],
-					// TanStack Query — data fetching
 					query: ["@tanstack/react-query"],
-					// HLS.js — only loaded on player page, ~300KB raw
-					// Splitting it out means non-player pages never download it
-					"hls": ["hls.js"],
-					// Motion (Framer Motion) — animation library, ~100KB
-					"motion": ["motion"],
-					// Lucide icons — large icon set
-					"icons": ["lucide-react"],
 				},
 			},
 		},

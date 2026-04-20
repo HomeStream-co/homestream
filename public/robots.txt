@@ -1,4 +1,5 @@
 # HomeStream — self-hosted media server
-# Disallow all crawlers — this is a private local application
+# This is a private local-network application.
+# Crawlers should not index it.
 User-agent: *
 Disallow: /
