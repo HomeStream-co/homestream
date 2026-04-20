@@ -1,4 +1,4 @@
-import { lazy, Suspense, Component, type ReactNode, type ErrorInfo } from 'react';
+import { Suspense, Component, type ReactNode, type ErrorInfo } from 'react';
 import { createBrowserRouter, Outlet, RouterProvider, useNavigate } from 'react-router-dom';
 
 import RootLayout from './layouts/RootLayout';
@@ -54,9 +54,8 @@ function ErrorFallback({ message, onReset }: { message: string; onReset: () => v
 
 // ── Dev-only tools (never bundled in production) ──────────────────────────────
 
-const AiroErrorBoundary = import.meta.env.DEV
-  ? lazy(() => import('../dev-tools/src/AiroErrorBoundary'))
-  : null;
+
+
 
 // ── App shell ─────────────────────────────────────────────────────────────────
 
@@ -69,17 +68,7 @@ const SpinnerFallback = () => (
 const router = createBrowserRouter([
   {
     path: '/',
-    element: import.meta.env.DEV && AiroErrorBoundary ? (
-      <Suspense fallback={<SpinnerFallback />}>
-        <AiroErrorBoundary>
-          <Suspense fallback={<SpinnerFallback />}>
-            <RootLayout>
-              <Outlet />
-            </RootLayout>
-          </Suspense>
-        </AiroErrorBoundary>
-      </Suspense>
-    ) : (
+    element: (
       <Suspense fallback={<SpinnerFallback />}>
         <RootLayout>
           <ProductionErrorBoundary>

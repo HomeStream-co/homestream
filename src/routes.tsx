@@ -19,10 +19,7 @@ const HistoryPage = lazy(() => import('./pages/history'));
 const RemotePage = lazy(() => import('./pages/remote'));
 const StatsPage  = lazy(() => import('./pages/stats'));
 
-// 404 routing by runtime:
-const NotFoundPage = import.meta.env.DEV
-  ? lazy(() => import('../dev-tools/src/PageNotFound'))
-  : lazy(() => import('./pages/_404'));
+const NotFoundPage = lazy(() => import('./pages/_404'));
 
 export const routes: RouteObject[] = [
   { path: '/', element: <HomePage /> },
