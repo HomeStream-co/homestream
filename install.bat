@@ -1,74 +1,98 @@
 @echo off
 setlocal EnableDelayedExpansion
-title HomeStream Installer Builder
+title HomeStream — Installer Builder
+
+:: ============================================================
+::  HomeStream — Build Installer for Windows
+::
+::  This script builds the full Electron desktop app (.exe).
+::  Run this ONCE on any Windows PC that has Node.js installed.
+::  The output installer can then be copied to any PC — no
+::  Node.js required on the target machine.
+::
+::  Requirements (this build machine only):
+::    - Node.js 18+   https://nodejs.org
+::    - ~2 GB free disk space (node_modules + Electron)
+::    - Internet connection (first run only)
+::
+::  Output:
+::    dist-electron\HomeStream-Setup-x.x.x.exe   ← NSIS installer
+::    dist-electron\HomeStream-x.x.x-portable.exe ← portable (no install)
+::    dist-electron\HomeStream-x.x.x-win.zip      ← ZIP archive
+::
+::  Quick start (gaming PC, no installer needed):
+::    → Use launch.bat instead — just needs Node.js, no build step.
+:: ============================================================
 
 echo.
-echo  ==========================================
-echo   HomeStream — Build Installer for Windows
-echo  ==========================================
+echo  =====================================================
+echo    HomeStream  ^|  Build Windows Installer
+echo  =====================================================
 echo.
-echo  Features: Multi-profile watch history, per-profile watchlists,
-echo            per-profile playback settings, Kids Mode content filter
+echo  This will create a standalone .exe installer that can
+echo  be copied to any Windows PC (no Node.js required there).
+echo.
+echo  For a quick start on THIS PC, use launch.bat instead.
 echo.
 
-:: ── Check Node.js ─────────────────────────────────────────────────────────────
+:: ── Check Node.js ─────────────────────────────────────────
 where node >nul 2>&1
 if %errorlevel% neq 0 (
     echo  [!] Node.js not found.
     echo.
-    echo  Downloading Node.js installer...
-    echo  Please install Node.js 22 LTS from the page that opens, then re-run this script.
+    echo  This build script requires Node.js on THIS machine.
+    echo  The OUTPUT installer will NOT require Node.js.
+    echo.
+    echo  Opening nodejs.org — install Node.js 22 LTS,
+    echo  restart your PC, then re-run install.bat.
     echo.
     start https://nodejs.org/en/download
     pause
     exit /b 1
 )
 
-for /f "tokens=1 delims=v" %%i in ('node --version') do set NODE_RAW=%%i
 for /f "tokens=1 delims=." %%i in ('node --version') do (
     set NODE_MAJOR=%%i
     set NODE_MAJOR=!NODE_MAJOR:v=!
 )
-
-echo  [✓] Node.js found: v%NODE_MAJOR% series
-
-if %NODE_MAJOR% LSS 18 (
-    echo.
-    echo  [!] Node.js 18 or higher is required. You have v%NODE_MAJOR%.
-    echo  Please update from https://nodejs.org and re-run this script.
+if !NODE_MAJOR! LSS 18 (
+    echo  [!] Node.js 18+ required. You have v!NODE_MAJOR!.
+    echo  Update from https://nodejs.org then re-run install.bat.
     echo.
     start https://nodejs.org/en/download
     pause
     exit /b 1
 )
+echo  [OK] Node.js v!NODE_MAJOR!
 
-:: ── Check npm ─────────────────────────────────────────────────────────────────
 where npm >nul 2>&1
 if %errorlevel% neq 0 (
-    echo  [!] npm not found. Please reinstall Node.js from https://nodejs.org
+    echo  [!] npm not found. Reinstall Node.js from https://nodejs.org
     pause
     exit /b 1
 )
-echo  [✓] npm found
+echo  [OK] npm found
 
-:: ── Install dependencies ──────────────────────────────────────────────────────
+:: ── Install dependencies ───────────────────────────────────
 echo.
 echo  [1/3] Installing dependencies...
-echo        (this may take a few minutes the first time)
+echo        (first run takes ~2 minutes — downloads ~500 MB)
 echo.
 call npm install
 if %errorlevel% neq 0 (
     echo.
-    echo  [!] npm install failed. Check the output above for errors.
+    echo  [!] npm install failed.
+    echo      Check your internet connection and try again.
+    echo      If behind a proxy, set HTTP_PROXY and HTTPS_PROXY.
     pause
     exit /b 1
 )
-echo  [✓] Dependencies installed
+echo  [OK] Dependencies installed
 
-:: ── Build ─────────────────────────────────────────────────────────────────────
+:: ── Build ──────────────────────────────────────────────────
 echo.
 echo  [2/3] Building HomeStream...
-echo        (compiling frontend + server bundle)
+echo        (compiling frontend + server bundle, ~1 minute)
 echo.
 call npm run build
 if %errorlevel% neq 0 (
@@ -77,39 +101,57 @@ if %errorlevel% neq 0 (
     pause
     exit /b 1
 )
-echo  [✓] Build complete
+echo  [OK] Build complete
 
-:: ── Package Electron installer ────────────────────────────────────────────────
+:: ── Package ────────────────────────────────────────────────
 echo.
-echo  [3/3] Packaging Windows installer...
-echo        (creating HomeStream-Setup.exe)
+echo  [3/3] Packaging Windows installer + portable builds...
+echo        (downloads Electron ~100 MB on first run)
 echo.
 call npx electron-builder --win --config electron/electron-builder.yml --publish never
 if %errorlevel% neq 0 (
     echo.
     echo  [!] Packaging failed. Check the output above for errors.
+    echo.
+    echo  Common fixes:
+    echo    - Run as Administrator if you get permission errors
+    echo    - Disable antivirus temporarily (it can block code signing)
+    echo    - Make sure no HomeStream.exe is currently running
     pause
     exit /b 1
 )
 
-:: ── Done ──────────────────────────────────────────────────────────────────────
+:: ── Done ───────────────────────────────────────────────────
 echo.
-echo  ==========================================
-echo   Done! Installer is ready.
-echo  ==========================================
-echo.
-echo  Location: dist-electron\
-echo.
-echo  Data files (created on first run):
-echo    media-library.json        - your media library
-echo    homestream-profiles.json  - user profiles (up to 6)
-echo    homestream-watchlist.json - per-profile My List
-echo    homestream-config.json    - app configuration
+echo  =====================================================
+echo    Done! Your installers are ready.
+echo  =====================================================
 echo.
 
-:: Open the output folder
+:: List what was built
+echo  Files in dist-electron\:
+dir /b dist-electron\*.exe dist-electron\*.zip 2>nul
+echo.
+echo  ── How to distribute ──────────────────────────────
+echo.
+echo  Option A — Full installer (recommended):
+echo    HomeStream-Setup-x.x.x.exe
+echo    Double-click to install. Creates Start Menu + Desktop
+echo    shortcuts. Uninstall via Windows Settings like any app.
+echo.
+echo  Option B — Portable (no install needed):
+echo    HomeStream-x.x.x-portable.exe
+echo    Copy anywhere, double-click to run. No install required.
+echo    Great for USB drives or shared PCs.
+echo.
+echo  Option C — ZIP archive:
+echo    HomeStream-x.x.x-win.zip
+echo    Extract anywhere, run HomeStream.exe inside.
+echo.
+echo  All options: no Node.js required on the target PC.
+echo.
+
+:: Open output folder
 explorer dist-electron
 
-echo  Double-click HomeStream-Setup-*.exe to install.
-echo.
 pause

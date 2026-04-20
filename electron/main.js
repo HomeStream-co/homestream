@@ -302,11 +302,12 @@ function createTray() {
 
 // ── IPC handlers ──────────────────────────────────────────────────────────────
 
-ipcMain.on('start-server', () => startServer());
-ipcMain.on('stop-server', () => stopServer());
-ipcMain.on('open-browser', () => shell.openExternal(`http://localhost:${SERVER_PORT}`));
-ipcMain.on('open-browser-lan', (_, url) => shell.openExternal(url));
-ipcMain.on('request-status', () => sendStatus());
+ipcMain.on('start-server',      () => startServer());
+ipcMain.on('stop-server',       () => stopServer());
+ipcMain.on('open-browser',      () => shell.openExternal(`http://localhost:${SERVER_PORT}`));
+ipcMain.on('open-browser-lan',  (_, url)  => shell.openExternal(url));
+ipcMain.on('open-browser-page', (_, page) => shell.openExternal(`http://localhost:${SERVER_PORT}${page}`));
+ipcMain.on('request-status',    () => sendStatus());
 
 // ── App lifecycle ─────────────────────────────────────────────────────────────
 
@@ -352,104 +353,238 @@ const CONTROL_PANEL_HTML = `<!DOCTYPE html>
     user-select: none;
   }
   .header {
-    padding: 20px 24px 16px;
+    padding: 16px 20px 14px;
     border-bottom: 1px solid #1f1f1f;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    -webkit-app-region: drag;
+    flex-shrink: 0;
+  }
+  .logo { font-size: 1.25rem; font-weight: 700; letter-spacing: 2px; color: #fff; }
+  .logo span { color: #7c3aed; }
+  .subtitle { font-size: 0.65rem; color: #555; letter-spacing: 1px; text-transform: uppercase; margin-top: 2px; }
+  .version-badge {
+    font-size: 0.65rem; color: #444; background: #141414;
+    border: 1px solid #222; border-radius: 4px; padding: 2px 7px;
+    -webkit-app-region: no-drag;
+  }
+
+  /* ── Status row ── */
+  .status-bar {
+    padding: 12px 20px;
     display: flex;
     align-items: center;
     gap: 12px;
-    -webkit-app-region: drag;
-  }
-  .logo { font-size: 1.4rem; font-weight: 700; letter-spacing: 2px; color: #fff; }
-  .logo span { color: #7c3aed; }
-  .subtitle { font-size: 0.7rem; color: #666; letter-spacing: 1px; text-transform: uppercase; margin-top: 2px; }
-  .status-bar {
-    padding: 16px 24px;
-    display: flex;
-    align-items: center;
-    gap: 16px;
     border-bottom: 1px solid #1f1f1f;
     flex-wrap: wrap;
+    flex-shrink: 0;
   }
   .status-dot {
-    width: 10px; height: 10px; border-radius: 50%;
+    width: 9px; height: 9px; border-radius: 50%;
     background: #ef4444; flex-shrink: 0;
     transition: background 0.3s;
   }
   .status-dot.running { background: #22c55e; box-shadow: 0 0 8px #22c55e88; animation: pulse 2s infinite; }
   @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.6; } }
-  .status-text { font-size: 0.85rem; color: #aaa; }
+  .status-text { font-size: 0.82rem; color: #aaa; flex: 1; min-width: 120px; }
   .status-text strong { color: #fff; }
   .url-chip {
-    background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 6px;
-    padding: 4px 10px; font-size: 0.75rem; color: #7c3aed;
+    background: #111; border: 1px solid #2a2a2a; border-radius: 6px;
+    padding: 3px 9px; font-size: 0.72rem; color: #7c3aed;
     cursor: pointer; transition: border-color 0.2s;
     -webkit-app-region: no-drag;
+    white-space: nowrap;
   }
-  .url-chip:hover { border-color: #7c3aed; }
+  .url-chip:hover { border-color: #7c3aed; color: #9d5cf6; }
+
+  /* ── Access panel (QR + addresses) ── */
+  .access-panel {
+    padding: 14px 20px;
+    border-bottom: 1px solid #1f1f1f;
+    display: none;
+    gap: 16px;
+    align-items: flex-start;
+    flex-shrink: 0;
+  }
+  .access-panel.visible { display: flex; }
+  .qr-wrap {
+    background: #fff;
+    border-radius: 8px;
+    padding: 6px;
+    flex-shrink: 0;
+    width: 80px; height: 80px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+  }
+  .qr-wrap img { width: 68px; height: 68px; display: block; }
+  .qr-wrap .qr-placeholder {
+    width: 68px; height: 68px;
+    background: repeating-linear-gradient(
+      45deg, #ddd 0, #ddd 2px, #fff 2px, #fff 8px
+    );
+    border-radius: 4px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.55rem; color: #999; text-align: center; padding: 4px;
+  }
+  .access-info { flex: 1; min-width: 0; }
+  .access-row {
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 8px;
+  }
+  .access-label {
+    font-size: 0.62rem; color: #555; text-transform: uppercase;
+    letter-spacing: 0.8px; width: 52px; flex-shrink: 0;
+  }
+  .access-url {
+    font-size: 0.75rem; color: #7c3aed; cursor: pointer;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    flex: 1;
+  }
+  .access-url:hover { color: #9d5cf6; text-decoration: underline; }
+  .copy-btn {
+    background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 4px;
+    color: #666; font-size: 0.6rem; padding: 2px 6px; cursor: pointer;
+    flex-shrink: 0; -webkit-app-region: no-drag;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .copy-btn:hover { color: #aaa; border-color: #444; }
+  .copy-btn.copied { color: #22c55e; border-color: #22c55e44; }
+  .qr-hint {
+    font-size: 0.62rem; color: #444; margin-top: 4px; line-height: 1.5;
+  }
+
+  /* ── First-run banner ── */
+  .first-run-banner {
+    margin: 0 20px 0;
+    background: linear-gradient(135deg, #1a0f2e, #0f1a2e);
+    border: 1px solid #3b2a6e;
+    border-radius: 8px;
+    padding: 12px 14px;
+    display: none;
+    flex-shrink: 0;
+  }
+  .first-run-banner.visible { display: block; }
+  .first-run-title {
+    font-size: 0.78rem; font-weight: 600; color: #a78bfa;
+    margin-bottom: 6px; display: flex; align-items: center; gap: 6px;
+  }
+  .first-run-steps {
+    font-size: 0.7rem; color: #8888aa; line-height: 1.8;
+    list-style: none;
+  }
+  .first-run-steps li::before { content: "→ "; color: #7c3aed; }
+
+  /* ── Action buttons ── */
   .actions {
-    padding: 16px 24px;
+    padding: 12px 20px;
     display: flex;
-    gap: 10px;
+    gap: 8px;
     border-bottom: 1px solid #1f1f1f;
     flex-wrap: wrap;
+    flex-shrink: 0;
   }
   button {
-    padding: 8px 18px; border-radius: 8px; border: none;
-    font-size: 0.82rem; font-weight: 600; cursor: pointer;
+    padding: 7px 16px; border-radius: 7px; border: none;
+    font-size: 0.8rem; font-weight: 600; cursor: pointer;
     transition: opacity 0.15s, transform 0.1s;
     -webkit-app-region: no-drag;
   }
   button:active { transform: scale(0.97); }
-  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  button:disabled { opacity: 0.35; cursor: not-allowed; }
   .btn-primary { background: #7c3aed; color: #fff; }
   .btn-primary:hover:not(:disabled) { background: #6d28d9; }
-  .btn-secondary { background: #1f1f1f; color: #e5e5e5; border: 1px solid #2a2a2a; }
-  .btn-secondary:hover:not(:disabled) { background: #2a2a2a; }
-  .btn-danger { background: #1f1f1f; color: #ef4444; border: 1px solid #3f1f1f; }
+  .btn-secondary { background: #1a1a1a; color: #e5e5e5; border: 1px solid #2a2a2a; }
+  .btn-secondary:hover:not(:disabled) { background: #242424; }
+  .btn-danger { background: #1a1a1a; color: #ef4444; border: 1px solid #3f1f1f; }
   .btn-danger:hover:not(:disabled) { background: #2a1010; }
-  .log-section { flex: 1; display: flex; flex-direction: column; overflow: hidden; padding: 0 24px 16px; }
+
+  /* ── Log ── */
+  .log-section { flex: 1; display: flex; flex-direction: column; overflow: hidden; padding: 0 20px 14px; min-height: 0; }
   .log-label {
-    font-size: 0.65rem; color: #555; text-transform: uppercase; letter-spacing: 1px;
-    padding: 12px 0 8px; display: flex; align-items: center; justify-content: space-between;
+    font-size: 0.62rem; color: #444; text-transform: uppercase; letter-spacing: 1px;
+    padding: 10px 0 6px; display: flex; align-items: center; justify-content: space-between;
+    flex-shrink: 0;
   }
-  .log-clear { cursor: pointer; color: #444; font-size: 0.65rem; }
-  .log-clear:hover { color: #888; }
+  .log-clear { cursor: pointer; color: #333; font-size: 0.62rem; }
+  .log-clear:hover { color: #777; }
   .log-box {
-    flex: 1; overflow-y: auto; background: #050505; border: 1px solid #1a1a1a;
-    border-radius: 8px; padding: 10px 12px; font-family: 'SF Mono', 'Fira Code', monospace;
-    font-size: 0.72rem; line-height: 1.6;
+    flex: 1; overflow-y: auto; background: #050505; border: 1px solid #181818;
+    border-radius: 7px; padding: 8px 10px; font-family: 'SF Mono', 'Cascadia Code', 'Fira Code', monospace;
+    font-size: 0.7rem; line-height: 1.65; min-height: 0;
   }
-  .log-box::-webkit-scrollbar { width: 4px; }
+  .log-box::-webkit-scrollbar { width: 3px; }
   .log-box::-webkit-scrollbar-track { background: transparent; }
-  .log-box::-webkit-scrollbar-thumb { background: #2a2a2a; border-radius: 2px; }
+  .log-box::-webkit-scrollbar-thumb { background: #222; border-radius: 2px; }
   .log-entry { display: flex; gap: 8px; }
-  .log-time { color: #444; flex-shrink: 0; }
-  .log-line.info { color: #aaa; }
+  .log-time { color: #333; flex-shrink: 0; }
+  .log-line.info { color: #888; }
   .log-line.success { color: #22c55e; }
   .log-line.warn { color: #f59e0b; }
   .log-line.error { color: #ef4444; }
-  .empty-log { color: #333; font-style: italic; }
+  .empty-log { color: #2a2a2a; font-style: italic; }
 </style>
 </head>
 <body>
+
+<!-- Header -->
 <div class="header">
   <div>
     <div class="logo">HOME<span>STREAM</span></div>
     <div class="subtitle">Control Panel</div>
   </div>
+  <div class="version-badge">v1.0.0</div>
 </div>
 
+<!-- Status row -->
 <div class="status-bar">
   <div class="status-dot" id="dot"></div>
   <div class="status-text" id="status-text">Starting…</div>
-  <div class="url-chip" id="lan-url" style="display:none" onclick="openLan()">—</div>
+  <div class="url-chip" id="local-url" style="display:none" onclick="openBrowser()">localhost:3000</div>
 </div>
 
+<!-- Access panel: QR code + addresses (shown when running) -->
+<div class="access-panel" id="access-panel">
+  <div class="qr-wrap" id="qr-wrap" onclick="openLan()" title="Click to open on this PC">
+    <div class="qr-placeholder">Scan to open on phone</div>
+  </div>
+  <div class="access-info">
+    <div class="access-row">
+      <span class="access-label">This PC</span>
+      <span class="access-url" id="local-link" onclick="openBrowser()">http://localhost:3000</span>
+      <button class="copy-btn" onclick="copyUrl('local')">Copy</button>
+    </div>
+    <div class="access-row">
+      <span class="access-label">Network</span>
+      <span class="access-url" id="lan-link" onclick="openLan()">—</span>
+      <button class="copy-btn" onclick="copyUrl('lan')">Copy</button>
+    </div>
+    <div class="qr-hint">
+      📱 Scan QR with your phone to use as a remote control.<br>
+      Both devices must be on the same WiFi network.
+    </div>
+  </div>
+</div>
+
+<!-- First-run banner (shown on first launch) -->
+<div class="first-run-banner" id="first-run-banner">
+  <div class="first-run-title">🎬 Welcome to HomeStream!</div>
+  <ul class="first-run-steps">
+    <li>The setup wizard has opened in your browser</li>
+    <li>Follow the steps to point HomeStream at your media folder</li>
+    <li>Add your TMDB API key for movie/show artwork (free)</li>
+    <li>Come back here anytime — this window stays in your system tray</li>
+  </ul>
+</div>
+
+<!-- Action buttons -->
 <div class="actions">
   <button class="btn-primary" id="btn-open" disabled onclick="openBrowser()">Open HomeStream</button>
+  <button class="btn-secondary" id="btn-setup" disabled onclick="openSetup()">Setup Wizard</button>
   <button class="btn-secondary" id="btn-stop" disabled onclick="toggleServer()">Stop Server</button>
 </div>
 
+<!-- Server log -->
 <div class="log-section">
   <div class="log-label">
     Server Log
@@ -463,15 +598,28 @@ const CONTROL_PANEL_HTML = `<!DOCTYPE html>
 <script>
   let isRunning = false;
   let lanUrl = '';
+  let localUrl = 'http://localhost:3000';
+  let isFirstRun = false;
+  let qrLoaded = false;
 
-  function openBrowser() { window.electronAPI?.openBrowser(); }
-  function openLan() { if (lanUrl) window.electronAPI?.openBrowserLan(lanUrl); }
+  function openBrowser()  { window.electronAPI?.openBrowser(); }
+  function openSetup()    { window.electronAPI?.openBrowserPage('/setup'); }
+  function openLan()      { if (lanUrl) window.electronAPI?.openBrowserLan(lanUrl); }
 
   function toggleServer() {
-    if (isRunning) {
-      window.electronAPI?.stopServer();
-    } else {
-      window.electronAPI?.startServer();
+    if (isRunning) window.electronAPI?.stopServer();
+    else           window.electronAPI?.startServer();
+  }
+
+  function copyUrl(which) {
+    const url = which === 'lan' ? lanUrl : localUrl;
+    if (!url) return;
+    navigator.clipboard?.writeText(url).catch(() => {});
+    const btn = document.querySelector('.copy-btn[onclick="copyUrl(\\''+which+'\\')"]');
+    if (btn) {
+      btn.textContent = 'Copied!';
+      btn.classList.add('copied');
+      setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 1500);
     }
   }
 
@@ -484,51 +632,87 @@ const CONTROL_PANEL_HTML = `<!DOCTYPE html>
     const box = document.getElementById('log-box');
     const empty = box.querySelector('.empty-log');
     if (empty) empty.remove();
-
     const div = document.createElement('div');
     div.className = 'log-entry';
     div.innerHTML =
       '<span class="log-time">' + entry.time + '</span>' +
       '<span class="log-line ' + entry.level + '">' + escHtml(entry.line) + '</span>';
     box.appendChild(div);
-
-    // Auto-scroll to bottom
     box.scrollTop = box.scrollHeight;
+
+    // Detect first run from log message
+    if (entry.line && entry.line.includes('First run detected')) {
+      isFirstRun = true;
+      document.getElementById('first-run-banner').classList.add('visible');
+    }
+  }
+
+  function loadQrCode(networkUrl) {
+    if (qrLoaded || !networkUrl) return;
+    qrLoaded = true;
+    const wrap = document.getElementById('qr-wrap');
+    // Fetch QR from the server's built-in QR endpoint
+    const qrUrl = networkUrl + '/api/remote/qr?size=200';
+    const img = document.createElement('img');
+    img.src = qrUrl;
+    img.alt = 'QR code';
+    img.onerror = () => {
+      // QR endpoint needs auth — show a manual hint instead
+      wrap.innerHTML = '<div class="qr-placeholder">Open network URL on phone</div>';
+    };
+    img.onload = () => {
+      wrap.innerHTML = '';
+      wrap.appendChild(img);
+    };
   }
 
   function escHtml(s) {
-    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   }
 
   function updateStatus(status) {
     isRunning = status.running;
-    lanUrl = status.lanUrl;
+    lanUrl = status.lanUrl || '';
+    localUrl = status.localUrl || 'http://localhost:3000';
 
-    const dot = document.getElementById('dot');
-    const text = document.getElementById('status-text');
-    const urlChip = document.getElementById('lan-url');
-    const btnOpen = document.getElementById('btn-open');
-    const btnStop = document.getElementById('btn-stop');
+    const dot        = document.getElementById('dot');
+    const text       = document.getElementById('status-text');
+    const localChip  = document.getElementById('local-url');
+    const accessPanel = document.getElementById('access-panel');
+    const localLink  = document.getElementById('local-link');
+    const lanLink    = document.getElementById('lan-link');
+    const btnOpen    = document.getElementById('btn-open');
+    const btnSetup   = document.getElementById('btn-setup');
+    const btnStop    = document.getElementById('btn-stop');
 
     dot.className = 'status-dot' + (isRunning ? ' running' : '');
     text.innerHTML = isRunning
       ? '<strong>Running</strong> — ready to stream'
       : '<strong>Stopped</strong>';
 
-    if (isRunning && status.lanUrl) {
-      urlChip.style.display = 'block';
-      urlChip.textContent = status.lanUrl;
+    if (isRunning) {
+      localChip.style.display = 'block';
+      localChip.textContent = 'localhost:3000';
+      accessPanel.classList.add('visible');
+      localLink.textContent = localUrl;
+      if (lanUrl) {
+        lanLink.textContent = lanUrl;
+        loadQrCode(lanUrl);
+      } else {
+        lanLink.textContent = 'Not connected to a network';
+      }
     } else {
-      urlChip.style.display = 'none';
+      localChip.style.display = 'none';
+      accessPanel.classList.remove('visible');
     }
 
-    btnOpen.disabled = !isRunning;
-    btnStop.disabled = false;
+    btnOpen.disabled  = !isRunning;
+    btnSetup.disabled = !isRunning;
+    btnStop.disabled  = false;
     btnStop.textContent = isRunning ? 'Stop Server' : 'Start Server';
-    btnStop.className = isRunning ? 'btn-danger' : 'btn-secondary';
+    btnStop.className   = isRunning ? 'btn-danger' : 'btn-secondary';
   }
 
-  // Listen for IPC events from main process
   window.electronAPI?.onStatus(updateStatus);
   window.electronAPI?.onLog(appendLog);
   window.electronAPI?.requestStatus();

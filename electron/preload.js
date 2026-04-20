@@ -9,13 +9,14 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('electronAPI', {
   // Actions
-  startServer: () => ipcRenderer.send('start-server'),
-  stopServer: () => ipcRenderer.send('stop-server'),
-  openBrowser: () => ipcRenderer.send('open-browser'),
-  openBrowserLan: (url) => ipcRenderer.send('open-browser-lan', url),
-  requestStatus: () => ipcRenderer.send('request-status'),
+  startServer:    () => ipcRenderer.send('start-server'),
+  stopServer:     () => ipcRenderer.send('stop-server'),
+  openBrowser:    () => ipcRenderer.send('open-browser'),
+  openBrowserLan: (url)  => ipcRenderer.send('open-browser-lan', url),
+  openBrowserPage:(page) => ipcRenderer.send('open-browser-page', page),
+  requestStatus:  () => ipcRenderer.send('request-status'),
 
   // Event listeners
-  onStatus: (callback) => ipcRenderer.on('status', (_event, data) => callback(data)),
-  onLog: (callback) => ipcRenderer.on('log', (_event, entry) => callback(entry)),
+  onStatus: (callback) => ipcRenderer.on('status', (_event, data)  => callback(data)),
+  onLog:    (callback) => ipcRenderer.on('log',    (_event, entry) => callback(entry)),
 });

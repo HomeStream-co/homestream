@@ -38,8 +38,15 @@ extraResources:
 # ── Windows ───────────────────────────────────────────────────────────────────
 win:
   target:
+    # Full NSIS installer — creates Start Menu + Desktop shortcuts, uninstallable
     - target: nsis
       arch: [x64, ia32]
+    # Portable .exe — no install needed, run from anywhere (USB, shared PC, etc.)
+    - target: portable
+      arch: [x64]
+    # ZIP archive — extract and run, useful for manual deployment
+    - target: zip
+      arch: [x64]
   # electron-builder auto-converts icon.png → .ico if no .ico is provided
   icon: electron/assets/icon.png
 
@@ -50,6 +57,10 @@ nsis:
   createStartMenuShortcut: true
   shortcutName: HomeStream
   runAfterFinish: true
+
+# Portable build stores its data next to the .exe (great for USB drives)
+portable:
+  artifactName: HomeStream-${version}-portable.exe
 
 # ── macOS ─────────────────────────────────────────────────────────────────────
 mac:
