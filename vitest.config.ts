@@ -50,7 +50,7 @@ export default defineConfig({
           environment: 'jsdom',
           setupFiles: ['./src/test/setup.ts'],
           include: ['src/test/**/*.test.{ts,tsx}'],
-          exclude: ['src/test/jellyfin/**', 'src/test/profiles/**'],
+          exclude: ['src/test/jellyfin/**', 'src/test/profiles/**', 'src/test/server/**'],
         },
         resolve: { alias: sharedAlias },
       },
