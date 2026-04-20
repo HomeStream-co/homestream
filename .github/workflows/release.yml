@@ -1,0 +1,184 @@
+# HomeStream Release Builder
+#
+# Triggered by pushing a version tag: git tag v1.2.3 && git push --tags
+#
+# Builds Electron installers for all three platforms in parallel:
+#   Windows  → HomeStream-Setup-x.x.x.exe  (NSIS)
+#   macOS    → HomeStream-x.x.x.dmg
+#   Linux    → HomeStream-x.x.x.AppImage + .deb
+#
+# All artifacts are uploaded to the GitHub Release created by the tag.
+#
+# Prerequisites:
+#   - macOS builds require a macOS runner (macos-latest)
+#   - Windows builds require a Windows runner (windows-latest)
+#   - Linux builds run on ubuntu-latest
+#   - No code-signing configured (add CSC_LINK / APPLE_ID secrets for that)
+
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write   # needed to create/upload release assets
+
+jobs:
+  # ── Create the GitHub Release ────────────────────────────────────────────────
+  create-release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    outputs:
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
+      version: ${{ steps.get_version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Get version from tag
+        id: get_version
+        run: echo "version=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: HomeStream v${{ steps.get_version.outputs.version }}
+          draft: false
+          prerelease: ${{ contains(github.ref, '-beta') || contains(github.ref, '-alpha') || contains(github.ref, '-rc') }}
+          body: |
+            ## HomeStream v${{ steps.get_version.outputs.version }}
+
+            ### Downloads
+            | Platform | File |
+            |----------|------|
+            | Windows  | `HomeStream-Setup-${{ steps.get_version.outputs.version }}.exe` |
+            | macOS    | `HomeStream-${{ steps.get_version.outputs.version }}.dmg` |
+            | Linux    | `HomeStream-${{ steps.get_version.outputs.version }}.AppImage` |
+            | Linux    | `homestream_${{ steps.get_version.outputs.version }}_amd64.deb` |
+
+            ### Installation
+            - **Windows**: Run the `.exe` installer
+            - **macOS**: Open the `.dmg` and drag HomeStream to Applications
+            - **Linux**: Make the `.AppImage` executable (`chmod +x`) and run it, or install the `.deb`
+
+  # ── Windows build ────────────────────────────────────────────────────────────
+  build-windows:
+    name: Build Windows
+    runs-on: windows-latest
+    needs: create-release
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Windows installer
+        run: npm run electron:win
+        env:
+          CI: true
+
+      - name: Upload Windows installer
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: dist-electron/HomeStream-Setup-${{ needs.create-release.outputs.version }}.exe
+          asset_name: HomeStream-Setup-${{ needs.create-release.outputs.version }}.exe
+          asset_content_type: application/octet-stream
+
+  # ── macOS build ──────────────────────────────────────────────────────────────
+  build-macos:
+    name: Build macOS
+    runs-on: macos-latest
+    needs: create-release
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build macOS DMG
+        run: npm run electron:mac
+        env:
+          CI: true
+          # Disable code signing for unsigned builds
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+
+      - name: Upload macOS DMG
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: dist-electron/HomeStream-${{ needs.create-release.outputs.version }}.dmg
+          asset_name: HomeStream-${{ needs.create-release.outputs.version }}.dmg
+          asset_content_type: application/octet-stream
+
+  # ── Linux build ──────────────────────────────────────────────────────────────
+  build-linux:
+    name: Build Linux
+    runs-on: ubuntu-latest
+    needs: create-release
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            libgtk-3-dev \
+            libnotify-dev \
+            libnss3 \
+            libxss1 \
+            libxtst6 \
+            xauth \
+            xvfb
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Linux packages
+        run: npm run electron:linux
+        env:
+          CI: true
+
+      - name: Upload AppImage
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: dist-electron/HomeStream-${{ needs.create-release.outputs.version }}.AppImage
+          asset_name: HomeStream-${{ needs.create-release.outputs.version }}.AppImage
+          asset_content_type: application/octet-stream
+
+      - name: Upload .deb package
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: dist-electron/homestream_${{ needs.create-release.outputs.version }}_amd64.deb
+          asset_name: homestream_${{ needs.create-release.outputs.version }}_amd64.deb
+          asset_content_type: application/octet-stream

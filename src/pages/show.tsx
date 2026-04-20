@@ -25,6 +25,7 @@ import EpisodeTracker from '@/components/EpisodeTracker';
 import { Progress } from '@/components/ui/progress';
 import type { MediaItem, Episode } from '@/types/media';
 import TrailerButton from '@/components/TrailerButton';
+import RestrictedContentGuard from '@/components/RestrictedContentGuard';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -166,6 +167,7 @@ export default function ShowPage() {
     'text-red-400 border-red-400/40';
 
   return (
+    <RestrictedContentGuard rated={item.rated} contentTitle={item.title}>
     <>
       <title>{item.title} — HomeStream</title>
       <meta name="description" content={item.plot || `Watch ${item.title} on HomeStream.`} />
@@ -558,5 +560,6 @@ export default function ShowPage() {
         </div>
       </div>
     </>
+    </RestrictedContentGuard>
   );
 }

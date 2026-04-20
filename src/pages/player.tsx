@@ -28,6 +28,7 @@ import PlayerEndOverlay from '@/components/player/PlayerEndOverlay';
 import PlayerInfoPanel from '@/components/player/PlayerInfoPanel';
 import PlayerShortcutsOverlay from '@/components/player/PlayerShortcutsOverlay';
 import PlayerBelowFold from '@/components/player/PlayerBelowFold';
+import RestrictedContentGuard from '@/components/RestrictedContentGuard';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -48,7 +49,7 @@ export default function PlayerPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { library, updateProgress, triggerPostWatchRecommendation, continueWatching } = useMedia();
-  const { isAllowed, activeProfile } = useProfile();
+  const { activeProfile } = useProfile();
   const profileId = activeProfile?.id ?? 'adult';
   const { settings: appSettings } = useTheme();
   const playerAccent = appSettings.syncPlayerColor ? 'hsl(var(--primary))' : 'rgba(255,255,255,0.9)';
@@ -149,10 +150,7 @@ export default function PlayerPage() {
     onCast:        () => castButtonRef.current?.(),
   });
 
-  // ── Kids profile block ────────────────────────────────────────────────────
-  useEffect(() => {
-    if (item && !isAllowed(item.rated)) navigate('/');
-  }, [item, isAllowed, navigate]);
+  // ── Kids profile block — handled by RestrictedContentGuard wrapper ──────────
 
   // ── Reset on id change ────────────────────────────────────────────────────
   useEffect(() => {
@@ -470,6 +468,7 @@ export default function PlayerPage() {
 
   // ── Main render ───────────────────────────────────────────────────────────
   return (
+    <RestrictedContentGuard rated={item.rated} contentTitle={item.title}>
     <div className="min-h-screen bg-black">
       <title>{item.title} — HomeStream</title>
 
@@ -773,5 +772,6 @@ export default function PlayerPage() {
         runEnrichment={runEnrichment}
       />
     </div>
+    </RestrictedContentGuard>
   );
 }

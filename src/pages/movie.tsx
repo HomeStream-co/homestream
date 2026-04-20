@@ -24,6 +24,7 @@ import { useProfile } from '@/context/ProfileContext';
 import { useTheme } from '@/context/ThemeContext';
 import MediaCard from '@/components/MediaCard';
 import TrailerButton from '@/components/TrailerButton';
+import RestrictedContentGuard from '@/components/RestrictedContentGuard';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -143,6 +144,7 @@ export default function MoviePage() {
     'text-red-400 border-red-400/40';
 
   return (
+    <RestrictedContentGuard rated={item.rated} contentTitle={item.title}>
     <>
       <title>{item.title} — HomeStream</title>
       <meta name="description" content={item.plot || `Watch ${item.title} on HomeStream.`} />
@@ -478,5 +480,6 @@ export default function MoviePage() {
         </div>
       </div>
     </>
+    </RestrictedContentGuard>
   );
 }
