@@ -6,7 +6,7 @@
  * if ≥ 90% complete.
  */
 import type { Request, Response } from 'express';
-import { readLibrary, writeLibrary } from '../../../../../libraryStore.js';
+import { readLibrary, writeLibraryDirect } from '../../../../../libraryStore.js';
 
 interface LibraryItem {
   id: string;
@@ -45,7 +45,7 @@ export default function handler(req: Request, res: Response) {
         : 0;
 
     library[idx] = { ...item, watchedSeconds, watchProgress: progress };
-    writeLibrary(library);
+    writeLibraryDirect(library);
 
     res.status(204).send();
   } catch (err) {
