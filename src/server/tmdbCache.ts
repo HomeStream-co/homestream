@@ -12,11 +12,17 @@
 
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import { getSecret } from '#airo/secrets';
 
 // Use persistent storage so the cache survives deploys and restarts.
 // Falls back to a local dir if /private is not available (e.g. local dev without the mount).
 const CACHE_DIR = fs.existsSync('/private') ? '/private/tmdb-cache' : path.resolve('./tmdb-cache');
+
+// Pre-baked cache shipped with the app — used as seed when /private cache is
+// missing or stale so the Discover page always has images on first load.
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const BAKED_CACHE_PATH = path.resolve(__dirname, '../../public/tmdb-cache-baked.json');
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 const TMDB_BASE = 'https://api.themoviedb.org/3';
 const TMDB_IMG = 'https://image.tmdb.org/t/p/w500';
@@ -56,11 +62,22 @@ function cacheFile(key: string): string {
 }
 
 function readCache(key: string): TMDBCacheEntry | null {
+  // 1. Try the live /private cache first
   const file = cacheFile(key);
-  if (!fs.existsSync(file)) return null;
-  try {
-    return JSON.parse(fs.readFileSync(file, 'utf-8')) as TMDBCacheEntry;
-  } catch { return null; }
+  if (fs.existsSync(file)) {
+    try {
+      return JSON.parse(fs.readFileSync(file, 'utf-8')) as TMDBCacheEntry;
+    } catch { /* fall through */ }
+  }
+  // 2. Fall back to the pre-baked cache bundled with the app
+  if (key === 'main' && fs.existsSync(BAKED_CACHE_PATH)) {
+    try {
+      const baked = JSON.parse(fs.readFileSync(BAKED_CACHE_PATH, 'utf-8')) as TMDBCacheEntry;
+      // Mark as stale so a background refresh is triggered, but still serve images
+      return { ...baked, stale: true };
+    } catch { /* ignore */ }
+  }
+  return null;
 }
 
 function writeCache(key: string, data: TMDBCacheEntry): void {
@@ -231,20 +248,28 @@ const CACHE_KEY = 'main';
 export async function getTMDBData(forceRefresh = false): Promise<TMDBCacheEntry & { stale?: boolean }> {
   const cached = readCache(CACHE_KEY);
 
-  // Serve fresh cache immediately — no network call
-  if (!forceRefresh && cached && isFresh(cached)) {
+  // Serve fresh live cache immediately — no network call needed
+  if (!forceRefresh && cached && isFresh(cached) && !cached.stale) {
     return cached;
   }
 
-  // Try to fetch fresh data
+  // If we have the baked (or stale live) cache, serve it immediately and
+  // kick off a background refresh so next request gets fresh data.
+  if (cached) {
+    // Background refresh — don't await, don't block the response
+    fetchFresh()
+      .then(fresh => writeCache(CACHE_KEY, fresh))
+      .catch(err => console.warn('[tmdbCache] Background refresh failed:', err));
+    return cached;
+  }
+
+  // No cache at all — must fetch synchronously (first cold start)
   try {
     const fresh = await fetchFresh();
     writeCache(CACHE_KEY, fresh);
     return fresh;
   } catch (err) {
-    console.warn('[tmdbCache] Network fetch failed, serving stale cache:', err);
-    // Return stale cache if available, otherwise empty
-    if (cached) return { ...cached, stale: true };
+    console.warn('[tmdbCache] Cold fetch failed:', err);
     return { fetchedAt: 0, upcoming: [], trending: [], trendingShows: [], stale: true };
   }
 }
