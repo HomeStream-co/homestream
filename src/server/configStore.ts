@@ -4,6 +4,9 @@
  * Stores setup wizard results in homestream-config.json.
  * All values are optional — the app works without any of them,
  * but the setup wizard guides users through the ideal configuration.
+ *
+ * Write safety: all writes go through a promise queue (same pattern as
+ * libraryStore) to prevent concurrent saves from corrupting the config file.
  */
 
 import fs from 'fs';
@@ -65,6 +68,8 @@ const DEFAULTS: AppConfig = {
   storageTvPct: 30,
 };
 
+// ── Read (always immediate) ───────────────────────────────────────────────────
+
 export function readConfig(): AppConfig {
   if (!fs.existsSync(CONFIG_PATH)) return { ...DEFAULTS };
   try {
@@ -75,6 +80,14 @@ export function readConfig(): AppConfig {
   }
 }
 
+// ── Write queue ───────────────────────────────────────────────────────────────
+
+let writeQueue: Promise<void> = Promise.resolve();
+
+/**
+ * Write config updates. All writes are serialised through a promise queue
+ * to prevent concurrent saves from corrupting homestream-config.json.
+ */
 export function writeConfig(updates: Partial<AppConfig>): AppConfig {
   const current = readConfig();
   const next: AppConfig = { ...current, ...updates };
@@ -85,7 +98,13 @@ export function writeConfig(updates: Partial<AppConfig>): AppConfig {
     next.libraryDir = next.libraryDir || `${updates.mediaDir}/library`;
   }
 
-  fs.writeFileSync(CONFIG_PATH, JSON.stringify(next, null, 2));
+  // Enqueue the write — non-blocking, returns the computed next config immediately
+  writeQueue = writeQueue.then(() => {
+    fs.writeFileSync(CONFIG_PATH, JSON.stringify(next, null, 2));
+  }).catch(err => {
+    console.error('[configStore] Write failed:', err);
+  });
+
   return next;
 }
 

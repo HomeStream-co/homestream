@@ -10,6 +10,8 @@
 
 import type { Request, Response } from 'express';
 import fs from 'fs';
+import { spawn } from 'child_process';
+import { createRequire } from 'module';
 import { readConfig } from '../../../configStore.js';
 import { readLibrary } from '../../../libraryStore.js';
 import { isReachable as qbitReachable } from '../../../qbittorrentClient.js';
@@ -162,10 +164,66 @@ async function checkDownloadJobs(): Promise<SubsystemCheck> {
   }
 }
 
+/**
+ * Detect the FFmpeg binary path using the same resolution logic as hlsTranscoder.
+ * Returns the path if found, or null if not available.
+ */
+function resolveFfmpegBin(): string {
+  if (process.env.FFMPEG_PATH) return process.env.FFMPEG_PATH;
+  try {
+    const req = createRequire(import.meta.url);
+    const p = req('ffmpeg-static') as string | null;
+    if (p) return p;
+  } catch { /* not installed */ }
+  return 'ffmpeg';
+}
+
+async function checkFfmpeg(): Promise<SubsystemCheck> {
+  return new Promise(resolve => {
+    const bin = resolveFfmpegBin();
+    const proc = spawn(bin, ['-version'], { stdio: 'pipe' });
+    let output = '';
+
+    proc.stdout?.on('data', (d: Buffer) => { output += d.toString(); });
+    proc.stderr?.on('data', (d: Buffer) => { output += d.toString(); });
+
+    const timer = setTimeout(() => {
+      proc.kill();
+      resolve({ name: 'FFmpeg', status: 'warn', message: 'Version check timed out', detail: `Binary: ${bin}` });
+    }, 5000);
+
+    proc.on('close', (code) => {
+      clearTimeout(timer);
+      if (code === 0) {
+        const versionMatch = output.match(/ffmpeg version ([^\s]+)/i);
+        const version = versionMatch ? versionMatch[1] : 'unknown';
+        resolve({ name: 'FFmpeg', status: 'ok', message: `v${version} — transcoding ready`, detail: `Binary: ${bin}` });
+      } else {
+        resolve({
+          name: 'FFmpeg',
+          status: 'error',
+          message: 'FFmpeg not found — transcoding and HLS playback will fail',
+          detail: `Install FFmpeg or set FFMPEG_PATH. Tried: ${bin}`,
+        });
+      }
+    });
+
+    proc.on('error', () => {
+      clearTimeout(timer);
+      resolve({
+        name: 'FFmpeg',
+        status: 'error',
+        message: 'FFmpeg not found — transcoding and HLS playback will fail',
+        detail: `Install FFmpeg or set FFMPEG_PATH. Tried: ${bin}`,
+      });
+    });
+  });
+}
+
 // ── Handler ───────────────────────────────────────────────────────────────────
 
 export default async function handler(_req: Request, res: Response) {
-  const [library, config, qbit, tmdb, ollama, torrentio, downloads] = await Promise.all([
+  const [library, config, qbit, tmdb, ollama, torrentio, downloads, ffmpeg] = await Promise.all([
     checkLibrary(),
     checkConfig(),
     checkQbit(),
@@ -173,9 +231,10 @@ export default async function handler(_req: Request, res: Response) {
     checkOllama(),
     checkTorrentio(),
     checkDownloadJobs(),
+    checkFfmpeg(),
   ]);
 
-  const checks: SubsystemCheck[] = [library, config, qbit, tmdb, ollama, torrentio, downloads];
+  const checks: SubsystemCheck[] = [library, config, qbit, tmdb, ollama, torrentio, downloads, ffmpeg];
 
   const overall: SubsystemStatus =
     checks.some(c => c.status === 'error') ? 'error' :

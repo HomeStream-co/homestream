@@ -13,35 +13,7 @@
  */
 import type { Request, Response } from 'express';
 import { readLibrary, writeLibrary } from '../../libraryStore.js';
-
-const DEMO_ITEM = {
-  id: 'demo-bbb',
-  title: 'Big Buck Bunny',
-  type: 'movie',
-  year: '2008',
-  filename: '__demo__big-buck-bunny.mp4',
-  filePath: '__demo__',
-  demoStreamUrl: 'https://download.blender.org/peach/bigbuckbunny_movies/BigBuckBunny_320x180.mp4',
-  poster: '/demo/bbb-poster.jpg',
-  backdrop: '/demo/bbb-backdrop.jpg',
-  plot: 'A large and lovable rabbit deals with three bullying rodents who want to steal his berries. Freely licensed under Creative Commons by the Blender Foundation.',
-  rating: 'G',
-  rated: 'G',
-  imdbRating: '7.8',
-  genre: ['Animation', 'Short', 'Comedy'],
-  runtime: '9 min',
-  director: 'Sacha Goedegebure',
-  actors: ['Big Buck Bunny'],
-  transcoding: false,
-  watchProgress: 0,
-  profileProgress: { adult: 0, kids: 0 },
-  isDemo: true,
-  // Signals to the player that this item requires an internet connection
-  requiresInternet: true,
-  importedFrom: 'demo',
-  // Fixed date — prevents demo item from appearing in "Recently Added" on every restart
-  addedAt: '2024-01-01T00:00:00.000Z',
-};
+import { DEMO_ITEM } from '../../demoItem.js';
 
 // Seed once at module load — fires as soon as the API route is first imported,
 // which happens on the first request to any /api/* endpoint.

@@ -49,36 +49,10 @@ function gzipMiddleware(req, res, next) {
   next();
 }
 
-// ── Demo item definition (single source of truth) ─────────────────────────
-
-const DEMO_ITEM = {
-  id: 'demo-bbb',
-  title: 'Big Buck Bunny',
-  type: 'movie',
-  year: '2008',
-  filename: '__demo__big-buck-bunny.mp4',
-  filePath: '__demo__',
-  demoStreamUrl: 'https://download.blender.org/peach/bigbuckbunny_movies/BigBuckBunny_320x180.mp4',
-  poster: '/demo/bbb-poster.jpg',
-  backdrop: '/demo/bbb-backdrop.jpg',
-  plot: 'A large and lovable rabbit deals with three bullying rodents who want to steal his berries. Freely licensed under Creative Commons by the Blender Foundation.',
-  rating: 'G',
-  imdbRating: '7.8',
-  genre: ['Animation', 'Short', 'Comedy'],
-  runtime: '9 min',
-  director: 'Sacha Goedegebure',
-  actors: ['Big Buck Bunny'],
-  transcoding: false,
-  watchProgress: 0,
-  profileProgress: { adult: 0, kids: 0 },
-  isDemo: true,
-  importedFrom: 'demo',
-  addedAt: new Date().toISOString(),
-};
-
 async function seedDemoItem() {
   try {
     const { readLibrary, writeLibrary } = await import('./libraryStore.js');
+    const { DEMO_ITEM } = await import('./demoItem.js');
     const library = readLibrary();
     if (library.find(m => m.id === 'demo-bbb')) return; // already seeded
     await writeLibrary(lib => { lib.unshift(DEMO_ITEM); return lib; });
@@ -139,6 +113,18 @@ export const serverBefore = (server) => {
 
   const shutdown = async (signal) => {
     console.log(`Got ${signal}, shutting down gracefully...`);
+    // Clean up HLS temp segments so /tmp doesn't accumulate across restarts
+    try {
+      const { stopAllHlsJobs, HLS_BASE_DIR } = await import('./hlsTranscoder.js');
+      stopAllHlsJobs();
+      const fs = await import('node:fs');
+      if (fs.existsSync(HLS_BASE_DIR)) {
+        fs.rmSync(HLS_BASE_DIR, { recursive: true, force: true });
+        console.log('[hls] Cleaned up temp segments on shutdown');
+      }
+    } catch (err) {
+      console.warn('[hls] Cleanup on shutdown failed (non-fatal):', err.message);
+    }
     process.exit(0);
   };
 

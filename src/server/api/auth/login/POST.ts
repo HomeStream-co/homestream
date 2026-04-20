@@ -2,8 +2,8 @@
  * POST /api/auth/login
  *
  * Validates the admin password and returns a session token stored in an
- * httpOnly cookie.  The token is a random hex string stored in memory
- * (restarts invalidate sessions — acceptable for a home server).
+ * httpOnly cookie.  Sessions are persisted to homestream-sessions.json so
+ * they survive server restarts — users stay logged in across reboots.
  *
  * Passwords are stored as bcrypt hashes. Plain-text passwords in existing
  * configs are accepted on first login and then automatically re-hashed.
@@ -15,28 +15,18 @@
  * Response: { ok: true } | { error: string }
  */
 import type { Request, Response } from 'express';
-import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import { readConfig, writeConfig } from '../../../configStore.js';
+import {
+  createSession,
+  isValidSession,
+  clearAllSessions,
+  getSessionCount,
+  SESSION_TTL_MS,
+} from '../../../sessionStore.js';
 
-// ── In-memory session store ───────────────────────────────────────────────────
-const sessions = new Map<string, number>();
-const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
-
-export function isValidSession(token: string): boolean {
-  const expiry = sessions.get(token);
-  if (!expiry) return false;
-  if (Date.now() > expiry) { sessions.delete(token); return false; }
-  return true;
-}
-
-export function clearAllSessions(): void {
-  sessions.clear();
-}
-
-export function getSessionCount(): number {
-  return sessions.size;
-}
+// Re-export for authMiddleware backwards compat
+export { isValidSession, clearAllSessions, getSessionCount };
 
 // ── Rate limiter ──────────────────────────────────────────────────────────────
 interface RateBucket {
@@ -95,14 +85,6 @@ setInterval(() => {
   }
 }, 30 * 60 * 1000);
 
-// Clean up expired sessions every hour
-setInterval(() => {
-  const now = Date.now();
-  for (const [token, expiry] of sessions) {
-    if (now > expiry) sessions.delete(token);
-  }
-}, 60 * 60 * 1000);
-
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function isBcryptHash(s: string): boolean {
@@ -156,8 +138,7 @@ export default async function handler(req: Request, res: Response) {
     }
   }
 
-  const token = crypto.randomBytes(32).toString('hex');
-  sessions.set(token, Date.now() + SESSION_TTL_MS);
+  const token = createSession();
 
   res.cookie('hs_session', token, {
     httpOnly: true,

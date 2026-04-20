@@ -11,11 +11,19 @@
  *
  * Rooms: mediaId-based so multiple screens can be controlled independently.
  * If no mediaId is provided, the remote controls the most recently active screen.
+ *
+ * Auth:
+ *   Connections must supply a valid session token via the `token` query param
+ *   OR via the `hs_session` cookie in the upgrade request headers.
+ *   If no admin password is configured (open mode), all connections are allowed.
+ *   Unauthenticated connections receive a 401 close frame and are dropped.
  */
 
 import { WebSocketServer, WebSocket } from 'ws';
 import type { IncomingMessage } from 'http';
 import type { Server } from 'http';
+import { readConfig } from './configStore.js';
+import { isValidSession } from './sessionStore.js';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -59,6 +67,39 @@ const clients = new Map<WebSocket, Client>();
 // Latest known player state per mediaId — sent to remotes on connect
 const latestState = new Map<string, PlayerState>();
 
+// ── Auth helper ───────────────────────────────────────────────────────────────
+
+/**
+ * Returns true if the WebSocket upgrade request is authenticated.
+ * Checks (in order):
+ *   1. Open mode — no admin password configured → always allowed
+ *   2. `token` query param — used by the /remote page (can't set cookies cross-origin)
+ *   3. `hs_session` cookie — used by the player page (same origin)
+ */
+function isAuthorised(req: IncomingMessage): boolean {
+  const cfg = readConfig();
+  const adminPassword = cfg.adminPassword || process.env.ADMIN_PASSWORD || '';
+
+  // Open mode — no password set
+  if (!adminPassword) return true;
+
+  const url = new URL(req.url ?? '/', `http://${req.headers.host}`);
+
+  // 1. Token query param (phone remote — different origin, can't send cookies)
+  const tokenParam = url.searchParams.get('token');
+  if (tokenParam && isValidSession(tokenParam)) return true;
+
+  // 2. Cookie (player page — same origin)
+  const cookieHeader = req.headers.cookie ?? '';
+  const cookieMatch = cookieHeader.match(/(?:^|;\s*)hs_session=([^;]+)/);
+  if (cookieMatch) {
+    const cookieToken = decodeURIComponent(cookieMatch[1]);
+    if (isValidSession(cookieToken)) return true;
+  }
+
+  return false;
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function send(ws: WebSocket, data: unknown) {
@@ -85,6 +126,13 @@ export function attachRemoteControl(server: Server): WebSocketServer {
   const wss = new WebSocketServer({ server, path: '/ws/remote' });
 
   wss.on('connection', (ws: WebSocket, req: IncomingMessage) => {
+    // ── Auth check ────────────────────────────────────────────────────────────
+    if (!isAuthorised(req)) {
+      console.warn('[remote] Rejected unauthenticated WebSocket connection from', req.socket.remoteAddress);
+      ws.close(4401, 'Unauthorized');
+      return;
+    }
+
     const url = new URL(req.url ?? '/', `http://${req.headers.host}`);
     const role = (url.searchParams.get('role') ?? 'remote') as ClientRole;
     const mediaId = url.searchParams.get('mediaId') ?? '*';

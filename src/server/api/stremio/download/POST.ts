@@ -5,6 +5,7 @@ import { readConfig } from '../../../configStore.js';
 import { runPreDownloadScan } from '../../../security/threatScanner.js';
 import { connectForDownload, disconnectAfterDownload } from '../../../vpnService.js';
 import type { VPNConfig } from '../../../vpnService.js';
+import { upsertJob, getAllPersistedJobs } from '../../../downloadJobStore.js';
 
 /**
  * POST /api/stremio/download
@@ -145,7 +146,31 @@ interface QbitJob {
 const qbitJobs = new Map<string, QbitJob>();
 
 export function getQbitJobs(): QbitJob[] {
-  return Array.from(qbitJobs.values());
+  // Merge in-memory jobs with persisted jobs from disk.
+  // In-memory jobs take precedence (they have live status).
+  const persisted = getAllPersistedJobs()
+    .filter(j => j.backend === 'qbittorrent')
+    .map(j => ({
+      jobId: j.jobId,
+      infoHash: j.infoHash,
+      title: j.title,
+      quality: j.quality,
+      type: j.type as 'movie' | 'series',
+      season: j.season,
+      episode: j.episode,
+      status: j.status as QbitJob['status'],
+      addedAt: j.addedAt,
+      poster: j.poster,
+      imdbId: j.imdbId,
+      backend: 'qbittorrent' as const,
+    }));
+
+  const inMemoryIds = new Set(qbitJobs.keys());
+  const merged = [...Array.from(qbitJobs.values())];
+  for (const p of persisted) {
+    if (!inMemoryIds.has(p.jobId)) merged.push(p);
+  }
+  return merged;
 }
 
 async function queueViaQbit(params: {
@@ -186,6 +211,23 @@ async function queueViaQbit(params: {
   };
 
   qbitJobs.set(job.jobId, job);
+
+  // Persist to disk so job survives server restarts
+  upsertJob({
+    jobId: job.jobId,
+    infoHash: job.infoHash,
+    title: job.title,
+    quality: job.quality,
+    type: job.type,
+    season: job.season,
+    episode: job.episode,
+    status: job.status,
+    addedAt: job.addedAt,
+    poster: job.poster,
+    imdbId: job.imdbId,
+    backend: 'qbittorrent',
+  });
+
   return job;
 }
 

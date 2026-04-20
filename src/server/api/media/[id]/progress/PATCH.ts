@@ -28,6 +28,12 @@ import { requireAuth } from '../../../../authMiddleware.js';
  *   - Sets lastWatchedAt to now (ISO string) for "Continue Watching" ordering
  *   - If progress >= 95, marks watchProgress = 0 (completed — remove from CW row)
  *     and sets watchedAt = now
+ *
+ * Debounce:
+ *   Server-side per-item debounce of 10 seconds. The player calls this every
+ *   few seconds; without debouncing, 4 simultaneous viewers = 4 writes/second
+ *   to media-library.json. Debounce reduces this to at most 1 write per item
+ *   per 10 seconds while still capturing the final position on completion.
  */
 
 interface ProfileProgressEntry {
@@ -36,6 +42,77 @@ interface ProfileProgressEntry {
   totalSeconds?: number;
   lastWatchedAt: string;
   watchedAt?: string;
+}
+
+// ── Per-item debounce ─────────────────────────────────────────────────────────
+// Key: `${mediaId}:${profileId}` → pending timer
+const pendingWrites = new Map<string, ReturnType<typeof setTimeout>>();
+const DEBOUNCE_MS = 10_000; // 10 seconds
+
+interface PendingWrite {
+  id: string;
+  progress: number;
+  currentTime?: number;
+  duration?: number;
+  profileId: string;
+  resolve: (value: Record<string, unknown> | null) => void;
+  reject: (err: unknown) => void;
+}
+
+const pendingData = new Map<string, PendingWrite>();
+
+async function flushWrite(key: string): Promise<Record<string, unknown> | null> {
+  const data = pendingData.get(key);
+  pendingData.delete(key);
+  pendingWrites.delete(key);
+  if (!data) return null;
+
+  const { id, progress, currentTime, duration, profileId } = data;
+  const safeProfileId: string = profileId || 'adult';
+  const now = new Date().toISOString();
+  const isComplete = progress >= 95;
+
+  let updated: Record<string, unknown> | null = null;
+
+  await writeLibrary<Record<string, unknown>>(lib => {
+    const idx = lib.findIndex(m => m.id === id);
+    if (idx === -1) return lib;
+
+    const item = lib[idx];
+
+    const profileEntry: ProfileProgressEntry = {
+      progress: isComplete ? 0 : progress,
+      lastWatchedAt: now,
+      ...(currentTime !== undefined && { watchedSeconds: isComplete ? 0 : currentTime }),
+      ...(duration !== undefined && { totalSeconds: duration }),
+      ...(isComplete && { watchedAt: now }),
+    };
+
+    const existingProfileProgress =
+      (item.profileProgress as Record<string, ProfileProgressEntry> | undefined) ?? {};
+    const profileProgress: Record<string, ProfileProgressEntry> = {
+      ...existingProfileProgress,
+      [safeProfileId]: profileEntry,
+    };
+
+    const adultEntry = safeProfileId === 'adult'
+      ? profileEntry
+      : (existingProfileProgress['adult'] ?? profileEntry);
+
+    updated = {
+      ...item,
+      profileProgress,
+      watchProgress: adultEntry.progress,
+      lastWatchedAt: adultEntry.lastWatchedAt,
+      ...(adultEntry.watchedSeconds !== undefined && { watchedSeconds: adultEntry.watchedSeconds }),
+      ...(adultEntry.totalSeconds !== undefined && { totalSeconds: adultEntry.totalSeconds }),
+      ...(adultEntry.watchedAt && { watchedAt: adultEntry.watchedAt }),
+    };
+    lib[idx] = updated!;
+    return lib;
+  });
+
+  return updated;
 }
 
 export default async function handler(req: Request, res: Response) {
@@ -53,61 +130,92 @@ export default async function handler(req: Request, res: Response) {
       return res.status(400).json({ error: 'progress (number) is required' });
     }
 
-    const safeProfileId: string = profileId || 'adult';
-    const now = new Date().toISOString();
+    const key = `${id}:${profileId || 'adult'}`;
     const isComplete = progress >= 95;
 
-    let updated: Record<string, unknown> | null = null;
+    // Always flush immediately on completion (>= 95%) so the final position
+    // is never lost. For in-progress updates, debounce to reduce write frequency.
+    if (isComplete) {
+      // Cancel any pending debounced write for this item
+      const existing = pendingWrites.get(key);
+      if (existing) {
+        clearTimeout(existing);
+        pendingWrites.delete(key);
+        pendingData.delete(key);
+      }
 
-    await writeLibrary<Record<string, unknown>>(lib => {
-      const idx = lib.findIndex(m => m.id === id);
-      if (idx === -1) return lib;
+      // Write immediately
+      const safeProfileId = profileId || 'adult';
+      const now = new Date().toISOString();
+      let updated: Record<string, unknown> | null = null;
 
-      const item = lib[idx];
+      await writeLibrary<Record<string, unknown>>(lib => {
+        const idx = lib.findIndex(m => m.id === id);
+        if (idx === -1) return lib;
+        const item = lib[idx];
 
-      // Build the per-profile progress entry
-      const profileEntry: ProfileProgressEntry = {
-        progress: isComplete ? 0 : progress,
-        lastWatchedAt: now,
-        ...(currentTime !== undefined && { watchedSeconds: isComplete ? 0 : currentTime }),
-        ...(duration !== undefined && { totalSeconds: duration }),
-        ...(isComplete && { watchedAt: now }),
-      };
+        const profileEntry: ProfileProgressEntry = {
+          progress: 0,
+          lastWatchedAt: now,
+          watchedSeconds: 0,
+          ...(duration !== undefined && { totalSeconds: duration }),
+          watchedAt: now,
+        };
 
-      // Merge into profileProgress map
-      const existingProfileProgress =
-        (item.profileProgress as Record<string, ProfileProgressEntry> | undefined) ?? {};
-      const profileProgress: Record<string, ProfileProgressEntry> = {
-        ...existingProfileProgress,
-        [safeProfileId]: profileEntry,
-      };
+        const existingProfileProgress =
+          (item.profileProgress as Record<string, ProfileProgressEntry> | undefined) ?? {};
+        const profileProgress = { ...existingProfileProgress, [safeProfileId]: profileEntry };
 
-      // Keep top-level fields in sync with the adult profile for backwards compat
-      // (Jellyfin API, startupCleanup, and any direct reads use these)
-      const adultEntry = safeProfileId === 'adult'
-        ? profileEntry
-        : (existingProfileProgress['adult'] ?? profileEntry);
+        const adultEntry = safeProfileId === 'adult'
+          ? profileEntry
+          : (existingProfileProgress['adult'] ?? profileEntry);
 
-      updated = {
-        ...item,
-        profileProgress,
-        // Top-level fields mirror adult profile
-        watchProgress: adultEntry.progress,
-        lastWatchedAt: adultEntry.lastWatchedAt,
-        ...(adultEntry.watchedSeconds !== undefined && { watchedSeconds: adultEntry.watchedSeconds }),
-        ...(adultEntry.totalSeconds !== undefined && { totalSeconds: adultEntry.totalSeconds }),
-        ...(adultEntry.watchedAt && { watchedAt: adultEntry.watchedAt }),
-      };
-      lib[idx] = updated!;
-      return lib;
-    });
+        updated = {
+          ...item,
+          profileProgress,
+          watchProgress: adultEntry.progress,
+          lastWatchedAt: adultEntry.lastWatchedAt,
+          watchedSeconds: adultEntry.watchedSeconds ?? 0,
+          ...(adultEntry.totalSeconds !== undefined && { totalSeconds: adultEntry.totalSeconds }),
+          watchedAt: adultEntry.watchedAt,
+        };
+        lib[idx] = updated!;
+        return lib;
+      });
 
-    if (!updated) {
-      return res.status(404).json({ error: 'Media item not found' });
+      if (!updated) return res.status(404).json({ error: 'Media item not found' });
+      return res.json(updated);
     }
 
-    res.json(updated);
+    // In-progress update — debounce
+    // Store the latest data (overwrites any pending write for this key)
+    pendingData.set(key, {
+      id,
+      progress,
+      currentTime,
+      duration,
+      profileId: profileId || 'adult',
+      resolve: () => {},
+      reject: () => {},
+    });
+
+    // Reset the debounce timer
+    const existing = pendingWrites.get(key);
+    if (existing) clearTimeout(existing);
+
+    pendingWrites.set(key, setTimeout(async () => {
+      try {
+        await flushWrite(key);
+      } catch (err) {
+        console.error('[progress] Debounced write failed:', err);
+      }
+    }, DEBOUNCE_MS));
+
+    // Respond immediately — the write will happen in the background
+    res.json({ ok: true, debounced: true });
+
   } catch (error) {
     res.status(500).json({ error: 'Failed to update progress', message: String(error) });
   }
 }
+

@@ -18,6 +18,7 @@
 import type { Request, Response } from 'express';
 import http from 'http';
 import { URL } from 'url';
+import { requireAuth } from '../../../authMiddleware.js';
 
 // ── UPnP SOAP helpers ─────────────────────────────────────────────────────────
 
@@ -127,6 +128,8 @@ async function getAVTransportControlUrl(location: string): Promise<string | null
 const AV_TRANSPORT = 'urn:schemas-upnp-org:service:AVTransport:1';
 
 export default async function handler(req: Request, res: Response) {
+  if (!requireAuth(req, res)) return;
+
   const { deviceLocation, streamUrl, title } = req.body as {
     deviceLocation?: string;
     streamUrl?: string;

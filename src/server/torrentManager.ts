@@ -22,6 +22,7 @@ import { writeLibrary } from './libraryStore.js';
 import { createJob } from './transcodeStore.js';
 import { transcodeFile } from './transcodeWorker.js';
 import { fetchOMDB } from './mediaUtils.js';
+import { upsertJob, updateJobStatus, getAllPersistedJobs } from './downloadJobStore.js';
 
 const UPLOADS_DIR = path.resolve('./uploads');
 if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
@@ -61,9 +62,39 @@ export function getJob(jobId: string): TorrentJob | undefined {
 }
 
 export function getAllJobs(): TorrentJob[] {
-  return Array.from(jobs.values()).sort(
+  // Merge in-memory jobs with persisted jobs from disk.
+  // In-memory jobs take precedence (they have live progress/speed/etc).
+  const persisted = getAllPersistedJobs()
+    .filter(j => j.backend === 'webtorrent')
+    .map(j => ({
+      jobId: j.jobId,
+      mediaId: '',
+      title: j.title,
+      quality: j.quality,
+      type: j.type as 'movie' | 'series',
+      season: j.season,
+      episode: j.episode,
+      status: j.status as TorrentJobStatus,
+      progress: j.status === 'done' ? 100 : 0,
+      downloadSpeed: 0,
+      uploadSpeed: 0,
+      peers: 0,
+      eta: 0,
+      addedAt: j.addedAt,
+      completedAt: j.completedAt,
+      infoHash: j.infoHash,
+      imdbId: j.imdbId,
+      poster: j.poster,
+    }));
+
+  const inMemoryIds = new Set(jobs.keys());
+  const merged = [...Array.from(jobs.values()).sort(
     (a, b) => new Date(b.addedAt).getTime() - new Date(a.addedAt).getTime()
-  );
+  )];
+  for (const p of persisted) {
+    if (!inMemoryIds.has(p.jobId)) merged.push(p);
+  }
+  return merged;
 }
 
 export function getActiveJobs(): TorrentJob[] {
@@ -287,6 +318,7 @@ export async function startTorrentDownload(params: {
           jFinal.status = 'done';
           jFinal.progress = 100;
           jFinal.completedAt = new Date().toISOString();
+          updateJobStatus(jobId, 'done', jFinal.completedAt);
         }
 
         resolve();
@@ -303,6 +335,7 @@ export async function startTorrentDownload(params: {
     if (j) {
       j.status = 'error';
       j.error = err instanceof Error ? err.message : String(err);
+      updateJobStatus(jobId, 'error', new Date().toISOString());
     }
     console.error(`[torrent] Download failed for "${title}":`, err);
   }
@@ -350,6 +383,22 @@ export function queueDownload(params: {
   };
 
   jobs.set(jobId, job);
+
+  // Persist to disk so job survives server restarts
+  upsertJob({
+    jobId,
+    infoHash: params.infoHash,
+    title: params.title,
+    quality: params.quality,
+    type: params.type,
+    season: params.season,
+    episode: params.episode,
+    status: 'queued',
+    addedAt: job.addedAt,
+    poster: params.poster,
+    imdbId: params.imdbId,
+    backend: 'webtorrent',
+  });
 
   // Fire and forget — runs in background
   startTorrentDownload({ jobId, mediaId, ...params }).catch(err => {
