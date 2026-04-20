@@ -272,29 +272,47 @@ function EditModal({ profile, onClose, onSave, onSetPin, onClearPin, onVerifyPin
 
         {/* Kids mode toggle */}
         {!profile?.isBuiltIn && (
-          <div className="mb-5 flex items-center justify-between bg-background rounded-lg px-3 py-2.5 border border-border">
-            <div>
-              <p className="text-sm text-foreground font-medium">Kids Mode</p>
-              <p className="text-xs text-muted-foreground">Only shows G and PG rated content</p>
-            </div>
+          <div className="mb-5 rounded-xl border border-yellow-500/25 bg-yellow-500/5 overflow-hidden">
+            <div className="flex items-center justify-between px-3 py-2.5">
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-yellow-400 flex-shrink-0" />
+                <div>
+                  <p className="text-sm text-foreground font-medium">Kids Mode</p>
+                  <p className="text-xs text-muted-foreground">Restricts to G, PG, TV-Y, TV-Y7, TV-G, TV-PG only</p>
+                </div>
+              </div>
             <button
               onClick={() => setRestricted(r => !r)}
-              className={`relative w-10 h-6 rounded-full transition-colors ${restricted ? 'bg-yellow-500' : 'bg-muted'}`}
+              className={`relative w-10 h-6 rounded-full transition-colors flex-shrink-0 ${restricted ? 'bg-yellow-500' : 'bg-muted'}`}
             >
               <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${restricted ? 'translate-x-4' : ''}`} />
             </button>
           </div>
+          {restricted && (
+            <div className="px-3 pb-3 text-[11px] text-yellow-400/80 leading-relaxed">
+              This profile will only see G, PG, TV-Y, TV-Y7, TV-G and TV-PG content.
+              Any attempt to open restricted content shows a block screen.
+              Set a PIN below to let a parent temporarily unlock it.
+            </div>
+          )}
+        </div>
         )}
 
-        {/* PIN management (edit mode only, non-kids) */}
-        {!isCreate && !profile?.restricted && (
+        {/* PIN management — shown for all non-built-in profiles in edit mode */}
+        {!isCreate && (
           <div className="mb-5 border border-border rounded-lg overflow-hidden">
             <div className="flex items-center justify-between px-3 py-2.5 bg-background">
               <div className="flex items-center gap-2">
                 {profile?.hasPin ? <Lock className="w-4 h-4 text-primary" /> : <LockOpen className="w-4 h-4 text-muted-foreground" />}
                 <div>
-                  <p className="text-sm text-foreground font-medium">PIN Lock</p>
-                  <p className="text-xs text-muted-foreground">{profile?.hasPin ? 'PIN is set' : 'No PIN set'}</p>
+                  <p className="text-sm text-foreground font-medium">
+                    {profile?.restricted ? 'Parental unlock PIN' : 'Profile PIN lock'}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {profile?.restricted
+                      ? (profile?.hasPin ? 'PIN set — parents can unlock restricted content' : 'No PIN — restricted content is hard-blocked')
+                      : (profile?.hasPin ? 'PIN required to select this profile' : 'No PIN — anyone can select this profile')}
+                  </p>
                 </div>
               </div>
               <button

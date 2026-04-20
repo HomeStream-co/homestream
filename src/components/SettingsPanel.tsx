@@ -626,13 +626,82 @@ export default function SettingsPanel({ onOpenSecurity, onOpenDebug }: SettingsP
                 </div>
               </div>
 
-              {/* ── 7. Adult Profile PIN ── */}
+              {/* ── 7. Parental Controls ── */}
               <div className="border-t border-border/50">
-                <SectionHeader icon={ShieldCheck} label="Adult Profile PIN" />
-                <div className="px-4 pb-4 space-y-3">
-                  <p className="text-[11px] text-muted-foreground">
-                    Require a 4-digit PIN to access the Adult profile from the profile selector.
-                  </p>
+                <SectionHeader icon={ShieldCheck} label="Parental Controls" />
+                <div className="px-4 pb-4 space-y-4">
+
+                  {/* How it works explainer */}
+                  <div className="rounded-xl bg-yellow-500/8 border border-yellow-500/20 p-3 space-y-2">
+                    <p className="text-xs font-semibold text-yellow-400 flex items-center gap-1.5">
+                      <ShieldCheck className="w-3.5 h-3.5" /> How parental controls work
+                    </p>
+                    <ul className="text-[11px] text-muted-foreground space-y-1 leading-relaxed">
+                      <li><span className="text-foreground font-medium">Kids Mode</span> — restricts a profile to G, PG, TV-Y, TV-Y7, TV-G and TV-PG rated content only. Any attempt to open restricted content shows a block screen.</li>
+                      <li><span className="text-foreground font-medium">PIN on a kids profile</span> — lets a parent temporarily unlock restricted content by entering their PIN (30-min session).</li>
+                      <li><span className="text-foreground font-medium">PIN on your adult profile</span> — prevents kids from switching to your profile from the "Who's watching?" screen.</li>
+                    </ul>
+                  </div>
+
+                  {/* Per-profile status cards */}
+                  <div className="space-y-2">
+                    <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-semibold">All profiles</p>
+                    {profiles.map(p => (
+                      <div key={p.id} className="flex items-center gap-3 bg-background rounded-xl px-3 py-2.5 border border-border">
+                        {/* Avatar */}
+                        <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center text-xl flex-shrink-0">
+                          {p.avatar}
+                        </div>
+                        {/* Name + badges */}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-foreground truncate">{p.name}</p>
+                          <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                            {p.restricted ? (
+                              <span className="text-[10px] bg-yellow-500/15 text-yellow-400 border border-yellow-500/20 px-1.5 py-0.5 rounded-full font-semibold flex items-center gap-0.5">
+                                <ShieldCheck className="w-2.5 h-2.5" /> Kids Mode ON
+                              </span>
+                            ) : (
+                              <span className="text-[10px] bg-muted text-muted-foreground px-1.5 py-0.5 rounded-full">
+                                Adult profile
+                              </span>
+                            )}
+                            {p.hasPin ? (
+                              <span className="text-[10px] bg-primary/10 text-primary border border-primary/20 px-1.5 py-0.5 rounded-full font-semibold flex items-center gap-0.5">
+                                <Lock className="w-2.5 h-2.5" /> PIN set
+                              </span>
+                            ) : (
+                              <span className="text-[10px] text-muted-foreground/60 px-1.5 py-0.5 rounded-full border border-border/40">
+                                No PIN
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        {/* Edit link */}
+                        <button
+                          onClick={() => { setOpen(false); navigate('/profiles'); }}
+                          className="text-[11px] text-primary hover:underline flex-shrink-0"
+                        >
+                          Edit
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* CTA to profiles page */}
+                  <button
+                    onClick={() => { setOpen(false); navigate('/profiles'); }}
+                    className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border border-border hover:border-primary/40 hover:bg-primary/5 transition-colors text-sm font-medium text-foreground"
+                  >
+                    <ShieldCheck className="w-4 h-4 text-yellow-400" />
+                    Manage Profiles &amp; Parental Controls
+                  </button>
+
+                  {/* Divider + adult PIN section */}
+                  <div className="border-t border-border/40 pt-3">
+                    <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-semibold mb-2">Adult profile PIN</p>
+                    <p className="text-[11px] text-muted-foreground mb-3">
+                      Require a PIN to switch to the Adult profile from the "Who's watching?" screen — prevents kids from accessing it.
+                    </p>
 
                   {/* Status + toggle */}
                   <div className="flex items-center justify-between">
@@ -722,6 +791,7 @@ export default function SettingsPanel({ onOpenSecurity, onOpenDebug }: SettingsP
                       </div>
                     </div>
                   )}
+                  </div>{/* end adult PIN pt-3 wrapper */}
                 </div>
               </div>
 
