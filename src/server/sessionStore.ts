@@ -62,9 +62,10 @@ function pruneExpired(sessions: Record<string, number>): Record<string, number> 
 enqueueWrite(pruneExpired);
 
 // Prune every hour at runtime
+// .unref() so this timer never prevents a clean process exit (SIGTERM/SIGINT)
 setInterval(() => {
   enqueueWrite(pruneExpired);
-}, 60 * 60 * 1000);
+}, 60 * 60 * 1000).unref();
 
 // ── Public API ────────────────────────────────────────────────────────────────
 

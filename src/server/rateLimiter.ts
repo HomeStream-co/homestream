@@ -74,6 +74,7 @@ export function getFailureDelay(ns: string, ip: string, opts: DelayOptions): num
 }
 
 // Clean up stale buckets every 30 minutes
+// .unref() so this timer never prevents a clean process exit (SIGTERM/SIGINT)
 setInterval(() => {
   const cutoff = Date.now() - 60 * 60 * 1000; // 1 hour
   for (const nsMap of store.values()) {
@@ -81,4 +82,4 @@ setInterval(() => {
       if (bucket.windowStart < cutoff) nsMap.delete(ip);
     }
   }
-}, 30 * 60 * 1000);
+}, 30 * 60 * 1000).unref();

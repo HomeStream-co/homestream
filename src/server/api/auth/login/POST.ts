@@ -78,12 +78,13 @@ function getFailureDelay(ip: string): number {
 }
 
 // Clean up old buckets every 30 minutes
+// .unref() so this timer never prevents a clean process exit (SIGTERM/SIGINT)
 setInterval(() => {
   const cutoff = Date.now() - RATE_WINDOW_MS;
   for (const [ip, bucket] of rateBuckets) {
     if (bucket.windowStart < cutoff) rateBuckets.delete(ip);
   }
-}, 30 * 60 * 1000);
+}, 30 * 60 * 1000).unref();
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 

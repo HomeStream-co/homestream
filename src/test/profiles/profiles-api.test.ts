@@ -8,7 +8,6 @@
  *   PATCH  /api/profiles/:id
  *   DELETE /api/profiles/:id
  *   POST   /api/profiles/:id/pin   (set / verify / clear)
- *   POST   /api/profiles/:id/verify-pin
  *
  * Strategy: vi.mock() profilesStore so handlers never touch disk.
  * Each test controls exactly what the store returns/throws.
@@ -48,7 +47,6 @@ const { default: getOneHandler }    = await import('../../server/api/profiles/[i
 const { default: patchHandler }     = await import('../../server/api/profiles/[id]/PATCH');
 const { default: deleteHandler }    = await import('../../server/api/profiles/[id]/DELETE');
 const { default: pinHandler }       = await import('../../server/api/profiles/[id]/pin/POST');
-const { default: verifyPinHandler } = await import('../../server/api/profiles/[id]/verify-pin/POST');
 
 // Reset all mocks between tests to avoid call-count bleed
 afterEach(() => { vi.clearAllMocks(); });
@@ -392,51 +390,5 @@ describe('POST /api/profiles/:id/pin', () => {
     const res = mockRes();
     await pinHandler(req as never, res as never);
     expect(res.statusCode).toBe(404);
-  });
-});
-
-// ── POST /api/profiles/:id/verify-pin ────────────────────────────────────────
-
-describe('POST /api/profiles/:id/verify-pin', () => {
-  beforeEach(() => {
-    store.verifyPin.mockResolvedValue(true);
-  });
-
-  it('returns { valid: true } for correct PIN', async () => {
-    const req = mockReq({ params: { id: 'profile_1' }, body: { pin: '1234' } });
-    const res = mockRes();
-    await verifyPinHandler(req as never, res as never);
-    expect((res.body as { valid: boolean }).valid).toBe(true);
-  });
-
-  it('returns { valid: false } for wrong PIN', async () => {
-    store.verifyPin.mockResolvedValue(false);
-    const req = mockReq({ params: { id: 'profile_1' }, body: { pin: '0000' } });
-    const res = mockRes();
-    await verifyPinHandler(req as never, res as never);
-    expect((res.body as { valid: boolean }).valid).toBe(false);
-  });
-
-  it('returns 400 when pin is missing', async () => {
-    const req = mockReq({ params: { id: 'profile_1' }, body: {} });
-    const res = mockRes();
-    await verifyPinHandler(req as never, res as never);
-    expect(res.statusCode).toBe(400);
-  });
-
-  it('returns 404 when profile not found', async () => {
-    store.verifyPin.mockRejectedValue(new Error('Profile not found'));
-    const req = mockReq({ params: { id: 'ghost' }, body: { pin: '1234' } });
-    const res = mockRes();
-    await verifyPinHandler(req as never, res as never);
-    expect(res.statusCode).toBe(404);
-  });
-
-  it('returns 500 on unexpected error', async () => {
-    store.verifyPin.mockRejectedValue(new Error('disk error'));
-    const req = mockReq({ params: { id: 'profile_1' }, body: { pin: '1234' } });
-    const res = mockRes();
-    await verifyPinHandler(req as never, res as never);
-    expect(res.statusCode).toBe(500);
   });
 });

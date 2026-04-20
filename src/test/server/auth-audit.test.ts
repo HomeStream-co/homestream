@@ -54,10 +54,9 @@ const OPEN_ENDPOINTS = new Set([
   'src/server/api/jellyfin/Users/GET.ts',
   'src/server/api/jellyfin/Users/[userId]/GET.ts',
 
-  // Profile PIN endpoints — must be open so the PIN numpad can verify
+  // Profile PIN endpoint — must be open so the PIN numpad can verify
   // without a session (the PIN IS the auth for profile switching)
   'src/server/api/profiles/[id]/pin/POST.ts',
-  'src/server/api/profiles/[id]/verify-pin/POST.ts',
 ]);
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
