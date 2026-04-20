@@ -160,6 +160,14 @@ function startServer() {
     pushLog(`Server ready at http://localhost:${SERVER_PORT}`, 'success');
     pushLog(`LAN address: http://${getLanIp()}:${SERVER_PORT}`, 'success');
     sendStatus();
+
+    // On first run (no config file yet) automatically open the setup wizard
+    // so the user doesn't have to figure out what to do next.
+    const configPath = path.resolve('./homestream-config.json');
+    const isFirstRun = !fs.existsSync(configPath);
+    const startPage = isFirstRun ? '/setup' : '/';
+    shell.openExternal(`http://localhost:${SERVER_PORT}${startPage}`);
+    if (isFirstRun) pushLog('First run detected — opening setup wizard in browser', 'info');
   }).catch(err => {
     pushLog(`Server failed to start: ${err.message}`, 'error');
     serverRunning = false;
@@ -180,7 +188,8 @@ function waitForServer(timeout = SERVER_READY_TIMEOUT) {
   return new Promise((resolve, reject) => {
     const start = Date.now();
     const check = () => {
-      http.get(`http://localhost:${SERVER_PORT}/api/media`, res => {
+      // /api/health is intentionally open (no auth required) — safe to poll here
+      http.get(`http://localhost:${SERVER_PORT}/api/health`, res => {
         if (res.statusCode === 200) resolve(true);
         else retry();
       }).on('error', retry);

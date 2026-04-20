@@ -1,178 +1,97 @@
-# 🎬 HomeStream
+# HomeStream
 
-**Self-hosted Netflix-style family media streaming** — watch your personal movie and TV collection from any device on your home network (or over the internet with a reverse proxy).
-
----
-
-## 📸 Screenshots
-
-| Home — Hero Banner & Genre Carousels | Video Player — Custom Controls |
-|:---:|:---:|
-| ![HomeStream home page showing hero banner with featured movie, Continue Watching row, and lazy-loaded genre carousels](docs/screenshots/home.png) | ![Full-screen video player with custom seek bar, speed selector, audio track switcher, and skip-intro button](docs/screenshots/player.png) |
-
-| Library — Grid View with Filters | Downloads — qBittorrent + WebTorrent |
-|:---:|:---:|
-| ![Library page showing movie/TV grid with codec badges, transcode progress indicators, and filter controls](docs/screenshots/library.png) | ![Downloads page showing active torrents with progress bars, speed indicators, and ETA](docs/screenshots/downloads.png) |
-
-| Setup Wizard — 8-Step Onboarding | Stats Dashboard — Codec & Storage |
-|:---:|:---:|
-| ![8-step setup wizard showing media folder, qBittorrent, Jellyfin, VPN, and API key configuration with REQUIRED/OPTIONAL badges](docs/screenshots/setup.png) | ![Stats dashboard showing codec breakdown bar chart, disk usage, resolution split, watch time, and live download speed](docs/screenshots/stats.png) |
-
-| Discover — TMDB Trending + Trailers | Phone Remote — WebSocket Touch UI |
-|:---:|:---:|
-| ![Discover page with Movies/TV/Search tabs, TMDB trending cards, and trailer modal overlay](docs/screenshots/discover.png) | ![Mobile-optimized phone remote with play/pause, seek, volume, and speed controls](docs/screenshots/remote.png) |
-
-> **Note:** To add real screenshots, run HomeStream locally, take screenshots of each page, and save them to `docs/screenshots/`. The filenames above match the expected paths.
+**Self-hosted Netflix-style family media streaming** — watch your personal movie and TV collection from any device on your home network.
 
 ---
 
-## ✨ Features
+## Install (Desktop App — Easiest)
+
+HomeStream runs as a native desktop app on Windows, macOS, and Linux.  
+No Docker, no command line, no configuration files needed.
+
+### Windows
+
+1. Download **`HomeStream-Setup-x.x.x.exe`** from the [Releases page](https://github.com/homestream-app/homestream/releases/latest)
+2. Double-click the installer and follow the prompts
+3. HomeStream launches automatically and opens the setup wizard in your browser
+
+### macOS
+
+1. Download **`HomeStream-x.x.x.dmg`** from the [Releases page](https://github.com/homestream-app/homestream/releases/latest)
+2. Open the `.dmg` and drag **HomeStream** to your Applications folder
+3. Open HomeStream from Applications — the setup wizard opens in your browser
+
+> **macOS Gatekeeper:** If you see "unidentified developer", right-click the app → Open → Open anyway.
+
+### Linux
+
+1. Download **`HomeStream-x.x.x.AppImage`** from the [Releases page](https://github.com/homestream-app/homestream/releases/latest)
+2. Make it executable and run it:
+   ```bash
+   chmod +x HomeStream-*.AppImage
+   ./HomeStream-*.AppImage
+   ```
+3. The setup wizard opens in your browser automatically
+
+> A `.deb` package is also available for Debian/Ubuntu: `sudo dpkg -i HomeStream-*.deb`
+
+---
+
+## First Run — Setup Wizard
+
+On first launch, HomeStream automatically opens a **setup wizard** in your browser that walks you through:
+
+1. **Media Folder** — point HomeStream at your video files
+2. **qBittorrent** *(optional)* — connect your torrent client for downloads
+3. **Jellyfin** *(optional)* — enable Jellyfin API compatibility for TV apps
+4. **VPN** *(optional)* — configure VPN kill-switch for downloads
+5. **API Keys** *(optional)* — OMDB/TMDB for metadata, Gemini for AI features
+6. **HTTPS** *(optional)* — enable HTTPS for remote access
+
+Everything is optional except the media folder. You can skip any step and configure it later in Settings.
+
+---
+
+## Features
 
 | Feature | Details |
 |---|---|
-| **Video Player** | Custom controls, ±10s seek, speed 0.5×–3×, keyboard shortcuts, TV D-pad navigation |
-| **Closed Captions** | Auto-fetch EN/ES WebVTT, SRT upload, one-key CC cycling (C key) |
+| **Video Player** | Custom controls, ±10s seek, speed 0.5×–3×, keyboard shortcuts |
+| **Closed Captions** | Auto-fetch EN/ES WebVTT, SRT upload, one-key CC cycling |
 | **Resume Playback** | Saves progress every 10s; resumes to exact second |
-| **Profiles** | Adult + Kids (G/PG filter); optional 4-digit PIN lock on Adult profile |
-| **Admin Password** | Optional login gate for the whole app |
-| **Watch History** | Full history page with per-item removal and clear-all |
+| **Multi-Profile** | Up to 6 profiles; Kids Mode filters G/PG content only |
+| **PIN Lock** | Optional 4-digit PIN on Adult profiles |
+| **Watch History** | Full history with per-item removal |
 | **Watchlist** | Bookmark titles to watch later |
 | **AI Enrichment** | Gemini-powered tags, mood, themes, summaries, similar titles |
 | **AI Chat** | Ask for recommendations from your library |
-| **Torrent Downloads** | Stremio/Torrentio integration + qBittorrent support |
-| **Security Scanning** | 4-layer scan: extension check → VirusTotal → magic bytes → archive inspection |
+| **Torrent Downloads** | Stremio/Torrentio + qBittorrent integration |
+| **Security Scanning** | Extension check → VirusTotal → magic bytes → archive inspection |
 | **DLNA Casting** | Cast to any DLNA/UPnP TV on your network |
-| **Chromecast** | Cast to Chromecast devices via the Google Cast SDK |
-| **Phone Remote** | WebSocket touch remote — control playback from your phone via QR code |
-| **Stats Dashboard** | Codec breakdown, storage usage, resolution split, watch time, live download speed |
+| **Chromecast** | Cast to Chromecast devices |
+| **Phone Remote** | WebSocket touch remote — scan QR code from your phone |
+| **Stats Dashboard** | Codec breakdown, storage, resolution split, watch time |
 | **Transcoding** | FFmpeg H.264 re-encode for browser compatibility; HEVC via HLS |
 | **Jellyfin API** | Compatible with Infuse, Jellyfin apps, and other Jellyfin clients |
-| **Dark Themes** | 6 built-in themes (Netflix Red, Ocean Blue, Forest Green, etc.) |
+| **Dark Themes** | 6 built-in themes |
 
 ---
 
-## 🐳 Docker Deployment (Recommended)
+## Media Folder Structure
 
-### Prerequisites
-
-- [Docker](https://docs.docker.com/get-docker/) ≥ 24
-- [Docker Compose](https://docs.docker.com/compose/install/) ≥ 2.20
-- A folder of video files on your host machine
-
-### 1. Clone the repository
-
-```bash
-git clone https://github.com/homestream-app/homestream.git
-cd homestream
-```
-
-### 2. Create your `docker-compose.yml`
-
-```yaml
-version: "3.9"
-
-services:
-  homestream:
-    image: homestream:latest          # or build: . if building locally
-    build: .
-    container_name: homestream
-    restart: unless-stopped
-    ports:
-      - "8080:5173"                   # host:container — change 8080 to any free port
-    volumes:
-      - /your/media/folder:/media     # ← point this at your video library
-      - homestream-data:/data         # persistent config + library database
-    environment:
-      # ── Required ──────────────────────────────────────────────────────────
-      MEDIA_DIR: /media               # path inside the container
-
-      # ── Optional API keys (all features work without them) ────────────────
-      OMDB_API_KEY: ""                # https://www.omdbapi.com/apikey.aspx (free)
-      TMDB_API_KEY: ""                # https://www.themoviedb.org/settings/api (free)
-      GEMINI_API_KEY: ""              # https://aistudio.google.com/app/apikey (free tier)
-      VIRUSTOTAL_API_KEY: ""          # https://www.virustotal.com/gui/my-apikey (free)
-
-      # ── Security ──────────────────────────────────────────────────────────
-      ADMIN_PASSWORD: ""              # leave blank to disable login gate
-                                      # set to a strong password to require login
-
-      # ── qBittorrent (optional) ────────────────────────────────────────────
-      QBITTORRENT_URL: ""             # e.g. http://192.168.1.100:8080
-      QBITTORRENT_USER: ""
-      QBITTORRENT_PASS: ""
-
-      # ── AI provider (optional) ────────────────────────────────────────────
-      AI_PROVIDER: "gemini"           # "gemini" or "ollama"
-      OLLAMA_URL: ""                  # e.g. http://host.docker.internal:11434
-      OLLAMA_MODEL: "llama3"
-
-volumes:
-  homestream-data:
-```
-
-### 3. Build and start
-
-```bash
-# Build the image (first time or after code changes)
-docker compose build
-
-# Start in the background
-docker compose up -d
-
-# View logs
-docker compose logs -f homestream
-```
-
-### 4. Open in your browser
+HomeStream scans your media folder recursively. Supported formats: `.mp4`, `.mkv`, `.avi`, `.webm`, `.mov`, `.m4v`
 
 ```
-http://localhost:8080
-```
-
-Or replace `localhost` with your server's IP address to access from other devices on your network.
-
----
-
-## 🔧 Configuration Reference
-
-All configuration is done via environment variables or the in-app **Settings** panel (⚙️ icon in the header).
-
-| Variable | Default | Description |
-|---|---|---|
-| `MEDIA_DIR` | `/media` | Path to your video library inside the container |
-| `ADMIN_PASSWORD` | *(blank)* | If set, requires login before accessing the app |
-| `OMDB_API_KEY` | *(blank)* | Fetches movie metadata (title, poster, rating, plot) |
-| `TMDB_API_KEY` | *(blank)* | Additional metadata + TMDB posters |
-| `GEMINI_API_KEY` | *(blank)* | AI enrichment + chat recommendations |
-| `VIRUSTOTAL_API_KEY` | *(blank)* | Hash-based malware scan on downloads |
-| `QBITTORRENT_URL` | *(blank)* | qBittorrent Web UI URL |
-| `QBITTORRENT_USER` | *(blank)* | qBittorrent username |
-| `QBITTORRENT_PASS` | *(blank)* | qBittorrent password |
-| `AI_PROVIDER` | `gemini` | `gemini` or `ollama` |
-| `OLLAMA_URL` | *(blank)* | Ollama server URL (if using local AI) |
-| `OLLAMA_MODEL` | `llama3` | Ollama model name |
-
----
-
-## 📁 Media Library Structure
-
-HomeStream scans your media folder recursively. Supported formats:
-
-```
-/media
+/your-media-folder
 ├── movies/
 │   ├── Inception (2010).mkv
 │   ├── The Dark Knight (2008).mp4
 │   └── ...
-├── tv/
-│   ├── Breaking Bad S01E01.mkv
-│   ├── Breaking Bad S01E02.mkv
-│   └── ...
-└── any-other-folder/
-    └── video.avi
+└── tv/
+    ├── Breaking Bad S01E01.mkv
+    ├── Breaking Bad S01E02.mkv
+    └── ...
 ```
-
-**Supported formats:** `.mp4`, `.mkv`, `.avi`, `.webm`, `.mov`, `.m4v`
 
 **Naming tips for best metadata matching:**
 - Movies: `Title (Year).ext` → `Inception (2010).mkv`
@@ -180,110 +99,85 @@ HomeStream scans your media folder recursively. Supported formats:
 
 ---
 
-## 🔒 Security
+## Docker Deployment (Headless / Server)
 
-### Admin Password
+If you want to run HomeStream on a server without a desktop, use Docker:
 
-Set `ADMIN_PASSWORD` to require a login before anyone can access HomeStream. Useful when exposing the app to the internet via a reverse proxy.
+```yaml
+# docker-compose.yml
+version: "3.9"
+services:
+  homestream:
+    build: .
+    container_name: homestream
+    restart: unless-stopped
+    ports:
+      - "8080:5173"
+    volumes:
+      - /your/media/folder:/media
+      - homestream-data:/data
+    environment:
+      MEDIA_DIR: /media
+      ADMIN_PASSWORD: ""        # set a strong password if exposing to internet
+      OMDB_API_KEY: ""          # https://www.omdbapi.com/apikey.aspx (free)
+      TMDB_API_KEY: ""          # https://www.themoviedb.org/settings/api (free)
+      GEMINI_API_KEY: ""        # https://aistudio.google.com/app/apikey (free)
 
-### Adult Profile PIN
-
-In **Settings → Adult Profile PIN**, set a 4-digit PIN to prevent switching to the Adult profile without entering the PIN. Useful for shared family devices.
-
-### Kids Profile
-
-The Kids profile automatically filters out any content rated above PG (TV-PG, PG-13, R, etc.) across all pages.
-
----
-
-## 🌐 Exposing to the Internet (Optional)
-
-To access HomeStream outside your home network, use a reverse proxy with HTTPS:
-
-### Nginx example
-
-```nginx
-server {
-    listen 443 ssl;
-    server_name homestream.yourdomain.com;
-
-    ssl_certificate     /etc/letsencrypt/live/homestream.yourdomain.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/homestream.yourdomain.com/privkey.pem;
-
-    # Increase timeout for large video streams
-    proxy_read_timeout 3600;
-    proxy_send_timeout 3600;
-
-    # Allow large uploads
-    client_max_body_size 50G;
-
-    location / {
-        proxy_pass         http://localhost:8080;
-        proxy_http_version 1.1;
-        proxy_set_header   Upgrade $http_upgrade;
-        proxy_set_header   Connection "upgrade";
-        proxy_set_header   Host $host;
-        proxy_set_header   X-Real-IP $remote_addr;
-        proxy_buffering    off;   # required for video streaming
-    }
-}
+volumes:
+  homestream-data:
 ```
-
-> **Security tip:** Always set `ADMIN_PASSWORD` when exposing HomeStream to the internet.
-
----
-
-## 🛠️ Building from Source
-
-If you want to run without Docker:
-
-### Requirements
-
-- Node.js ≥ 22
-- npm ≥ 10
-
-> **FFmpeg is bundled automatically.** The `ffmpeg-static` package ships a pre-built FFmpeg binary for your platform — no manual install needed. If you prefer to use a system FFmpeg instead, set the `FFMPEG_PATH` environment variable to its path.
-
-### Steps
 
 ```bash
-# Install dependencies
-npm install
-
-# Development server (hot reload)
-npm run dev
-
-# Production build
-npm run build
-
-# Start production server
-node dist/server.bundle.mjs
+docker compose up -d
+# Open http://localhost:8080
 ```
 
-Set environment variables in a `.env` file at the project root (same variables as the Docker table above).
+---
+
+## Security
+
+- **Admin Password** — set in Settings to require login before accessing the app
+- **Profile PINs** — 4-digit PIN to lock Adult profiles on shared devices
+- **Kids Mode** — automatically filters content rated above PG
+
+> Always set an Admin Password if exposing HomeStream to the internet.
 
 ---
 
-## 🐛 Troubleshooting
+## Troubleshooting
 
-### Video won't play / shows transcoding spinner
+**Video won't play / shows transcoding spinner**
+FFmpeg is re-encoding the file for browser compatibility. This happens once per file. If stuck, go to **Settings → Debug Panel → Fix Stuck Transcodes**.
 
-FFmpeg is re-encoding the file for browser compatibility. This happens once per file. Check progress in **Library → transcoding indicator**. If it's stuck, open **Settings → Debug Panel → Fix Stuck Transcodes**.
+**No poster or metadata**
+Add an OMDB API key in **Settings → API Keys**. Free tier: 1,000 requests/day.
 
-### Metadata not loading (no poster / plot)
+**Can't find media files**
+Use **Settings → Scan for New Files** to trigger a manual scan.
 
-Add an OMDB API key in **Settings → API Keys**. Free tier allows 1,000 requests/day.
-
-### Can't find my media files
-
-Check that your `MEDIA_DIR` environment variable matches the container mount path. Use **Settings → Scan for New Files** to trigger a manual scan.
-
-### Health check
-
-Visit `/api/health/full` in your browser for a live status of all 7 subsystems (media scanner, FFmpeg, qBittorrent, AI, captions, security, database).
+**Health check**
+Visit `/api/health` in your browser for a live status of all subsystems.
 
 ---
 
-## 📝 License
+## Building from Source
+
+```bash
+# Clone
+git clone https://github.com/homestream-app/homestream.git
+cd homestream
+
+# macOS / Linux — builds the installer automatically
+bash install.sh
+
+# Windows — builds the installer automatically
+install.bat
+```
+
+> **FFmpeg is bundled automatically** via `ffmpeg-static` — no manual install needed.
+
+---
+
+## License
 
 MIT — use freely, modify freely, no warranty.
