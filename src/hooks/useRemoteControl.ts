@@ -68,7 +68,11 @@ export function useRemoteControl(
     if (!mediaId) return;
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const url = `${protocol}//${window.location.host}/ws/remote?role=screen&mediaId=${encodeURIComponent(mediaId)}`;
+    // Pass session token as query param for environments where cookies
+    // may not be forwarded (e.g. phone remote on LAN).
+    const cookieToken = document.cookie.match(/(?:^|;\s*)hs_session=([^;]+)/)?.[1] ?? '';
+    const tokenParam = cookieToken ? `&token=${encodeURIComponent(cookieToken)}` : '';
+    const url = `${protocol}//${window.location.host}/ws/remote?role=screen&mediaId=${encodeURIComponent(mediaId)}${tokenParam}`;
 
     let ws: WebSocket;
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null;

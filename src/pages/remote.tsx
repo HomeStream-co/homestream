@@ -235,7 +235,11 @@ export default function RemotePage() {
 
   const connect = useCallback(() => {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const url = `${protocol}//${window.location.host}/ws/remote?role=remote&mediaId=*`;
+    // Pass session token as query param — the /remote page may be accessed
+    // from a phone on the same LAN where cookies aren't sent cross-origin.
+    const cookieToken = document.cookie.match(/(?:^|;\s*)hs_session=([^;]+)/)?.[1] ?? '';
+    const tokenParam = cookieToken ? `&token=${encodeURIComponent(cookieToken)}` : '';
+    const url = `${protocol}//${window.location.host}/ws/remote?role=remote&mediaId=*${tokenParam}`;
     const ws = new WebSocket(url);
     wsRef.current = ws;
     setStatus('connecting');
