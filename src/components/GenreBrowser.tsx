@@ -17,7 +17,7 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Star, Download, Bookmark, BookmarkCheck, Play,
-  ChevronLeft, ChevronRight, Loader2, Film, Trophy, Flame,
+  ChevronLeft, ChevronRight, Loader2, Trophy, Flame,
 } from 'lucide-react';
 import { X, Volume2, VolumeX } from 'lucide-react';
 import type { TMDBMovie } from '@/server/tmdbCache';
@@ -236,9 +236,12 @@ function DownloadModal({ target, onClose }: { target: DownloadTarget; onClose: (
       >
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
           <div className="flex items-center gap-3">
-            {target.posterUrl && (
-              <img src={target.posterUrl} alt={target.title} className="w-8 h-12 rounded object-cover" />
-            )}
+            <ImageWithFallback
+              src={target.posterUrl}
+              alt={target.title}
+              className="w-8 h-12 rounded object-cover"
+              fallbackClassName="w-8 h-12 rounded bg-muted"
+            />
             <div>
               <p className="text-sm font-semibold text-foreground">{target.title}</p>
               <p className="text-xs text-muted-foreground capitalize">{target.type}</p>
@@ -321,19 +324,13 @@ function GenreCard({
     <>
       <div className="flex-shrink-0 w-36 sm:w-40 group">
         <div className="relative aspect-[2/3] rounded-xl overflow-hidden bg-muted mb-2">
-          {movie.posterUrl ? (
-            <img
-              src={movie.posterUrl}
-              alt={movie.title}
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-              loading="lazy"
-              onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
-            />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center">
-              <Film className="w-8 h-8 text-muted-foreground/30" />
-            </div>
-          )}
+          <ImageWithFallback
+            src={movie.posterUrl}
+            alt={movie.title}
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+            fallbackClassName="w-full h-full"
+            loading="lazy"
+          />
 
           {/* Hover overlay */}
           <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2 p-2">

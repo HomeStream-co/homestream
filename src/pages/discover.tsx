@@ -556,9 +556,12 @@ function DownloadModal({ target, onClose }: { target: DownloadTarget; onClose: (
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
           <div className="flex items-center gap-3">
-            {target.posterUrl && (
-              <img src={target.posterUrl} alt={target.title} className="w-8 h-12 rounded object-cover" />
-            )}
+            <ImageWithFallback
+              src={target.posterUrl}
+              alt={target.title}
+              className="w-8 h-12 rounded object-cover"
+              fallbackClassName="w-8 h-12 rounded bg-muted"
+            />
             <div>
               <p className="text-sm font-semibold text-foreground">{target.title}</p>
               <p className="text-xs text-muted-foreground capitalize">{target.type} · {target.release_date ? formatDate(target.release_date) : ''}</p>
