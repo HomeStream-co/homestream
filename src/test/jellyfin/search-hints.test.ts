@@ -139,7 +139,22 @@ describe('GET /api/jellyfin/Search/Hints', () => {
       id: `item-${i}`,
       title: `Movie ${i}`,
       type: 'movie' as const,
+      year: '2020',
       genre: ['Action'],
+      poster: '',
+      backdrop: '',
+      imdbRating: '7.0',
+      rated: 'PG',
+      plot: '',
+      filename: `movie-${i}.mp4`,
+      filepath: `/media/movie-${i}.mp4`,
+      addedAt: '2024-01-01T00:00:00.000Z',
+      watchProgress: 0,
+      watchedSeconds: 0,
+      totalSeconds: 0,
+      runtime: 90,
+      director: 'Director',
+      actors: 'Actor',
     }));
 
     const req = mockReq({ query: { searchTerm: 'movie', limit: '999' } });

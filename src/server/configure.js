@@ -153,6 +153,34 @@ export const serverBefore = (server) => {
   // Gzip compression for API JSON responses
   server.use(gzipMiddleware);
 
+  // ── Security headers ──────────────────────────────────────────────────────
+  // HomeStream is a local-network app — CSP is permissive for LAN IPs and
+  // localhost, but still blocks obvious XSS vectors.
+  server.use((req, res, next) => {
+    // Only apply to HTML responses (not API or media streams)
+    if (!req.path.startsWith('/api') && !req.path.startsWith('/api/stream')) {
+      res.set({
+        'X-Content-Type-Options': 'nosniff',
+        'X-Frame-Options': 'SAMEORIGIN',
+        'X-XSS-Protection': '1; mode=block',
+        'Referrer-Policy': 'strict-origin-when-cross-origin',
+        // Permissive CSP for local network — allows LAN IPs, localhost, and
+        // external sources needed for TMDB posters and Google Fonts
+        'Content-Security-Policy': [
+          "default-src 'self'",
+          "script-src 'self' 'unsafe-inline' 'unsafe-eval'", // Vite HMR needs unsafe-eval in dev
+          "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+          "font-src 'self' https://fonts.gstatic.com data:",
+          "img-src 'self' data: blob: https://image.tmdb.org https://img.omdbapi.com https://m.media-amazon.com",
+          "media-src 'self' blob: https://download.blender.org",
+          "connect-src 'self' ws: wss: https://api.themoviedb.org https://torrentio.strem.fun",
+          "frame-ancestors 'none'",
+        ].join('; '),
+      });
+    }
+    next();
+  });
+
   server.use(express.static(join(__dirname, "client"), {
     setHeaders(res, filePath) {
       res.set("Cache-Control", filePath.includes("/assets/")

@@ -150,7 +150,9 @@ export default defineConfig(({ mode }) => ({
 		rollupOptions: {
 			output: {
 				manualChunks: {
-					"react-vendor": ["react", "react-dom"],
+					// Core React runtime — tiny, cached forever
+					"react-vendor": ["react", "react-dom", "react-router-dom"],
+					// Radix UI — large but stable, rarely changes
 					"radix-ui": [
 						"@radix-ui/react-accordion",
 						"@radix-ui/react-alert-dialog",
@@ -179,7 +181,15 @@ export default defineConfig(({ mode }) => ({
 						"@radix-ui/react-toggle-group",
 						"@radix-ui/react-tooltip",
 					],
+					// TanStack Query — data fetching
 					query: ["@tanstack/react-query"],
+					// HLS.js — only loaded on player page, ~300KB raw
+					// Splitting it out means non-player pages never download it
+					"hls": ["hls.js"],
+					// Motion (Framer Motion) — animation library, ~100KB
+					"motion": ["motion"],
+					// Lucide icons — large icon set
+					"icons": ["lucide-react"],
 				},
 			},
 		},

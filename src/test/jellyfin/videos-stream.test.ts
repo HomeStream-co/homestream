@@ -72,9 +72,23 @@ describe('GET /api/jellyfin/Videos/:id/stream', () => {
     mockLibrary = [{
       id: 'special-001',
       title: 'My Movie (2024)',
-      type: 'movie',
+      type: 'movie' as const,
+      year: '2024',
+      genre: ['Drama'],
+      poster: '',
+      backdrop: '',
+      imdbRating: '7.0',
+      rated: 'PG',
+      plot: '',
       filename: 'my movie (2024).mp4',
       filepath: '/media/my movie (2024).mp4',
+      addedAt: '2024-01-01T00:00:00.000Z',
+      watchProgress: 0,
+      watchedSeconds: 0,
+      totalSeconds: 0,
+      runtime: 90,
+      director: 'Director',
+      actors: 'Actor',
     }];
 
     const req = mockReq({ params: { id: 'special-001' } });
