@@ -12,11 +12,11 @@
  */
 
 import fs from 'fs';
-import path from 'path';
 
 // Use persistent storage so the library survives deploys and restarts.
+import { dataPath } from './dataDir.js';
 // Falls back to local path in dev environments without the /private mount.
-const LIBRARY_PATH = fs.existsSync('/private') ? '/private/media-library.json' : path.resolve('./media-library.json');
+const LIBRARY_PATH = dataPath('media-library.json');
 
 // ── Read (always immediate) ───────────────────────────────────────────────────
 

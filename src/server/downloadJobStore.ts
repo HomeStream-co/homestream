@@ -20,9 +20,9 @@
  */
 
 import fs from 'fs';
-import path from 'path';
 
-const JOBS_PATH = fs.existsSync('/private') ? '/private/homestream-downloads.json' : path.resolve('./homestream-downloads.json');
+import { dataPath } from './dataDir.js';
+const JOBS_PATH = dataPath('homestream-downloads.json');
 const RETENTION_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
 // ── Types ─────────────────────────────────────────────────────────────────────

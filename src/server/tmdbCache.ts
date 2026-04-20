@@ -17,10 +17,10 @@ import path from 'path';
 import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 import { getSecret } from '#airo/secrets';
+import { dataDir } from './dataDir.js';
 
 // Use persistent storage so the cache survives deploys and restarts.
-// Falls back to a local dir if /private is not available (e.g. local dev without the mount).
-const CACHE_DIR = fs.existsSync('/private') ? '/private/tmdb-cache' : path.resolve('./tmdb-cache');
+const CACHE_DIR = path.join(dataDir(), 'tmdb-cache');
 
 // Pre-baked cache shipped with the app — used as seed when /private cache is
 // missing or stale so the Discover page always has images on first load.

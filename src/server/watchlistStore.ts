@@ -20,9 +20,9 @@
  */
 
 import fs from 'fs';
-import path from 'path';
 
-const WATCHLIST_PATH = fs.existsSync('/private') ? '/private/homestream-watchlist.json' : path.resolve('./homestream-watchlist.json');
+import { dataPath } from './dataDir.js';
+const WATCHLIST_PATH = dataPath('homestream-watchlist.json');
 
 // ── Read ──────────────────────────────────────────────────────────────────────
 

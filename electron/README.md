@@ -1,105 +1,114 @@
-# HomeStream — Electron Desktop App
+# HomeStream — Desktop App Build Guide
 
-Wraps the HomeStream server + React UI in a native desktop app for Windows, macOS, and Linux.
-No auto-updater — users download new versions manually.
+This directory contains the Electron wrapper that turns HomeStream into a
+native desktop application with a system tray icon, control panel, and
+auto-launch of the setup wizard on first run.
 
-## What it does
+---
 
-- **Control Panel window** — shows server status, LAN URL, start/stop button, live log viewer
-- **System tray icon** — runs in the background; right-click for quick access
-- **Opens in browser** — clicking "Open HomeStream" launches `http://localhost:3000` in the default browser
-- **Phone remote** — LAN URL shown in the control panel; scan the QR code from `/remote`
+## What the .exe does
 
-## Prerequisites
+1. Launches a small **Control Panel** window showing server status + logs
+2. Starts the HomeStream Express server as a background child process
+3. Detects first run → automatically opens `http://localhost:3000/setup` in your browser
+4. Adds a **system tray icon** — right-click to open browser, stop/start server, or quit
+5. Keeps running in the tray when you close the control panel window
 
-- Node.js 22+
-- npm dependencies installed (`npm install`)
-- FFmpeg on PATH (for transcoding features)
+---
 
-## Build Steps
+## Prerequisites (build machine only — NOT needed by end users)
 
-### 1. Build the web app
+| Tool | Version | Notes |
+|------|---------|-------|
+| Node.js | 22+ | https://nodejs.org |
+| npm | 10+ | Comes with Node |
+| Windows | 10/11 | Cross-compile from macOS/Linux is possible but not recommended for .exe |
 
-```bash
-npm run build
+End users need **nothing** pre-installed — FFmpeg is bundled inside the .exe.
+
+---
+
+## Build the Windows installer
+
+```powershell
+# 1. Install dependencies
+npm install
+
+# 2. Build the web app + server bundle, then package as .exe
+npm run electron:win
 ```
 
-This produces `dist/` (frontend) and `dist/server.bundle.mjs` (backend).
+Output files land in `dist-electron/`:
 
-### 2. Build the Electron installer
+| File | Description |
+|------|-------------|
+| `HomeStream-Setup-1.0.0.exe` | NSIS installer — creates Start Menu + Desktop shortcuts |
+| `HomeStream-1.0.0-portable.exe` | Portable — no install needed, run from anywhere |
+| `HomeStream-1.0.0-win.zip` | ZIP archive for manual deployment |
+
+---
+
+## Build for other platforms
 
 ```bash
-# Current platform only:
-npm run electron:build
-
-# Specific platform:
-npm run electron:win    # Windows .exe (NSIS installer)
-npm run electron:mac    # macOS .dmg
+npm run electron:mac    # macOS .dmg (must run on macOS)
 npm run electron:linux  # Linux .AppImage + .deb
+npm run electron:build  # All platforms (requires platform-specific runners)
 ```
 
-Output goes to `dist-electron/`.
+---
 
-## Development (no packaging)
+## Where user data is stored (end user's machine)
 
-Run the Vite dev server first, then launch Electron pointing at it:
+All data files are written to the OS user-data folder — **never** next to the .exe:
 
-```bash
-# Terminal 1
+| OS | Path |
+|----|------|
+| Windows | `%APPDATA%\HomeStream\` |
+| macOS | `~/Library/Application Support/HomeStream/` |
+| Linux | `~/.config/HomeStream/` |
+
+Files stored there:
+- `homestream-config.json` — setup wizard results, API keys
+- `media-library.json` — your media library index
+- `homestream-profiles.json` — user profiles + PINs
+- `homestream-sessions.json` — login sessions
+- `homestream-downloads.json` — download job history
+- `homestream-subscriptions.json` — auto-download subscriptions
+- `tmdb-cache/` — cached TMDB metadata (refreshed every 30 days)
+
+---
+
+## Auto-updater (optional)
+
+By default the auto-updater is **disabled** — the placeholder `owner`/`repo`
+values in `electron-builder.yml` are detected and skipped gracefully.
+
+To enable it:
+1. Create a GitHub repo for your HomeStream fork
+2. Edit `electron/electron-builder.yml`:
+   ```yaml
+   publish:
+     owner: your-github-username
+     repo: your-repo-name
+   ```
+3. Set `GH_TOKEN` env var when publishing:
+   ```powershell
+   $env:GH_TOKEN="ghp_yourtoken"
+   npm run electron:publish
+   ```
+
+---
+
+## Development mode
+
+```powershell
+# Terminal 1 — start the Vite dev server
 npm run dev
 
-# Terminal 2
+# Terminal 2 — launch Electron pointing at the dev server
 npm run electron:dev
 ```
 
-In dev mode the control panel shows "Development mode — use npm run dev to start the server".
-The server is already running via Vite, so just click "Open HomeStream".
-
-## Icons
-
-Icons are pre-generated in `electron/assets/`. To regenerate:
-
-```bash
-node electron/create-icons.mjs
-```
-
-For production `.ico` (Windows) and `.icns` (macOS), electron-builder auto-converts
-`icon.png` on the respective platform. Alternatively:
-
-- **Windows .ico**: `magick convert icon.png -resize 256x256 icon.ico`
-- **macOS .icns**: Use `iconutil` on macOS or `electron-icon-maker`
-
-## Architecture
-
-```
-electron/
-├── main.js          — Electron main process (control panel, tray, server spawn)
-├── preload.js       — IPC bridge (contextBridge → window.electronAPI)
-├── electron-builder.yml
-├── tray-icon.png    — 16×16 system tray icon
-├── create-icons.mjs — Icon generator script
-└── assets/
-    ├── icon.png     — 512×512 app icon (source for all platforms)
-    └── icon-256.png — 256×256 variant
-```
-
-### Server spawn
-
-In packaged mode, `main.js` spawns `resources/server/server.bundle.mjs` as a child process
-using the bundled Node.js runtime. The server listens on port 3000.
-
-### Data directories
-
-The server stores data in the user's home directory:
-- **Media library**: configured via Setup Wizard (default: `~/Videos/HomeStream`)
-- **Config**: `homestream-config.json` next to the server bundle
-- **Watchlist / progress**: `watchlist.json`, `media-library.json`
-
-## Installer output
-
-| Platform | File                              |
-|----------|-----------------------------------|
-| Windows  | `HomeStream-Setup-1.0.0.exe`      |
-| macOS    | `HomeStream-1.0.0.dmg`            |
-| Linux    | `HomeStream-1.0.0.AppImage`       |
-| Linux    | `homestream_1.0.0_amd64.deb`      |
+In dev mode the Electron control panel shows a notice to use `npm run dev`
+and does not spawn a server child process (Vite handles it).

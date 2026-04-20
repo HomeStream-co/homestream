@@ -9,10 +9,10 @@
  */
 
 import fs from 'fs';
-import path from 'path';
 import bcrypt from 'bcryptjs';
 
-const PROFILES_PATH = fs.existsSync('/private') ? '/private/homestream-profiles.json' : path.resolve('./homestream-profiles.json');
+import { dataPath } from './dataDir.js';
+const PROFILES_PATH = dataPath('homestream-profiles.json');
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 

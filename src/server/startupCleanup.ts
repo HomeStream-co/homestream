@@ -38,7 +38,8 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 
-const LIBRARY_PATH = fs.existsSync('/private') ? '/private/media-library.json' : path.resolve('./media-library.json');
+import { dataPath } from './dataDir.js';
+const LIBRARY_PATH = dataPath('media-library.json');
 const UPLOADS_DIR  = path.resolve('./uploads');
 
 // Mirrors the constant in hlsTranscoder.ts — kept in sync via the exported

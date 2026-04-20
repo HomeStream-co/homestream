@@ -70,16 +70,41 @@ function setupAutoUpdater({ controlWindowGetter, pushLog }) {
   getControlWindow = controlWindowGetter;
   pushLogFn = pushLog;
 
+  // Skip entirely in dev mode
+  if (!app.isPackaged) {
+    log('Auto-updater disabled in dev mode', 'info');
+    return;
+  }
+
+  // Skip if the GitHub repo hasn't been configured yet (placeholder values).
+  // This prevents electron-updater from throwing on first-time local builds.
+  let publishConfig;
+  try {
+    const builderCfg = require('fs').readFileSync(
+      require('path').join(__dirname, 'electron-builder.yml'), 'utf8'
+    );
+    const ownerMatch = builderCfg.match(/owner:\s*(.+)/);
+    const repoMatch  = builderCfg.match(/repo:\s*(.+)/);
+    const owner = ownerMatch?.[1]?.trim();
+    const repo  = repoMatch?.[1]?.trim();
+    if (!owner || owner === 'homestream-app' || !repo || repo === 'homestream') {
+      log('Auto-updater not configured — skipping (set owner/repo in electron/electron-builder.yml to enable)', 'info');
+      sendStatus('idle');
+      return;
+    }
+    publishConfig = { owner, repo };
+  } catch {
+    log('Could not read electron-builder.yml — auto-updater disabled', 'warn');
+    sendStatus('idle');
+    return;
+  }
+
+  log(`Auto-updater configured for ${publishConfig.owner}/${publishConfig.repo}`);
+
   // electron-updater reads publish config from electron-builder.yml automatically.
   // Disable auto-download so the user controls when to download.
   autoUpdater.autoDownload = false;
   autoUpdater.autoInstallOnAppQuit = false;
-
-  // In dev mode, allow testing update flow with a local dev-app-update.yml
-  // (electron-updater skips update checks in dev unless this is set)
-  if (!app.isPackaged) {
-    autoUpdater.forceDevUpdateConfig = false; // keep skipped in dev by default
-  }
 
   // ── Event handlers ──────────────────────────────────────────────────────────
 

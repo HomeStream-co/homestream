@@ -10,9 +10,9 @@
  */
 
 import fs from 'fs';
-import path from 'path';
 
-const CONFIG_PATH = fs.existsSync('/private') ? '/private/homestream-config.json' : path.resolve('./homestream-config.json');
+import { dataPath } from './dataDir.js';
+const CONFIG_PATH = dataPath('homestream-config.json');
 
 export interface AppConfig {
   setupComplete: boolean;

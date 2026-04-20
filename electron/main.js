@@ -136,6 +136,12 @@ function startServer() {
       PORT: String(SERVER_PORT),
       NODE_ENV: 'production',
       ELECTRON: '1',
+      // Tell all server stores where to write data files.
+      // app.getPath('userData') resolves to the OS user-data folder:
+      //   Windows: %APPDATA%\HomeStream
+      //   macOS:   ~/Library/Application Support/HomeStream
+      //   Linux:   ~/.config/HomeStream
+      HOMESTREAM_DATA: app.getPath('userData'),
       // Inject the bundled ffmpeg path so the server uses it automatically.
       // This means users do NOT need to install FFmpeg manually.
       FFMPEG_PATH: getFfmpegPath() ?? 'ffmpeg',
@@ -164,7 +170,8 @@ function startServer() {
 
     // On first run (no config file yet) automatically open the setup wizard
     // so the user doesn't have to figure out what to do next.
-    const configPath = path.resolve('./homestream-config.json');
+    // Use the same userData path that the server stores data in.
+    const configPath = path.join(app.getPath('userData'), 'homestream-config.json');
     const isFirstRun = !fs.existsSync(configPath);
     const startPage = isFirstRun ? '/setup' : '/';
     shell.openExternal(`http://localhost:${SERVER_PORT}${startPage}`);
