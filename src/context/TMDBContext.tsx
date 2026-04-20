@@ -1,4 +1,5 @@
 // @refresh reset
+/* eslint-disable react-refresh/only-export-components */
 /**
  * TMDBContext — fetches TMDB data once per app session.
  *

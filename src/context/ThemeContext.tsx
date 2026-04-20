@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 /**
  * ThemeContext — manages the active color theme and all user preferences
  * that live in the settings panel.

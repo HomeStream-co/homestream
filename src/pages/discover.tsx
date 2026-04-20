@@ -742,7 +742,7 @@ export default function DiscoverPage() {
   const filteredRecommended = filterMovies(recommended);
 
   // TV shows from dedicated TMDB /trending/tv/week endpoint
-  const filteredShows = useMemo(() => filterMovies(trendingShows), [trendingShows, searchQuery, filterMovies]);
+  const filteredShows = useMemo(() => filterMovies(trendingShows), [trendingShows, filterMovies]);
 
   const handleTMDBDownload = useCallback((movie: TMDBMovie) => {
     setDownloadTarget({ title: movie.title, posterUrl: movie.posterUrl, release_date: movie.release_date, type: 'movie' });
