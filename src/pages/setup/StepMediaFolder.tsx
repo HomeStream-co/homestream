@@ -44,12 +44,15 @@ export default function StepMediaFolder({ form, set, status, setStatus, onNext, 
               type="text"
               value={form.mediaDir}
               onChange={e => set('mediaDir', e.target.value)}
-              placeholder="/media"
+              placeholder="C:\Users\Public\Videos\HomeStream"
               className="w-full bg-background border border-border rounded-lg pl-9 pr-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary font-mono"
             />
           </div>
           <p className="text-[10px] text-muted-foreground mt-1">
-            HomeStream will create: <code className="bg-muted px-1 rounded">{form.mediaDir}/downloads</code> and <code className="bg-muted px-1 rounded">{form.mediaDir}/library</code>
+            HomeStream will create subfolders here automatically. Both forward slashes and backslashes are accepted.
+          </p>
+          <p className="text-[10px] text-muted-foreground mt-0.5">
+            Subfolders: <code className="bg-muted px-1 rounded">downloads\</code> and <code className="bg-muted px-1 rounded">library\</code>
           </p>
         </div>
 

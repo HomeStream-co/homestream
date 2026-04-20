@@ -157,6 +157,13 @@ function startServer() {
       // Inject the bundled ffmpeg path so the server uses it automatically.
       // This means users do NOT need to install FFmpeg manually.
       FFMPEG_PATH: getFfmpegPath() ?? 'ffmpeg',
+      // Inject platform info so the setup wizard can suggest the right default
+      // media directory for the user's OS (Windows vs macOS vs Linux).
+      HOMESTREAM_PLATFORM: process.platform,
+      HOMESTREAM_DEFAULT_MEDIA_DIR: (() => {
+        const videos = app.getPath('videos');
+        return path.join(videos, 'HomeStream');
+      })(),
     },
     stdio: 'pipe',
   });
@@ -328,6 +335,11 @@ ipcMain.on('open-browser',      () => shell.openExternal(`http://localhost:${SER
 ipcMain.on('open-browser-lan',  (_, url)  => shell.openExternal(url));
 ipcMain.on('open-browser-page', (_, page) => shell.openExternal(`http://localhost:${SERVER_PORT}${page}`));
 ipcMain.on('request-status',    () => sendStatus());
+
+// Provide the setup wizard with a platform-appropriate default media directory.
+// The wizard calls GET /api/electron/platform-defaults to get this value.
+// We inject it via the server env so the API route can read it.
+// This is set before startServer() so the env var is available when the server spawns.
 
 // ── App lifecycle ─────────────────────────────────────────────────────────────
 

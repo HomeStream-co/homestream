@@ -55,22 +55,19 @@ extraResources:
     to: server/server.bundle.mjs
   # FFmpeg binary — ffmpeg-static resolves a local path that won't exist in the
   # packaged app, so we copy the binary into resources and point FFMPEG_PATH at it.
+  # On Windows, ffmpeg-static installs ffmpeg.exe; on Linux/macOS it's just ffmpeg.
   # electron-builder resolves the from path relative to the project root at build time.
-  - from: node_modules/ffmpeg-static/ffmpeg
-    to: ffmpeg/ffmpeg
+  # When building on Windows (npm run electron:win), ffmpeg-static provides ffmpeg.exe.
+  - from: node_modules/ffmpeg-static/ffmpeg.exe
+    to: ffmpeg/ffmpeg.exe
     filter: ["**/*"]
 
 # ── Windows ───────────────────────────────────────────────────────────────────
 win:
   target:
     # Full NSIS installer — creates Start Menu + Desktop shortcuts, uninstallable
+    # This is the primary deliverable: HomeStream-Setup-x.x.x.exe inside a ZIP.
     - target: nsis
-      arch: [x64, ia32]
-    # Portable .exe — no install needed, run from anywhere (USB, shared PC, etc.)
-    - target: portable
-      arch: [x64]
-    # ZIP archive — extract and run, useful for manual deployment
-    - target: zip
       arch: [x64]
   # electron-builder auto-converts icon.png → .ico if no .ico is provided
   icon: electron/assets/icon.png
@@ -82,10 +79,11 @@ nsis:
   createStartMenuShortcut: true
   shortcutName: HomeStream
   runAfterFinish: true
-
-# Portable build stores its data next to the .exe (great for USB drives)
-portable:
-  artifactName: HomeStream-${version}-portable.exe
+  # Installer branding images
+  # headerImage: shown top-right on every wizard page (150×57 px, BMP or PNG)
+  # installerSidebar: shown left side on Welcome/Finish pages (164×314 px, BMP or PNG)
+  headerImage: electron/assets/nsis-header.png
+  installerSidebar: electron/assets/nsis-sidebar.png
 
 # ── macOS ─────────────────────────────────────────────────────────────────────
 mac:

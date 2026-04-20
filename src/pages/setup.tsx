@@ -56,8 +56,12 @@ export default function SetupPage() {
   const [step, setStep] = useState(0);
 
   // ── Form state ──
+  // Default mediaDir: fetched from the server on mount (Electron injects the
+  // correct OS path; cloud/dev falls back to a sensible platform default).
+  // We start with a Windows path as the optimistic default since the .exe
+  // installer targets Windows first — it gets replaced on mount.
   const [form, setForm] = useState<FormData>({
-    mediaDir: '/media',
+    mediaDir: 'C:\\Users\\Public\\Videos\\HomeStream',
     qbitUrl: 'http://localhost:8080',
     qbitUsername: 'admin',
     qbitPassword: 'homestream',
@@ -129,6 +133,18 @@ export default function SetupPage() {
       if (data.setupComplete) navigate('/');
     }).catch(() => {});
   }, [navigate]);
+
+  // ── Fetch platform-aware default media directory from Electron ──
+  useEffect(() => {
+    fetch('/api/electron')
+      .then(r => r.json())
+      .then((data: { defaultMediaDir?: string }) => {
+        if (data.defaultMediaDir) {
+          setForm(f => ({ ...f, mediaDir: data.defaultMediaDir! }));
+        }
+      })
+      .catch(() => {/* non-fatal — keep the optimistic default */});
+  }, []);
 
   // ── Auto-scan when reaching finish step ──
   const runScan = useCallback(async (dir: string) => {

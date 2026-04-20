@@ -3,7 +3,7 @@
  * Overview of what HomeStream needs and what's optional.
  */
 import {
-  HardDrive, Wifi, KeyRound, CheckCircle2, ChevronRight, ExternalLink, Zap, Tv2,
+  HardDrive, Wifi, KeyRound, CheckCircle2, ChevronRight, Zap, Tv2,
 } from 'lucide-react';
 import type { SetupStepProps } from './types';
 
@@ -90,19 +90,7 @@ export default function StepWelcome({ onNext }: SetupStepProps) {
       </div>
 
       <div className="bg-primary/10 border border-primary/20 rounded-xl p-3 text-xs text-muted-foreground leading-relaxed">
-        <strong className="text-foreground">Running with Docker?</strong> Check your <code className="bg-muted px-1 rounded">.env</code> file — most settings are pre-filled from environment variables.
-      </div>
-
-      <div className="flex items-center justify-center gap-4 text-[11px] text-muted-foreground">
-        <a href="https://github.com/homestream-app/homestream#readme" target="_blank" rel="noopener noreferrer"
-          className="flex items-center gap-1 text-primary hover:underline">
-          <ExternalLink className="w-3 h-3" /> Full documentation
-        </a>
-        <span className="text-border">·</span>
-        <a href="https://github.com/homestream-app/homestream/blob/main/docker-compose.yml" target="_blank" rel="noopener noreferrer"
-          className="flex items-center gap-1 text-primary hover:underline">
-          <ExternalLink className="w-3 h-3" /> Docker Compose quickstart
-        </a>
+        <strong className="text-foreground">Everything is bundled.</strong> Node.js, FFmpeg, and all server components are included in the installer — no extra software to install. Just point HomeStream at your media folder and you&apos;re streaming.
       </div>
 
       <button
