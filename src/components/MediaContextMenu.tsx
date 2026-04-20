@@ -23,11 +23,12 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import {
-  Play, Info, Star, StarOff, X, Film, Tv2,
+  Play, Info, Star, StarOff, X, Film, Tv2, Trash2, AlertTriangle,
 } from 'lucide-react';
 import type { MediaItem } from '@/types/media';
 import { useMedia } from '@/context/MediaContext';
 import TrailerButton from '@/components/TrailerButton';
+import { toast } from 'sonner';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -42,11 +43,12 @@ interface MediaContextMenuProps {
 
 export default function MediaContextMenu({ item, children, disabled = false }: MediaContextMenuProps) {
   const navigate = useNavigate();
-  const { watchlist, addToWatchlist, removeFromWatchlist } = useMedia();
+  const { watchlist, addToWatchlist, removeFromWatchlist, deleteMedia } = useMedia();
   const inWatchlist = watchlist.includes(item.id);
 
   const [open, setOpen] = useState(false);
   const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -62,6 +64,7 @@ export default function MediaContextMenu({ item, children, disabled = false }: M
   const closeMenu = useCallback(() => {
     setOpen(false);
     setMenuPos(null);
+    setConfirmDelete(false);
   }, []);
 
   // ── Right-click (desktop) ───────────────────────────────────────────────────
@@ -120,6 +123,11 @@ export default function MediaContextMenu({ item, children, disabled = false }: M
   const handleFavorite = () => {
     if (inWatchlist) { removeFromWatchlist(item.id); } else { addToWatchlist(item.id); }
     // Keep menu open so user can see the state change
+  };
+  const handleDeleteConfirmed = async () => {
+    closeMenu();
+    await deleteMedia(item.id);
+    toast.success(`"${item.title}" removed from library`);
   };
 
   // ── Compute menu position (keep inside viewport) ────────────────────────────
@@ -216,6 +224,34 @@ export default function MediaContextMenu({ item, children, disabled = false }: M
               {/* Menu items */}
               <div className="py-1">
 
+                {/* Confirm-delete state */}
+                {confirmDelete ? (
+                  <div className="px-4 py-3">
+                    <div className="flex items-center gap-2 mb-3">
+                      <AlertTriangle className="w-4 h-4 text-red-400 flex-shrink-0" />
+                      <p className="text-sm font-semibold text-foreground">Remove from library?</p>
+                    </div>
+                    <p className="text-xs text-muted-foreground mb-3 leading-relaxed">
+                      This removes the entry from HomeStream. The file on disk is not deleted.
+                    </p>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={handleDeleteConfirmed}
+                        className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-red-500 hover:bg-red-600 text-white text-xs font-semibold transition-colors"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                        Remove
+                      </button>
+                      <button
+                        onClick={() => setConfirmDelete(false)}
+                        className="flex-1 px-3 py-2 rounded-lg border border-border text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
                 {/* Play */}
                 <button
                   onClick={handlePlay}
@@ -267,6 +303,20 @@ export default function MediaContextMenu({ item, children, disabled = false }: M
                   type={item.type === 'series' ? 'series' : 'movie'}
                   variant="menuitem"
                 />
+
+                {/* Divider + Delete */}
+                <div className="border-t border-border mx-4 my-1" />
+                <button
+                  onClick={() => setConfirmDelete(true)}
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-red-500/10 transition-colors text-left group"
+                >
+                  <div className="w-8 h-8 rounded-full bg-red-500/10 flex items-center justify-center flex-shrink-0 group-hover:bg-red-500/20 transition-colors">
+                    <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                  </div>
+                  <span className="text-sm font-medium text-red-400">Remove from Library</span>
+                </button>
+                  </>
+                )}
 
               </div>
 

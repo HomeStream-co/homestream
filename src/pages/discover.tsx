@@ -20,12 +20,13 @@ import { motion, AnimatePresence } from 'motion/react';
 import {
   Compass, Star, Calendar, Download, Bookmark, BookmarkCheck,
   Loader2, WifiOff, RefreshCw, Film, TrendingUp, Sparkles,
-  ChevronDown, Search, X, Tv2, Clapperboard, Play, Volume2, VolumeX,
+  ChevronDown, Search, X, Tv2, Clapperboard, Play, Volume2, VolumeX, Layers,
 } from 'lucide-react';
 import { useMedia } from '@/context/MediaContext';
 import { useTMDBContext } from '@/context/TMDBContext';
 import type { TMDBMovie } from '@/server/tmdbCache';
 import { fetchTrailerKey } from '@/lib/trailerCache';
+import GenreBrowser from '@/components/GenreBrowser';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -711,7 +712,7 @@ export default function DiscoverPage() {
   const { library, watchlist, addToWatchlist, removeFromWatchlist } = useMedia();
   const [downloadTarget, setDownloadTarget] = useState<DownloadTarget | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeTab, setActiveTab] = useState<'movies' | 'shows' | 'search'>('movies');
+  const [activeTab, setActiveTab] = useState<'movies' | 'shows' | 'genres' | 'search'>('movies');
 
   // Direct search state
   const [directQuery, setDirectQuery] = useState('');
@@ -781,6 +782,7 @@ export default function DiscoverPage() {
   const TABS = [
     { id: 'movies' as const, label: 'Movies', icon: Film },
     { id: 'shows' as const, label: 'TV Shows', icon: Tv2 },
+    { id: 'genres' as const, label: 'Browse by Genre', icon: Layers },
     { id: 'search' as const, label: 'Search & Download', icon: Clapperboard },
   ];
 
@@ -805,7 +807,7 @@ export default function DiscoverPage() {
             </div>
 
             <div className="flex items-center gap-2">
-              {activeTab !== 'search' && (
+              {activeTab !== 'search' && activeTab !== 'genres' && (
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
                   <input
@@ -908,6 +910,11 @@ export default function DiscoverPage() {
                 </div>
               )}
             </div>
+          )}
+
+          {/* ── Genres tab ── */}
+          {activeTab === 'genres' && (
+            <GenreBrowser />
           )}
 
           {/* ── Search & Download tab ── */}
