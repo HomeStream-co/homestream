@@ -26,7 +26,6 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { useAuth } from '@/context/AuthContext';
 import { useMedia } from '@/context/MediaContext';
 import { useProfile } from '@/context/ProfileContext';
 import { useTheme } from '@/context/ThemeContext';
@@ -112,6 +111,70 @@ export default function ShowPage() {
   const item = useMemo(() => library.find(m => m.id === id), [library, id]);
 
   const inWatchlist = watchlist.includes(id ?? '');
+
+  // ── Subscription state ───────────────────────────────────────────────────
+  const [subDialogOpen, setSubDialogOpen] = useState(false);
+  const [subSchedule, setSubSchedule] = useState<string>('weekly');
+  const [subStatus, setSubStatus] = useState<'idle' | 'subscribed' | 'loading'>('idle');
+  const [checkingNow, setCheckingNow] = useState(false);
+
+  // Load existing subscription on mount
+  useEffect(() => {
+    if (!item?.imdbId) return;
+    fetch('/api/subscriptions')
+      .then(r => r.json())
+      .then((data: { subscriptions: Array<{ imdbId: string; schedule: string; enabled: boolean }> }) => {
+        const existing = data.subscriptions?.find(s => s.imdbId === item.imdbId);
+        if (existing) {
+          setSubStatus('subscribed');
+          setSubSchedule(existing.schedule);
+        }
+      })
+      .catch(() => {/* non-fatal */});
+  }, [item?.imdbId]);
+
+  const handleSubscribe = async () => {
+    if (!item?.imdbId) return;
+    setSubStatus('loading');
+    try {
+      await fetch('/api/subscriptions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          imdbId: item.imdbId,
+          title: item.title,
+          poster: item.poster,
+          totalSeasons: Math.max(...(item.episodes?.map(e => e.season) ?? [1])),
+          schedule: subSchedule,
+          enabled: true,
+        }),
+      });
+      setSubStatus('subscribed');
+      setSubDialogOpen(false);
+    } catch {
+      setSubStatus('idle');
+    }
+  };
+
+  const handleUnsubscribe = async () => {
+    if (!item?.imdbId) return;
+    await fetch('/api/subscriptions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ imdbId: item.imdbId, action: 'unsubscribe' }),
+    });
+    setSubStatus('idle');
+  };
+
+  const handleCheckNow = async () => {
+    if (!item?.imdbId) return;
+    setCheckingNow(true);
+    try {
+      await fetch(`/api/subscriptions/${item.imdbId}/check`, { method: 'POST' });
+    } finally {
+      setCheckingNow(false);
+    }
+  };
 
   const seasons = useMemo(() => groupSeasons(item?.episodes || []), [item]);
   const overallProgress = useMemo(() => item ? getShowProgress(item) : null, [item]);
@@ -365,6 +428,38 @@ export default function ShowPage() {
                     <Download className="w-4 h-4" />
                     Download
                   </a>
+
+                  {/* Auto-download subscription */}
+                  {subStatus === 'subscribed' ? (
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={handleUnsubscribe}
+                        className="flex items-center gap-2 px-5 py-3 rounded-xl bg-primary/10 border border-primary/30 text-primary font-semibold text-sm hover:bg-destructive/10 hover:border-destructive/30 hover:text-destructive transition-colors"
+                        title="Unsubscribe from auto-downloads"
+                      >
+                        <BellOff className="w-4 h-4" />
+                        Subscribed
+                      </button>
+                      <button
+                        onClick={handleCheckNow}
+                        disabled={checkingNow}
+                        className="flex items-center gap-2 px-3 py-3 rounded-xl bg-card border border-border text-muted-foreground font-semibold text-sm hover:bg-muted transition-colors disabled:opacity-50"
+                        title="Check for new episodes now"
+                      >
+                        <RefreshCw className={`w-4 h-4 ${checkingNow ? 'animate-spin' : ''}`} />
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setSubDialogOpen(true)}
+                      disabled={subStatus === 'loading'}
+                      className="flex items-center gap-2 px-5 py-3 rounded-xl bg-card border border-border text-foreground font-semibold text-sm hover:bg-muted transition-colors disabled:opacity-50"
+                      title="Auto-download new episodes"
+                    >
+                      <Bell className="w-4 h-4" />
+                      Auto-Download
+                    </button>
+                  )}
                 </div>
 
                 {/* AI summary or plot */}
@@ -570,5 +665,51 @@ export default function ShowPage() {
       </div>
     </>
     </RestrictedContentGuard>
+
+    {/* ── Subscribe dialog ─────────────────────────────────────────────── */}
+    <Dialog open={subDialogOpen} onOpenChange={setSubDialogOpen}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Bell className="w-5 h-5 text-primary" />
+            Auto-Download New Episodes
+          </DialogTitle>
+        </DialogHeader>
+        <div className="py-2 space-y-4">
+          <p className="text-sm text-muted-foreground">
+            HomeStream will automatically check for new episodes of{' '}
+            <span className="font-semibold text-foreground">{item?.title}</span>{' '}
+            and download them to your library.
+          </p>
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-foreground">Check frequency</label>
+            <Select value={subSchedule} onValueChange={setSubSchedule}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="daily">Every day</SelectItem>
+                <SelectItem value="every3days">Every 3 days</SelectItem>
+                <SelectItem value="weekly">Every week</SelectItem>
+                <SelectItem value="every2weeks">Every 2 weeks</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Only episodes newer than what you already have will be downloaded.
+            HomeStream must be running for checks to fire.
+          </p>
+        </div>
+        <DialogFooter className="gap-2">
+          <Button variant="outline" onClick={() => setSubDialogOpen(false)}>
+            Cancel
+          </Button>
+          <Button onClick={handleSubscribe} disabled={subStatus === 'loading'}>
+            <Bell className="w-4 h-4 mr-2" />
+            Subscribe
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

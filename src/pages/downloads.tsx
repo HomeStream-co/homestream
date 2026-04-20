@@ -19,9 +19,11 @@ import {
   Film, Tv2, ArrowDown, ArrowUp, Zap, HardDrive,
   RefreshCw, X, ChevronDown, ChevronUp, Activity,
   Settings2, Save, BarChart3, Layers,
+  Bell, BellOff, Calendar,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import VPNPanel from '@/components/VPNPanel';
+import { Link } from 'react-router-dom';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -423,6 +425,62 @@ export default function DownloadsPage() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'active' | 'done' | 'error'>('all');
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+
+  // Subscriptions state
+  interface Subscription {
+    imdbId: string;
+    title: string;
+    poster?: string;
+    schedule: string;
+    enabled: boolean;
+    lastCheckedAt?: string;
+    nextCheckAt?: string;
+  }
+  const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
+  const [checkingId, setCheckingId] = useState<string | null>(null);
+
+  const fetchSubscriptions = useCallback(async () => {
+    try {
+      const res = await fetch('/api/subscriptions');
+      if (!res.ok) return;
+      const json = await res.json() as { subscriptions: Subscription[] };
+      setSubscriptions(json.subscriptions ?? []);
+    } catch { /* silent */ }
+  }, []);
+
+  const handleUnsubscribe = async (imdbId: string) => {
+    await fetch('/api/subscriptions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ imdbId, action: 'unsubscribe' }),
+    });
+    setSubscriptions(s => s.filter(x => x.imdbId !== imdbId));
+    toast.success('Unsubscribed');
+  };
+
+  const handleToggle = async (imdbId: string) => {
+    await fetch('/api/subscriptions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ imdbId, action: 'toggle' }),
+    });
+    fetchSubscriptions();
+  };
+
+  const handleCheckNow = async (imdbId: string, title: string) => {
+    setCheckingId(imdbId);
+    try {
+      await fetch(`/api/subscriptions/${imdbId}/check`, { method: 'POST' });
+      toast.success(`Checked "${title}" — see downloads for new episodes`);
+      fetchSubscriptions();
+    } catch {
+      toast.error('Check failed');
+    } finally {
+      setCheckingId(null);
+    }
+  };
+
+  useEffect(() => { fetchSubscriptions(); }, [fetchSubscriptions]);
 
   // Storage state
   const [storage, setStorage] = useState<StorageStats | null>(null);
@@ -1006,6 +1064,90 @@ export default function DownloadsPage() {
                   </AnimatePresence>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* ── Subscriptions ── */}
+          {subscriptions.length > 0 && (
+            <div className="mt-8">
+              <div className="flex items-center gap-2 mb-4">
+                <Bell className="w-4 h-4 text-primary" />
+                <h2 className="text-sm font-semibold text-foreground uppercase tracking-wide">
+                  Auto-Download Subscriptions
+                </h2>
+                <span className="text-xs text-muted-foreground">({subscriptions.length})</span>
+              </div>
+              <div className="space-y-2">
+                {subscriptions.map(sub => (
+                  <motion.div
+                    key={sub.imdbId}
+                    layout
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -8 }}
+                    className="flex items-center gap-3 p-3 rounded-xl bg-card border border-border"
+                  >
+                    {sub.poster && (
+                      <img
+                        src={sub.poster}
+                        alt={sub.title}
+                        className="w-10 h-14 object-cover rounded-lg flex-shrink-0"
+                        onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                      />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-foreground truncate">{sub.title}</p>
+                      <div className="flex items-center gap-3 mt-0.5">
+                        <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                          <Calendar className="w-3 h-3" />
+                          {sub.schedule === 'daily' ? 'Daily'
+                            : sub.schedule === 'every3days' ? 'Every 3 days'
+                            : sub.schedule === 'weekly' ? 'Weekly'
+                            : 'Every 2 weeks'}
+                        </span>
+                        {sub.nextCheckAt && sub.enabled && (
+                          <span className="text-xs text-muted-foreground">
+                            Next: {new Date(sub.nextCheckAt).toLocaleDateString()}
+                          </span>
+                        )}
+                        {!sub.enabled && (
+                          <span className="text-xs text-muted-foreground italic">Paused</span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      {/* Check now */}
+                      <button
+                        onClick={() => handleCheckNow(sub.imdbId, sub.title)}
+                        disabled={checkingId === sub.imdbId}
+                        className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-50"
+                        title="Check for new episodes now"
+                      >
+                        <RefreshCw className={`w-3.5 h-3.5 ${checkingId === sub.imdbId ? 'animate-spin' : ''}`} />
+                      </button>
+                      {/* Pause / resume */}
+                      <button
+                        onClick={() => handleToggle(sub.imdbId)}
+                        className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                        title={sub.enabled ? 'Pause subscription' : 'Resume subscription'}
+                      >
+                        {sub.enabled ? <Bell className="w-3.5 h-3.5" /> : <BellOff className="w-3.5 h-3.5" />}
+                      </button>
+                      {/* Unsubscribe */}
+                      <button
+                        onClick={() => handleUnsubscribe(sub.imdbId)}
+                        className="p-2 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                        title="Remove subscription"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground mt-3">
+                To subscribe to a show, open its detail page and click <strong>Auto-Download</strong>.
+              </p>
             </div>
           )}
 
