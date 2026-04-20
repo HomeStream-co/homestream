@@ -14,6 +14,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { ChevronLeft, ChevronRight, Star, Calendar, Compass } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import type { TMDBMovie } from '@/server/tmdbCache';
+import ImageWithFallback from '@/components/ImageWithFallback';
 
 const SLIDE_INTERVAL_MS = 8000;
 
@@ -106,20 +107,20 @@ export default function HeroBanner({ movies, loading }: HeroBannerProps) {
           className="absolute inset-0"
         >
           {movie.backdropUrl ? (
-            <img
+            <ImageWithFallback
               src={movie.backdropUrl}
               alt={movie.title}
               className="w-full h-full object-cover scale-105"
+              fallbackClassName="w-full h-full scale-105 bg-gradient-to-br from-primary/20 to-background"
               style={{ filter: 'brightness(0.45)' }}
-              onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
             />
           ) : movie.posterUrl ? (
-            <img
+            <ImageWithFallback
               src={movie.posterUrl}
               alt={movie.title}
               className="w-full h-full object-cover object-top scale-105"
+              fallbackClassName="w-full h-full scale-105 bg-gradient-to-br from-primary/20 to-background"
               style={{ filter: 'brightness(0.45) blur(4px)' }}
-              onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
             />
           ) : (
             <div className="w-full h-full bg-gradient-to-br from-primary/20 to-background" />
@@ -142,7 +143,7 @@ export default function HeroBanner({ movies, loading }: HeroBannerProps) {
             }`}
           >
             {m.posterUrl ? (
-              <img src={m.posterUrl} alt={m.title} className="w-full h-full object-cover" />
+              <ImageWithFallback src={m.posterUrl} alt={m.title} className="w-full h-full object-cover" fallbackClassName="w-full h-full bg-muted" />
             ) : (
               <div className="w-full h-full bg-muted" />
             )}

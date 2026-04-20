@@ -27,6 +27,7 @@ import { useTMDBContext } from '@/context/TMDBContext';
 import type { TMDBMovie } from '@/server/tmdbCache';
 import { fetchTrailerKey } from '@/lib/trailerCache';
 import GenreBrowser from '@/components/GenreBrowser';
+import ImageWithFallback from '@/components/ImageWithFallback';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
