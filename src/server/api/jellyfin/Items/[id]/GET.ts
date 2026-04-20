@@ -26,7 +26,7 @@ interface LibraryItem {
   watchedSeconds?: number;
   runtime?: number;
   director?: string;
-  actors?: string;
+  actors?: string | string[];
   enrichment?: { aiSummary?: string; tags?: string[]; mood?: string };
 }
 
@@ -53,9 +53,10 @@ function toJellyfinItem(item: LibraryItem, baseUrl: string) {
     RunTimeTicks: item.runtime ? item.runtime * 600_000_000 : undefined,
     People: [
       ...(item.director ? [{ Name: item.director, Type: 'Director' }] : []),
-      ...(item.actors
-        ? (Array.isArray(item.actors) ? item.actors : item.actors.split(',')).slice(0, 5).map((a: string) => ({ Name: a.trim(), Type: 'Actor' }))
-        : []),
+      ...((item.actors
+        ? ([] as string[]).concat(item.actors)
+        : []
+      ).slice(0, 5).flatMap(a => a.split(',').map(n => ({ Name: n.trim(), Type: 'Actor' })))),
     ],
     UserData: {
       PlaybackPositionTicks: item.watchedSeconds ? item.watchedSeconds * 10_000_000 : 0,
