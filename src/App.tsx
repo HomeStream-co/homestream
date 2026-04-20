@@ -1,5 +1,5 @@
 import { lazy, Suspense, Component, type ReactNode, type ErrorInfo } from 'react';
-import { createBrowserRouter, Outlet, RouterProvider } from 'react-router-dom';
+import { createBrowserRouter, Outlet, RouterProvider, useNavigate } from 'react-router-dom';
 
 import RootLayout from './layouts/RootLayout';
 import Spinner from './components/Spinner';
@@ -22,20 +22,34 @@ class ProductionErrorBoundary extends Component<{ children: ReactNode }, EBState
 
   render() {
     if (!this.state.hasError) return this.props.children;
-    return (
-      <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-4 p-8 text-center">
-        <div className="text-4xl">⚠️</div>
-        <h1 className="text-xl font-bold text-foreground">Something went wrong</h1>
-        <p className="text-sm text-muted-foreground max-w-sm">{this.state.message || 'An unexpected error occurred.'}</p>
+    return <ErrorFallback message={this.state.message} onReset={() => this.setState({ hasError: false, message: '' })} />;
+  }
+}
+
+// Separate function component so we can use hooks (useNavigate) inside the fallback
+function ErrorFallback({ message, onReset }: { message: string; onReset: () => void }) {
+  const navigate = useNavigate();
+  return (
+    <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-4 p-8 text-center">
+      <div className="text-4xl">⚠️</div>
+      <h1 className="text-xl font-bold text-foreground">Something went wrong</h1>
+      <p className="text-sm text-muted-foreground max-w-sm">{message || 'An unexpected error occurred.'}</p>
+      <div className="flex gap-3 mt-2">
         <button
-          onClick={() => window.location.reload()}
-          className="mt-2 px-5 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors"
+          onClick={() => { onReset(); navigate('/profiles', { replace: true }); }}
+          className="px-5 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors"
         >
-          Reload HomeStream
+          Go to Profiles
+        </button>
+        <button
+          onClick={() => { onReset(); navigate('/', { replace: true }); }}
+          className="px-5 py-2 rounded-lg border border-border text-sm font-medium text-foreground hover:bg-muted transition-colors"
+        >
+          Go Home
         </button>
       </div>
-    );
-  }
+    </div>
+  );
 }
 
 // ── Dev-only tools (never bundled in production) ──────────────────────────────
@@ -66,13 +80,15 @@ const router = createBrowserRouter([
         </AiroErrorBoundary>
       </Suspense>
     ) : (
-      <ProductionErrorBoundary>
-        <Suspense fallback={<SpinnerFallback />}>
-          <RootLayout>
-            <Outlet />
-          </RootLayout>
-        </Suspense>
-      </ProductionErrorBoundary>
+      <Suspense fallback={<SpinnerFallback />}>
+        <RootLayout>
+          <ProductionErrorBoundary>
+            <Suspense fallback={<SpinnerFallback />}>
+              <Outlet />
+            </Suspense>
+          </ProductionErrorBoundary>
+        </RootLayout>
+      </Suspense>
     ),
     children: routes,
   },
