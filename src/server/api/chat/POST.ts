@@ -202,6 +202,7 @@ async function chatWithOllama(
 // ── Main handler ──────────────────────────────────────────────────────────────
 export default async function handler(req: Request, res: Response) {
   try {
+    if (!requireAuth(req, res)) return;
     const { message, library, history = [] } = req.body as ChatRequest;
 
     if (!message?.trim()) {

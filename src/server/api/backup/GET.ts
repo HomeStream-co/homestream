@@ -27,8 +27,9 @@ function safeReadJson<T>(filePath: string, fallback: T): T {
   }
 }
 
-export default function handler(_req: Request, res: Response) {
+export default function handler(req: Request, res: Response) {
   try {
+    if (!requireAuth(req, res)) return;
     const library  = safeReadJson<unknown[]>(LIBRARY_PATH, []);
     const config   = safeReadJson<Record<string, unknown>>(CONFIG_PATH, {});
     const profiles = safeReadJson<unknown[]>(PROFILES_PATH, []);

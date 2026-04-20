@@ -13,8 +13,9 @@ import { readConfig } from '../../../configStore.js';
 import { scanExistingMedia, importExistingMedia } from '../../../existingMediaScanner.js';
 import { requireAuth } from '../../../authMiddleware.js';
 
-export default async function handler(_req: Request, res: Response) {
+export default async function handler(req: Request, res: Response) {
   try {
+    if (!requireAuth(req, res)) return;
     const cfg = readConfig();
     if (!cfg.mediaDir) {
       return res.status(400).json({ error: 'Media directory not configured. Run the setup wizard first.' });

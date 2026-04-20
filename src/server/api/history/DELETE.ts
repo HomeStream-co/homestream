@@ -29,6 +29,7 @@ interface ProfileProgressEntry {
 
 export default async function handler(req: Request, res: Response) {
   try {
+    if (!requireAuth(req, res)) return;
     const { id, profileId = 'adult' } = req.body as { id?: string; profileId?: string };
 
     await writeLibrary<Record<string, unknown>>(lib => {

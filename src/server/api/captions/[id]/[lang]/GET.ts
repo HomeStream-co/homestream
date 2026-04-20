@@ -15,6 +15,7 @@ import { requireAuth } from '../../../../authMiddleware.js';
  * browser <track> element doesn't throw a network error.
  */
 export default async function handler(req: Request, res: Response) {
+  if (!requireAuth(req, res)) return;
   const { id, lang } = req.params;
 
   // Validate lang to prevent path traversal

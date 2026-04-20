@@ -1,5 +1,5 @@
 import type { Request, Response } from 'express';
-import { requireAuth } from '../../authMiddleware.js';
+import { requireAuth } from '../../../authMiddleware.js';
 
 /**
  * POST /api/stremio/search
@@ -48,6 +48,7 @@ async function cinemetaSearch(query: string, type: 'movie' | 'series'): Promise<
 }
 
 export default async function handler(req: Request, res: Response) {
+  if (!requireAuth(req, res)) return;
   const { query, type } = req.body as { query?: string; type?: string };
 
   if (!query?.trim()) {

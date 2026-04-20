@@ -43,6 +43,7 @@ interface LibraryItem {
 
 export default async function handler(req: Request, res: Response) {
   try {
+    if (!requireAuth(req, res)) return;
     const profileId = (req.query.profile as string | undefined)?.trim();
     const library = readLibrary<LibraryItem>();
 

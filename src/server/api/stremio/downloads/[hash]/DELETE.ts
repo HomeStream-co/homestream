@@ -9,6 +9,7 @@ import { requireAuth } from '../../../../authMiddleware.js';
  * Query param: ?deleteFiles=true  — also delete downloaded files from disk
  */
 export default async function handler(req: Request, res: Response) {
+  if (!requireAuth(req, res)) return;
   const { hash } = req.params as { hash: string };
   const deleteFiles = req.query.deleteFiles === 'true';
 

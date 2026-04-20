@@ -235,6 +235,7 @@ async function queueViaQbit(params: {
 // ─── Handler ──────────────────────────────────────────────────────────────────
 
 export default async function handler(req: Request, res: Response) {
+  if (!requireAuth(req, res)) return;
   const {
     imdbId,
     type,

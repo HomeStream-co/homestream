@@ -1,5 +1,5 @@
 import type { Request, Response } from 'express';
-import { requireAuth } from '../../authMiddleware.js';
+import { requireAuth } from '../../../authMiddleware.js';
 
 /**
  * POST /api/stremio/stream
@@ -62,6 +62,7 @@ function buildMagnet(infoHash: string, sources?: string[]): string {
 }
 
 export default async function handler(req: Request, res: Response) {
+  if (!requireAuth(req, res)) return;
   const { imdbId, type, season, episode } = req.body as {
     imdbId?: string;
     type?: string;

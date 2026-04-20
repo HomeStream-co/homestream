@@ -15,7 +15,8 @@ import { requireAuth } from '../../../authMiddleware.js';
  * Polled every 2s by the Downloads page.
  */
 
-export default async function handler(_req: Request, res: Response) {
+export default async function handler(req: Request, res: Response) {
+  if (!requireAuth(req, res)) return;
   const wtJobs = getAllJobs();
   const qbitJobMeta = getQbitJobs(); // metadata we stored when adding (title, poster, etc.)
 

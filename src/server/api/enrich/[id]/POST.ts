@@ -76,6 +76,7 @@ Be specific and accurate. Tags should be highly searchable keywords a viewer wou
 }
 
 export default async function handler(req: Request, res: Response) {
+  if (!requireAuth(req, res)) return;
   const { id } = req.params;
 
   const lib = readLibraryLocal();

@@ -18,7 +18,7 @@
 import type { Request, Response } from 'express';
 import dgram from 'dgram';
 import http from 'http';
-import { requireAuth } from '../../authMiddleware.js';
+import { requireAuth } from '../../../authMiddleware.js';
 import { URL } from 'url';
 
 const SSDP_ADDR = '239.255.255.250';
@@ -144,8 +144,9 @@ function discoverDevices(): Promise<DeviceInfo[]> {
 
 // ── Handler ───────────────────────────────────────────────────────────────────
 
-export default async function handler(_req: Request, res: Response) {
+export default async function handler(req: Request, res: Response) {
   try {
+    if (!requireAuth(req, res)) return;
     const devices = await discoverDevices();
 
     // Sort: renderers first, then alphabetically

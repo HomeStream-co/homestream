@@ -19,6 +19,7 @@ import { execSync } from 'child_process';
 import { readLibrary } from '../../libraryStore.js';
 import { readConfig } from '../../configStore.js';
 import { getTransferInfo, isReachable } from '../../qbittorrentClient.js';
+import { requireAuth } from '../../authMiddleware.js';
 
 interface LibraryItem {
   id: string;
@@ -74,6 +75,7 @@ function resolveResolution(item: LibraryItem): '4K' | '1080p' | '720p' | 'SD' {
 
 export default async function handler(_req: Request, res: Response) {
   try {
+    if (!requireAuth(_req, res)) return;
     const library = readLibrary<LibraryItem>();
     const cfg = readConfig();
 

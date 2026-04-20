@@ -9,6 +9,7 @@ import { pauseTorrent, isReachable } from '../../../../qbittorrentClient.js';
 import { requireAuth } from '../../../../authMiddleware.js';
 
 export default async function handler(req: Request, res: Response) {
+  if (!requireAuth(req, res)) return;
   const { hash } = req.body as { hash?: string };
   if (!hash) return res.status(400).json({ error: 'hash is required' });
 

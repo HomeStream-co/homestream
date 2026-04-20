@@ -73,6 +73,7 @@ function stubVtt(lang: string): string {
 }
 
 export default async function handler(req: Request, res: Response) {
+  if (!requireAuth(req, res)) return;
   const { id } = req.params;
 
   // Look up the media item to get its IMDB ID and title

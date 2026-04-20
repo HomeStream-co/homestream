@@ -40,6 +40,7 @@ export default async function handler(req: Request, res: Response) {
   try {
     if (!requireAuth(req, res)) return;
     const { id } = req.params;
+    const lib = readLibraryLocal();
     const idx = lib.findIndex(m => m.id === id);
 
     if (idx === -1) {

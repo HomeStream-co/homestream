@@ -12,6 +12,7 @@ import { requireAuth } from '../../../authMiddleware.js';
 
 export default async function handler(req: Request, res: Response) {
   try {
+    if (!requireAuth(req, res)) return;
     const { moviesPct, tvPct } = req.body as { moviesPct?: unknown; tvPct?: unknown };
 
     const m = Number(moviesPct);

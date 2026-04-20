@@ -26,8 +26,9 @@ function getDiskStats(dir: string): { free: number; total: number } | null {
   return null;
 }
 
-export default async function handler(_req: Request, res: Response) {
+export default async function handler(req: Request, res: Response) {
   try {
+    if (!requireAuth(req, res)) return;
     const library = readLibrary<{
       fileSize?: number;
       filepath?: string;
