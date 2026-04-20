@@ -173,7 +173,9 @@ interface SettingsPanelProps {
 
 export default function SettingsPanel({ onOpenSecurity, onOpenDebug }: SettingsPanelProps) {
   const { settings, activeTheme, setTheme, updateSetting } = useTheme();
-  const { adultPinEnabled, setAdultPin, clearAdultPin } = useProfile();
+  const { profiles, setPin, clearPin } = useProfile();
+  const adultProfile = profiles.find(p => p.id === 'adult');
+  const adultPinEnabled = adultProfile?.hasPin ?? false;
   const { requiresPassword, logout, logoutAll } = useAuth();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
@@ -648,7 +650,16 @@ export default function SettingsPanel({ onOpenSecurity, onOpenDebug }: SettingsP
                           Change PIN
                         </button>
                         <button
-                          onClick={() => { clearAdultPin(); setPinMode('idle'); toast.success('Adult PIN removed'); }}
+                          onClick={async () => {
+                            try {
+                              await clearPin('adult', '');
+                              setPinMode('idle');
+                              toast.success('Adult PIN removed');
+                            } catch {
+                              // If PIN is set, we need to verify first — redirect to profile page
+                              toast.error('Enter current PIN on the Profiles page to remove it');
+                            }
+                          }}
                           className="text-[11px] text-destructive hover:text-destructive/80 transition-colors"
                         >
                           Remove
@@ -689,13 +700,14 @@ export default function SettingsPanel({ onOpenSecurity, onOpenDebug }: SettingsP
                       <div className="flex gap-2">
                         <button
                           onClick={() => {
-                            if (pinInput.length !== 4) { setPinError('PIN must be exactly 4 digits'); return; }
+                            if (pinInput.length < 4) { setPinError('PIN must be at least 4 digits'); return; }
                             if (pinInput !== pinConfirm) { setPinError('PINs do not match'); return; }
-                            setAdultPin(pinInput);
-                            setPinMode('idle');
-                            setPinInput('');
-                            setPinConfirm('');
-                            toast.success('Adult PIN saved');
+                            void setPin('adult', pinInput).then(() => {
+                              setPinMode('idle');
+                              setPinInput('');
+                              setPinConfirm('');
+                              toast.success('Adult PIN saved');
+                            }).catch(err => setPinError(String(err)));
                           }}
                           className="flex-1 bg-primary/10 hover:bg-primary/20 border border-primary/20 text-primary text-xs font-semibold py-2 rounded-lg transition-colors"
                         >

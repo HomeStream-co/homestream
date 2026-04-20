@@ -7,7 +7,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'sonner';
 import { useMedia } from '@/context/MediaContext';
-import { useProfile, PROFILES, type ProfileId } from '@/context/ProfileContext';
+import { useProfile, type Profile } from '@/context/ProfileContext';
 import SettingsPanel from '@/components/SettingsPanel';
 import StremioPanel from '@/components/StremioPanel';
 import SecurityPanel from '@/components/SecurityPanel';
@@ -123,12 +123,12 @@ export default function Header({ onChatOpen: _onChatOpen }: HeaderProps) {
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [debugOpen, setDebugOpen] = useState(false);
   const [securityOpen, setSecurityOpen] = useState(false);
-  // PIN lock state — which profile id is pending PIN verification
-  const [pinPendingId, setPinPendingId] = useState<ProfileId | null>(null);
+  // PIN lock state — which profile is pending PIN verification
+  const [pinPendingProfile, setPinPendingProfile] = useState<Profile | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
   const { watchlist } = useMedia();
-  const { activeProfile, setActiveProfile, adultPinEnabled } = useProfile();
+  const { activeProfile, profiles, setActiveProfile, verifyPin } = useProfile();
   const activeDownloads = useActiveDownloadCount();
 
   useEffect(() => {
@@ -309,13 +309,12 @@ export default function Header({ onChatOpen: _onChatOpen }: HeaderProps) {
                       <div className="px-3 py-2 border-b border-border">
                         <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Switch Profile</p>
                       </div>
-                      {PROFILES.map(profile => (
+                      {profiles.map(profile => (
                         <button
                           key={profile.id}
                           onClick={() => {
-                            // If switching to Adult and PIN is enabled, show PIN gate
-                            if (profile.id === 'adult' && adultPinEnabled && activeProfile?.id !== 'adult') {
-                              setPinPendingId('adult');
+                            if (profile.hasPin && activeProfile?.id !== profile.id) {
+                              setPinPendingProfile(profile);
                               setProfileMenuOpen(false);
                               return;
                             }
@@ -332,7 +331,7 @@ export default function Header({ onChatOpen: _onChatOpen }: HeaderProps) {
                             {profile.restricted && (
                               <p className="text-[10px] text-yellow-500">G &amp; PG only</p>
                             )}
-                            {profile.id === 'adult' && adultPinEnabled && (
+                            {profile.hasPin && (
                               <p className="text-[10px] text-primary/70 flex items-center gap-0.5">
                                 <Lock className="w-2.5 h-2.5" /> PIN protected
                               </p>
@@ -434,12 +433,12 @@ export default function Header({ onChatOpen: _onChatOpen }: HeaderProps) {
               <div className="px-1">
                 <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium px-2 mb-2">Profile</p>
                 <div className="flex flex-col gap-0.5">
-                  {PROFILES.map(profile => (
+                  {profiles.map(profile => (
                     <button
                       key={profile.id}
                       onClick={() => {
-                        if (profile.id === 'adult' && adultPinEnabled && activeProfile?.id !== 'adult') {
-                          setPinPendingId('adult');
+                        if (profile.hasPin && activeProfile?.id !== profile.id) {
+                          setPinPendingProfile(profile);
                           setMobileOpen(false);
                           return;
                         }
@@ -458,7 +457,7 @@ export default function Header({ onChatOpen: _onChatOpen }: HeaderProps) {
                         {profile.restricted && (
                           <span className="text-[10px] text-yellow-500">G &amp; PG only</span>
                         )}
-                        {profile.id === 'adult' && adultPinEnabled && (
+                        {profile.hasPin && (
                           <span className="text-[10px] text-primary/70 flex items-center gap-0.5">
                             <Lock className="w-2.5 h-2.5" /> PIN protected
                           </span>
@@ -484,16 +483,17 @@ export default function Header({ onChatOpen: _onChatOpen }: HeaderProps) {
       </AnimatePresence>
     </header>
 
-    {/* PIN lock overlay — shown when switching to PIN-protected Adult profile */}
-    {pinPendingId && (
+    {/* PIN lock overlay — shown when switching to a PIN-protected profile */}
+    {pinPendingProfile && (
       <PinLock
-        profileName="Adult"
+        profileName={pinPendingProfile.name}
+        onVerify={pin => verifyPin(pinPendingProfile.id, pin)}
         onSuccess={() => {
-          setActiveProfile(pinPendingId);
-          setPinPendingId(null);
-          toast.success('Welcome back, Adult profile');
+          setActiveProfile(pinPendingProfile.id);
+          setPinPendingProfile(null);
+          toast.success(`Welcome, ${pinPendingProfile.name}`);
         }}
-        onCancel={() => setPinPendingId(null)}
+        onCancel={() => setPinPendingProfile(null)}
       />
     )}
   </>
