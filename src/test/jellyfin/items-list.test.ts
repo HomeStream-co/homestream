@@ -74,6 +74,8 @@ describe('GET /api/jellyfin/Items', () => {
         expect(item).toHaveProperty('ServerId', 'homestream-server-001');
         expect(item).toHaveProperty('UserData');
         expect(item).toHaveProperty('Genres');
+        // Items list does NOT include People — that's only in Items/:id
+        expect(item).not.toHaveProperty('People');
       }
     });
 
