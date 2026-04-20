@@ -66,6 +66,11 @@ export interface MediaItem {
   // Top-level watchProgress / watchedSeconds / lastWatchedAt mirror the adult profile
   // for backwards compatibility with Jellyfin API and legacy code.
   profileProgress?: Record<string, ProfileProgressEntry>;
+  // Demo content flags
+  isDemo?: boolean;             // true for built-in demo items (Big Buck Bunny)
+  requiresInternet?: boolean;   // true if the item streams from the internet (demo only)
+  importedFrom?: string;        // 'demo' | 'upload' | 'scan' | 'qbittorrent'
+  demoStreamUrl?: string;       // CDN URL for demo items
   // TV show episode tracking
   totalSeasons?: number;
   episodes?: Episode[];

@@ -3,6 +3,10 @@
  *
  * Returns all audio and subtitle tracks for a media file.
  * Uses the probe cache so repeated calls are instant (no repeated ffprobe).
+ *
+ * File resolution order (mirrors stream endpoint):
+ *  1. item.filePath (absolute path — handles downloads folder, custom dirs)
+ *  2. uploads/<filename> (legacy upload path)
  */
 import type { Request, Response } from 'express';
 import path from 'path';
@@ -20,21 +24,31 @@ export default async function handler(req: Request, res: Response) {
       return res.json({ audio: [], subtitles: [] });
     }
 
-    const library = JSON.parse(fs.readFileSync(libPath, 'utf8')) as Array<{
-      id: string; filename?: string; filePath?: string;
-    }>;
+    type LibEntry = { id: string; filename?: string; filePath?: string; filepath?: string };
+    const library = JSON.parse(fs.readFileSync(libPath, 'utf8')) as LibEntry[];
 
     const item = library.find(m => m.id === id);
     if (!item) return res.status(404).json({ error: 'Media not found' });
 
-    const filename = item.filename ?? path.basename(item.filePath ?? '');
-    const filePath = path.join(UPLOADS_DIR, filename);
+    // Resolve file path — prefer stored absolute path, fall back to uploads/
+    let resolvedPath: string | null = null;
 
-    if (!fs.existsSync(filePath)) {
+    const storedPath = item.filePath ?? item.filepath;
+    if (storedPath && fs.existsSync(storedPath)) {
+      resolvedPath = storedPath;
+    } else {
+      const filename = item.filename ?? path.basename(storedPath ?? '');
+      if (filename) {
+        const uploadsPath = path.join(UPLOADS_DIR, filename);
+        if (fs.existsSync(uploadsPath)) resolvedPath = uploadsPath;
+      }
+    }
+
+    if (!resolvedPath) {
       return res.json({ audio: [], subtitles: [] });
     }
 
-    const probe = await probeFile(filePath);
+    const probe = await probeFile(resolvedPath);
 
     res.set('Cache-Control', 'private, max-age=3600');
     res.json({ audio: probe.audioTracks, subtitles: probe.subtitleTracks });

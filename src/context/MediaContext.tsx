@@ -63,7 +63,6 @@ export function MediaProvider({ children }: { children: ReactNode }) {
       .catch(() => {
         // Server unavailable — keep localStorage value, will sync on next load
       });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profileId, watchlistKey]);
 
   const refreshLibrary = useCallback(async () => {
@@ -116,7 +115,6 @@ export function MediaProvider({ children }: { children: ReactNode }) {
       const cachedWl = JSON.parse(localStorage.getItem(watchlistKey) || '[]') as string[];
       setWatchlist(cachedWl);
     } catch { /* ignore */ }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [progressKey, watchlistKey]);
 
   // ── Watchlist mutations — optimistic UI + server persist ───────────────────
@@ -144,7 +142,6 @@ export function MediaProvider({ children }: { children: ReactNode }) {
           return reverted;
         });
       });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profileId, watchlistKey]);
 
   const removeFromWatchlist = useCallback((id: string) => {
@@ -169,7 +166,6 @@ export function MediaProvider({ children }: { children: ReactNode }) {
           return reverted;
         });
       });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profileId, watchlistKey]);
 
   const updateProgress = useCallback((id: string, progress: number, currentTime?: number, duration?: number) => {
@@ -197,7 +193,6 @@ export function MediaProvider({ children }: { children: ReactNode }) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ progress, currentTime, duration, profileId }),
     }).catch(console.error);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profileId, progressKey]);
 
   const triggerPostWatchRecommendation = useCallback((id: string) => {

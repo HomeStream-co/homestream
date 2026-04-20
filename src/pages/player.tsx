@@ -60,7 +60,8 @@ export default function PlayerPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { library, updateProgress, triggerPostWatchRecommendation, continueWatching } = useMedia();
-  const { isAllowed } = useProfile();
+  const { isAllowed, activeProfile } = useProfile();
+  const profileId = activeProfile?.id ?? 'adult';
   const { settings: appSettings } = useTheme();
   const playerAccent = appSettings.syncPlayerColor ? 'hsl(var(--primary))' : 'rgba(255,255,255,0.9)';
   const item = library.find(m => m.id === id);
@@ -472,15 +473,21 @@ export default function PlayerPage() {
   }, [id, saveProgress]);
 
   // ── Save on navigate away (React Router unmount) ──
+  // Capture profileId in a ref so the cleanup closure always has the current value
+  const profileIdRef = useRef(profileId);
+  useEffect(() => { profileIdRef.current = profileId; }, [profileId]);
+
   useEffect(() => {
     return () => {
       // Flush progress when leaving the player page
-      if (id && videoRef.current && videoRef.current.duration > 0) {
-        const ct = videoRef.current.currentTime;
-        const dur = videoRef.current.duration;
+      const video = videoRef.current;
+      if (id && video && video.duration > 0) {
+        const ct = video.currentTime;
+        const dur = video.duration;
         const pct = (ct / dur) * 100;
+        // Include profileId so progress is stored under the correct profile
+        const payload = JSON.stringify({ progress: pct, currentTime: ct, duration: dur, profileId: profileIdRef.current });
         // Fire-and-forget — use sendBeacon for reliability on unload
-        const payload = JSON.stringify({ progress: pct, currentTime: ct, duration: dur });
         if (navigator.sendBeacon) {
           const blob = new Blob([payload], { type: 'application/json' });
           navigator.sendBeacon(`/api/media/${id}/progress`, blob);
@@ -494,6 +501,7 @@ export default function PlayerPage() {
         }
       }
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   // ── Watch-complete trigger at 85% ──
@@ -524,6 +532,10 @@ export default function PlayerPage() {
     return () => clearInterval(autoplayTimerRef.current);
   }, [showEndOverlay, autoplayCancelled, nextItem, navigate, appSettings.autoplayNext]);
 
+  const skipIntro = useCallback(() => {
+    if (videoRef.current) videoRef.current.currentTime = SKIP_INTRO_END;
+  }, []);
+
   // ── Skip Intro visibility + auto-skip ──
   useEffect(() => {
     const inIntro = currentTime > 30 && currentTime < SKIP_INTRO_END && playing;
@@ -531,7 +543,7 @@ export default function PlayerPage() {
     if (inIntro && appSettings.autoSkipIntro) {
       skipIntro();
     }
-  }, [currentTime, playing, appSettings.autoSkipIntro]);
+  }, [currentTime, playing, appSettings.autoSkipIntro, skipIntro]);
 
   // ── Auto-hide controls ──
   const resetControlsTimer = useCallback(() => {
@@ -563,6 +575,8 @@ export default function PlayerPage() {
     video.addEventListener('enterpictureinpicture', onEnter);
     video.addEventListener('leavepictureinpicture', onLeave);
     return () => {
+      // Use the captured `video` variable — not videoRef.current — so the
+      // cleanup always removes listeners from the same element that added them.
       video.removeEventListener('enterpictureinpicture', onEnter);
       video.removeEventListener('leavepictureinpicture', onLeave);
     };
@@ -1020,10 +1034,6 @@ export default function PlayerPage() {
     else document.exitFullscreen();
   };
 
-  const skipIntro = () => {
-    if (videoRef.current) videoRef.current.currentTime = SKIP_INTRO_END;
-  };
-
   const SPEED_OPTIONS = [3, 2, 1.5, 1.25, 1, 0.75, 0.5];
 
   const changeSpeed = (rate: number) => {
@@ -1188,11 +1198,17 @@ export default function PlayerPage() {
           onError={() => {
             const video = videoRef.current;
             const code = video?.error?.code;
+            // Special message for the demo item which requires internet
+            const isDemo = item?.isDemo || item?.filename?.startsWith('__demo__');
             const msgs: Record<number, string> = {
               1: 'Playback aborted',
-              2: 'Network error — check your connection to the HomeStream server',
+              2: isDemo
+                ? 'Network error — the demo item (Big Buck Bunny) requires an internet connection to stream. Add your own media files to play offline.'
+                : 'Network error — check your connection to the HomeStream server',
               3: 'Decoding error — this file format may not be supported by your browser',
-              4: 'File not found or unsupported format',
+              4: isDemo
+                ? 'Demo item unavailable — internet connection required to stream Big Buck Bunny. Add your own media files to play offline.'
+                : 'File not found or unsupported format',
             };
             setVideoError(msgs[code ?? 4] ?? 'Unable to play this file');
             setVideoLoading(false);

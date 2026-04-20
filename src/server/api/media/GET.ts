@@ -26,6 +26,7 @@ const DEMO_ITEM = {
   backdrop: '/demo/bbb-backdrop.jpg',
   plot: 'A large and lovable rabbit deals with three bullying rodents who want to steal his berries. Freely licensed under Creative Commons by the Blender Foundation.',
   rating: 'G',
+  rated: 'G',
   imdbRating: '7.8',
   genre: ['Animation', 'Short', 'Comedy'],
   runtime: '9 min',
@@ -35,6 +36,8 @@ const DEMO_ITEM = {
   watchProgress: 0,
   profileProgress: { adult: 0, kids: 0 },
   isDemo: true,
+  // Signals to the player that this item requires an internet connection
+  requiresInternet: true,
   importedFrom: 'demo',
   // Fixed date — prevents demo item from appearing in "Recently Added" on every restart
   addedAt: '2024-01-01T00:00:00.000Z',
