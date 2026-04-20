@@ -69,6 +69,7 @@ export const viteServerBefore = (server, _viteServer) => {
   server.use(cookieParser());
   server.use(express.json({ limit: '50mb' }));
   server.use(express.urlencoded({ extended: true, limit: '50mb' }));
+  import('./demoGuard.js').then(({ demoGuard }) => server.use(demoGuard)).catch(() => {});
 };
 
 export const viteServerAfter = (_server, _viteServer) => {};
@@ -76,6 +77,10 @@ export const viteServerAfter = (_server, _viteServer) => {};
 // ── Production server hooks ────────────────────────────────────────────────
 
 export const serverBefore = (server) => {
+  // Demo guard — rate-limits expensive API key endpoints in open/unauthenticated mode
+  import('./demoGuard.js').then(({ demoGuard }) => server.use(demoGuard)).catch(err => {
+    console.warn('[demoGuard] Failed to load (non-fatal):', err.message);
+  });
   // Startup cleanup: reset any items stuck with transcoding:true
   import('./startupCleanup.js').then(({ runStartupCleanup }) => {
     runStartupCleanup();
