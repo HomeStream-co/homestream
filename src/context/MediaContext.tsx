@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
 import type { MediaItem } from '@/types/media';
 import { useProfile } from '@/context/ProfileContext';

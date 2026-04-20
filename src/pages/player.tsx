@@ -253,7 +253,7 @@ export default function PlayerPage() {
     clearTimeout(ps.controlsTimerRef.current);
     if (ps.playing) ps.controlsTimerRef.current = setTimeout(() => ps.setShowControls(false), 3000);
   }, [ps]);
-  useEffect(() => { resetControlsTimer(); return () => clearTimeout(ps.controlsTimerRef.current); }, [ps.playing, resetControlsTimer]);
+  useEffect(() => { resetControlsTimer(); return () => clearTimeout(ps.controlsTimerRef.current); }, [ps.playing, ps.controlsTimerRef, resetControlsTimer]);
 
   // ── Fullscreen listener ───────────────────────────────────────────────────
   useEffect(() => {

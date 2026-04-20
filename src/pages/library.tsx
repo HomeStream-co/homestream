@@ -513,8 +513,9 @@ export default function LibraryPage() {
 
   // Clean up SSE connections on unmount
   useEffect(() => {
+    const refs = sseRefs.current;
     return () => {
-      sseRefs.current.forEach(es => es.close());
+      refs.forEach(es => es.close());
     };
   }, []);
 

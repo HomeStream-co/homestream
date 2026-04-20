@@ -98,8 +98,8 @@ export function usePlayerProgress({
 
   // ── Save on navigate away (React Router unmount) ──────────────────────────
   useEffect(() => {
+    const video = videoRef.current;
     return () => {
-      const video = videoRef.current;
       if (id && video && video.duration > 0) {
         const ct = video.currentTime;
         const dur = video.duration;
