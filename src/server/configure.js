@@ -54,11 +54,11 @@ async function seedDemoItem() {
     const { readLibrary, writeLibrary } = await import('./libraryStore.js');
     const { ALL_DEMO_ITEMS } = await import('./demoLibrary.js');
     const library = readLibrary();
-    const existingIds = new Set(library.map(m => m.id));
-    const toAdd = ALL_DEMO_ITEMS.filter(d => !existingIds.has(d.id));
-    if (toAdd.length === 0) return;
-    await writeLibrary(lib => { lib.unshift(...toAdd); return lib; });
-    console.log(`[demo] Seeded ${toAdd.length} demo items into library`);
+    const demoIds = new Set(ALL_DEMO_ITEMS.map(d => d.id));
+    // Remove stale demo entries, re-insert fresh ones at the front
+    const nonDemo = library.filter(m => !demoIds.has(m.id));
+    await writeLibrary(() => [...ALL_DEMO_ITEMS, ...nonDemo]);
+    console.log(`[demo] Synced ${ALL_DEMO_ITEMS.length} demo items into library`);
   } catch (err) {
     console.warn('[demo] Seed failed (non-fatal):', err.message);
   }

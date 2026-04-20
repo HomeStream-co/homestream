@@ -25,15 +25,17 @@ function ensureDemoSeeded() {
   demoSeeded = true;
   try {
     const library = readLibrary<Record<string, unknown>>();
-    const existingIds = new Set(library.map(m => m.id as string));
-    const toAdd = ALL_DEMO_ITEMS.filter(d => !existingIds.has(d.id));
-    if (toAdd.length === 0) return;
-    writeLibrary(lib => {
-      // Prepend new demo items (newest first so they appear at top)
-      lib.unshift(...(toAdd as unknown as Record<string, unknown>[]));
-      return lib;
+    const demoIds = new Set(ALL_DEMO_ITEMS.map(d => d.id));
+
+    // Remove stale demo items so we can re-insert fresh ones
+    const nonDemo = library.filter(m => !demoIds.has(m.id as string));
+    const toAdd = ALL_DEMO_ITEMS as unknown as Record<string, unknown>[];
+
+    writeLibrary(() => {
+      // Demo items at the front, user content after
+      return [...toAdd, ...nonDemo];
     }).catch(err => console.warn('[demo] Seed failed:', err));
-    console.log(`[demo] Seeded ${toAdd.length} demo items`);
+    console.log(`[demo] Synced ${ALL_DEMO_ITEMS.length} demo items`);
   } catch (err) {
     console.warn('[demo] Seed error (non-fatal):', err);
   }

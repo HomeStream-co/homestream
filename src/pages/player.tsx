@@ -557,9 +557,10 @@ export default function PlayerPage() {
             const isDemo = item.isDemo || item.filename?.startsWith('__demo__');
             const msgs: Record<number, string> = {
               1: 'Playback aborted',
-              2: isDemo ? 'Network error — the demo item (Big Buck Bunny) requires an internet connection to stream.' : 'Network error — check your connection to the HomeStream server',
+
+              2: isDemo ? 'Network error — demo items require an internet connection to stream from the Blender CDN.' : 'Network error — check your connection to the HomeStream server',
               3: 'Decoding error — this file format may not be supported by your browser',
-              4: isDemo ? 'Demo item unavailable — internet connection required.' : 'File not found or unsupported format',
+              4: isDemo ? 'Demo item unavailable — internet connection required to stream from the Blender CDN.' : 'File not found or unsupported format',
             };
             ps.setVideoError(msgs[code ?? 4] ?? 'Unable to play this file');
             ps.setVideoLoading(false);
