@@ -10,6 +10,12 @@
  */
 import { useEffect, useRef, useCallback } from 'react';
 
+export interface SubtitleTrack {
+  index: number;
+  label: string;
+  language: string;
+}
+
 export interface RemoteHandlers {
   onPlay?: () => void;
   onPause?: () => void;
@@ -21,17 +27,24 @@ export interface RemoteHandlers {
   onFullscreen?: () => void;
   onNextEpisode?: () => void;
   onSpeed?: (rate: number) => void;
+  /** track = -1 means off */
+  onSubtitle?: (track: number) => void;
+  onCast?: () => void;
 }
 
 export interface PlayerStatePayload {
   mediaId: string;
   title: string;
+  /** Poster image URL — shown on the phone remote */
+  poster?: string;
   currentTime: number;
   duration: number;
   paused: boolean;
   volume: number;
   speed: number;
   hasNextEpisode: boolean;
+  subtitleTracks?: SubtitleTrack[];
+  activeSubtitle?: number;
 }
 
 export function useRemoteControl(
@@ -58,7 +71,7 @@ export function useRemoteControl(
 
       ws.onmessage = (e) => {
         try {
-          const msg = JSON.parse(e.data) as { type: string; position?: number; level?: number; seconds?: number; rate?: number };
+          const msg = JSON.parse(e.data) as { type: string; position?: number; level?: number; seconds?: number; rate?: number; track?: number };
           const h = handlersRef.current;
           switch (msg.type) {
             case 'play':         h.onPlay?.(); break;
@@ -71,6 +84,8 @@ export function useRemoteControl(
             case 'fullscreen':   h.onFullscreen?.(); break;
             case 'next_episode': h.onNextEpisode?.(); break;
             case 'speed':        h.onSpeed?.(msg.rate ?? 1); break;
+            case 'subtitle':     h.onSubtitle?.(msg.track ?? -1); break;
+            case 'cast':         h.onCast?.(); break;
           }
         } catch { /* ignore */ }
       };

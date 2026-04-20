@@ -72,6 +72,10 @@ export default function PlayerPage() {
     && transcodeJob.status !== 'skipped';
 
   // ── Remote control — WebSocket phone remote ──
+  // Use a ref for setCcLang so the handler can reference it before state is declared
+  const setCcLangRef = useRef<((lang: 'off' | 'en' | 'es') => void) | null>(null);
+  const castButtonRef = useRef<(() => void) | null>(null);
+
   const { sendState } = useRemoteControl(id, {
     onPlay:        () => videoRef.current?.play(),
     onPause:       () => videoRef.current?.pause(),
@@ -82,6 +86,12 @@ export default function PlayerPage() {
     onSkipIntro:   () => { if (videoRef.current) videoRef.current.currentTime = SKIP_INTRO_END; },
     onFullscreen:  () => { if (!document.fullscreenElement) containerRef.current?.requestFullscreen(); else document.exitFullscreen(); },
     onSpeed:       (rate) => { if (videoRef.current) { videoRef.current.playbackRate = rate; setPlaybackRate(rate); } },
+    onSubtitle:    (track) => {
+      // track: -1 = off, 0 = English, 1 = Spanish
+      const lang: 'off' | 'en' | 'es' = track === -1 ? 'off' : track === 0 ? 'en' : 'es';
+      setCcLangRef.current?.(lang);
+    },
+    onCast:        () => castButtonRef.current?.(),
   });
 
   // ── HLS transcoding — for HEVC/H.265 and other non-browser-native codecs ──
@@ -225,6 +235,8 @@ export default function PlayerPage() {
   const [showSpeedMenu, setShowSpeedMenu] = useState(false);
   // Closed captions
   const [ccLang, setCcLang] = useState<'off' | 'en' | 'es'>('off');
+  // Wire setCcLang into the remote control ref so the WS handler can call it
+  useEffect(() => { setCcLangRef.current = setCcLang; }, []);
   const [showCcMenu, setShowCcMenu] = useState(false);
   // CC styling
   const [ccFontSize, setCcFontSize] = useState<'small' | 'medium' | 'large'>('medium');
@@ -1112,12 +1124,18 @@ export default function PlayerPage() {
                 sendState({
                   mediaId: id ?? '',
                   title: item?.title ?? '',
+                  poster: item?.poster,
                   currentTime: videoRef.current.currentTime,
                   duration: videoRef.current.duration || 0,
                   paused: videoRef.current.paused,
                   volume: videoRef.current.volume,
                   speed: videoRef.current.playbackRate,
                   hasNextEpisode: !!nextItem,
+                  subtitleTracks: [
+                    { index: 0, label: 'English', language: 'en' },
+                    { index: 1, label: 'Español', language: 'es' },
+                  ],
+                  activeSubtitle: ccLang === 'off' ? -1 : ccLang === 'en' ? 0 : 1,
                 });
               }
             }
