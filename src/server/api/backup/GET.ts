@@ -14,9 +14,9 @@ import fs from 'fs';
 import path from 'path';
 import { requireAuth } from '../../authMiddleware.js';
 
-const LIBRARY_PATH  = path.resolve('./media-library.json');
-const CONFIG_PATH   = path.resolve('./homestream-config.json');
-const PROFILES_PATH = path.resolve('./homestream-profiles.json');
+const LIBRARY_PATH  = fs.existsSync('/private') ? '/private/media-library.json'       : path.resolve('./media-library.json');
+const CONFIG_PATH   = fs.existsSync('/private') ? '/private/homestream-config.json'   : path.resolve('./homestream-config.json');
+const PROFILES_PATH = fs.existsSync('/private') ? '/private/homestream-profiles.json' : path.resolve('./homestream-profiles.json');
 
 function safeReadJson<T>(filePath: string, fallback: T): T {
   try {

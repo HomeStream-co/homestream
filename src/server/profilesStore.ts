@@ -12,7 +12,7 @@ import fs from 'fs';
 import path from 'path';
 import bcrypt from 'bcryptjs';
 
-const PROFILES_PATH = path.resolve('./homestream-profiles.json');
+const PROFILES_PATH = fs.existsSync('/private') ? '/private/homestream-profiles.json' : path.resolve('./homestream-profiles.json');
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 

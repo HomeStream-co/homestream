@@ -22,7 +22,7 @@
 import fs from 'fs';
 import path from 'path';
 
-const WATCHLIST_PATH = path.resolve('./homestream-watchlist.json');
+const WATCHLIST_PATH = fs.existsSync('/private') ? '/private/homestream-watchlist.json' : path.resolve('./homestream-watchlist.json');
 
 // ── Read ──────────────────────────────────────────────────────────────────────
 

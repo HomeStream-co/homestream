@@ -16,7 +16,7 @@
 import fs from 'fs';
 import path from 'path';
 
-const SUBS_PATH = path.resolve('./homestream-subscriptions.json');
+const SUBS_PATH = fs.existsSync('/private') ? '/private/homestream-subscriptions.json' : path.resolve('./homestream-subscriptions.json');
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 

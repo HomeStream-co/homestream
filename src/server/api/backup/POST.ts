@@ -19,8 +19,8 @@ import path from 'path';
 import { writeLibraryDirect } from '../../libraryStore.js';
 import { requireAuth } from '../../authMiddleware.js';
 
-const CONFIG_PATH   = path.resolve('./homestream-config.json');
-const PROFILES_PATH = path.resolve('./homestream-profiles.json');
+const CONFIG_PATH   = fs.existsSync('/private') ? '/private/homestream-config.json'   : path.resolve('./homestream-config.json');
+const PROFILES_PATH = fs.existsSync('/private') ? '/private/homestream-profiles.json' : path.resolve('./homestream-profiles.json');
 
 // Fields that are NEVER restored from backup (must be re-entered by user)
 const REDACTED_CONFIG_FIELDS = new Set([

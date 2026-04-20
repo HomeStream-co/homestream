@@ -21,7 +21,7 @@ export default async function handler(req: Request, res: Response) {
     if (!requireAuth(req, res)) return;
     const { id } = req.params;
 
-    const libPath = path.resolve('./media-library.json');
+    const libPath = fs.existsSync('/private') ? '/private/media-library.json' : path.resolve('./media-library.json');
     if (!fs.existsSync(libPath)) {
       return res.json({ audio: [], subtitles: [] });
     }

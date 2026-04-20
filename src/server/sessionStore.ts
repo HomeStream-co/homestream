@@ -17,7 +17,7 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 
-const SESSIONS_PATH = path.resolve('./homestream-sessions.json');
+const SESSIONS_PATH = fs.existsSync('/private') ? '/private/homestream-sessions.json' : path.resolve('./homestream-sessions.json');
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 // ── Write queue (same pattern as libraryStore) ────────────────────────────────

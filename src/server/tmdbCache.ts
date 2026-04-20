@@ -14,7 +14,9 @@ import fs from 'fs';
 import path from 'path';
 import { getSecret } from '#airo/secrets';
 
-const CACHE_DIR = path.resolve('./tmdb-cache');
+// Use persistent storage so the cache survives deploys and restarts.
+// Falls back to a local dir if /private is not available (e.g. local dev without the mount).
+const CACHE_DIR = fs.existsSync('/private') ? '/private/tmdb-cache' : path.resolve('./tmdb-cache');
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 const TMDB_BASE = 'https://api.themoviedb.org/3';
 const TMDB_IMG = 'https://image.tmdb.org/t/p/w500';

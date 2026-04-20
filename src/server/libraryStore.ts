@@ -14,7 +14,9 @@
 import fs from 'fs';
 import path from 'path';
 
-const LIBRARY_PATH = path.resolve('./media-library.json');
+// Use persistent storage so the library survives deploys and restarts.
+// Falls back to local path in dev environments without the /private mount.
+const LIBRARY_PATH = fs.existsSync('/private') ? '/private/media-library.json' : path.resolve('./media-library.json');
 
 // ── Read (always immediate) ───────────────────────────────────────────────────
 

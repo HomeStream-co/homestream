@@ -22,7 +22,7 @@
 import fs from 'fs';
 import path from 'path';
 
-const JOBS_PATH = path.resolve('./homestream-downloads.json');
+const JOBS_PATH = fs.existsSync('/private') ? '/private/homestream-downloads.json' : path.resolve('./homestream-downloads.json');
 const RETENTION_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
 // ── Types ─────────────────────────────────────────────────────────────────────

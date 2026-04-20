@@ -12,7 +12,7 @@
 import fs from 'fs';
 import path from 'path';
 
-const CONFIG_PATH = path.resolve('./homestream-config.json');
+const CONFIG_PATH = fs.existsSync('/private') ? '/private/homestream-config.json' : path.resolve('./homestream-config.json');
 
 export interface AppConfig {
   setupComplete: boolean;
