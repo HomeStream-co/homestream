@@ -18,6 +18,7 @@ import {
   CheckCircle2, AlertCircle, Clock, Loader2,
   Film, Tv2, ArrowDown, ArrowUp, Zap, HardDrive,
   RefreshCw, X, ChevronDown, ChevronUp, Activity,
+  Settings2, Save, BarChart3, Layers,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import VPNPanel from '@/components/VPNPanel';
@@ -87,6 +88,16 @@ interface DownloadsResponse {
   backend: 'qbittorrent' | 'webtorrent';
   qbitOnline: boolean;
   error?: string;
+}
+
+interface StorageStats {
+  libraryBytes: number;
+  libraryCount: number;
+  diskFreeBytes: number | null;
+  diskTotalBytes: number | null;
+  mediaDir: string | null;
+  categoryBytes: { movies: number; tv: number; other: number };
+  storageAllocation: { moviesPct: number; tvPct: number; otherPct: number };
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -413,6 +424,47 @@ export default function DownloadsPage() {
   const [filter, setFilter] = useState<'all' | 'active' | 'done' | 'error'>('all');
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
+  // Storage state
+  const [storage, setStorage] = useState<StorageStats | null>(null);
+  const [showStorageSettings, setShowStorageSettings] = useState(false);
+  const [moviesPct, setMoviesPct] = useState(60);
+  const [tvPct, setTvPct] = useState(30);
+  const [savingAlloc, setSavingAlloc] = useState(false);
+
+  const fetchStorage = useCallback(async () => {
+    try {
+      const res = await fetch('/api/library/storage');
+      if (!res.ok) return;
+      const json = await res.json() as StorageStats;
+      setStorage(json);
+      setMoviesPct(json.storageAllocation.moviesPct);
+      setTvPct(json.storageAllocation.tvPct);
+    } catch { /* silent */ }
+  }, []);
+
+  const saveAllocation = async () => {
+    if (moviesPct + tvPct > 100) {
+      toast.error('Movies % + TV % cannot exceed 100%');
+      return;
+    }
+    setSavingAlloc(true);
+    try {
+      const res = await fetch('/api/library/storage', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ moviesPct, tvPct }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      toast.success('Storage allocation saved');
+      await fetchStorage();
+      setShowStorageSettings(false);
+    } catch (err) {
+      toast.error(`Failed to save: ${String(err)}`);
+    } finally {
+      setSavingAlloc(false);
+    }
+  };
+
   const fetchData = useCallback(async () => {
     try {
       const res = await fetch('/api/stremio/downloads');
@@ -429,9 +481,11 @@ export default function DownloadsPage() {
 
   useEffect(() => {
     fetchData();
+    fetchStorage();
     const interval = setInterval(fetchData, 2000);
-    return () => clearInterval(interval);
-  }, [fetchData]);
+    const storageInterval = setInterval(fetchStorage, 15000);
+    return () => { clearInterval(interval); clearInterval(storageInterval); };
+  }, [fetchData, fetchStorage]);
 
   const handleDelete = useCallback(async (hash: string, deleteFiles: boolean) => {
     try {
@@ -559,6 +613,258 @@ export default function DownloadsPage() {
             <VPNPanel />
           </div>
 
+          {/* ── Disk Usage Bar ── */}
+          {storage && storage.diskTotalBytes && (
+            <motion.div
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mb-6 bg-card border border-border rounded-2xl p-4"
+            >
+              {/* Header row */}
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <HardDrive className="w-4 h-4 text-primary" />
+                  <span className="text-sm font-semibold text-foreground">Storage</span>
+                  {storage.mediaDir && (
+                    <span className="text-[10px] text-muted-foreground bg-muted/40 px-2 py-0.5 rounded-full font-mono truncate max-w-[180px]">
+                      {storage.mediaDir}
+                    </span>
+                  )}
+                </div>
+                <button
+                  onClick={() => setShowStorageSettings(s => !s)}
+                  className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors px-2 py-1 rounded-lg hover:bg-muted"
+                >
+                  <Settings2 className="w-3.5 h-3.5" />
+                  Organise
+                  {showStorageSettings ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                </button>
+              </div>
+
+              {/* Main disk bar */}
+              {(() => {
+                const total = storage.diskTotalBytes!;
+                const free  = storage.diskFreeBytes ?? 0;
+                const used  = total - free;
+                const usedPct = Math.min(100, (used / total) * 100);
+                const freePct = 100 - usedPct;
+
+                // Color thresholds
+                const barColor =
+                  usedPct >= 90 ? 'bg-red-500' :
+                  usedPct >= 75 ? 'bg-orange-500' :
+                  usedPct >= 60 ? 'bg-yellow-500' :
+                  'bg-green-500';
+
+                const textColor =
+                  usedPct >= 90 ? 'text-red-400' :
+                  usedPct >= 75 ? 'text-orange-400' :
+                  usedPct >= 60 ? 'text-yellow-400' :
+                  'text-green-400';
+
+                const label =
+                  usedPct >= 90 ? '⚠ Critical — disk nearly full' :
+                  usedPct >= 75 ? 'Running low on space' :
+                  usedPct >= 60 ? 'Moderate usage' :
+                  'Plenty of space available';
+
+                return (
+                  <div>
+                    {/* Bar */}
+                    <div className="relative w-full h-5 bg-muted/50 rounded-full overflow-hidden mb-2">
+                      <motion.div
+                        className={`h-full rounded-full ${barColor} transition-colors duration-700`}
+                        initial={{ width: 0 }}
+                        animate={{ width: `${usedPct}%` }}
+                        transition={{ duration: 0.8, ease: 'easeOut' }}
+                      />
+                      {/* Library portion overlay */}
+                      <motion.div
+                        className="absolute top-0 left-0 h-full bg-primary/40 rounded-full"
+                        initial={{ width: 0 }}
+                        animate={{ width: `${Math.min(usedPct, (storage.libraryBytes / total) * 100)}%` }}
+                        transition={{ duration: 0.8, ease: 'easeOut', delay: 0.1 }}
+                      />
+                      {/* Percentage label inside bar */}
+                      <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-white/90 mix-blend-plus-lighter">
+                        {usedPct.toFixed(1)}% used
+                      </span>
+                    </div>
+
+                    {/* Stats row */}
+                    <div className="flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-3">
+                        <span className="text-muted-foreground">
+                          <span className="font-semibold text-foreground">{fmtBytes(used)}</span> used
+                        </span>
+                        <span className="text-muted-foreground">·</span>
+                        <span className={`font-semibold ${textColor}`}>{fmtBytes(free)} free</span>
+                        <span className="text-muted-foreground">·</span>
+                        <span className="text-muted-foreground">{fmtBytes(total)} total</span>
+                      </div>
+                      <span className={`text-[10px] font-medium ${textColor}`}>{label}</span>
+                    </div>
+
+                    {/* Library breakdown mini-bars */}
+                    <div className="mt-3 grid grid-cols-3 gap-2">
+                      {[
+                        { label: 'Movies', bytes: storage.categoryBytes.movies, color: 'bg-blue-500', icon: Film },
+                        { label: 'TV Shows', bytes: storage.categoryBytes.tv, color: 'bg-purple-500', icon: Tv2 },
+                        { label: 'Other', bytes: storage.categoryBytes.other, color: 'bg-muted-foreground', icon: Layers },
+                      ].map(({ label: lbl, bytes, color, icon: Icon }) => {
+                        const pct = total > 0 ? Math.min(100, (bytes / total) * 100) : 0;
+                        return (
+                          <div key={lbl} className="bg-muted/30 rounded-xl p-2.5">
+                            <div className="flex items-center gap-1.5 mb-1.5">
+                              <Icon className="w-3 h-3 text-muted-foreground" />
+                              <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">{lbl}</span>
+                            </div>
+                            <div className="w-full h-1.5 bg-muted/60 rounded-full overflow-hidden mb-1">
+                              <motion.div
+                                className={`h-full rounded-full ${color}`}
+                                initial={{ width: 0 }}
+                                animate={{ width: `${pct}%` }}
+                                transition={{ duration: 0.7, ease: 'easeOut', delay: 0.2 }}
+                              />
+                            </div>
+                            <p className="text-[11px] font-bold text-foreground">{fmtBytes(bytes)}</p>
+                            <p className="text-[10px] text-muted-foreground">{pct.toFixed(1)}% of disk</p>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Allocation warning */}
+                    {freePct < 10 && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        className="mt-3 flex items-center gap-2 p-2.5 bg-red-500/10 border border-red-500/20 rounded-xl text-xs text-red-400"
+                      >
+                        <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+                        <span>Less than 10% disk space remaining. Consider removing completed downloads or expanding storage.</span>
+                      </motion.div>
+                    )}
+                  </div>
+                );
+              })()}
+
+              {/* ── Storage Allocation Settings (collapsible) ── */}
+              <AnimatePresence>
+                {showStorageSettings && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="overflow-hidden"
+                  >
+                    <div className="mt-4 pt-4 border-t border-border">
+                      <div className="flex items-center gap-2 mb-3">
+                        <BarChart3 className="w-4 h-4 text-primary" />
+                        <p className="text-sm font-semibold text-foreground">Storage Organisation</p>
+                        <span className="text-[10px] text-muted-foreground bg-muted/40 px-2 py-0.5 rounded-full">
+                          Set target % of disk per category
+                        </span>
+                      </div>
+                      <p className="text-xs text-muted-foreground mb-4 leading-relaxed">
+                        These targets are informational — HomeStream uses them to warn you when a category is approaching its limit. Files are not automatically moved or deleted.
+                      </p>
+
+                      <div className="flex flex-col gap-4">
+                        {/* Movies slider */}
+                        <div>
+                          <div className="flex items-center justify-between mb-1.5">
+                            <div className="flex items-center gap-1.5">
+                              <Film className="w-3.5 h-3.5 text-blue-400" />
+                              <span className="text-xs font-semibold text-foreground">Movies</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="number"
+                                min={0} max={100}
+                                value={moviesPct}
+                                onChange={e => setMoviesPct(Math.min(100, Math.max(0, Number(e.target.value))))}
+                                className="w-14 text-center text-xs font-bold bg-muted border border-border rounded-lg px-2 py-1 text-foreground"
+                              />
+                              <span className="text-xs text-muted-foreground">%</span>
+                            </div>
+                          </div>
+                          <input
+                            type="range" min={0} max={100} value={moviesPct}
+                            onChange={e => setMoviesPct(Number(e.target.value))}
+                            className="w-full accent-blue-500 h-2 rounded-full"
+                          />
+                          {storage?.diskTotalBytes && (
+                            <p className="text-[10px] text-muted-foreground mt-0.5">
+                              Target: {fmtBytes((storage.diskTotalBytes * moviesPct) / 100)} · Currently using {fmtBytes(storage.categoryBytes.movies)}
+                            </p>
+                          )}
+                        </div>
+
+                        {/* TV slider */}
+                        <div>
+                          <div className="flex items-center justify-between mb-1.5">
+                            <div className="flex items-center gap-1.5">
+                              <Tv2 className="w-3.5 h-3.5 text-purple-400" />
+                              <span className="text-xs font-semibold text-foreground">TV Shows</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="number"
+                                min={0} max={100}
+                                value={tvPct}
+                                onChange={e => setTvPct(Math.min(100, Math.max(0, Number(e.target.value))))}
+                                className="w-14 text-center text-xs font-bold bg-muted border border-border rounded-lg px-2 py-1 text-foreground"
+                              />
+                              <span className="text-xs text-muted-foreground">%</span>
+                            </div>
+                          </div>
+                          <input
+                            type="range" min={0} max={100} value={tvPct}
+                            onChange={e => setTvPct(Number(e.target.value))}
+                            className="w-full accent-purple-500 h-2 rounded-full"
+                          />
+                          {storage?.diskTotalBytes && (
+                            <p className="text-[10px] text-muted-foreground mt-0.5">
+                              Target: {fmtBytes((storage.diskTotalBytes * tvPct) / 100)} · Currently using {fmtBytes(storage.categoryBytes.tv)}
+                            </p>
+                          )}
+                        </div>
+
+                        {/* Other (implied) */}
+                        <div className="flex items-center justify-between p-2.5 bg-muted/30 rounded-xl">
+                          <div className="flex items-center gap-1.5">
+                            <Layers className="w-3.5 h-3.5 text-muted-foreground" />
+                            <span className="text-xs text-muted-foreground">Other / Unallocated</span>
+                          </div>
+                          <span className={`text-xs font-bold ${moviesPct + tvPct > 100 ? 'text-red-400' : 'text-foreground'}`}>
+                            {Math.max(0, 100 - moviesPct - tvPct)}%
+                          </span>
+                        </div>
+
+                        {moviesPct + tvPct > 100 && (
+                          <p className="text-xs text-red-400 flex items-center gap-1.5">
+                            <AlertCircle className="w-3.5 h-3.5" />
+                            Total exceeds 100% — reduce Movies or TV allocation
+                          </p>
+                        )}
+
+                        <button
+                          onClick={saveAllocation}
+                          disabled={savingAlloc || moviesPct + tvPct > 100}
+                          className="flex items-center justify-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground py-2.5 rounded-xl text-sm font-semibold transition-colors disabled:opacity-50"
+                        >
+                          {savingAlloc ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                          Save Allocation
+                        </button>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </motion.div>
+          )}
+
           {/* ── Global transfer stats bar ── */}
           <AnimatePresence>
             {tf && data?.qbitOnline && (
@@ -587,6 +893,31 @@ export default function DownloadsPage() {
               </motion.div>
             )}
           </AnimatePresence>
+
+          {/* ── Download Stats Summary ── */}
+          {totalAll > 0 && (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
+              {[
+                { label: 'Total Downloads', value: String(totalAll),    icon: Download,    color: 'text-primary',    bg: 'bg-primary/10' },
+                { label: 'Active',          value: String(totalActive), icon: Activity,    color: 'text-blue-400',   bg: 'bg-blue-400/10' },
+                { label: 'Completed',       value: String(totalDone),   icon: CheckCircle2, color: 'text-green-400', bg: 'bg-green-400/10' },
+                { label: 'Issues',          value: String(totalError),  icon: AlertCircle,
+                  color: totalError > 0 ? 'text-red-400' : 'text-muted-foreground',
+                  bg:    totalError > 0 ? 'bg-red-400/10' : 'bg-muted/30' },
+              ].map(({ label, value, icon: Icon, color, bg }) => (
+                <motion.div key={label} initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
+                  className="bg-card border border-border rounded-xl p-3 flex items-center gap-3">
+                  <div className={`w-9 h-9 rounded-xl ${bg} flex items-center justify-center flex-shrink-0`}>
+                    <Icon className={`w-4 h-4 ${color}`} />
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-muted-foreground uppercase tracking-wide">{label}</p>
+                    <p className={`text-lg font-bold ${color}`}>{value}</p>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          )}
 
           {/* ── Filter tabs ── */}
           <div className="flex items-center gap-1 mb-4 bg-muted/30 rounded-xl p-1 w-fit">
