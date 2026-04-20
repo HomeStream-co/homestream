@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="600" viewBox="0 0 400 600">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="0.7" y2="1">
+      <stop offset="0%" stop-color="#1a1a2e"/>
+      <stop offset="100%" stop-color="#16213e"/>
+    </linearGradient>
+    <linearGradient id="shine" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#e94560" stop-opacity="0"/>
+      <stop offset="50%" stop-color="#e94560" stop-opacity="0.15"/>
+      <stop offset="100%" stop-color="#e94560" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="600" fill="url(#g)"/>
+  <rect width="400" height="600" fill="url(#shine)"/>
+  <!-- Top accent line -->
+  <rect x="40" y="40" width="320" height="2" fill="#e94560" opacity="0.9"/>
+  <!-- Bottom accent line -->
+  <rect x="40" y="558" width="320" height="2" fill="#e94560" opacity="0.9"/>
+  <!-- Corner marks -->
+  <rect x="40" y="40" width="2" height="20" fill="#e94560" opacity="0.7"/>
+  <rect x="358" y="40" width="2" height="20" fill="#e94560" opacity="0.7"/>
+  <rect x="40" y="540" width="2" height="20" fill="#e94560" opacity="0.7"/>
+  <rect x="358" y="540" width="2" height="20" fill="#e94560" opacity="0.7"/>
+  <!-- Title -->
+  <text x="200" y="320" font-family="Georgia,serif" font-size="34" font-weight="bold" fill="white" text-anchor="middle" dominant-baseline="middle">Sintel</text>
+  
+  <!-- Year -->
+  <text x="200" y="376" font-family="Arial,sans-serif" font-size="15" fill="#e94560" text-anchor="middle" opacity="0.9" letter-spacing="4">2010</text>
+  <!-- Demo badge -->
+  <text x="200" y="545" font-family="Arial,sans-serif" font-size="10" fill="white" text-anchor="middle" opacity="0.35" letter-spacing="2">DEMO · CC BY</text>
+</svg>
