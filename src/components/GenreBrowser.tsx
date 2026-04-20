@@ -33,7 +33,7 @@ interface GenreDef {
   emoji: string;
 }
 
-const GENRES: GenreDef[] = [
+const MOVIE_GENRES: GenreDef[] = [
   { id: 28,    name: 'Action',      emoji: '💥' },
   { id: 35,    name: 'Comedy',      emoji: '😂' },
   { id: 18,    name: 'Drama',       emoji: '🎭' },
@@ -51,6 +51,27 @@ const GENRES: GenreDef[] = [
   { id: 37,    name: 'Western',     emoji: '🤠' },
   { id: 10752, name: 'War',         emoji: '⚔️' },
 ];
+
+// TV show genres use different TMDB IDs
+const TV_GENRES: GenreDef[] = [
+  { id: 10759, name: 'Action & Adventure', emoji: '💥' },
+  { id: 35,    name: 'Comedy',             emoji: '😂' },
+  { id: 18,    name: 'Drama',              emoji: '🎭' },
+  { id: 9648,  name: 'Mystery',            emoji: '🔍' },
+  { id: 10765, name: 'Sci-Fi & Fantasy',   emoji: '🚀' },
+  { id: 80,    name: 'Crime',              emoji: '🕵️' },
+  { id: 10768, name: 'War & Politics',     emoji: '⚔️' },
+  { id: 16,    name: 'Animation',          emoji: '🎨' },
+  { id: 10751, name: 'Family',             emoji: '👨‍👩‍👧' },
+  { id: 10762, name: 'Kids',               emoji: '🧒' },
+  { id: 10763, name: 'News',               emoji: '📰' },
+  { id: 10764, name: 'Reality',            emoji: '📺' },
+  { id: 10766, name: 'Soap',               emoji: '🫧' },
+  { id: 10767, name: 'Talk',               emoji: '🎙️' },
+  { id: 99,    name: 'Documentary',        emoji: '🎬' },
+];
+
+type MediaType = 'movie' | 'tv';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -470,22 +491,25 @@ function HorizontalCarousel({
 
 export default function GenreBrowser() {
   const { library, watchlist, addToWatchlist, removeFromWatchlist } = useMedia();
-  const [activeGenre, setActiveGenre] = useState<GenreDef>(GENRES[0]);
+  const [mediaType, setMediaType] = useState<MediaType>('movie');
+  const [activeGenre, setActiveGenre] = useState<GenreDef>(MOVIE_GENRES[0]);
   const [genreData, setGenreData] = useState<GenreData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [downloadTarget, setDownloadTarget] = useState<DownloadTarget | null>(null);
 
-  // Per-genre cache so switching back is instant
-  const cache = useRef<Map<number, GenreData>>(new Map());
+  // Separate caches for movies and TV so switching back is instant
+  const movieCache = useRef<Map<number, GenreData>>(new Map());
+  const tvCache    = useRef<Map<number, GenreData>>(new Map());
 
   const libraryTitles = new Set(library.map(m => m.title.toLowerCase()));
 
-  const loadGenre = useCallback(async (genre: GenreDef) => {
+  const loadGenre = useCallback(async (genre: GenreDef, type: MediaType) => {
     setActiveGenre(genre);
     setError(null);
 
-    // Serve from cache if available
+    const cache = type === 'tv' ? tvCache : movieCache;
+
     if (cache.current.has(genre.id)) {
       setGenreData(cache.current.get(genre.id)!);
       return;
@@ -494,7 +518,7 @@ export default function GenreBrowser() {
     setLoading(true);
     setGenreData(null);
     try {
-      const res = await fetch(`/api/tmdb/genres?genreId=${genre.id}`);
+      const res = await fetch(`/api/tmdb/genres?genreId=${genre.id}&mediaType=${type}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json() as GenreData;
       cache.current.set(genre.id, data);
@@ -506,9 +530,16 @@ export default function GenreBrowser() {
     }
   }, []);
 
-  // Load first genre on mount
+  // Switch media type — reset to first genre of the new type
+  const handleMediaTypeSwitch = useCallback((type: MediaType) => {
+    setMediaType(type);
+    const genres = type === 'tv' ? TV_GENRES : MOVIE_GENRES;
+    loadGenre(genres[0], type);
+  }, [loadGenre]);
+
+  // Load first movie genre on mount
   useEffect(() => {
-    loadGenre(GENRES[0]);
+    loadGenre(MOVIE_GENRES[0], 'movie');
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -517,18 +548,46 @@ export default function GenreBrowser() {
       title: movie.title,
       posterUrl: movie.posterUrl,
       release_date: movie.release_date,
-      type: 'movie',
+      type: mediaType === 'tv' ? 'series' : 'movie',
     });
-  }, []);
+  }, [mediaType]);
+
+  const genres = mediaType === 'tv' ? TV_GENRES : MOVIE_GENRES;
 
   return (
     <>
+      {/* Movies / TV Shows toggle */}
+      <div className="flex items-center gap-2 mb-6">
+        <div className="flex bg-card border border-border rounded-lg p-1 gap-1">
+          <button
+            onClick={() => handleMediaTypeSwitch('movie')}
+            className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
+              mediaType === 'movie'
+                ? 'bg-primary text-primary-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            🎬 Movies
+          </button>
+          <button
+            onClick={() => handleMediaTypeSwitch('tv')}
+            className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
+              mediaType === 'tv'
+                ? 'bg-primary text-primary-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            📺 TV Shows
+          </button>
+        </div>
+      </div>
+
       {/* Genre pill selector */}
       <div className="flex gap-2 overflow-x-auto pb-2 mb-8" style={{ scrollbarWidth: 'none' }}>
-        {GENRES.map(genre => (
+        {genres.map(genre => (
           <button
             key={genre.id}
-            onClick={() => loadGenre(genre)}
+            onClick={() => loadGenre(genre, mediaType)}
             className={`flex-shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-all border ${
               activeGenre.id === genre.id
                 ? 'bg-primary text-primary-foreground border-primary shadow-md shadow-primary/20'
@@ -547,7 +606,7 @@ export default function GenreBrowser() {
         <div>
           <h2 className="text-xl font-heading font-bold text-foreground">{activeGenre.name}</h2>
           <p className="text-xs text-muted-foreground">
-            Must-see classics and what's hot right now
+            {mediaType === 'tv' ? "Must-see series and what's trending right now" : "Must-see classics and what's hot right now"}
           </p>
         </div>
       </div>
@@ -565,7 +624,7 @@ export default function GenreBrowser() {
         <div className="text-center py-16">
           <p className="text-sm text-red-400 mb-3">{error}</p>
           <button
-            onClick={() => loadGenre(activeGenre)}
+            onClick={() => loadGenre(activeGenre, mediaType)}
             className="text-xs text-primary hover:text-primary/80"
           >
             Try again
@@ -577,7 +636,7 @@ export default function GenreBrowser() {
       <AnimatePresence mode="wait">
         {genreData && !loading && (
           <motion.div
-            key={activeGenre.id}
+            key={`${mediaType}-${activeGenre.id}`}
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
@@ -595,7 +654,7 @@ export default function GenreBrowser() {
               onDownload={handleDownload}
             />
             <HorizontalCarousel
-              title="Top Rated Right Now"
+              title={mediaType === 'tv' ? 'Trending Right Now' : 'Top Rated Right Now'}
               icon={Flame}
               iconColor="text-orange-500"
               movies={genreData.topRated}
@@ -621,3 +680,4 @@ export default function GenreBrowser() {
     </>
   );
 }
+

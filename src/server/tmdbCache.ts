@@ -288,6 +288,41 @@ export async function getGenreTopRated(genreId: number): Promise<TMDBMovie[]> {
   } catch { return []; }
 }
 
+/**
+ * Top-rated all-time classics for a genre (TV shows).
+ */
+export async function getGenreMustSeeTv(genreId: number): Promise<TMDBMovie[]> {
+  try {
+    const raw = await tmdbGet('/discover/tv', {
+      sort_by: 'vote_average.desc',
+      with_genres: String(genreId),
+      'vote_count.gte': '500',
+      'vote_average.gte': '7.5',
+    });
+    const results = ((raw as { results: Record<string, unknown>[] }).results ?? [])
+      .map(r => normaliseMovie({ ...r, _mediaType: 'tv' }))
+      .slice(0, 20);
+    return results;
+  } catch { return []; }
+}
+
+/**
+ * Currently popular TV shows in a genre.
+ */
+export async function getGenreTopRatedTv(genreId: number): Promise<TMDBMovie[]> {
+  try {
+    const raw = await tmdbGet('/discover/tv', {
+      sort_by: 'popularity.desc',
+      with_genres: String(genreId),
+      'vote_count.gte': '100',
+    });
+    const results = ((raw as { results: Record<string, unknown>[] }).results ?? [])
+      .map(r => normaliseMovie({ ...r, _mediaType: 'tv' }))
+      .slice(0, 20);
+    return results;
+  } catch { return []; }
+}
+
 // ── Public API ────────────────────────────────────────────────────────────────
 
 const CACHE_KEY = 'main';
