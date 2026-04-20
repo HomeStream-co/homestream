@@ -32,6 +32,16 @@ interface SubtitleTrack {
   language: string;
 }
 
+interface CastSessionInfo {
+  active: boolean;
+  deviceName?: string;
+  isPaused?: boolean;
+  currentTime?: number;
+  duration?: number;
+  volume?: number;
+  muted?: boolean;
+}
+
 interface PlayerState {
   type: 'state';
   mediaId: string;
@@ -45,6 +55,7 @@ interface PlayerState {
   hasNextEpisode: boolean;
   subtitleTracks?: SubtitleTrack[];
   activeSubtitle?: number; // -1 = off
+  cast?: CastSessionInfo;
 }
 
 type ConnStatus = 'connecting' | 'connected' | 'disconnected' | 'no_screen';
@@ -197,18 +208,21 @@ export default function RemotePage() {
 
   // Tick local time forward while playing
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const statePaused = state?.paused;
+  const stateDuration = state?.duration;
+  const stateCurrentTime = state?.currentTime;
   useEffect(() => {
-    if (state && !state.paused && !isScrubbing) {
+    if (state && !statePaused && !isScrubbing) {
       tickRef.current = setInterval(() => {
-        setLocalTime(t => Math.min(t + 1, state.duration));
+        setLocalTime(t => Math.min(t + 1, stateDuration ?? 0));
       }, 1000);
     }
     return () => { if (tickRef.current) clearInterval(tickRef.current); };
-  }, [state?.paused, state?.duration, isScrubbing]);
+  }, [statePaused, stateDuration, isScrubbing, state]);
 
   useEffect(() => {
-    if (state) setLocalTime(state.currentTime);
-  }, [state?.currentTime]);
+    if (stateCurrentTime !== undefined) setLocalTime(stateCurrentTime);
+  }, [stateCurrentTime]);
 
   // ── WebSocket ─────────────────────────────────────────────────────────────
 
@@ -371,7 +385,6 @@ export default function RemotePage() {
               state={state}
               displayTime={displayTime}
               progress={progress}
-              isScrubbing={isScrubbing}
               setIsScrubbing={setIsScrubbing}
               setScrubValue={setScrubValue}
               showSpeedPicker={showSpeedPicker}
@@ -482,7 +495,6 @@ export default function RemotePage() {
                   state={state}
                   displayTime={displayTime}
                   progress={progress}
-                  isScrubbing={isScrubbing}
                   setIsScrubbing={setIsScrubbing}
                   setScrubValue={setScrubValue}
                   send={send}
@@ -668,12 +680,11 @@ function QrModal({ qrData, onClose }: { qrData: { url: string; qr: string }; onC
 }
 
 function SeekBar({
-  state, displayTime, progress, isScrubbing, setIsScrubbing, setScrubValue, send,
+  state, displayTime, progress, setIsScrubbing, setScrubValue, send,
 }: {
   state: PlayerState;
   displayTime: number;
   progress: number;
-  isScrubbing: boolean;
   setIsScrubbing: (v: boolean) => void;
   setScrubValue: (v: number) => void;
   send: (cmd: Record<string, unknown>) => void;
@@ -828,14 +839,13 @@ function SpeedPicker({
 // ── Landscape controls panel ──────────────────────────────────────────────────
 
 function LandscapeControls({
-  state, displayTime, progress, isScrubbing, setIsScrubbing, setScrubValue,
+  state, displayTime, progress, setIsScrubbing, setScrubValue,
   showSpeedPicker, setShowSpeedPicker, hasSubtitles, subtitleActive,
   screenCount, qrData, showQr, setShowQr, send, sendHaptic, cycleSubtitle,
 }: {
   state: PlayerState;
   displayTime: number;
   progress: number;
-  isScrubbing: boolean;
   setIsScrubbing: (v: boolean) => void;
   setScrubValue: (v: number) => void;
   showSpeedPicker: boolean;
@@ -873,7 +883,6 @@ function LandscapeControls({
         state={state}
         displayTime={displayTime}
         progress={progress}
-        isScrubbing={isScrubbing}
         setIsScrubbing={setIsScrubbing}
         setScrubValue={setScrubValue}
         send={send}
