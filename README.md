@@ -4,6 +4,28 @@
 
 ---
 
+## 📸 Screenshots
+
+| Home — Hero Banner & Genre Carousels | Video Player — Custom Controls |
+|:---:|:---:|
+| ![HomeStream home page showing hero banner with featured movie, Continue Watching row, and lazy-loaded genre carousels](docs/screenshots/home.png) | ![Full-screen video player with custom seek bar, speed selector, audio track switcher, and skip-intro button](docs/screenshots/player.png) |
+
+| Library — Grid View with Filters | Downloads — qBittorrent + WebTorrent |
+|:---:|:---:|
+| ![Library page showing movie/TV grid with codec badges, transcode progress indicators, and filter controls](docs/screenshots/library.png) | ![Downloads page showing active torrents with progress bars, speed indicators, and ETA](docs/screenshots/downloads.png) |
+
+| Setup Wizard — 8-Step Onboarding | Stats Dashboard — Codec & Storage |
+|:---:|:---:|
+| ![8-step setup wizard showing media folder, qBittorrent, Jellyfin, VPN, and API key configuration with REQUIRED/OPTIONAL badges](docs/screenshots/setup.png) | ![Stats dashboard showing codec breakdown bar chart, disk usage, resolution split, watch time, and live download speed](docs/screenshots/stats.png) |
+
+| Discover — TMDB Trending + Trailers | Phone Remote — WebSocket Touch UI |
+|:---:|:---:|
+| ![Discover page with Movies/TV/Search tabs, TMDB trending cards, and trailer modal overlay](docs/screenshots/discover.png) | ![Mobile-optimized phone remote with play/pause, seek, volume, and speed controls](docs/screenshots/remote.png) |
+
+> **Note:** To add real screenshots, run HomeStream locally, take screenshots of each page, and save them to `docs/screenshots/`. The filenames above match the expected paths.
+
+---
+
 ## ✨ Features
 
 | Feature | Details |
@@ -20,7 +42,11 @@
 | **Torrent Downloads** | Stremio/Torrentio integration + qBittorrent support |
 | **Security Scanning** | 4-layer scan: extension check → VirusTotal → magic bytes → archive inspection |
 | **DLNA Casting** | Cast to any DLNA/UPnP TV on your network |
-| **Transcoding** | FFmpeg H.264 re-encode for browser compatibility |
+| **Chromecast** | Cast to Chromecast devices via the Google Cast SDK |
+| **Phone Remote** | WebSocket touch remote — control playback from your phone via QR code |
+| **Stats Dashboard** | Codec breakdown, storage usage, resolution split, watch time, live download speed |
+| **Transcoding** | FFmpeg H.264 re-encode for browser compatibility; HEVC via HLS |
+| **Jellyfin API** | Compatible with Infuse, Jellyfin apps, and other Jellyfin clients |
 | **Dark Themes** | 6 built-in themes (Netflix Red, Ocean Blue, Forest Green, etc.) |
 
 ---

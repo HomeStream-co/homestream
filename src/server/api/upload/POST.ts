@@ -110,13 +110,16 @@ export default function handler(req: Request, res: Response) {
       })
       .catch((transcodeErr: Error) => {
         console.error(`[transcode] Error for ${mediaItem.id}:`, transcodeErr.message);
+        // IMPORTANT: use absolute path here — the stream endpoint resolves by
+        // absolute path via fs.existsSync(). A relative URL like /uploads/...
+        // would cause existsSync to return false → 404 on playback.
         writeLibrary(lib => {
           const idx = lib.findIndex(m => (m as { id: string }).id === mediaItem.id);
           if (idx !== -1) {
             const item = lib[idx] as Record<string, unknown>;
             item.filename         = inputFilename;
-            item.filepath         = `/uploads/${inputFilename}`;
-            item.filePath         = `/uploads/${inputFilename}`;
+            item.filepath         = inputPath;   // absolute path
+            item.filePath         = inputPath;   // absolute path
             item.transcoding      = false;
             item.transcodeError   = transcodeErr.message;
           }

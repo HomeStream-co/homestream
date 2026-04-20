@@ -17,6 +17,7 @@ const DiscoverPage = lazy(() => import('./pages/discover'));
 const HttpsSetupPage = lazy(() => import('./pages/https-setup'));
 const HistoryPage = lazy(() => import('./pages/history'));
 const RemotePage = lazy(() => import('./pages/remote'));
+const StatsPage  = lazy(() => import('./pages/stats'));
 
 // 404 routing by runtime:
 const NotFoundPage = import.meta.env.DEV
@@ -41,6 +42,7 @@ export const routes: RouteObject[] = [
   { path: '/history', element: <HistoryPage /> },
   { path: '/https-setup', element: <HttpsSetupPage /> },
   { path: '/remote', element: <RemotePage /> },
+  { path: '/stats', element: <StatsPage /> },
   { path: '*', element: <NotFoundPage /> },
 ];
 

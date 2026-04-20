@@ -36,7 +36,8 @@ const DEMO_ITEM = {
   profileProgress: { adult: 0, kids: 0 },
   isDemo: true,
   importedFrom: 'demo',
-  addedAt: new Date().toISOString(),
+  // Fixed date — prevents demo item from appearing in "Recently Added" on every restart
+  addedAt: '2024-01-01T00:00:00.000Z',
 };
 
 // Seed once at module load — fires as soon as the API route is first imported,

@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import {
   Search, Upload, Menu, X, Film, Bookmark, ChevronDown, Lock,
-  Home, Compass, Download, Library, History, Settings2, Wifi,
+  Home, Compass, Download, Library, History, Settings2, Wifi, BarChart3,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'sonner';
@@ -141,6 +141,7 @@ export default function Header({ onChatOpen: _onChatOpen }: HeaderProps) {
     { to: '/downloads', label: 'Downloads' },
     { to: '/library',  label: 'My Library' },
     { to: '/history',  label: 'History' },
+    { to: '/stats',    label: 'Stats' },
   ];
 
   return (
@@ -368,6 +369,7 @@ export default function Header({ onChatOpen: _onChatOpen }: HeaderProps) {
                 { to: '/history',   label: 'History',    Icon: History },
                 { to: '/watchlist', label: 'Watchlist',  Icon: Bookmark, badge: watchlist.length },
                 { to: '/remote',    label: 'Phone Remote', Icon: Wifi },
+                { to: '/stats',     label: 'Stats',        Icon: BarChart3 },
               ].map(({ to, label, Icon, badge }) => (
                 <Link
                   key={to}

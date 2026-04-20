@@ -96,12 +96,15 @@ function walkDir(dir: string, results: ScannedFile[] = []): ScannedFile[] {
  * Returns a list of found files — does NOT import them yet.
  */
 export function scanExistingMedia(mediaDir: string): ScanResult {
-  const library = readLibrary<{ filePath?: string; filepath?: string; originalFilename?: string }>();
+  const library = readLibrary<{ filePath?: string; filepath?: string; originalFilename?: string; filename?: string }>();
   const knownPaths = new Set([
     ...library.map(m => m.filePath ?? ''),
     ...library.map(m => m.filepath ?? ''),
   ]);
-  const knownNames = new Set(library.map(m => m.originalFilename ?? ''));
+  const knownNames = new Set([
+    ...library.map(m => m.originalFilename ?? ''),
+    ...library.map(m => m.filename ?? ''),
+  ]);
 
   const allFiles = walkDir(mediaDir);
   const newFiles: ScannedFile[] = [];
