@@ -19,38 +19,64 @@ function serverBundlePlugin(): Plugin {
 			if (built) return;
 			built = true;
 			console.log("Bundling server code with esbuild...");
+			const outfile = path.resolve(__dirname, "dist", "server.bundle.mjs");
 			await esbuild.build({
 				entryPoints: [path.resolve(__dirname, "dist", "app.js")],
 				bundle: true,
 				platform: "node",
 				target: "node22",
 				format: "esm",
-				outfile: path.resolve(__dirname, "dist", "server.bundle.mjs"),
+				outfile,
 				packages: "bundle",
 				sourcemap: true,
-				// webrtc-polyfill/lib/Blob.js uses top-level await (TLA) which esbuild
-				// cannot inline into synchronous __esm() wrappers. The async-ness
-				// propagates through the entire module graph and causes:
-				//   "SyntaxError: Unexpected reserved word" at runtime.
-				// On Node 18+ all these polyfills are no-ops — node-datachannel provides
-				// real WebRTC. We replace the whole package with a synchronous stub.
+				// Alias problem packages to synchronous stubs:
+				// - webrtc-polyfill: uses top-level await, replaced with no-op stub
+				// - webtorrent: uses top-level await AND production has no node_modules;
+				//   replaced with a graceful stub (torrent downloads are desktop-only)
 				alias: {
 					"webrtc-polyfill": path.resolve(
 						__dirname,
 						"src/server/stubs/webrtc-polyfill-stub.js"
 					),
+					"webtorrent": path.resolve(
+						__dirname,
+						"src/server/stubs/webtorrent-stub.js"
+					),
 				},
 				// node-datachannel is a native addon — keep external so it resolves
 				// from node_modules at runtime (installed alongside the app).
-				// webtorrent uses top-level await and complex ESM internals that
-				// conflict with esbuild's bundling — keep external so it resolves
-				// from node_modules at runtime.
-				external: ["node-datachannel", "webtorrent"],
+				external: ["node-datachannel"],
+				// Banner provides require() for CJS deps (dotenv, etc.) bundled into ESM.
+				// Uses __airo_createRequire alias — safe because the post-process step
+				// below deduplicates all other `import { createRequire }` statements
+				// so there is no name collision at runtime.
 				banner: {
-					js: `import { createRequire as __createRequire } from 'module';
-const require = __createRequire(import.meta.url);`,
+					js: `import { createRequire as __airo_createRequire } from 'module';\nconst require = __airo_createRequire(import.meta.url);`,
 				},
 			});
+
+			// Post-process: deduplicate `import { createRequire } from "module"` lines.
+			// Multiple bundled deps (ffmpeg-static, qbit client, setup scripts) each emit
+			// their own top-level createRequire import. Node ESM treats these as duplicate
+			// bindings and throws "Identifier 'createRequire' has already been declared".
+			// We keep only the FIRST occurrence and remove all subsequent ones.
+			{
+				const fs2 = await import("fs");
+				let src = fs2.readFileSync(outfile, "utf8");
+				let firstSeen = false;
+				src = src.replace(
+					/^import \{ createRequire(?: as \w+)? \} from ["']module["'];?\r?\n/gm,
+					(match) => {
+						if (!firstSeen) { firstSeen = true; return match; }
+						return "";
+					}
+				);
+				// Ensure a single canonical require() is available for CJS deps
+				if (!firstSeen) {
+					src = `import { createRequire } from "module";\nconst require = createRequire(import.meta.url);\n` + src;
+				}
+				fs2.writeFileSync(outfile, src);
+			}
 			console.log("Server bundle created at dist/server.bundle.mjs");
 		},
 	};
