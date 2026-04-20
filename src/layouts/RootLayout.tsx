@@ -58,9 +58,9 @@ export default function RootLayout({ children }: RootLayoutProps) {
   const isProfiles = location.pathname === '/profiles';
 
   return (
-    <ThemeProvider>
+    <ProfileProvider>
       <AuthProvider>
-        <ProfileProvider>
+        <ThemeProvider>
           <MediaProvider>
             <TMDBWrapper>
               <Website>
@@ -88,8 +88,8 @@ export default function RootLayout({ children }: RootLayoutProps) {
               </Website>
             </TMDBWrapper>
           </MediaProvider>
-        </ProfileProvider>
+        </ThemeProvider>
       </AuthProvider>
-    </ThemeProvider>
+    </ProfileProvider>
   );
 }
