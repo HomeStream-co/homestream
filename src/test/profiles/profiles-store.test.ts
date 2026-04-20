@@ -332,7 +332,7 @@ describe('toPublic', () => {
     const all = readProfiles();
     const stored = all.find(pr => pr.id === p.id)!;
     const pub = toPublic(stored);
-    expect((pub as Record<string, unknown>).pinHash).toBeUndefined();
+    expect((pub as unknown as Record<string, unknown>).pinHash).toBeUndefined();
   });
 
   it('exposes hasPin as true when PIN is set', async () => {
