@@ -6,7 +6,7 @@
  * The libraryStore and configStore are vi.mock()'d so tests never touch disk.
  */
 import { vi } from 'vitest';
-import type { Request, Response } from 'express';
+import type { Request } from 'express';
 
 // ── Mock req/res factory ──────────────────────────────────────────────────────
 

@@ -13,7 +13,7 @@
  *  - Empty library
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { mockReq, mockRes, SAMPLE_LIBRARY, MOVIE_ITEM, SERIES_ITEM, MOVIE_ITEM_2 } from './helpers';
+import { mockReq, mockRes, SAMPLE_LIBRARY, MOVIE_ITEM, MOVIE_ITEM_2 } from './helpers';
 
 // ── Mock libraryStore ─────────────────────────────────────────────────────────
 
