@@ -8,13 +8,14 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
-import { Clock, Trash2, X, Play, CheckCircle2, Film, Tv, Loader2 } from 'lucide-react';
+import { Clock, Trash2, X, Play, CheckCircle2, Film, Tv, Loader2, User } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel,
   AlertDialogContent, AlertDialogDescription,
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { useProfile } from '@/context/ProfileContext';
 
 interface HistoryItem {
   id: string;
@@ -52,14 +53,18 @@ function formatDuration(seconds: number): string {
 }
 
 export default function HistoryPage() {
+  const { activeProfile } = useProfile();
+  const profileId = activeProfile?.id ?? 'adult';
+
   const [items, setItems] = useState<HistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [clearAllOpen, setClearAllOpen] = useState(false);
   const [removingId, setRemovingId] = useState<string | null>(null);
 
   const fetchHistory = async () => {
+    setLoading(true);
     try {
-      const res = await fetch('/api/history');
+      const res = await fetch(`/api/history?profile=${encodeURIComponent(profileId)}`);
       const data = await res.json() as HistoryItem[];
       setItems(data);
     } catch {
@@ -69,7 +74,8 @@ export default function HistoryPage() {
     }
   };
 
-  useEffect(() => { fetchHistory(); }, []);
+  // Re-fetch whenever the active profile changes
+  useEffect(() => { void fetchHistory(); }, [profileId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const removeItem = async (id: string) => {
     setRemovingId(id);
@@ -77,7 +83,7 @@ export default function HistoryPage() {
       await fetch('/api/history', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id }),
+        body: JSON.stringify({ id, profileId }),
       });
       setItems(prev => prev.filter(i => i.id !== id));
       toast.success('Removed from history');
@@ -93,7 +99,7 @@ export default function HistoryPage() {
       await fetch('/api/history', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
+        body: JSON.stringify({ profileId }),
       });
       setItems([]);
       toast.success('Watch history cleared');
@@ -123,9 +129,17 @@ export default function HistoryPage() {
             <Clock className="w-6 h-6 text-primary" />
             <div>
               <h1 className="text-2xl font-heading text-foreground">Watch History</h1>
-              <p className="text-sm text-muted-foreground mt-0.5">
-                {loading ? 'Loading…' : `${items.length} title${items.length !== 1 ? 's' : ''} watched`}
-              </p>
+              <div className="flex items-center gap-2 mt-0.5">
+                <p className="text-sm text-muted-foreground">
+                  {loading ? 'Loading…' : `${items.length} title${items.length !== 1 ? 's' : ''} watched`}
+                </p>
+                {activeProfile && (
+                  <span className="inline-flex items-center gap-1 text-xs text-muted-foreground/70 bg-muted px-2 py-0.5 rounded-full">
+                    <User className="w-3 h-3" />
+                    {activeProfile.avatar} {activeProfile.name}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
           {items.length > 0 && (
@@ -278,9 +292,12 @@ export default function HistoryPage() {
       <AlertDialog open={clearAllOpen} onOpenChange={setClearAllOpen}>
         <AlertDialogContent className="bg-card border-border">
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-foreground">Clear all watch history?</AlertDialogTitle>
+            <AlertDialogTitle className="text-foreground">
+              Clear {activeProfile ? `${activeProfile.avatar} ${activeProfile.name}'s` : 'all'} watch history?
+            </AlertDialogTitle>
             <AlertDialogDescription className="text-muted-foreground">
-              This removes all watch history and progress data. Your library files are not affected.
+              This removes watch history and progress data for the <strong>{activeProfile?.name ?? 'current'}</strong> profile only.
+              Other profiles are not affected. Your library files are not deleted.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

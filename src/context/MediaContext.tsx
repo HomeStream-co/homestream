@@ -106,6 +106,17 @@ export function MediaProvider({ children }: { children: ReactNode }) {
     refreshLibrary();
   }, [refreshLibrary]);
 
+  // When the active profile changes, immediately seed continueWatching from
+  // that profile's localStorage cache so the UI doesn't flash the old profile's
+  // row before the server fetch completes.
+  useEffect(() => {
+    try {
+      const cached = JSON.parse(localStorage.getItem(progressKey) || '[]') as ContinueWatchingItem[];
+      setContinueWatching(cached);
+    } catch { /* ignore */ }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [progressKey]);
+
   // ── Watchlist mutations — optimistic UI + server persist ───────────────────
 
   const addToWatchlist = useCallback((id: string) => {
@@ -113,7 +124,7 @@ export function MediaProvider({ children }: { children: ReactNode }) {
     setWatchlist(prev => {
       if (prev.includes(id)) return prev;
       const next = [...prev, id];
-      localStorage.setItem('homestream-watchlist', JSON.stringify(next));
+      localStorage.setItem(watchlistKey, JSON.stringify(next));
       return next;
     });
     // Persist to server
@@ -121,23 +132,24 @@ export function MediaProvider({ children }: { children: ReactNode }) {
       .then(r => r.ok ? r.json() as Promise<{ watchlist: string[] }> : Promise.reject())
       .then(({ watchlist: serverList }) => {
         setWatchlist(serverList);
-        localStorage.setItem('homestream-watchlist', JSON.stringify(serverList));
+        localStorage.setItem(watchlistKey, JSON.stringify(serverList));
       })
       .catch(() => {
         // Server write failed — revert optimistic update
         setWatchlist(prev => {
           const reverted = prev.filter(w => w !== id);
-          localStorage.setItem('homestream-watchlist', JSON.stringify(reverted));
+          localStorage.setItem(watchlistKey, JSON.stringify(reverted));
           return reverted;
         });
       });
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [watchlistKey]);
 
   const removeFromWatchlist = useCallback((id: string) => {
     // Optimistic update
     setWatchlist(prev => {
       const next = prev.filter(w => w !== id);
-      localStorage.setItem('homestream-watchlist', JSON.stringify(next));
+      localStorage.setItem(watchlistKey, JSON.stringify(next));
       return next;
     });
     // Persist to server
@@ -145,17 +157,18 @@ export function MediaProvider({ children }: { children: ReactNode }) {
       .then(r => r.ok ? r.json() as Promise<{ watchlist: string[] }> : Promise.reject())
       .then(({ watchlist: serverList }) => {
         setWatchlist(serverList);
-        localStorage.setItem('homestream-watchlist', JSON.stringify(serverList));
+        localStorage.setItem(watchlistKey, JSON.stringify(serverList));
       })
       .catch(() => {
         // Server write failed — revert optimistic update (add back)
         setWatchlist(prev => {
           const reverted = [...prev, id];
-          localStorage.setItem('homestream-watchlist', JSON.stringify(reverted));
+          localStorage.setItem(watchlistKey, JSON.stringify(reverted));
           return reverted;
         });
       });
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [watchlistKey]);
 
   const updateProgress = useCallback((id: string, progress: number, currentTime?: number, duration?: number) => {
     // If complete (≥95%), remove from Continue Watching
@@ -173,7 +186,7 @@ export function MediaProvider({ children }: { children: ReactNode }) {
           next = [...prev, { id, progress }];
         }
       }
-      localStorage.setItem('homestream-progress', JSON.stringify(next));
+      localStorage.setItem(progressKey, JSON.stringify(next));
       return next;
     });
     // Persist to server — survives restarts, device switches
@@ -182,7 +195,8 @@ export function MediaProvider({ children }: { children: ReactNode }) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ progress, currentTime, duration, profileId }),
     }).catch(console.error);
-  }, [profileId]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profileId, progressKey]);
 
   const triggerPostWatchRecommendation = useCallback((id: string) => {
     setPendingRecommendation(id);
