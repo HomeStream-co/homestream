@@ -5,7 +5,7 @@
 import {
   Lock, Shield, Globe, CheckCircle2, ChevronLeft, ChevronRight,
   Loader2, ExternalLink, Upload, ToggleLeft, ToggleRight,
-  CheckCircle, XCircle as XCircleIcon, Zap, Gauge,
+  CheckCircle, XCircle as XCircleIcon, Zap, Gauge, Info,
 } from 'lucide-react';
 import type { SetupStepProps } from './types';
 
@@ -14,6 +14,24 @@ interface ProviderMeta {
   id: string; name: string; authType: ProviderAuthType;
   protocol: 'wireguard' | 'openvpn'; configUrl?: string;
 }
+
+type VPNServerType = 'p2p' | 'standard' | 'obfuscated' | 'double' | 'tor';
+
+interface ServerTypeMeta {
+  id: VPNServerType;
+  label: string;
+  description: string;
+  supportedBy: string[];
+  warning?: string;
+}
+
+const SERVER_TYPES: ServerTypeMeta[] = [
+  { id: 'p2p',        label: 'P2P',        description: 'Dedicated torrent-optimised nodes. Best for downloads — no speed caps.',                                     supportedBy: ['nordvpn','protonvpn','mullvad','expressvpn','surfshark','pia','ipvanish','cyberghost'] },
+  { id: 'standard',   label: 'Standard',   description: 'General-purpose server. Use if your provider has no dedicated P2P nodes.',                                   supportedBy: ['nordvpn','protonvpn','mullvad','expressvpn','surfshark','pia','ipvanish','cyberghost','ivpn','airvpn','norton','custom'] },
+  { id: 'obfuscated', label: 'Obfuscated', description: 'Traffic disguised as HTTPS. Useful if your ISP blocks VPN protocols.',                                       supportedBy: ['nordvpn','expressvpn','surfshark'], warning: 'Slower than standard. Only use if your ISP blocks VPN traffic.' },
+  { id: 'double',     label: 'Double-hop', description: 'Traffic routed through two VPN servers. More private, but noticeably slower.',                               supportedBy: ['nordvpn','protonvpn'], warning: 'Roughly halves download speed. Not recommended for large files.' },
+  { id: 'tor',        label: 'Tor',        description: 'Exit through the Tor network. Maximum anonymity, very slow — not suitable for large downloads.',              supportedBy: ['nordvpn','protonvpn'], warning: 'Tor exit nodes are extremely slow (often < 1 Mbps). Avoid for torrents.' },
+];
 
 const PROVIDERS: ProviderMeta[] = [
   { id: 'mullvad',    name: 'Mullvad',                 authType: 'config_file',  protocol: 'wireguard', configUrl: 'https://mullvad.net/en/account/wireguard-config' },
@@ -52,6 +70,7 @@ export default function StepVPN({
           password: form.vpnPassword || undefined,
           autoConnect: form.vpnAutoConnect,
           autoFastest: form.vpnAutoFastest,
+          serverType: form.vpnServerType,
           knownServers: form.vpnKnownServers
             ? form.vpnKnownServers.split(',').map(s => s.trim()).filter(Boolean)
             : undefined,
@@ -133,6 +152,51 @@ export default function StepVPN({
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* Server type selector */}
+          <div>
+            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 block">Server Type</label>
+            <div className="grid grid-cols-5 gap-1.5">
+              {SERVER_TYPES.map(t => {
+                const supported = t.supportedBy.includes(form.vpnProvider);
+                return (
+                  <button key={t.id}
+                    onClick={() => supported && set('vpnServerType', t.id)}
+                    disabled={!supported}
+                    title={supported ? t.description : `Not available for ${selectedProvider.name}`}
+                    className={`flex flex-col items-center gap-0.5 p-2.5 rounded-xl border text-center transition-all disabled:opacity-35 disabled:cursor-not-allowed ${
+                      form.vpnServerType === t.id && supported
+                        ? 'border-primary bg-primary/10 text-primary'
+                        : 'border-border text-muted-foreground hover:border-primary/40 hover:text-foreground'
+                    }`}
+                  >
+                    <span className="text-[11px] font-semibold">{t.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+            {/* Description + warning */}
+            {(() => {
+              const meta = SERVER_TYPES.find(t => t.id === form.vpnServerType);
+              if (!meta) return null;
+              return (
+                <div className={`mt-2 flex items-start gap-1.5 p-2.5 rounded-xl text-[10px] leading-relaxed ${
+                  meta.warning ? 'bg-amber-500/5 border border-amber-500/15 text-amber-400' : 'bg-muted/30 text-muted-foreground'
+                }`}>
+                  <Info className="w-3 h-3 mt-0.5 flex-shrink-0" />
+                  <span>
+                    {meta.description}
+                    {meta.warning && <span className="block mt-0.5 font-semibold">{meta.warning}</span>}
+                    {!meta.supportedBy.includes(form.vpnProvider) && (
+                      <span className="block mt-0.5 text-amber-400 font-semibold">
+                        {selectedProvider.name} doesn&apos;t support {meta.label} — will fall back to Standard.
+                      </span>
+                    )}
+                  </span>
+                </div>
+              );
+            })()}
           </div>
 
           {/* Config file */}

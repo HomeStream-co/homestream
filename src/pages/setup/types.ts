@@ -39,6 +39,8 @@ export interface FormData {
   vpnUsername: string;
   vpnPassword: string;
   vpnAutoConnect: boolean;
+  /** Preferred server type for providers that support multiple categories */
+  vpnServerType: 'p2p' | 'standard' | 'obfuscated' | 'double' | 'tor';
   /** Auto-select the fastest/lowest-latency server before each download */
   vpnAutoFastest: boolean;
   /** For OpenVPN credential providers: comma-separated list of server hostnames to ping-rank */

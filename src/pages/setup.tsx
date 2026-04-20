@@ -81,6 +81,7 @@ export default function SetupPage() {
     vpnUsername: '',
     vpnPassword: '',
     vpnAutoConnect: false,
+    vpnServerType: 'p2p',
     vpnAutoFastest: true,
     vpnKnownServers: '',
   });

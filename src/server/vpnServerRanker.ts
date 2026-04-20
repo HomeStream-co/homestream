@@ -114,7 +114,7 @@ const CLI_FASTEST: Partial<Record<VPNProviderType, (serverType: VPNServerType) =
   expressvpn: async (serverType) => {
     // ExpressVPN CLI: `expressvpn connect smart` always picks the recommended server.
     // There's no server-type flag in the CLI — type is handled by the config file chosen.
-    const _ = serverType; // acknowledged — not used
+    void serverType;
     const { stdout } = await execAsync('expressvpn connect smart 2>&1', { timeout: 30_000 });
     const match = stdout.match(/Connected to (.+)/i);
     return match?.[1]?.trim() ?? 'expressvpn-smart';
@@ -122,7 +122,7 @@ const CLI_FASTEST: Partial<Record<VPNProviderType, (serverType: VPNServerType) =
   surfshark: async (serverType) => {
     // Surfshark CLI (Linux): `surfshark-vpn attack` = fastest server.
     // Obfuscated mode requires a different command.
-    const _ = serverType;
+    void serverType;
     const { stdout } = await execAsync('surfshark-vpn attack 2>&1', { timeout: 30_000 });
     const match = stdout.match(/Connected to (.+)/i);
     return match?.[1]?.trim() ?? 'surfshark-fastest';
