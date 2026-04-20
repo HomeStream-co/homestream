@@ -8,10 +8,13 @@
  *    returned as-is, with a `stale: true` flag so the UI can show a notice.
  *  - No timers, no intervals, no cron. The only work that happens is when a
  *    request actually comes in and the cache is expired.
+ *  - All posterUrl/backdropUrl values use LOCAL /tmdb-images/<hash>.jpg paths
+ *    so images work with zero internet access.
  */
 
 import fs from 'fs';
 import path from 'path';
+import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 import { getSecret } from '#airo/secrets';
 
@@ -23,10 +26,47 @@ const CACHE_DIR = fs.existsSync('/private') ? '/private/tmdb-cache' : path.resol
 // missing or stale so the Discover page always has images on first load.
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const BAKED_CACHE_PATH = path.resolve(__dirname, '../../public/tmdb-cache-baked.json');
+const LOCAL_IMG_DIR   = path.resolve(__dirname, '../../public/tmdb-images');
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 const TMDB_BASE = 'https://api.themoviedb.org/3';
 const TMDB_IMG = 'https://image.tmdb.org/t/p/w500';
 const TMDB_IMG_ORIGINAL = 'https://image.tmdb.org/t/p/original';
+
+// ── Local image path helpers ──────────────────────────────────────────────────
+
+/**
+ * Convert a TMDB poster/backdrop path to a local /tmdb-images/<hash>.jpg URL.
+ * Uses the same MD5 scheme as scripts/cache-tmdb-images.cjs so the files match.
+ * Falls back to the live TMDB URL if the local file doesn't exist yet.
+ */
+function toLocalImgUrl(tmdbPath: string | null, size: 'w500' | 'original'): string {
+  if (!tmdbPath) return '';
+  const hash = crypto.createHash('md5').update(tmdbPath + size).digest('hex').slice(0, 12);
+  const localFile = path.join(LOCAL_IMG_DIR, `${hash}.jpg`);
+  if (fs.existsSync(localFile)) return `/tmdb-images/${hash}.jpg`;
+  // File not cached yet — return live URL as fallback (will work when online)
+  const base = size === 'w500' ? TMDB_IMG : TMDB_IMG_ORIGINAL;
+  return `${base}${tmdbPath}`;
+}
+
+/**
+ * Rewrite any TMDB CDN URLs in a cache entry to local paths.
+ * Called when reading the /private cache so stale entries are fixed in-place.
+ */
+function localiseUrls(entry: TMDBCacheEntry): TMDBCacheEntry {
+  const fix = (movies: TMDBMovie[]): TMDBMovie[] =>
+    movies.map(m => ({
+      ...m,
+      posterUrl:   m.poster_path   ? toLocalImgUrl(m.poster_path,   'w500')     : m.posterUrl,
+      backdropUrl: m.backdrop_path ? toLocalImgUrl(m.backdrop_path, 'original') : m.backdropUrl,
+    }));
+  return {
+    ...entry,
+    upcoming:      fix(entry.upcoming),
+    trending:      fix(entry.trending),
+    trendingShows: fix(entry.trendingShows),
+  };
+}
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -62,11 +102,19 @@ function cacheFile(key: string): string {
 }
 
 function readCache(key: string): TMDBCacheEntry | null {
-  // 1. Try the live /private cache first
+  // 1. Try the live /private cache first — rewrite any stale TMDB URLs to local paths
   const file = cacheFile(key);
   if (fs.existsSync(file)) {
     try {
-      return JSON.parse(fs.readFileSync(file, 'utf-8')) as TMDBCacheEntry;
+      const raw = JSON.parse(fs.readFileSync(file, 'utf-8')) as TMDBCacheEntry;
+      // Check if URLs are still pointing at TMDB CDN — fix them and save back
+      const sample = raw.trending?.[0]?.posterUrl ?? '';
+      if (sample.startsWith('https://image.tmdb.org')) {
+        const fixed = localiseUrls(raw);
+        writeCache(key, fixed);
+        return fixed;
+      }
+      return raw;
     } catch { /* fall through */ }
   }
   // 2. Fall back to the pre-baked cache bundled with the app
@@ -93,19 +141,22 @@ function isFresh(entry: TMDBCacheEntry): boolean {
 }
 
 function normaliseMovie(m: Record<string, unknown>): TMDBMovie {
+  const posterPath   = (m.poster_path   ?? null) as string | null;
+  const backdropPath = (m.backdrop_path ?? null) as string | null;
   return {
     id: m.id as number,
     title: (m.title ?? m.name ?? '') as string,
     overview: (m.overview ?? '') as string,
-    poster_path: (m.poster_path ?? null) as string | null,
-    backdrop_path: (m.backdrop_path ?? null) as string | null,
+    poster_path:   posterPath,
+    backdrop_path: backdropPath,
     release_date: (m.release_date ?? m.first_air_date ?? '') as string,
     vote_average: (m.vote_average ?? 0) as number,
-    vote_count: (m.vote_count ?? 0) as number,
-    genre_ids: (m.genre_ids ?? []) as number[],
-    popularity: (m.popularity ?? 0) as number,
-    posterUrl: m.poster_path ? `${TMDB_IMG}${m.poster_path}` : '',
-    backdropUrl: m.backdrop_path ? `${TMDB_IMG_ORIGINAL}${m.backdrop_path}` : '',
+    vote_count:   (m.vote_count   ?? 0) as number,
+    genre_ids:    (m.genre_ids    ?? []) as number[],
+    popularity:   (m.popularity   ?? 0) as number,
+    // Always use local cached images — falls back to live URL if not yet downloaded
+    posterUrl:   toLocalImgUrl(posterPath,   'w500'),
+    backdropUrl: toLocalImgUrl(backdropPath, 'original'),
   };
 }
 
