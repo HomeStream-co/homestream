@@ -147,12 +147,25 @@ interface ChromecastButtonProps {
   poster?: string;
   currentTime?: number;
   className?: string;
+  /** Called with a trigger function so parent can programmatically start casting */
+  onTriggerRef?: (trigger: () => void) => void;
+  /** Called whenever cast state changes — gives parent live session info */
+  onCastStateChange?: (info: {
+    active: boolean;
+    deviceName?: string;
+    isPaused: boolean;
+    currentTime: number;
+    duration: number;
+    volume: number;
+    muted: boolean;
+  }) => void;
 }
 
 type CastState = 'unavailable' | 'available' | 'connecting' | 'connected';
 
 export default function ChromecastButton({
   streamUrl, title, poster, currentTime = 0, className,
+  onTriggerRef, onCastStateChange,
 }: ChromecastButtonProps) {
   const [castState, setCastState] = useState<CastState>('unavailable');
   const [sdkLoaded, setSdkLoaded] = useState(false);
@@ -166,6 +179,8 @@ export default function ChromecastButton({
 
   const playerRef = useRef<RemotePlayer | null>(null);
   const controllerRef = useRef<RemotePlayerController | null>(null);
+  const onCastStateChangeRef = useRef(onCastStateChange);
+  onCastStateChangeRef.current = onCastStateChange;
 
   // ── Load Cast SDK (once per page) ──
   useEffect(() => {
@@ -195,6 +210,18 @@ export default function ChromecastButton({
   const initCast = useCallback(() => {
     if (!window.cast || !window.chrome?.cast) return;
 
+    const notifyParent = (active: boolean) => {
+      const p = playerRef.current;
+      onCastStateChangeRef.current?.({
+        active,
+        isPaused: p?.isPaused ?? false,
+        currentTime: p?.currentTime ?? 0,
+        duration: p?.duration ?? 0,
+        volume: p?.volumeLevel ?? 1,
+        muted: p?.isMuted ?? false,
+      });
+    };
+
     try {
       const ctx = window.cast.framework.CastContext.getInstance();
       ctx.setOptions({
@@ -213,36 +240,37 @@ export default function ChromecastButton({
         () => {
           const connected = player.isConnected;
           setCastState(connected ? 'connected' : 'available');
-          if (!connected) setShowPanel(false);
+          if (!connected) { setShowPanel(false); notifyParent(false); }
+          else notifyParent(true);
         }
       );
 
     // Playback state
     controller.addEventListener(
       window.cast.framework.RemotePlayerEventType.IS_PAUSED_CHANGED,
-      () => setIsPaused(player.isPaused)
+      () => { setIsPaused(player.isPaused); notifyParent(true); }
     );
 
     // Time sync
     controller.addEventListener(
       window.cast.framework.RemotePlayerEventType.CURRENT_TIME_CHANGED,
-      () => { if (!seeking) setCastTime(player.currentTime); }
+      () => { if (!seeking) { setCastTime(player.currentTime); notifyParent(true); } }
     );
 
     controller.addEventListener(
       window.cast.framework.RemotePlayerEventType.DURATION_CHANGED,
-      () => setCastDuration(player.duration)
+      () => { setCastDuration(player.duration); notifyParent(true); }
     );
 
     // Volume sync
     controller.addEventListener(
       window.cast.framework.RemotePlayerEventType.VOLUME_LEVEL_CHANGED,
-      () => setVolume(player.volumeLevel)
+      () => { setVolume(player.volumeLevel); notifyParent(true); }
     );
 
     controller.addEventListener(
       window.cast.framework.RemotePlayerEventType.IS_MUTED_CHANGED,
-      () => setMuted(player.isMuted)
+      () => { setMuted(player.isMuted); notifyParent(true); }
     );
 
     // Session state
@@ -313,6 +341,11 @@ export default function ChromecastButton({
       setCastState('available');
     }
   }, [streamUrl, title, poster, currentTime]);
+
+  // Expose trigger to parent via ref callback
+  useEffect(() => {
+    onTriggerRef?.(startCast);
+  }, [onTriggerRef, startCast]);
 
   const togglePlayPause = useCallback(() => {
     controllerRef.current?.playOrPause();

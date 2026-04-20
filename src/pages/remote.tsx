@@ -21,7 +21,7 @@ import {
   Play, Pause, SkipForward, SkipBack, Volume2, VolumeX,
   Wifi, WifiOff, Film, FastForward, ChevronRight, Zap,
   RotateCcw, QrCode, X, ExternalLink, Subtitles,
-  Maximize2, Cast, ChevronUp, ChevronDown,
+  Maximize2, Cast, ChevronUp, ChevronDown, Tv2, Square,
 } from 'lucide-react';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -178,6 +178,7 @@ export default function RemotePage() {
   const [showSpeedPicker, setShowSpeedPicker] = useState(false);
   const [screenCount, setScreenCount] = useState(0);
   const [isLandscape, setIsLandscape] = useState(false);
+  const [showCastPanel, setShowCastPanel] = useState(false);
 
   // Seek / volume flash overlays
   const [seekFlash, setSeekFlash] = useState<{ dir: 'left' | 'right'; secs: number; key: number } | null>(null);
@@ -223,6 +224,12 @@ export default function RemotePage() {
   useEffect(() => {
     if (stateCurrentTime !== undefined) setLocalTime(stateCurrentTime);
   }, [stateCurrentTime]);
+
+  // Auto-open cast panel when a cast session becomes active
+  const castActive = state?.cast?.active;
+  useEffect(() => {
+    if (castActive) setShowCastPanel(true);
+  }, [castActive]);
 
   // ── WebSocket ─────────────────────────────────────────────────────────────
 
@@ -395,6 +402,8 @@ export default function RemotePage() {
               qrData={qrData}
               showQr={showQr}
               setShowQr={setShowQr}
+              showCastPanel={showCastPanel}
+              setShowCastPanel={setShowCastPanel}
               send={send}
               sendHaptic={sendHaptic}
               cycleSubtitle={cycleSubtitle}
@@ -573,10 +582,33 @@ export default function RemotePage() {
                   </PillBtn>
 
                   {/* Cast */}
-                  <PillBtn onClick={() => sendHaptic({ type: 'cast' })}>
+                  <PillBtn
+                    onClick={() => {
+                      haptic(30);
+                      if (state.cast?.active) {
+                        setShowCastPanel(v => !v);
+                      } else {
+                        send({ type: 'cast' });
+                      }
+                    }}
+                    active={state.cast?.active || showCastPanel}
+                    title={state.cast?.active ? 'Manage cast session' : 'Cast to Chromecast'}
+                  >
                     <Cast className="w-3.5 h-3.5" />
+                    {state.cast?.active ? 'Casting' : 'Cast'}
                   </PillBtn>
                 </div>
+
+                {/* Cast session panel */}
+                <AnimatePresence>
+                  {showCastPanel && state.cast?.active && (
+                    <CastPanel
+                      cast={state.cast}
+                      send={send}
+                      onClose={() => setShowCastPanel(false)}
+                    />
+                  )}
+                </AnimatePresence>
 
                 {/* Volume */}
                 <VolumeControl state={state} send={send} />
@@ -836,12 +868,130 @@ function SpeedPicker({
   );
 }
 
+// ── Cast session panel ────────────────────────────────────────────────────────
+
+function CastPanel({
+  cast, send, onClose,
+}: {
+  cast: CastSessionInfo;
+  send: (cmd: Record<string, unknown>) => void;
+  onClose: () => void;
+}) {
+  const progress = (cast.duration ?? 0) > 0
+    ? ((cast.currentTime ?? 0) / (cast.duration ?? 1)) * 100
+    : 0;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 12, scale: 0.97 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: 12, scale: 0.97 }}
+      transition={{ duration: 0.2 }}
+      className="w-full bg-card border border-border rounded-2xl p-4 shadow-xl"
+    >
+      {/* Header */}
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <Tv2 className="w-4 h-4 text-primary animate-pulse" />
+          <span className="text-sm font-semibold text-foreground">
+            Casting{cast.deviceName ? ` · ${cast.deviceName}` : ' to TV'}
+          </span>
+        </div>
+        <button
+          onClick={onClose}
+          className="w-6 h-6 rounded-full bg-muted flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <X className="w-3 h-3" />
+        </button>
+      </div>
+
+      {/* Progress bar */}
+      {(cast.duration ?? 0) > 0 && (
+        <div className="mb-3">
+          <input
+            type="range"
+            min={0}
+            max={cast.duration ?? 100}
+            step={1}
+            value={cast.currentTime ?? 0}
+            onChange={e => {
+              haptic(20);
+              send({ type: 'cast_seek', position: Number(e.target.value) });
+            }}
+            className="w-full h-2 rounded-full accent-primary cursor-pointer"
+            style={{
+              background: `linear-gradient(to right, hsl(var(--primary)) ${progress}%, hsl(var(--muted)) ${progress}%)`,
+            }}
+          />
+          <div className="flex justify-between text-[10px] text-muted-foreground font-mono mt-1">
+            <span>{formatTime(cast.currentTime ?? 0)}</span>
+            <span>{formatTime(cast.duration ?? 0)}</span>
+          </div>
+        </div>
+      )}
+
+      {/* Playback controls */}
+      <div className="flex items-center justify-center gap-4 mb-4">
+        <button
+          onClick={() => { haptic(30); send({ type: 'cast_playpause' }); }}
+          className="w-12 h-12 rounded-full bg-primary hover:bg-primary/90 active:scale-95 flex items-center justify-center shadow-md shadow-primary/30 transition-all"
+        >
+          {cast.isPaused
+            ? <Play className="w-5 h-5 text-primary-foreground fill-primary-foreground ml-0.5" />
+            : <Pause className="w-5 h-5 text-primary-foreground fill-primary-foreground" />
+          }
+        </button>
+        <button
+          onClick={() => { haptic([30, 20, 30]); send({ type: 'cast_stop' }); }}
+          className="w-10 h-10 rounded-full bg-card border border-border hover:bg-destructive/10 hover:border-destructive/40 active:scale-95 flex items-center justify-center transition-all"
+          title="Stop casting"
+        >
+          <Square className="w-4 h-4 text-muted-foreground fill-muted-foreground" />
+        </button>
+      </div>
+
+      {/* Volume */}
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => { haptic(20); send({ type: 'cast_volume', level: (cast.muted || (cast.volume ?? 1) === 0) ? 0.5 : 0 }); }}
+          className="text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
+        >
+          {(cast.muted || (cast.volume ?? 1) === 0)
+            ? <VolumeX className="w-4 h-4" />
+            : <Volume2 className="w-4 h-4" />
+          }
+        </button>
+        <input
+          type="range"
+          min={0}
+          max={1}
+          step={0.05}
+          value={cast.muted ? 0 : (cast.volume ?? 1)}
+          onChange={e => send({ type: 'cast_volume', level: Number(e.target.value) })}
+          className="flex-1 h-1.5 rounded-full accent-primary cursor-pointer"
+          style={{
+            background: `linear-gradient(to right, hsl(var(--primary)) ${(cast.muted ? 0 : (cast.volume ?? 1)) * 100}%, hsl(var(--muted)) ${(cast.muted ? 0 : (cast.volume ?? 1)) * 100}%)`,
+          }}
+        />
+        <span className="text-[10px] text-muted-foreground w-7 text-right font-mono flex-shrink-0">
+          {cast.muted ? '0%' : `${Math.round((cast.volume ?? 1) * 100)}%`}
+        </span>
+      </div>
+
+      <p className="text-[10px] text-muted-foreground/50 text-center mt-3">
+        Volume controls your TV via HDMI-CEC
+      </p>
+    </motion.div>
+  );
+}
+
 // ── Landscape controls panel ──────────────────────────────────────────────────
 
 function LandscapeControls({
   state, displayTime, progress, setIsScrubbing, setScrubValue,
   showSpeedPicker, setShowSpeedPicker, hasSubtitles, subtitleActive,
-  screenCount, qrData, showQr, setShowQr, send, sendHaptic, cycleSubtitle,
+  screenCount, qrData, showQr, setShowQr, showCastPanel, setShowCastPanel,
+  send, sendHaptic, cycleSubtitle,
 }: {
   state: PlayerState;
   displayTime: number;
@@ -856,6 +1006,8 @@ function LandscapeControls({
   qrData: { url: string; qr: string } | null;
   showQr: boolean;
   setShowQr: (v: boolean) => void;
+  showCastPanel: boolean;
+  setShowCastPanel: (v: boolean | ((prev: boolean) => boolean)) => void;
   send: (cmd: Record<string, unknown>) => void;
   sendHaptic: (cmd: Record<string, unknown>, pattern?: number | number[]) => void;
   cycleSubtitle: () => void;
@@ -934,10 +1086,33 @@ function LandscapeControls({
         <PillBtn onClick={() => sendHaptic({ type: 'fullscreen' })}>
           <Maximize2 className="w-3.5 h-3.5" />
         </PillBtn>
-        <PillBtn onClick={() => sendHaptic({ type: 'cast' })}>
+        <PillBtn
+          onClick={() => {
+            haptic(30);
+            if (state.cast?.active) {
+              setShowCastPanel(v => !v);
+            } else {
+              send({ type: 'cast' });
+            }
+          }}
+          active={state.cast?.active || showCastPanel}
+          title={state.cast?.active ? 'Manage cast session' : 'Cast to Chromecast'}
+        >
           <Cast className="w-3.5 h-3.5" />
+          {state.cast?.active ? 'Casting' : 'Cast'}
         </PillBtn>
       </div>
+
+      {/* Cast session panel */}
+      <AnimatePresence>
+        {showCastPanel && state.cast?.active && (
+          <CastPanel
+            cast={state.cast}
+            send={send}
+            onClose={() => setShowCastPanel(false)}
+          />
+        )}
+      </AnimatePresence>
 
       <VolumeControl state={state} send={send} />
     </div>

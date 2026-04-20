@@ -45,6 +45,15 @@ export interface PlayerStatePayload {
   hasNextEpisode: boolean;
   subtitleTracks?: SubtitleTrack[];
   activeSubtitle?: number;
+  cast?: {
+    active: boolean;
+    deviceName?: string;
+    isPaused: boolean;
+    currentTime: number;
+    duration: number;
+    volume: number;
+    muted: boolean;
+  };
 }
 
 export function useRemoteControl(

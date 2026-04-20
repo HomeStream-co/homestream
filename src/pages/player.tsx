@@ -76,6 +76,17 @@ export default function PlayerPage() {
   const setCcLangRef = useRef<((lang: 'off' | 'en' | 'es') => void) | null>(null);
   const castButtonRef = useRef<(() => void) | null>(null);
 
+  // Live cast session info — populated by ChromecastButton via onCastStateChange
+  const [castInfo, setCastInfo] = useState<{
+    active: boolean;
+    deviceName?: string;
+    isPaused: boolean;
+    currentTime: number;
+    duration: number;
+    volume: number;
+    muted: boolean;
+  } | null>(null);
+
   const { sendState } = useRemoteControl(id, {
     onPlay:        () => videoRef.current?.play(),
     onPause:       () => videoRef.current?.pause(),
@@ -1136,6 +1147,7 @@ export default function PlayerPage() {
                     { index: 1, label: 'Español', language: 'es' },
                   ],
                   activeSubtitle: ccLang === 'off' ? -1 : ccLang === 'en' ? 0 : 1,
+                  cast: castInfo ?? undefined,
                 });
               }
             }
@@ -1837,6 +1849,8 @@ export default function PlayerPage() {
                               title={item.title ?? 'HomeStream'}
                               poster={item.poster}
                               currentTime={currentTime}
+                              onTriggerRef={(fn) => { castButtonRef.current = fn; }}
+                              onCastStateChange={(info) => setCastInfo(info.active ? info : null)}
                             />
                           </div>
                         )}
