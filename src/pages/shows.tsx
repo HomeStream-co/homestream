@@ -15,7 +15,7 @@ import MediaCard from '@/components/MediaCard';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toActorsString } from '@/lib/utils';
 
-const GENRES = ['All', 'Drama', 'Comedy', 'Action', 'Sci-Fi', 'Thriller', 'Crime', 'Animation', 'Documentary', 'Fantasy', 'Horror', 'Romance', 'Family'];
+const GENRES = ['All', 'Drama', 'Comedy', 'Action', 'Sci-Fi', 'Thriller', 'Crime', 'Animation', 'Documentary', 'Fantasy', 'Horror', 'Romance', 'Family', 'Adventure', 'Mystery', 'Reality', 'Kids'];
 const SORT_OPTIONS = [
   { value: 'added',    label: 'Date Added' },
   { value: 'rating',   label: 'Top Rated' },
@@ -84,7 +84,7 @@ export default function ShowsPage() {
   }, [library, query, selectedGenre, sortBy, isAllowed]);
 
   return (
-    <div className="min-h-screen bg-background pt-20 pb-16">
+    <div className="bg-background pt-20 pb-16">
       <title>TV Shows — HomeStream</title>
       <meta name="description" content="Browse your TV show collection on HomeStream." />
 
@@ -151,12 +151,11 @@ export default function ShowsPage() {
 
         {/* Grid */}
         {loading ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-5">
-            {Array.from({ length: 12 }).map((_, i) => (
+          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-7 xl:grid-cols-9 gap-4">
+            {Array.from({ length: 18 }).map((_, i) => (
               <div key={i}>
-                <Skeleton className="aspect-[2/3] rounded-xl" />
+                <Skeleton className="aspect-[2/3] rounded-lg" />
                 <Skeleton className="h-3 mt-2 rounded" />
-                <Skeleton className="h-2 mt-1 rounded w-2/3" />
               </div>
             ))}
           </div>
@@ -180,7 +179,7 @@ export default function ShowsPage() {
           </div>
         ) : (
           <motion.div
-            className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-5"
+            className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-7 xl:grid-cols-9 gap-4"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
           >

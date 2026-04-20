@@ -144,14 +144,16 @@ export const serverBefore = (server) => {
         'X-Frame-Options': 'SAMEORIGIN',
         'X-XSS-Protection': '1; mode=block',
         'Referrer-Policy': 'strict-origin-when-cross-origin',
-        // Permissive CSP for local network — allows LAN IPs, localhost, and
-        // external sources needed for TMDB posters and Google Fonts
+        // Permissive CSP for local network — allows LAN IPs, localhost.
+        // All TMDB poster/backdrop images are served locally from /tmdb-images/
+        // so no external image.tmdb.org origin is needed.
+        // connect-src still allows api.themoviedb.org for metadata fetches.
         'Content-Security-Policy': [
           "default-src 'self'",
           "script-src 'self' 'unsafe-inline' 'unsafe-eval'", // Vite HMR needs unsafe-eval in dev
           "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
           "font-src 'self' https://fonts.gstatic.com data:",
-          "img-src 'self' data: blob: https://image.tmdb.org https://img.omdbapi.com https://m.media-amazon.com",
+          "img-src 'self' data: blob:",
           "media-src 'self' blob:",
           "connect-src 'self' ws: wss: https://api.themoviedb.org https://torrentio.strem.fun",
           "frame-ancestors 'none'",
