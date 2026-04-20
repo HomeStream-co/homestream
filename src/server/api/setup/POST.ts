@@ -1,10 +1,11 @@
 import type { Request, Response } from 'express';
 import fs from 'fs';
 import bcrypt from 'bcryptjs';
-import { writeConfig, readConfig } from '../../configStore.js';
+import { writeConfig, readConfig, isSetupComplete } from '../../configStore.js';
 import { testConnection as testQbit } from '../../qbittorrentClient.js';
 import { startWatcher, stopWatcher } from '../../folderWatcher.js';
 import { scanExistingMedia, importExistingMedia, type ScannedFile } from '../../existingMediaScanner.js';
+import { requireAuth } from '../../authMiddleware.js';
 
 // In-memory store for scan results so import can reference them
 let lastScanFiles: ScannedFile[] = [];
@@ -39,6 +40,10 @@ async function testJellyfin(url: string, apiKey: string): Promise<{ ok: boolean;
 
 export default async function handler(req: Request, res: Response) {
   const { action, ...fields } = req.body as Record<string, string>;
+
+  // Allow unauthenticated access only before setup is complete.
+  // After setup, require auth to prevent config takeover.
+  if (isSetupComplete() && !requireAuth(req, res)) return;
 
   try {
     switch (action) {

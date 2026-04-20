@@ -16,6 +16,7 @@ import { readConfig } from '../../../configStore.js';
 import { readLibrary } from '../../../libraryStore.js';
 import { isReachable as qbitReachable } from '../../../qbittorrentClient.js';
 import { getAllJobs, type TorrentJob } from '../../../torrentManager.js';
+import { requireAuth } from '../../../authMiddleware.js';
 
 export type SubsystemStatus = 'ok' | 'warn' | 'error' | 'unknown';
 
@@ -222,7 +223,8 @@ async function checkFfmpeg(): Promise<SubsystemCheck> {
 
 // ── Handler ───────────────────────────────────────────────────────────────────
 
-export default async function handler(_req: Request, res: Response) {
+export default async function handler(req: Request, res: Response) {
+  if (!requireAuth(req, res)) return;
   const [library, config, qbit, tmdb, ollama, torrentio, downloads, ffmpeg] = await Promise.all([
     checkLibrary(),
     checkConfig(),

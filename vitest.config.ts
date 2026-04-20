@@ -60,7 +60,7 @@ export default defineConfig({
           name: 'node',
           environment: 'node',
           setupFiles: ['./src/test/setup-node.ts'],
-          include: ['src/test/jellyfin/**/*.test.ts', 'src/test/profiles/**/*.test.ts'],
+          include: ['src/test/jellyfin/**/*.test.ts', 'src/test/profiles/**/*.test.ts', 'src/test/server/**/*.test.ts'],
         },
         resolve: { alias: sharedAlias },
       },

@@ -13,6 +13,7 @@
  */
 import type { Request, Response } from 'express';
 import { writeLibrary } from '../../../../libraryStore.js';
+import { requireJellyfinAuth } from '../../../../jellyfinAuth.js';
 
 interface PlayingBody {
   ItemId?: string;
@@ -27,6 +28,7 @@ function ticksToSeconds(ticks: number): number {
 }
 
 export default async function handler(req: Request, res: Response) {
+  if (!requireJellyfinAuth(req, res)) return;
   try {
     const { ItemId, PositionTicks, EventName } = req.body as PlayingBody;
 

@@ -6,6 +6,7 @@
  */
 import type { Request, Response } from 'express';
 import { readLibrary } from '../../../../../libraryStore.js';
+import { requireJellyfinAuth } from '../../../../../jellyfinAuth.js';
 
 interface LibraryItem {
   id: string;
@@ -78,6 +79,7 @@ function toJellyfinItem(item: LibraryItem, baseUrl: string) {
 }
 
 export default function handler(req: Request, res: Response) {
+  if (!requireJellyfinAuth(req, res)) return;
   try {
     const library = readLibrary<LibraryItem>();
     const {

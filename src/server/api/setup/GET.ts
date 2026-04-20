@@ -2,6 +2,7 @@ import type { Request, Response } from 'express';
 import { spawn } from 'child_process';
 import { createRequire } from 'module';
 import { readConfig, isSetupComplete } from '../../configStore.js';
+import { requireAuth } from '../../authMiddleware.js';
 
 /** Mask a key: show first 4 chars + dots, or empty string if not set */
 function mask(key: string): string {
@@ -51,7 +52,11 @@ async function detectFfmpeg(): Promise<{ available: boolean; version: string; pa
   });
 }
 
-export default async function handler(_req: Request, res: Response) {
+export default async function handler(req: Request, res: Response) {
+  // Allow unauthenticated access only before setup is complete (wizard needs it).
+  // Once setup is done, require auth so config details aren't publicly readable.
+  if (isSetupComplete() && !requireAuth(req, res)) return;
+
   const config = readConfig();
   const ffmpeg = await detectFfmpeg();
 

@@ -7,6 +7,7 @@
  */
 import type { Request, Response } from 'express';
 import { readLibrary, writeLibraryDirect } from '../../../../../libraryStore.js';
+import { requireJellyfinAuth } from '../../../../../jellyfinAuth.js';
 
 interface LibraryItem {
   id: string;
@@ -22,6 +23,7 @@ interface StoppedBody {
 }
 
 export default function handler(req: Request, res: Response) {
+  if (!requireJellyfinAuth(req, res)) return;
   try {
     const body = req.body as StoppedBody;
     const itemId = body.ItemId;
