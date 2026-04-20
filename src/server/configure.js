@@ -49,21 +49,6 @@ function gzipMiddleware(req, res, next) {
   next();
 }
 
-async function seedDemoItem() {
-  try {
-    const { readLibrary, writeLibrary } = await import('./libraryStore.js');
-    const { ALL_DEMO_ITEMS } = await import('./demoLibrary.js');
-    const library = readLibrary();
-    const demoIds = new Set(ALL_DEMO_ITEMS.map(d => d.id));
-    // Remove stale demo entries, re-insert fresh ones at the front
-    const nonDemo = library.filter(m => !demoIds.has(m.id));
-    await writeLibrary(() => [...ALL_DEMO_ITEMS, ...nonDemo]);
-    console.log(`[demo] Synced ${ALL_DEMO_ITEMS.length} demo items into library`);
-  } catch (err) {
-    console.warn('[demo] Seed failed (non-fatal):', err.message);
-  }
-}
-
 // ── Vite dev server hooks ──────────────────────────────────────────────────
 
 export const viteServerBefore = (server, _viteServer) => {
@@ -71,7 +56,6 @@ export const viteServerBefore = (server, _viteServer) => {
   server.use(cookieParser());
   server.use(express.json({ limit: '50mb' }));
   server.use(express.urlencoded({ extended: true, limit: '50mb' }));
-  import('./demoGuard.js').then(({ demoGuard }) => server.use(demoGuard)).catch(() => {});
 };
 
 export const viteServerAfter = (_server, _viteServer) => {};
@@ -79,10 +63,6 @@ export const viteServerAfter = (_server, _viteServer) => {};
 // ── Production server hooks ────────────────────────────────────────────────
 
 export const serverBefore = (server) => {
-  // Demo guard — rate-limits expensive API key endpoints in open/unauthenticated mode
-  import('./demoGuard.js').then(({ demoGuard }) => server.use(demoGuard)).catch(err => {
-    console.warn('[demoGuard] Failed to load (non-fatal):', err.message);
-  });
   // Startup cleanup: reset any items stuck with transcoding:true
   import('./startupCleanup.js').then(({ runStartupCleanup }) => {
     runStartupCleanup();
@@ -172,7 +152,7 @@ export const serverBefore = (server) => {
           "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
           "font-src 'self' https://fonts.gstatic.com data:",
           "img-src 'self' data: blob: https://image.tmdb.org https://img.omdbapi.com https://m.media-amazon.com",
-          "media-src 'self' blob: https://download.blender.org",
+          "media-src 'self' blob:",
           "connect-src 'self' ws: wss: https://api.themoviedb.org https://torrentio.strem.fun",
           "frame-ancestors 'none'",
         ].join('; '),
@@ -225,7 +205,4 @@ export const serverListening = (server) => {
   }).catch(err => {
     console.warn('[remote] Failed to attach remote control (non-fatal):', err.message);
   });
-
-  // Seed demo item once server is ready (single call — not duplicated in serverBefore)
-  seedDemoItem();
 };

@@ -39,8 +39,6 @@ interface LibraryItem {
   addedAt?: string;
   genre?: string[];
   year?: string;
-  demoStream?: boolean;
-  isDemo?: boolean;
 }
 
 function getDiskStats(dir: string): { free: number; total: number } | null {

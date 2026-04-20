@@ -34,12 +34,10 @@ export default async function handler(req: Request, res: Response) {
       filepath?: string;
       filePath?: string;
       type?: string;
-      isDemo?: boolean;
-      demoStream?: boolean;
     }>();
     const cfg = readConfig();
 
-    const real = library.filter(i => !i.isDemo && !i.demoStream);
+    const real = library;
 
     let libraryBytes = 0;
     let movieBytes   = 0;
