@@ -60,8 +60,6 @@ function ensureDemoSeeded() {
   }
 }
 
-type ProfileId = 'adult' | 'kids';
-
 interface ProfileProgressEntry {
   progress: number;
   watchedSeconds?: number;
@@ -75,8 +73,8 @@ export default function handler(req: Request, res: Response) {
     ensureDemoSeeded();
     const library = readLibrary<Record<string, unknown>>();
 
-    const profileId = req.query.profile as ProfileId | undefined;
-    if (!profileId || (profileId !== 'adult' && profileId !== 'kids')) {
+    const profileId = (req.query.profile as string | undefined)?.trim();
+    if (!profileId) {
       // No profile filter — return raw data
       return res.json(library);
     }

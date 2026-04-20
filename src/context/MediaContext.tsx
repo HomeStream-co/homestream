@@ -34,17 +34,21 @@ export function MediaProvider({ children }: { children: ReactNode }) {
   const { activeProfile } = useProfile();
   const profileId = activeProfile?.id ?? 'adult';
 
+  // Profile-scoped localStorage keys — each profile gets its own cache bucket
+  const progressKey = `homestream-progress-${profileId}`;
+  const watchlistKey = `homestream-watchlist`; // watchlist is shared across profiles
+
   // Watchlist — server is source of truth; localStorage is a fast initial value
   // that gets replaced on first successful server fetch.
   const [watchlist, setWatchlist] = useState<string[]>(() => {
     try {
-      return JSON.parse(localStorage.getItem('homestream-watchlist') || '[]');
+      return JSON.parse(localStorage.getItem(watchlistKey) || '[]');
     } catch { return []; }
   });
 
   const [continueWatching, setContinueWatching] = useState<ContinueWatchingItem[]>(() => {
     try {
-      return JSON.parse(localStorage.getItem('homestream-progress') || '[]');
+      return JSON.parse(localStorage.getItem(progressKey) || '[]');
     } catch { return []; }
   });
 
@@ -55,11 +59,13 @@ export function MediaProvider({ children }: { children: ReactNode }) {
       .then(ids => {
         setWatchlist(ids);
         // Keep localStorage in sync as a fast-load cache
-        localStorage.setItem('homestream-watchlist', JSON.stringify(ids));
+        localStorage.setItem(watchlistKey, JSON.stringify(ids));
       })
       .catch(() => {
         // Server unavailable — keep localStorage value, will sync on next load
       });
+  // watchlistKey is stable (not profile-scoped) so this only runs once
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const refreshLibrary = useCallback(async () => {
@@ -82,7 +88,11 @@ export function MediaProvider({ children }: { children: ReactNode }) {
           .map(m => ({ id: m.id, progress: m.watchProgress! }));
         if (serverProgress.length > 0) {
           setContinueWatching(serverProgress);
-          localStorage.setItem('homestream-progress', JSON.stringify(serverProgress));
+          localStorage.setItem(progressKey, JSON.stringify(serverProgress));
+        } else {
+          // Profile has no in-progress items — clear the local cache too
+          setContinueWatching([]);
+          localStorage.removeItem(progressKey);
         }
       }
     } catch (err) {
@@ -90,7 +100,7 @@ export function MediaProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoading(false);
     }
-  }, [profileId]);
+  }, [profileId, progressKey]);
 
   useEffect(() => {
     refreshLibrary();

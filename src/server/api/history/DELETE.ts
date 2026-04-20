@@ -1,25 +1,67 @@
 /**
  * DELETE /api/history
  *
- * Clears watch history for one or all items.
- * Body: { id?: string }  — omit id to clear all history
+ * Clears watch history for one or all items, scoped to a profile.
+ *
+ * Body:
+ *   id?        — omit to clear all history
+ *   profileId? — which profile's history to clear (defaults to 'adult')
+ *
+ * Behaviour:
+ *   - Removes lastWatchedAt / watchedAt from the per-profile entry in
+ *     profileProgress[profileId] (and resets progress to 0 for that profile)
+ *   - If the cleared profile is 'adult' (or no profileId given), also clears
+ *     the top-level lastWatchedAt / watchedAt fields for backwards compat
+ *     with Jellyfin API and legacy code.
+ *   - Does NOT touch other profiles' progress entries.
  */
 import type { Request, Response } from 'express';
 import { writeLibrary } from '../../libraryStore.js';
 
+interface ProfileProgressEntry {
+  progress: number;
+  watchedSeconds?: number;
+  totalSeconds?: number;
+  lastWatchedAt?: string;
+  watchedAt?: string;
+}
+
 export default async function handler(req: Request, res: Response) {
   try {
-    const { id } = req.body as { id?: string };
+    const { id, profileId = 'adult' } = req.body as { id?: string; profileId?: string };
 
     await writeLibrary<Record<string, unknown>>(lib => {
       return lib.map(item => {
         if (id && item.id !== id) return item;
-        // Only remove history-tracking fields (lastWatchedAt, watchedAt).
-        // Preserve watchProgress and watchedSeconds so the item still appears
-        // in Continue Watching and resumes from the correct position.
-        const { lastWatchedAt: _l, watchedAt: _w, ...rest } = item as Record<string, unknown>;
-        void _l; void _w;
-        return rest;
+
+        // Clear the per-profile entry
+        const existingPP = (item.profileProgress as Record<string, ProfileProgressEntry> | undefined) ?? {};
+        const profileEntry = existingPP[profileId];
+        if (!profileEntry) return item; // nothing to clear for this profile
+
+        const clearedEntry: ProfileProgressEntry = {
+          progress: 0,
+          watchedSeconds: 0,
+          totalSeconds: profileEntry.totalSeconds,
+          // Remove lastWatchedAt and watchedAt
+        };
+
+        const updatedPP: Record<string, ProfileProgressEntry> = {
+          ...existingPP,
+          [profileId]: clearedEntry,
+        };
+
+        const base: Record<string, unknown> = { ...item, profileProgress: updatedPP };
+
+        // Keep top-level fields in sync for the adult profile (Jellyfin compat)
+        if (profileId === 'adult') {
+          delete base.lastWatchedAt;
+          delete base.watchedAt;
+          base.watchProgress = 0;
+          base.watchedSeconds = 0;
+        }
+
+        return base;
       });
     });
 

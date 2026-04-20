@@ -30,8 +30,6 @@ import { requireAuth } from '../../../../authMiddleware.js';
  *     and sets watchedAt = now
  */
 
-export type ProfileId = 'adult' | 'kids';
-
 interface ProfileProgressEntry {
   progress: number;
   watchedSeconds?: number;
@@ -48,14 +46,14 @@ export default async function handler(req: Request, res: Response) {
       progress?: number;
       currentTime?: number;
       duration?: number;
-      profileId?: ProfileId;
+      profileId?: string;
     };
 
     if (progress === undefined || typeof progress !== 'number') {
       return res.status(400).json({ error: 'progress (number) is required' });
     }
 
-    const safeProfileId: ProfileId = profileId === 'kids' ? 'kids' : 'adult';
+    const safeProfileId: string = profileId || 'adult';
     const now = new Date().toISOString();
     const isComplete = progress >= 95;
 
