@@ -244,7 +244,6 @@ export default async function handler(req: Request, res: Response) {
     year,
     season,
     totalSeasons = 1,
-    totalEpisodes = 10,
     streams: preloadedStreams,
   } = req.body as {
     imdbId?: string;
@@ -254,7 +253,6 @@ export default async function handler(req: Request, res: Response) {
     year?: string;
     season?: number;
     totalSeasons?: number;
-    totalEpisodes?: number;
     streams?: StreamResult[];
   };
 
@@ -287,7 +285,7 @@ export default async function handler(req: Request, res: Response) {
     if (vpnConnected && vpnCfg) {
       await disconnectAfterDownload(vpnCfg);
     }
-  };;
+  };
 
   try {
     if (type === 'movie') {
@@ -341,7 +339,11 @@ export default async function handler(req: Request, res: Response) {
       }
 
     } else {
-      // Series — batch fetch all episodes
+      // Series — probe each season dynamically to find real episode counts.
+      // We fetch episodes one-by-one and stop when Torrentio returns nothing,
+      // which is the natural signal that the season has ended. This avoids
+      // hammering Torrentio for episodes that don't exist (e.g. assuming every
+      // season has the same number of episodes).
       const seasonsToFetch: number[] = [];
       if (season != null) {
         seasonsToFetch.push(season);
@@ -349,9 +351,18 @@ export default async function handler(req: Request, res: Response) {
         for (let s = 1; s <= totalSeasons; s++) seasonsToFetch.push(s);
       }
 
+      // Max episodes we'll probe per season before giving up (safety cap)
+      const MAX_EPISODES_PER_SEASON = 50;
+
       const episodeTasks: Array<{ season: number; episode: number }> = [];
       for (const s of seasonsToFetch) {
-        for (let ep = 1; ep <= totalEpisodes; ep++) {
+        for (let ep = 1; ep <= MAX_EPISODES_PER_SEASON; ep++) {
+          // Probe this episode — if Torrentio returns nothing, season is done
+          const probe = await fetchStreamsForEpisode(imdbId, 'series', s, ep);
+          if (probe.length === 0) {
+            console.log(`[download] S${s} ends at E${ep - 1} (no streams found for E${ep})`);
+            break;
+          }
           episodeTasks.push({ season: s, episode: ep });
         }
       }
