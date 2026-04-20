@@ -30,17 +30,35 @@ directories:
   buildResources: electron/assets
 
 # Files to include in the package
+# electron-builder automatically includes all package.json "dependencies" in the
+# asar archive. We list the explicit app files here; node_modules for dependencies
+# are handled automatically by electron-builder.
 files:
   - dist/**/*
   - electron/main.js
   - electron/preload.js
   - electron/tray-icon.png
   - package.json
+  # electron-updater and its deps must be resolvable by the main process at runtime.
+  # electron-builder includes package.json "dependencies" automatically, but listing
+  # them explicitly here ensures they are never accidentally excluded.
+  - node_modules/electron-updater/**/*
+  - node_modules/builder-util-runtime/**/*
+  - node_modules/semver/**/*
+  - node_modules/js-yaml/**/*
+  - node_modules/lazy-val/**/*
 
-# Server bundle shipped as an extra resource (loaded at runtime by main.js)
+# Extra resources shipped alongside the app (available at process.resourcesPath at runtime)
 extraResources:
+  # Server bundle — loaded by main.js as a child process
   - from: dist/server.bundle.mjs
     to: server/server.bundle.mjs
+  # FFmpeg binary — ffmpeg-static resolves a local path that won't exist in the
+  # packaged app, so we copy the binary into resources and point FFMPEG_PATH at it.
+  # electron-builder resolves the from path relative to the project root at build time.
+  - from: node_modules/ffmpeg-static/ffmpeg
+    to: ffmpeg/ffmpeg
+    filter: ["**/*"]
 
 # ── Windows ───────────────────────────────────────────────────────────────────
 win:

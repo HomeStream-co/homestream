@@ -69,15 +69,27 @@ process.on('unhandledRejection', (reason) => {
   process.stderr.write(`[Electron CRASH] unhandledRejection: ${reason}\n`);
 });
 // ffmpeg-static ships a pre-built binary for the current platform.
-// In a packaged Electron app the node_modules tree is included, so this
-// resolves correctly at runtime without the user installing FFmpeg manually.
+// In a packaged Electron app, node_modules is NOT included — the binary is
+// copied into resources/ffmpeg/ via extraResources in electron-builder.yml.
+// In dev mode we fall back to the node_modules copy directly.
 function getFfmpegPath() {
+  if (app.isPackaged) {
+    // Packaged: binary is in resources/ffmpeg/ffmpeg (or ffmpeg.exe on Windows)
+    const base = path.join(process.resourcesPath, 'ffmpeg', 'ffmpeg');
+    const win  = base + '.exe';
+    if (fs.existsSync(win))  return win;
+    if (fs.existsSync(base)) return base;
+    // Shouldn't happen — log and fall back to system PATH
+    pushLog('WARNING: Bundled ffmpeg not found in resources — falling back to system ffmpeg', 'warn');
+    return 'ffmpeg';
+  }
+  // Dev mode: use ffmpeg-static from node_modules
   try {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
-    return require('ffmpeg-static');
-  } catch {
-    return null; // Fall back to system FFmpeg if somehow not bundled
-  }
+    const p = require('ffmpeg-static');
+    if (p && fs.existsSync(p)) return p;
+  } catch { /* not installed */ }
+  return 'ffmpeg';
 }
 
 // ── Config ────────────────────────────────────────────────────────────────────
