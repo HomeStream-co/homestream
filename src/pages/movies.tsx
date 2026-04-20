@@ -13,6 +13,7 @@ import { useMedia } from '@/context/MediaContext';
 import { useProfile } from '@/context/ProfileContext';
 import MediaCard from '@/components/MediaCard';
 import { Skeleton } from '@/components/ui/skeleton';
+import { toActorsString } from '@/lib/utils';
 
 const GENRES = ['All', 'Action', 'Comedy', 'Drama', 'Horror', 'Sci-Fi', 'Thriller', 'Animation', 'Documentary', 'Romance', 'Family', 'Crime', 'Adventure'];
 const SORT_OPTIONS = [
@@ -40,7 +41,7 @@ export default function MoviesPage() {
       items = items.filter(m =>
         m.title.toLowerCase().includes(q) ||
         m.plot.toLowerCase().includes(q) ||
-        m.actors.toLowerCase().includes(q) ||
+        toActorsString(m.actors).toLowerCase().includes(q) ||
         m.director.toLowerCase().includes(q) ||
         m.genre.some(g => g.toLowerCase().includes(q))
       );

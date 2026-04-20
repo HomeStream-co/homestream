@@ -33,7 +33,7 @@ export interface MediaItem {
   genre: string[];
   plot: string;
   director: string;
-  actors: string;
+  actors: string | string[];  // string[] for demo items, comma-separated string for OMDB items
   imdbRating: string;
   poster: string;
   type: 'movie' | 'series';

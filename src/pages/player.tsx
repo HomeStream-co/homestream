@@ -11,6 +11,7 @@ import { useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'motion/react';
 import { Cpu, FastForward, Rewind, RotateCcw, SkipForward, X as XIcon } from 'lucide-react';
+import { toActorsArray } from '@/lib/utils';
 
 import { useMedia } from '@/context/MediaContext';
 import { useProfile } from '@/context/ProfileContext';
@@ -98,8 +99,8 @@ export default function PlayerPage() {
           const sharedGenres = m.genre.filter((g: string) => item.genre.includes(g)).length;
           score += sharedGenres * 3;
           if (m.director && item.director && m.director !== 'Unknown' && m.director === item.director) score += 4;
-          const itemActors = item.actors.split(',').map((a: string) => a.trim());
-          const mActors = m.actors.split(',').map((a: string) => a.trim());
+          const itemActors = toActorsArray(item.actors);
+          const mActors = toActorsArray(m.actors);
           score += mActors.filter((a: string) => a !== 'Unknown' && itemActors.includes(a)).length * 2;
           if (m.type === item.type) score += 1;
           if (Math.abs((parseFloat(m.imdbRating) || 0) - (parseFloat(item.imdbRating) || 0)) < 1.5) score += 1;
