@@ -21,7 +21,7 @@ import {
   Monitor, Zap, SkipForward, RotateCcw, Tag, HardDrive,
   Compass, RefreshCw, Clock, WifiOff, KeyRound, Eye, EyeOff,
   Loader2, CheckCircle2, XCircle, ScanLine, Database, ShieldCheck, LogOut, Wrench, Lock, ShieldAlert,
-  Volume2, Subtitles, Wand2, AlertTriangle, X,
+  Volume2, Subtitles, Wand2, AlertTriangle, X, Film, Tv2, Layers,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTheme, THEMES, type AppSettings } from '@/context/ThemeContext';
@@ -332,6 +332,13 @@ export default function SettingsPanel({ onOpenSecurity, onOpenDebug }: SettingsP
   const [scanning, setScanning] = useState(false);
   const [scanResult, setScanResult] = useState<{ added: number; skipped: number } | null>(null);
 
+  // Storage allocation sliders
+  const [allocMovies, setAllocMovies] = useState(60);
+  const [allocTv, setAllocTv] = useState(30);
+  const [allocSaving, setAllocSaving] = useState(false);
+  const [allocSaved, setAllocSaved] = useState(false);
+  const allocOther = Math.max(0, 100 - allocMovies - allocTv);
+
   // Health badge for debug button
   const [healthStatus, setHealthStatus] = useState<'ok' | 'warn' | 'error' | null>(null);
 
@@ -353,14 +360,22 @@ export default function SettingsPanel({ onOpenSecurity, onOpenDebug }: SettingsP
       .catch(() => setApiKeysLoaded(true));
   }, [open, apiKeysLoaded]);
 
-  // Load storage stats when panel opens
+  // Load storage stats + allocation when panel opens
   useEffect(() => {
     if (!open || storageStats) return;
     setStorageLoading(true);
     fetch('/api/library/storage')
       .then(r => r.json())
-      .then((data: { libraryBytes: number; libraryCount: number; diskFreeBytes: number | null; diskTotalBytes: number | null }) => {
+      .then((data: {
+        libraryBytes: number; libraryCount: number;
+        diskFreeBytes: number | null; diskTotalBytes: number | null;
+        storageAllocation?: { moviesPct: number; tvPct: number };
+      }) => {
         setStorageStats(data);
+        if (data.storageAllocation) {
+          setAllocMovies(data.storageAllocation.moviesPct);
+          setAllocTv(data.storageAllocation.tvPct);
+        }
       })
       .catch(() => {})
       .finally(() => setStorageLoading(false));
@@ -394,6 +409,26 @@ export default function SettingsPanel({ onOpenSecurity, onOpenDebug }: SettingsP
       toast.error('Scan failed — check server logs');
     } finally {
       setScanning(false);
+    }
+  };
+
+  const saveAllocation = async () => {
+    setAllocSaving(true);
+    setAllocSaved(false);
+    try {
+      const res = await fetch('/api/library/storage', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ moviesPct: allocMovies, tvPct: allocTv }),
+      });
+      if (!res.ok) throw new Error('Save failed');
+      setAllocSaved(true);
+      setTimeout(() => setAllocSaved(false), 3000);
+      toast.success('Storage allocation saved');
+    } catch {
+      toast.error('Failed to save allocation');
+    } finally {
+      setAllocSaving(false);
     }
   };
 
@@ -788,6 +823,84 @@ export default function SettingsPanel({ onOpenSecurity, onOpenDebug }: SettingsP
                         </p>
                       )}
                       <p className="text-[10px] text-muted-foreground text-center">Finds video files in your media folder not yet in the library</p>
+                    </div>
+
+                    {/* Storage allocation sliders */}
+                    <div className="border-t border-border/40 pt-3 space-y-3">
+                      <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-semibold">Storage Allocation Targets</p>
+                      <p className="text-[11px] text-muted-foreground leading-snug">
+                        Set how much of your disk you want reserved for each content type. These are soft targets — HomeStream uses them to warn you when a category is over-allocated.
+                      </p>
+
+                      {/* Movies slider */}
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between text-[11px]">
+                          <span className="text-foreground flex items-center gap-1.5">
+                            <Film className="w-3 h-3 text-blue-400" /> Movies
+                          </span>
+                          <span className="font-mono font-semibold text-foreground">{allocMovies}%</span>
+                        </div>
+                        <input
+                          type="range" min={0} max={100} step={5}
+                          value={allocMovies}
+                          onChange={e => {
+                            const v = Number(e.target.value);
+                            setAllocMovies(v);
+                            if (v + allocTv > 100) setAllocTv(100 - v);
+                          }}
+                          className="w-full accent-blue-400 cursor-pointer"
+                        />
+                      </div>
+
+                      {/* TV slider */}
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between text-[11px]">
+                          <span className="text-foreground flex items-center gap-1.5">
+                            <Tv2 className="w-3 h-3 text-purple-400" /> TV Shows
+                          </span>
+                          <span className="font-mono font-semibold text-foreground">{allocTv}%</span>
+                        </div>
+                        <input
+                          type="range" min={0} max={100} step={5}
+                          value={allocTv}
+                          onChange={e => {
+                            const v = Number(e.target.value);
+                            setAllocTv(v);
+                            if (allocMovies + v > 100) setAllocMovies(100 - v);
+                          }}
+                          className="w-full accent-purple-400 cursor-pointer"
+                        />
+                      </div>
+
+                      {/* Other (read-only remainder) */}
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="text-muted-foreground flex items-center gap-1.5">
+                          <Layers className="w-3 h-3" /> Other (remainder)
+                        </span>
+                        <span className="font-mono text-muted-foreground">{allocOther}%</span>
+                      </div>
+
+                      {/* Visual bar */}
+                      <div className="h-2 rounded-full overflow-hidden flex gap-0.5">
+                        <div className="bg-blue-400 rounded-l-full transition-all" style={{ width: `${allocMovies}%` }} />
+                        <div className="bg-purple-400 transition-all" style={{ width: `${allocTv}%` }} />
+                        <div className="bg-muted flex-1 rounded-r-full" />
+                      </div>
+
+                      <button
+                        onClick={saveAllocation}
+                        disabled={allocSaving}
+                        className={`w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold transition-colors ${
+                          allocSaved
+                            ? 'bg-green-500/20 border border-green-500/30 text-green-400'
+                            : 'bg-primary/10 hover:bg-primary/20 border border-primary/20 text-primary'
+                        } disabled:opacity-60`}
+                      >
+                        {allocSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> :
+                         allocSaved ? <CheckCircle2 className="w-3.5 h-3.5" /> :
+                         <HardDrive className="w-3.5 h-3.5" />}
+                        {allocSaving ? 'Saving…' : allocSaved ? 'Saved!' : 'Save Allocation'}
+                      </button>
                     </div>
                   </div>
                 </div>

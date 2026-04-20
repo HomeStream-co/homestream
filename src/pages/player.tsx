@@ -72,6 +72,23 @@ export default function PlayerPage() {
   const castButtonRef = useRef<(() => void) | null>(null);
   useEffect(() => { setCcLangRef.current = ps.setCcLang; }, [ps.setCcLang]);
 
+  // ── Apply default volume + subtitle language from settings on mount ───────
+  useEffect(() => {
+    const video = ps.videoRef.current;
+    if (video) {
+      const vol = Math.max(0, Math.min(1, appSettings.defaultVolume / 100));
+      video.volume = vol;
+      ps.setVolume(vol);
+    }
+    // Apply subtitle language preference (only 'en' and 'es' are supported tracks)
+    const lang = appSettings.subtitleLanguage;
+    if (lang === 'en' || lang === 'es') {
+      ps.setCcLang(lang);
+    }
+  // Run once on mount — intentionally no deps so it doesn't re-run on every settings change
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // ── Derived: similar items ────────────────────────────────────────────────
   const similarItems = item
     ? library

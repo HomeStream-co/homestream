@@ -179,6 +179,45 @@ export async function getRecommendations(
   }
 }
 
+// ── Genre-specific fetches ────────────────────────────────────────────────────
+
+/**
+ * Top-rated all-time classics for a genre.
+ * Sorted by vote_average desc, minimum 1 000 votes so obscure films don't sneak in.
+ */
+export async function getGenreMustSee(genreId: number): Promise<TMDBMovie[]> {
+  try {
+    const raw = await tmdbGet('/discover/movie', {
+      sort_by: 'vote_average.desc',
+      with_genres: String(genreId),
+      'vote_count.gte': '1000',
+      'vote_average.gte': '7.5',
+    });
+    const results = ((raw as { results: Record<string, unknown>[] }).results ?? [])
+      .map(normaliseMovie)
+      .slice(0, 20);
+    return attachGenres(results);
+  } catch { return []; }
+}
+
+/**
+ * Currently popular titles in a genre.
+ * Sorted by popularity desc, minimum 100 votes so brand-new films appear.
+ */
+export async function getGenreTopRated(genreId: number): Promise<TMDBMovie[]> {
+  try {
+    const raw = await tmdbGet('/discover/movie', {
+      sort_by: 'popularity.desc',
+      with_genres: String(genreId),
+      'vote_count.gte': '100',
+    });
+    const results = ((raw as { results: Record<string, unknown>[] }).results ?? [])
+      .map(normaliseMovie)
+      .slice(0, 20);
+    return attachGenres(results);
+  } catch { return []; }
+}
+
 // ── Public API ────────────────────────────────────────────────────────────────
 
 const CACHE_KEY = 'main';

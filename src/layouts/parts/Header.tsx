@@ -15,10 +15,8 @@ import PinLock from '@/components/PinLock';
 import NotificationBell from '@/components/NotificationBell';
 import { notify } from '@/lib/notificationStore';
 
-// DebugPanel is dev-only — excluded from production bundle
-const DebugPanel = import.meta.env.DEV
-  ? lazy(() => import('@/components/DebugPanel'))
-  : null;
+// DebugPanel — lazy-loaded but always available (not DEV-only)
+const DebugPanel = lazy(() => import('@/components/DebugPanel'));
 
 interface HeaderProps {
   onChatOpen?: () => void;
@@ -264,14 +262,12 @@ export default function Header({ onChatOpen: _onChatOpen }: HeaderProps) {
             {/* ── Settings cog (Security Center + Debug Panel live inside) ── */}
             <SettingsPanel
               onOpenSecurity={() => setSecurityOpen(true)}
-              onOpenDebug={import.meta.env.DEV ? () => setDebugOpen(true) : undefined}
+              onOpenDebug={() => setDebugOpen(true)}
             />
 
-            {import.meta.env.DEV && DebugPanel && (
-              <Suspense fallback={null}>
-                <DebugPanel open={debugOpen} onClose={() => setDebugOpen(false)} />
-              </Suspense>
-            )}
+            <Suspense fallback={null}>
+              <DebugPanel open={debugOpen} onClose={() => setDebugOpen(false)} />
+            </Suspense>
             <SecurityPanel open={securityOpen} onClose={() => setSecurityOpen(false)} />
 
             {/* ── Stremio ── */}
