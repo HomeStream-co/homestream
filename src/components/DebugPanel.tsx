@@ -1,18 +1,14 @@
 /**
- * DebugPanel — floating debug/health overlay
+ * DebugPanel — slide-in diagnostics panel (cogwheel → Debug & Diagnostics)
  *
- * Accessible from the header (wrench icon). Four tabs:
+ * Tabs:
+ *  1. Health     — live subsystem checks with auto-refresh
+ *  2. Quick Fixes — one-click repair actions via /api/debug/repair
+ *  3. System     — RAM, CPU, uptime, Node version, platform
+ *  4. Network    — ping TMDB / Torrentio / OpenSubtitles with latency
+ *  5. Crash Log  — full crash log with copy-for-support
  *
- *  1. Health    — live subsystem checks with smart "Fix It" suggestions
- *  2. Repair    — one-click fix actions for common stuck states
- *  3. System    — live runtime stats (memory, CPU, uptime, Node version)
- *  4. Logs      — crash log viewer with copy-for-support
- *
- * Design goals:
- *  - Any user should be able to get themselves unstuck without reading docs
- *  - Problems surface automatically with a direct "Fix It" button
- *  - Network connectivity test built-in
- *  - All actions show clear before/after feedback
+ * Always visible (not DEV-only). Designed to get any user unstuck.
  */
 
 import { useState, useCallback, useEffect } from 'react';
@@ -22,14 +18,14 @@ import {
   HelpCircle, Wrench, Loader2, ChevronRight, Trash2,
   Database, Wifi, Download, Cpu, Film, Server,
   ClipboardCopy, ClipboardCheck, Bug,
-  Activity, Zap, MemoryStick, Clock, Terminal,
-  Network, RotateCcw, ShieldAlert, Info,
+  Activity, Zap, Globe, MemoryStick, Clock, Terminal,
+  RotateCcw, ShieldOff, Play,
 } from 'lucide-react';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 type SubsystemStatus = 'ok' | 'warn' | 'error' | 'unknown';
-type Tab = 'health' | 'repair' | 'system' | 'logs';
+type Tab = 'health' | 'fixes' | 'system' | 'network' | 'crashes';
 
 interface SubsystemCheck {
   name: string;
@@ -65,6 +61,7 @@ interface SystemInfo {
     heapUsedMb: number;
     heapTotalMb: number;
     rssMb: number;
+    externalMb: number;
     freeMb: number;
     totalMb: number;
   };
@@ -77,18 +74,26 @@ interface SystemInfo {
   pid: number;
 }
 
+interface NetworkResult {
+  name: string;
+  ok: boolean;
+  ms: number;
+  status?: number;
+  error?: string;
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function StatusIcon({ status, className = 'w-4 h-4' }: { status: SubsystemStatus; className?: string }) {
-  if (status === 'ok')      return <CheckCircle2 className={`${className} text-green-400`} />;
-  if (status === 'warn')    return <AlertTriangle className={`${className} text-yellow-400`} />;
-  if (status === 'error')   return <XCircle className={`${className} text-destructive`} />;
+  if (status === 'ok')   return <CheckCircle2 className={`${className} text-green-400`} />;
+  if (status === 'warn') return <AlertTriangle className={`${className} text-yellow-400`} />;
+  if (status === 'error') return <XCircle className={`${className} text-destructive`} />;
   return <HelpCircle className={`${className} text-muted-foreground`} />;
 }
 
 function statusColor(status: SubsystemStatus) {
-  if (status === 'ok')    return 'text-green-400';
-  if (status === 'warn')  return 'text-yellow-400';
+  if (status === 'ok')   return 'text-green-400';
+  if (status === 'warn') return 'text-yellow-400';
   if (status === 'error') return 'text-destructive';
   return 'text-muted-foreground';
 }
@@ -101,129 +106,215 @@ function subsystemIcon(name: string) {
   if (name.includes('Ollama'))   return <Cpu className="w-3.5 h-3.5 text-muted-foreground" />;
   if (name.includes('Torrentio')) return <Wifi className="w-3.5 h-3.5 text-muted-foreground" />;
   if (name.includes('Download')) return <Database className="w-3.5 h-3.5 text-muted-foreground" />;
-  if (name.includes('FFmpeg'))   return <Terminal className="w-3.5 h-3.5 text-muted-foreground" />;
+  if (name.includes('FFmpeg'))   return <Play className="w-3.5 h-3.5 text-muted-foreground" />;
   return <Server className="w-3.5 h-3.5 text-muted-foreground" />;
 }
 
-function formatUptime(seconds: number): string {
+function fmtUptime(seconds: number): string {
   const d = Math.floor(seconds / 86400);
   const h = Math.floor((seconds % 86400) / 3600);
   const m = Math.floor((seconds % 3600) / 60);
   const s = seconds % 60;
   if (d > 0) return `${d}d ${h}h ${m}m`;
-  if (h > 0) return `${h}h ${m}m`;
+  if (h > 0) return `${h}h ${m}m ${s}s`;
   if (m > 0) return `${m}m ${s}s`;
   return `${s}s`;
 }
 
-function MemBar({ used, total, label }: { used: number; total: number; label: string }) {
-  const pct = total > 0 ? Math.round((used / total) * 100) : 0;
-  const color = pct > 85 ? 'bg-destructive' : pct > 65 ? 'bg-yellow-400' : 'bg-green-400';
+// ── Tab button ────────────────────────────────────────────────────────────────
+
+function TabBtn({
+  active, onClick, icon: Icon, label, badge,
+}: {
+  active: boolean;
+  onClick: () => void;
+  icon: React.ElementType;
+  label: string;
+  badge?: 'warn' | 'error';
+}) {
   return (
-    <div className="flex flex-col gap-1">
-      <div className="flex justify-between text-[10px]">
-        <span className="text-muted-foreground">{label}</span>
-        <span className="text-foreground font-mono">{used} / {total} MB <span className="text-muted-foreground">({pct}%)</span></span>
+    <button
+      onClick={onClick}
+      className={`relative flex flex-col items-center gap-0.5 px-2 py-2 rounded-lg text-[10px] font-semibold transition-colors flex-1 ${
+        active ? 'bg-primary/15 text-primary' : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+      }`}
+    >
+      <Icon className="w-3.5 h-3.5" />
+      {label}
+      {badge && (
+        <span className={`absolute top-1 right-1 w-2 h-2 rounded-full ${badge === 'error' ? 'bg-destructive' : 'bg-yellow-400'}`} />
+      )}
+    </button>
+  );
+}
+
+// ── Health Tab ────────────────────────────────────────────────────────────────
+
+function HealthTab({ health, loading, onRefresh }: {
+  health: HealthReport | null;
+  loading: boolean;
+  onRefresh: () => void;
+}) {
+  const [expandedCheck, setExpandedCheck] = useState<string | null>(null);
+
+  return (
+    <div className="flex flex-col gap-3 p-4">
+      <div className="flex items-center justify-between">
+        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Subsystem Health</p>
+        <button
+          onClick={onRefresh}
+          disabled={loading}
+          className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+        >
+          <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} />
+          Refresh
+        </button>
       </div>
-      <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-        <div className={`h-full rounded-full transition-all duration-500 ${color}`} style={{ width: `${pct}%` }} />
-      </div>
+
+      {loading && !health && (
+        <div className="flex items-center gap-2 py-6 justify-center text-muted-foreground text-xs">
+          <Loader2 className="w-4 h-4 animate-spin" /> Running checks…
+        </div>
+      )}
+
+      {!loading && !health && (
+        <div className="flex flex-col items-center gap-2 py-6 text-muted-foreground text-xs">
+          <XCircle className="w-6 h-6 text-destructive" />
+          <p>Failed to load health data</p>
+          <button onClick={onRefresh} className="text-primary text-[11px] hover:underline">Try again</button>
+        </div>
+      )}
+
+      {health && (
+        <>
+          {/* Overall banner */}
+          <div className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-xs font-semibold ${
+            health.overall === 'ok'    ? 'bg-green-500/10 border-green-500/20 text-green-400' :
+            health.overall === 'warn'  ? 'bg-yellow-500/10 border-yellow-500/20 text-yellow-400' :
+                                         'bg-destructive/10 border-destructive/20 text-destructive'
+          }`}>
+            <StatusIcon status={health.overall} className="w-4 h-4" />
+            {health.overall === 'ok'   ? 'All systems operational' :
+             health.overall === 'warn' ? 'Some warnings — see details below' :
+                                         'Issues detected — action required'}
+          </div>
+
+          <div className="flex flex-col gap-1">
+            {health.checks.map(check => (
+              <div key={check.name}>
+                <button
+                  onClick={() => setExpandedCheck(expandedCheck === check.name ? null : check.name)}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-muted/50 transition-colors text-left"
+                >
+                  <StatusIcon status={check.status} className="w-3.5 h-3.5 flex-shrink-0" />
+                  <div className="flex items-center gap-1.5 flex-shrink-0">{subsystemIcon(check.name)}</div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium text-foreground">{check.name}</p>
+                    <p className={`text-[10px] ${statusColor(check.status)} truncate`}>{check.message}</p>
+                  </div>
+                  {check.detail && (
+                    <ChevronRight className={`w-3 h-3 text-muted-foreground flex-shrink-0 transition-transform ${expandedCheck === check.name ? 'rotate-90' : ''}`} />
+                  )}
+                </button>
+                {expandedCheck === check.name && check.detail && (
+                  <div className="mx-3 mb-1 px-3 py-2 rounded-lg bg-muted/30 border border-border">
+                    <p className="text-[10px] text-muted-foreground font-mono break-all">{check.detail}</p>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+
+          <p className="text-[9px] text-muted-foreground text-right">
+            Last checked: {new Date(health.timestamp).toLocaleTimeString()}
+          </p>
+        </>
+      )}
     </div>
   );
 }
 
-// ── Smart fix suggestions ─────────────────────────────────────────────────────
-// Maps health check problems to the repair action that fixes them
+// ── Quick Fixes Tab ───────────────────────────────────────────────────────────
 
-function getSuggestedFix(check: SubsystemCheck): { action: string; label: string } | null {
-  if (check.status === 'ok') return null;
-  const n = check.name;
-  const m = check.message.toLowerCase();
-  if (n.includes('Library') && m.includes('stuck')) return { action: 'clear_stuck_transcodes', label: 'Clear Stuck Transcodes' };
-  if (n.includes('Download') && m.includes('error')) return { action: 'clear_errored_downloads', label: 'Clear Errored Downloads' };
-  if (n.includes('Download') && m.includes('stuck')) return { action: 'clear_stuck_queued', label: 'Clear Stuck Queue' };
-  if (n.includes('TMDB') && (m.includes('fail') || m.includes('error'))) return { action: 'test_network', label: 'Test Network' };
-  if (n.includes('Config') && m.includes('setup')) return null; // handled by setup wizard link
-  if (n.includes('FFmpeg') && m.includes('not found')) return null; // install guide
-  return null;
-}
-
-// ── Repair actions definition ─────────────────────────────────────────────────
-
-interface RepairAction {
+interface QuickFix {
   id: string;
   label: string;
   description: string;
   icon: React.ReactNode;
   variant?: 'default' | 'destructive' | 'warning';
-  confirmLabel?: string; // if set, requires a confirm step
+  confirmMsg?: string;
 }
 
-const REPAIR_ACTIONS: RepairAction[] = [
+const QUICK_FIXES: QuickFix[] = [
   {
     id: 'clear_stuck_transcodes',
     label: 'Clear Stuck Transcodes',
-    description: 'Resets library items stuck with a "transcoding" flag — fixes videos that won\'t play.',
+    description: 'Resets library items stuck with transcoding:true — fixes "spinning forever" on media cards',
     icon: <RefreshCw className="w-3.5 h-3.5" />,
   },
   {
     id: 'clear_errored_downloads',
     label: 'Clear Errored Downloads',
-    description: 'Removes failed download jobs from the queue so you can retry them.',
+    description: 'Removes failed download jobs from the queue so new downloads can start',
     icon: <Trash2 className="w-3.5 h-3.5" />,
-    variant: 'warning',
+    variant: 'destructive',
   },
   {
     id: 'clear_stuck_queued',
-    label: 'Clear Stuck Queue',
-    description: 'Removes queued download jobs that have been waiting more than 30 minutes.',
+    label: 'Clear Stuck Queued Jobs',
+    description: 'Removes download jobs stuck in "queued" state for more than 30 minutes',
     icon: <Trash2 className="w-3.5 h-3.5" />,
-    variant: 'warning',
+    variant: 'destructive',
   },
   {
     id: 'reset_hls_sessions',
     label: 'Reset HLS Sessions',
-    description: 'Kills all active video transcode sessions. Fixes buffering or "video won\'t start" issues.',
+    description: 'Kills all active HLS transcode sessions — fixes video that won\'t load or is buffering forever',
     icon: <RotateCcw className="w-3.5 h-3.5" />,
   },
   {
     id: 'clear_tmdb_cache',
-    label: 'Refresh Metadata Cache',
-    description: 'Forces all movie/show artwork and info to re-fetch from TMDB on next view.',
+    label: 'Clear TMDB Cache',
+    description: 'Forces all metadata to re-fetch from TMDB on next view — fixes stale or missing posters/info',
     icon: <RefreshCw className="w-3.5 h-3.5" />,
   },
   {
     id: 'test_network',
-    label: 'Test Network Connectivity',
-    description: 'Pings TMDB, Torrentio, and OpenSubtitles to check if external services are reachable.',
-    icon: <Network className="w-3.5 h-3.5" />,
+    label: 'Test External Connectivity',
+    description: 'Pings TMDB, Torrentio, and OpenSubtitles to check if your server can reach the internet',
+    icon: <Globe className="w-3.5 h-3.5" />,
   },
   {
     id: 'reindex_library',
-    label: 'Re-index Library',
-    description: 'Opens the Setup Wizard to re-scan your media folder and add new files.',
-    icon: <Database className="w-3.5 h-3.5" />,
+    label: 'Re-enrich Library Metadata',
+    description: 'Triggers a background re-fetch of AI enrichment tags and metadata for all library items',
+    icon: <Zap className="w-3.5 h-3.5" />,
   },
   {
     id: 'clear_watch_progress',
     label: 'Reset All Watch Progress',
-    description: 'Wipes server-side watch progress for every title. Cannot be undone.',
-    icon: <ShieldAlert className="w-3.5 h-3.5" />,
+    description: 'Wipes server-side watch progress for every title. Per-profile progress (stored locally) is unaffected.',
+    icon: <ShieldOff className="w-3.5 h-3.5" />,
+    variant: 'warning',
+    confirmMsg: 'This will reset watch progress for all titles on the server. Continue?',
+  },
+  {
+    id: 'clear_crash_log',
+    label: 'Clear Crash Log',
+    description: 'Wipes the crash log after you\'ve reviewed or copied it',
+    icon: <Trash2 className="w-3.5 h-3.5" />,
     variant: 'destructive',
-    confirmLabel: 'Yes, reset all progress',
   },
 ];
 
-// ── Repair Tab ────────────────────────────────────────────────────────────────
-
-function RepairTab({ onRefreshHealth }: { onRefreshHealth: () => void }) {
+function QuickFixesTab() {
   const [results, setResults] = useState<Record<string, { msg: string; ok: boolean }>>({});
   const [running, setRunning] = useState<string | null>(null);
-  const [confirming, setConfirming] = useState<string | null>(null);
+  const [pendingConfirm, setPendingConfirm] = useState<string | null>(null);
 
-  const runAction = async (id: string) => {
+  const runFix = async (id: string) => {
     setRunning(id);
-    setConfirming(null);
+    setResults(r => ({ ...r, [id]: { msg: '', ok: true } }));
     try {
       const res = await fetch('/api/debug/repair', {
         method: 'POST',
@@ -232,7 +323,6 @@ function RepairTab({ onRefreshHealth }: { onRefreshHealth: () => void }) {
       });
       const data = await res.json() as { ok: boolean; message: string };
       setResults(r => ({ ...r, [id]: { msg: data.message, ok: data.ok } }));
-      if (data.ok) onRefreshHealth();
     } catch (err) {
       setResults(r => ({ ...r, [id]: { msg: String(err), ok: false } }));
     } finally {
@@ -240,197 +330,306 @@ function RepairTab({ onRefreshHealth }: { onRefreshHealth: () => void }) {
     }
   };
 
+  const handleRun = (fix: QuickFix) => {
+    if (fix.confirmMsg) {
+      setPendingConfirm(fix.id);
+    } else {
+      void runFix(fix.id);
+    }
+  };
+
   return (
-    <div className="p-4 flex flex-col gap-2.5">
-      <p className="text-[10px] text-muted-foreground leading-relaxed mb-1">
-        These actions fix the most common stuck states. All are safe to run — they only clear flags or queued jobs, never delete your media files.
+    <div className="flex flex-col gap-2 p-4">
+      <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">One-click Repairs</p>
+      <p className="text-[11px] text-muted-foreground leading-relaxed mb-2">
+        These actions are safe to run at any time. Use them to unstick common problems without restarting HomeStream.
       </p>
 
-      {REPAIR_ACTIONS.map(action => {
-        const result = results[action.id];
-        const isRunning = running === action.id;
-        const isConfirming = confirming === action.id;
-
-        const btnClass = action.variant === 'destructive'
-          ? 'bg-destructive/20 hover:bg-destructive/30 text-destructive'
-          : action.variant === 'warning'
-          ? 'bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-400'
-          : 'bg-primary/20 hover:bg-primary/30 text-primary';
-
-        return (
-          <div key={action.id} className="rounded-xl border border-border bg-muted/10 overflow-hidden">
-            <div className="flex items-start gap-3 p-3">
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-medium text-foreground">{action.label}</p>
-                <p className="text-[10px] text-muted-foreground mt-0.5 leading-relaxed">{action.description}</p>
-                {result?.msg && (
-                  <p className={`text-[10px] mt-1.5 font-medium ${result.ok ? 'text-green-400' : 'text-destructive'}`}>
-                    {result.ok ? '✓ ' : '✗ '}{result.msg}
-                  </p>
-                )}
-              </div>
-
-              <div className="flex flex-col gap-1.5 flex-shrink-0">
-                {isConfirming ? (
-                  <>
-                    <button
-                      onClick={() => runAction(action.id)}
-                      className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-destructive/30 hover:bg-destructive/50 text-destructive text-[10px] font-semibold transition-colors"
-                    >
-                      {action.confirmLabel ?? 'Confirm'}
-                    </button>
-                    <button
-                      onClick={() => setConfirming(null)}
-                      className="text-[10px] text-muted-foreground hover:text-foreground text-center transition-colors"
-                    >
-                      Cancel
-                    </button>
-                  </>
-                ) : (
-                  <button
-                    onClick={() => action.confirmLabel ? setConfirming(action.id) : runAction(action.id)}
-                    disabled={isRunning || running !== null}
-                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-semibold transition-colors disabled:opacity-40 ${btnClass}`}
-                  >
-                    {isRunning ? <Loader2 className="w-3 h-3 animate-spin" /> : action.icon}
-                    Run
-                  </button>
-                )}
+      {QUICK_FIXES.map(fix => (
+        <div key={fix.id} className="rounded-xl border border-border bg-muted/10 overflow-hidden">
+          {/* Confirm prompt */}
+          {pendingConfirm === fix.id && (
+            <div className="px-3 pt-3 pb-2 bg-yellow-500/8 border-b border-yellow-500/20">
+              <p className="text-[11px] text-yellow-400 font-medium mb-2">{fix.confirmMsg}</p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => { setPendingConfirm(null); void runFix(fix.id); }}
+                  className="flex-1 py-1.5 rounded-lg text-[10px] font-semibold bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-400 border border-yellow-500/30 transition-colors"
+                >
+                  Yes, proceed
+                </button>
+                <button
+                  onClick={() => setPendingConfirm(null)}
+                  className="flex-1 py-1.5 rounded-lg text-[10px] font-semibold bg-muted hover:bg-muted/70 text-muted-foreground transition-colors"
+                >
+                  Cancel
+                </button>
               </div>
             </div>
+          )}
+
+          <div className="flex items-start gap-3 p-3">
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-medium text-foreground">{fix.label}</p>
+              <p className="text-[10px] text-muted-foreground mt-0.5 leading-snug">{fix.description}</p>
+              {results[fix.id]?.msg && (
+                <p className={`text-[10px] mt-1.5 font-medium ${results[fix.id].ok ? 'text-green-400' : 'text-destructive'}`}>
+                  {results[fix.id].ok ? '✓ ' : '✗ '}{results[fix.id].msg}
+                </p>
+              )}
+            </div>
+            <button
+              onClick={() => handleRun(fix)}
+              disabled={running === fix.id || pendingConfirm === fix.id}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-semibold transition-colors flex-shrink-0 disabled:opacity-50 ${
+                fix.variant === 'destructive' ? 'bg-destructive/20 hover:bg-destructive/30 text-destructive' :
+                fix.variant === 'warning'     ? 'bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-400' :
+                                                'bg-primary/20 hover:bg-primary/30 text-primary'
+              }`}
+            >
+              {running === fix.id ? <Loader2 className="w-3 h-3 animate-spin" /> : fix.icon}
+              Run
+            </button>
           </div>
-        );
-      })}
+        </div>
+      ))}
     </div>
   );
 }
 
-// ── System Tab ────────────────────────────────────────────────────────────────
+// ── System Info Tab ───────────────────────────────────────────────────────────
 
 function SystemTab() {
   const [info, setInfo] = useState<SystemInfo | null>(null);
   const [loading, setLoading] = useState(false);
-  const [lastFetched, setLastFetched] = useState<Date | null>(null);
+  const [uptimeTick, setUptimeTick] = useState(0);
 
-  const fetch_ = useCallback(async () => {
+  const fetchInfo = useCallback(async () => {
     setLoading(true);
     try {
       const res = await fetch('/api/debug/system-info');
       const data = await res.json() as SystemInfo;
       setInfo(data);
-      setLastFetched(new Date());
-    } catch {
-      setInfo(null);
+    } catch { /* ignore */ } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { void fetchInfo(); }, [fetchInfo]);
+
+  // Tick uptime every second
+  useEffect(() => {
+    if (!info) return;
+    const t = setInterval(() => setUptimeTick(n => n + 1), 1000);
+    return () => clearInterval(t);
+  }, [info]);
+
+  const liveUptime = info ? info.uptime + uptimeTick : 0;
+
+  const Row = ({ label, value, mono = false, color }: { label: string; value: string; mono?: boolean; color?: string }) => (
+    <div className="flex items-center justify-between py-1.5 border-b border-border/30 last:border-0">
+      <span className="text-[11px] text-muted-foreground">{label}</span>
+      <span className={`text-[11px] font-medium ${color ?? 'text-foreground'} ${mono ? 'font-mono' : ''}`}>{value}</span>
+    </div>
+  );
+
+  if (loading && !info) {
+    return (
+      <div className="flex items-center gap-2 py-10 justify-center text-muted-foreground text-xs p-4">
+        <Loader2 className="w-4 h-4 animate-spin" /> Loading system info…
+      </div>
+    );
+  }
+
+  if (!info) {
+    return (
+      <div className="flex flex-col items-center gap-2 py-10 text-muted-foreground text-xs p-4">
+        <XCircle className="w-6 h-6 text-destructive" />
+        <p>Failed to load system info</p>
+        <button onClick={fetchInfo} className="text-primary text-[11px] hover:underline">Retry</button>
+      </div>
+    );
+  }
+
+  const heapPct = Math.round((info.memory.heapUsedMb / info.memory.heapTotalMb) * 100);
+  const ramPct  = Math.round(((info.memory.totalMb - info.memory.freeMb) / info.memory.totalMb) * 100);
+
+  return (
+    <div className="flex flex-col gap-4 p-4">
+      <div className="flex items-center justify-between">
+        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Runtime</p>
+        <button onClick={fetchInfo} disabled={loading} className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50">
+          <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} /> Refresh
+        </button>
+      </div>
+
+      {/* Uptime hero */}
+      <div className="rounded-xl bg-primary/8 border border-primary/20 px-4 py-3 flex items-center gap-3">
+        <Clock className="w-5 h-5 text-primary flex-shrink-0" />
+        <div>
+          <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Server Uptime</p>
+          <p className="text-lg font-bold text-foreground font-mono">{fmtUptime(liveUptime)}</p>
+        </div>
+        <div className="ml-auto text-right">
+          <p className="text-[10px] text-muted-foreground">PID</p>
+          <p className="text-sm font-mono text-foreground">{info.pid}</p>
+        </div>
+      </div>
+
+      {/* Memory */}
+      <div>
+        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1.5">
+          <MemoryStick className="w-3 h-3" /> Memory
+        </p>
+        <div className="space-y-2">
+          {/* Heap bar */}
+          <div>
+            <div className="flex justify-between text-[10px] mb-1">
+              <span className="text-muted-foreground">JS Heap</span>
+              <span className="text-foreground font-mono">{info.memory.heapUsedMb} / {info.memory.heapTotalMb} MB ({heapPct}%)</span>
+            </div>
+            <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+              <div className={`h-full rounded-full ${heapPct > 80 ? 'bg-destructive' : heapPct > 60 ? 'bg-yellow-400' : 'bg-primary'}`} style={{ width: `${heapPct}%` }} />
+            </div>
+          </div>
+          {/* System RAM bar */}
+          <div>
+            <div className="flex justify-between text-[10px] mb-1">
+              <span className="text-muted-foreground">System RAM</span>
+              <span className="text-foreground font-mono">{info.memory.totalMb - info.memory.freeMb} / {info.memory.totalMb} MB ({ramPct}%)</span>
+            </div>
+            <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+              <div className={`h-full rounded-full ${ramPct > 90 ? 'bg-destructive' : ramPct > 75 ? 'bg-yellow-400' : 'bg-green-500'}`} style={{ width: `${ramPct}%` }} />
+            </div>
+          </div>
+          <Row label="RSS (total process)" value={`${info.memory.rssMb} MB`} mono />
+        </div>
+      </div>
+
+      {/* CPU */}
+      <div>
+        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1.5">
+          <Cpu className="w-3 h-3" /> CPU
+        </p>
+        <Row label="Model" value={info.cpu.model.length > 30 ? info.cpu.model.slice(0, 30) + '…' : info.cpu.model} />
+        <Row label="Cores" value={String(info.cpu.cores)} mono />
+        {info.cpu.loadAvg.some(v => v > 0) && (
+          <Row
+            label="Load avg (1/5/15m)"
+            value={info.cpu.loadAvg.map(v => v.toFixed(2)).join(' / ')}
+            mono
+            color={info.cpu.loadAvg[0] > info.cpu.cores ? 'text-destructive' : info.cpu.loadAvg[0] > info.cpu.cores * 0.7 ? 'text-yellow-400' : 'text-green-400'}
+          />
+        )}
+      </div>
+
+      {/* Platform */}
+      <div>
+        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1.5">
+          <Terminal className="w-3 h-3" /> Platform
+        </p>
+        <Row label="Node.js" value={info.node} mono />
+        <Row label="OS" value={`${info.platform} / ${info.arch}`} mono />
+        <Row label="Environment" value={info.env} mono color={info.env === 'production' ? 'text-green-400' : 'text-yellow-400'} />
+      </div>
+    </div>
+  );
+}
+
+// ── Network Tab ───────────────────────────────────────────────────────────────
+
+function NetworkTab() {
+  const [results, setResults] = useState<NetworkResult[] | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const runTest = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch('/api/debug/repair', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'test_network' }),
+      });
+      const data = await res.json() as { ok: boolean; message: string };
+      // Parse the "Name: ✓ 123ms · Name: ✗ error" format
+      const parsed: NetworkResult[] = data.message.split(' · ').map(part => {
+        const match = part.match(/^(.+?):\s*(✓|✗)\s*(.+)$/);
+        if (!match) return { name: part, ok: false, ms: 0, error: 'parse error' };
+        const ok = match[2] === '✓';
+        const rest = match[3];
+        const msMatch = rest.match(/^(\d+)ms$/);
+        return {
+          name: match[1],
+          ok,
+          ms: msMatch ? parseInt(msMatch[1]) : 0,
+          error: ok ? undefined : rest,
+        };
+      });
+      setResults(parsed);
+    } catch (err) {
+      setResults([{ name: 'Error', ok: false, ms: 0, error: String(err) }]);
     } finally {
       setLoading(false);
     }
   }, []);
 
-  useEffect(() => { fetch_(); }, [fetch_]);
-
-  // Auto-refresh every 10 seconds
-  useEffect(() => {
-    const t = setInterval(fetch_, 10_000);
-    return () => clearInterval(t);
-  }, [fetch_]);
-
-  const platformLabel = (p: string) => ({ win32: 'Windows', darwin: 'macOS', linux: 'Linux' }[p] ?? p);
+  const latencyColor = (ms: number) => {
+    if (ms < 200) return 'text-green-400';
+    if (ms < 600) return 'text-yellow-400';
+    return 'text-destructive';
+  };
 
   return (
-    <div className="p-4 flex flex-col gap-4">
+    <div className="flex flex-col gap-4 p-4">
       <div className="flex items-center justify-between">
-        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Runtime Statistics</p>
-        <div className="flex items-center gap-2">
-          {lastFetched && (
-            <span className="text-[9px] text-muted-foreground">
-              Updated {lastFetched.toLocaleTimeString()}
-            </span>
-          )}
-          <button
-            onClick={fetch_}
-            disabled={loading}
-            className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} />
-          </button>
-        </div>
+        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">External Connectivity</p>
       </div>
 
-      {loading && !info && (
-        <div className="flex items-center gap-2 py-6 justify-center text-muted-foreground text-xs">
-          <Loader2 className="w-4 h-4 animate-spin" /> Loading…
-        </div>
-      )}
+      <p className="text-[11px] text-muted-foreground leading-relaxed">
+        Tests whether your HomeStream server can reach the external services it depends on. Run this if downloads, metadata, or subtitles aren't working.
+      </p>
 
-      {info && (
-        <>
-          {/* Identity row */}
-          <div className="grid grid-cols-2 gap-2">
-            {[
-              { icon: <Server className="w-3.5 h-3.5" />, label: 'Platform', value: `${platformLabel(info.platform)} ${info.arch}` },
-              { icon: <Terminal className="w-3.5 h-3.5" />, label: 'Node.js', value: info.node },
-              { icon: <Clock className="w-3.5 h-3.5" />, label: 'Uptime', value: formatUptime(info.uptime) },
-              { icon: <Activity className="w-3.5 h-3.5" />, label: 'PID', value: String(info.pid) },
-            ].map(({ icon, label, value }) => (
-              <div key={label} className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-muted/20 border border-border">
-                <span className="text-muted-foreground">{icon}</span>
-                <div className="min-w-0">
-                  <p className="text-[9px] text-muted-foreground uppercase tracking-wide">{label}</p>
-                  <p className="text-xs font-mono text-foreground truncate">{value}</p>
-                </div>
+      <button
+        onClick={runTest}
+        disabled={loading}
+        className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-primary/10 hover:bg-primary/20 border border-primary/20 text-primary text-xs font-semibold transition-colors disabled:opacity-60"
+      >
+        {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Globe className="w-3.5 h-3.5" />}
+        {loading ? 'Testing connectivity…' : 'Run Connectivity Test'}
+      </button>
+
+      {results && (
+        <div className="flex flex-col gap-2">
+          {results.map((r, i) => (
+            <div key={i} className={`flex items-center gap-3 px-3 py-2.5 rounded-xl border ${
+              r.ok ? 'bg-green-500/5 border-green-500/20' : 'bg-destructive/5 border-destructive/20'
+            }`}>
+              {r.ok
+                ? <CheckCircle2 className="w-4 h-4 text-green-400 flex-shrink-0" />
+                : <XCircle className="w-4 h-4 text-destructive flex-shrink-0" />
+              }
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-medium text-foreground">{r.name}</p>
+                {r.error && <p className="text-[10px] text-destructive">{r.error}</p>}
               </div>
-            ))}
-          </div>
-
-          {/* Memory */}
-          <div className="rounded-xl border border-border bg-muted/10 p-3 flex flex-col gap-3">
-            <div className="flex items-center gap-1.5">
-              <MemoryStick className="w-3.5 h-3.5 text-muted-foreground" />
-              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Memory</p>
-            </div>
-            <MemBar used={info.memory.heapUsedMb} total={info.memory.heapTotalMb} label="JS Heap" />
-            <MemBar used={info.memory.rssMb} total={info.memory.totalMb} label="Process RSS / System" />
-            <div className="flex justify-between text-[10px] pt-0.5">
-              <span className="text-muted-foreground">System free</span>
-              <span className="text-foreground font-mono">{info.memory.freeMb} MB</span>
-            </div>
-          </div>
-
-          {/* CPU */}
-          <div className="rounded-xl border border-border bg-muted/10 p-3 flex flex-col gap-2">
-            <div className="flex items-center gap-1.5">
-              <Cpu className="w-3.5 h-3.5 text-muted-foreground" />
-              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">CPU</p>
-            </div>
-            <p className="text-[10px] text-foreground font-mono truncate">{info.cpu.model}</p>
-            <div className="flex gap-4 text-[10px]">
-              <div>
-                <span className="text-muted-foreground">Cores </span>
-                <span className="text-foreground font-mono">{info.cpu.cores}</span>
-              </div>
-              {info.cpu.loadAvg[0] > 0 && (
-                <>
-                  <div>
-                    <span className="text-muted-foreground">Load 1m </span>
-                    <span className="text-foreground font-mono">{info.cpu.loadAvg[0].toFixed(2)}</span>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">5m </span>
-                    <span className="text-foreground font-mono">{info.cpu.loadAvg[1].toFixed(2)}</span>
-                  </div>
-                </>
+              {r.ok && r.ms > 0 && (
+                <span className={`text-[11px] font-mono font-semibold ${latencyColor(r.ms)}`}>{r.ms}ms</span>
               )}
             </div>
-          </div>
+          ))}
 
-          {/* Environment */}
-          <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-muted/10 border border-border text-[10px]">
-            <span className="text-muted-foreground">Environment</span>
-            <span className={`font-mono font-semibold ${info.env === 'production' ? 'text-green-400' : 'text-yellow-400'}`}>
-              {info.env}
-            </span>
-          </div>
-        </>
+          {results.some(r => !r.ok) && (
+            <div className="rounded-xl bg-yellow-500/8 border border-yellow-500/20 p-3">
+              <p className="text-[11px] text-yellow-400 font-semibold mb-1">Connectivity issues detected</p>
+              <ul className="text-[10px] text-muted-foreground space-y-1 leading-relaxed">
+                <li>• Check your server's internet connection</li>
+                <li>• If using a VPN, try disconnecting it temporarily</li>
+                <li>• Check if your firewall is blocking outbound HTTPS</li>
+                <li>• The service itself may be temporarily down</li>
+              </ul>
+            </div>
+          )}
+        </div>
       )}
     </div>
   );
@@ -438,7 +637,7 @@ function SystemTab() {
 
 // ── Crash Log Tab ─────────────────────────────────────────────────────────────
 
-function LogsTab() {
+function CrashLogTab() {
   const [entries, setEntries] = useState<CrashEntry[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -458,7 +657,7 @@ function LogsTab() {
     }
   }, []);
 
-  useEffect(() => { fetchLog(); }, [fetchLog]);
+  useEffect(() => { void fetchLog(); }, [fetchLog]);
 
   const copyAll = async () => {
     if (!entries?.length) return;
@@ -484,11 +683,7 @@ function LogsTab() {
   const clearLog = async () => {
     setClearing(true);
     try {
-      await fetch('/api/debug/repair', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'clear_crash_log' }),
-      });
+      await fetch('/api/crash-log?clear=1');
       setEntries([]);
     } finally {
       setClearing(false);
@@ -496,33 +691,37 @@ function LogsTab() {
   };
 
   const typeColor = (type: string) => {
-    if (type === 'uncaughtException')  return 'text-destructive bg-destructive/10 border-destructive/20';
-    if (type === 'unhandledRejection') return 'text-orange-400 bg-orange-500/10 border-orange-500/20';
-    if (type === 'expressError')       return 'text-yellow-400 bg-yellow-500/10 border-yellow-500/20';
+    if (type === 'uncaughtException')   return 'text-destructive bg-destructive/10 border-destructive/20';
+    if (type === 'unhandledRejection')  return 'text-orange-400 bg-orange-500/10 border-orange-500/20';
+    if (type === 'expressError')        return 'text-yellow-400 bg-yellow-500/10 border-yellow-500/20';
     return 'text-muted-foreground bg-muted/20 border-border';
   };
 
   return (
-    <div className="p-4 flex flex-col gap-3">
-      {/* Actions row */}
-      <div className="flex items-center gap-2 flex-wrap">
-        <button
-          onClick={fetchLog}
-          disabled={loading}
-          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-muted hover:bg-muted/80 text-foreground text-[10px] font-medium transition-colors disabled:opacity-50"
-        >
-          <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} />
-          Refresh
+    <div className="flex flex-col gap-3 p-4">
+      <div className="flex items-center justify-between">
+        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+          Crash Log
+          {entries !== null && entries.length > 0 && (
+            <span className="ml-2 text-[9px] bg-destructive/20 text-destructive px-1.5 py-0.5 rounded-full font-bold">{entries.length}</span>
+          )}
+        </p>
+        <button onClick={fetchLog} disabled={loading} className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50">
+          <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} /> Refresh
         </button>
+      </div>
+
+      <p className="text-[11px] text-muted-foreground leading-relaxed">
+        If HomeStream crashes or behaves unexpectedly, click <strong className="text-foreground/70">Copy All for Support</strong> and paste the result into a GitHub issue or support chat.
+      </p>
+
+      <div className="flex items-center gap-2">
         <button
           onClick={copyAll}
           disabled={!entries?.length}
           className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-primary/20 hover:bg-primary/30 text-primary text-[10px] font-semibold transition-colors disabled:opacity-40"
         >
-          {copied
-            ? <><ClipboardCheck className="w-3 h-3" /> Copied!</>
-            : <><ClipboardCopy className="w-3 h-3" /> Copy All for Support</>
-          }
+          {copied ? <><ClipboardCheck className="w-3 h-3" /> Copied!</> : <><ClipboardCopy className="w-3 h-3" /> Copy All for Support</>}
         </button>
         {entries !== null && entries.length > 0 && (
           <button
@@ -536,13 +735,9 @@ function LogsTab() {
         )}
       </div>
 
-      <p className="text-[10px] text-muted-foreground leading-relaxed">
-        If HomeStream crashes or behaves unexpectedly, click <strong className="text-foreground/70">Copy All for Support</strong> and paste the result into a GitHub issue or support chat. Includes full stack traces, platform info, and timing.
-      </p>
-
       {loading && (
         <div className="flex items-center gap-2 py-4 justify-center text-muted-foreground text-xs">
-          <Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading crash log…
+          <Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading…
         </div>
       )}
 
@@ -553,7 +748,7 @@ function LogsTab() {
       )}
 
       {!loading && entries !== null && entries.length > 0 && (
-        <div className="flex flex-col gap-2 max-h-80 overflow-y-auto pr-1">
+        <div className="flex flex-col gap-2 max-h-72 overflow-y-auto pr-1">
           {entries.map(entry => (
             <div key={entry.id} className={`rounded-xl border text-[10px] overflow-hidden ${typeColor(entry.type)}`}>
               <button
@@ -595,141 +790,61 @@ function LogsTab() {
   );
 }
 
-// ── Health Tab ────────────────────────────────────────────────────────────────
+// ── Copy Full Diagnostic Report ───────────────────────────────────────────────
 
-function HealthTab({
-  health,
-  loading,
-  onRefresh,
-  onRunFix,
-  fixResults,
-  runningFix,
-}: {
-  health: HealthReport | null;
-  loading: boolean;
-  onRefresh: () => void;
-  onRunFix: (action: string) => void;
-  fixResults: Record<string, { msg: string; ok: boolean }>;
-  runningFix: string | null;
-}) {
-  const [expandedCheck, setExpandedCheck] = useState<string | null>(null);
+function CopyDiagnosticButton({ health, sysInfo }: { health: HealthReport | null; sysInfo: SystemInfo | null }) {
+  const [copied, setCopied] = useState(false);
+
+  const copy = async () => {
+    const lines: string[] = [
+      '═══════════════════════════════════════════════════',
+      'HomeStream Diagnostic Report',
+      `Generated: ${new Date().toISOString()}`,
+      '═══════════════════════════════════════════════════',
+      '',
+    ];
+
+    if (sysInfo) {
+      lines.push('── System ──────────────────────────────────────────');
+      lines.push(`Node.js:    ${sysInfo.node}`);
+      lines.push(`Platform:   ${sysInfo.platform} / ${sysInfo.arch}`);
+      lines.push(`Uptime:     ${fmtUptime(sysInfo.uptime)}`);
+      lines.push(`PID:        ${sysInfo.pid}`);
+      lines.push(`Heap:       ${sysInfo.memory.heapUsedMb} / ${sysInfo.memory.heapTotalMb} MB`);
+      lines.push(`RSS:        ${sysInfo.memory.rssMb} MB`);
+      lines.push(`System RAM: ${sysInfo.memory.totalMb - sysInfo.memory.freeMb} / ${sysInfo.memory.totalMb} MB free`);
+      lines.push(`CPU:        ${sysInfo.cpu.model} (${sysInfo.cpu.cores} cores)`);
+      lines.push(`Load avg:   ${sysInfo.cpu.loadAvg.map(v => v.toFixed(2)).join(' / ')}`);
+      lines.push('');
+    }
+
+    if (health) {
+      lines.push('── Health Checks ───────────────────────────────────');
+      lines.push(`Overall: ${health.overall.toUpperCase()}`);
+      for (const c of health.checks) {
+        lines.push(`  [${c.status.toUpperCase().padEnd(5)}] ${c.name}: ${c.message}`);
+        if (c.detail) lines.push(`           ${c.detail}`);
+      }
+      lines.push('');
+    }
+
+    lines.push('═══════════════════════════════════════════════════');
+    lines.push('Paste this into a GitHub issue or support chat.');
+
+    await navigator.clipboard.writeText(lines.join('\n'));
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2500);
+  };
 
   return (
-    <div className="p-4 flex flex-col gap-3">
-      {loading && !health && (
-        <div className="flex items-center gap-2 py-6 justify-center text-muted-foreground text-xs">
-          <Loader2 className="w-4 h-4 animate-spin" /> Running checks…
-        </div>
-      )}
-
-      {!loading && !health && (
-        <div className="flex flex-col items-center gap-3 py-6">
-          <XCircle className="w-8 h-8 text-destructive" />
-          <p className="text-xs text-muted-foreground text-center">Failed to load health data.<br />Is the server running?</p>
-          <button
-            onClick={onRefresh}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary/20 hover:bg-primary/30 text-primary text-xs font-medium transition-colors"
-          >
-            <RefreshCw className="w-3 h-3" /> Retry
-          </button>
-        </div>
-      )}
-
-      {health && (
-        <>
-          {/* Overall status banner */}
-          <div className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl border ${
-            health.overall === 'ok'
-              ? 'bg-green-500/10 border-green-500/20'
-              : health.overall === 'warn'
-              ? 'bg-yellow-500/10 border-yellow-500/20'
-              : 'bg-destructive/10 border-destructive/20'
-          }`}>
-            <StatusIcon status={health.overall} className="w-4 h-4 flex-shrink-0" />
-            <div className="flex-1 min-w-0">
-              <p className={`text-xs font-semibold ${statusColor(health.overall)}`}>
-                {health.overall === 'ok'
-                  ? 'All systems operational'
-                  : health.overall === 'warn'
-                  ? 'Some systems need attention'
-                  : 'Critical issues detected'}
-              </p>
-              <p className="text-[9px] text-muted-foreground">
-                {health.checks.filter(c => c.status !== 'ok').length} issue{health.checks.filter(c => c.status !== 'ok').length !== 1 ? 's' : ''} found · checked {new Date(health.timestamp).toLocaleTimeString()}
-              </p>
-            </div>
-          </div>
-
-          {/* Individual checks */}
-          <div className="flex flex-col gap-1">
-            {health.checks.map(check => {
-              const fix = getSuggestedFix(check);
-              const fixResult = fix ? fixResults[fix.action] : null;
-              return (
-                <div key={check.name}>
-                  <button
-                    onClick={() => setExpandedCheck(expandedCheck === check.name ? null : check.name)}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-muted/50 transition-colors text-left"
-                  >
-                    <StatusIcon status={check.status} className="w-3.5 h-3.5 flex-shrink-0" />
-                    <div className="flex items-center gap-1.5 flex-shrink-0">
-                      {subsystemIcon(check.name)}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-medium text-foreground">{check.name}</p>
-                      <p className={`text-[10px] ${statusColor(check.status)} truncate`}>{check.message}</p>
-                    </div>
-                    {(check.detail || fix) && (
-                      <ChevronRight className={`w-3 h-3 text-muted-foreground flex-shrink-0 transition-transform ${expandedCheck === check.name ? 'rotate-90' : ''}`} />
-                    )}
-                  </button>
-
-                  {expandedCheck === check.name && (
-                    <div className="mx-3 mb-1 px-3 py-2.5 rounded-lg bg-muted/30 border border-border flex flex-col gap-2">
-                      {check.detail && (
-                        <p className="text-[10px] text-muted-foreground font-mono break-all">{check.detail}</p>
-                      )}
-                      {fix && (
-                        <div className="flex items-center gap-2">
-                          <Zap className="w-3 h-3 text-primary flex-shrink-0" />
-                          <p className="text-[10px] text-primary flex-1">Suggested fix: {fix.label}</p>
-                          <button
-                            onClick={() => onRunFix(fix.action)}
-                            disabled={runningFix === fix.action}
-                            className="flex items-center gap-1 px-2 py-1 rounded-md bg-primary/20 hover:bg-primary/30 text-primary text-[10px] font-semibold transition-colors disabled:opacity-50"
-                          >
-                            {runningFix === fix.action
-                              ? <Loader2 className="w-2.5 h-2.5 animate-spin" />
-                              : <Zap className="w-2.5 h-2.5" />
-                            }
-                            Fix It
-                          </button>
-                        </div>
-                      )}
-                      {fixResult?.msg && (
-                        <p className={`text-[10px] font-medium ${fixResult.ok ? 'text-green-400' : 'text-destructive'}`}>
-                          {fixResult.ok ? '✓ ' : '✗ '}{fixResult.msg}
-                        </p>
-                      )}
-                      {check.name.includes('Config') && check.message.toLowerCase().includes('setup') && (
-                        <a href="/setup" className="text-[10px] text-primary hover:underline flex items-center gap-1">
-                          <ChevronRight className="w-2.5 h-2.5" /> Open Setup Wizard
-                        </a>
-                      )}
-                      {check.name.includes('FFmpeg') && check.status === 'error' && (
-                        <p className="text-[10px] text-muted-foreground">
-                          Install FFmpeg from <span className="font-mono text-foreground/70">ffmpeg.org</span> or set the <span className="font-mono text-foreground/70">FFMPEG_PATH</span> environment variable.
-                        </p>
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </>
-      )}
-    </div>
+    <button
+      onClick={copy}
+      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-muted hover:bg-muted/70 text-muted-foreground hover:text-foreground text-[10px] font-semibold transition-colors"
+      title="Copy full diagnostic report to clipboard"
+    >
+      {copied ? <ClipboardCheck className="w-3 h-3 text-green-400" /> : <ClipboardCopy className="w-3 h-3" />}
+      {copied ? 'Copied!' : 'Copy Report'}
+    </button>
   );
 }
 
@@ -740,23 +855,15 @@ interface DebugPanelProps {
   onClose: () => void;
 }
 
-const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
-  { id: 'health', label: 'Health',  icon: <Activity className="w-3.5 h-3.5" /> },
-  { id: 'repair', label: 'Repair',  icon: <Wrench className="w-3.5 h-3.5" /> },
-  { id: 'system', label: 'System',  icon: <Cpu className="w-3.5 h-3.5" /> },
-  { id: 'logs',   label: 'Logs',    icon: <Bug className="w-3.5 h-3.5" /> },
-];
-
 export default function DebugPanel({ open, onClose }: DebugPanelProps) {
   const [tab, setTab] = useState<Tab>('health');
   const [health, setHealth] = useState<HealthReport | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [fixResults, setFixResults] = useState<Record<string, { msg: string; ok: boolean }>>({});
-  const [runningFix, setRunningFix] = useState<string | null>(null);
-  const [crashCount, setCrashCount] = useState<number | null>(null);
+  const [healthLoading, setHealthLoading] = useState(false);
+  const [sysInfo, setSysInfo] = useState<SystemInfo | null>(null);
+  const [fetched, setFetched] = useState(false);
 
   const fetchHealth = useCallback(async () => {
-    setLoading(true);
+    setHealthLoading(true);
     try {
       const res = await fetch('/api/health/full');
       const data = await res.json() as HealthReport;
@@ -764,54 +871,37 @@ export default function DebugPanel({ open, onClose }: DebugPanelProps) {
     } catch {
       setHealth(null);
     } finally {
-      setLoading(false);
+      setHealthLoading(false);
     }
   }, []);
 
-  // Fetch crash count for badge on Logs tab
-  const fetchCrashCount = useCallback(async () => {
+  const fetchSysInfo = useCallback(async () => {
     try {
-      const res = await fetch('/api/crash-log');
-      const data = await res.json() as { count: number };
-      setCrashCount(data.count ?? 0);
+      const res = await fetch('/api/debug/system-info');
+      const data = await res.json() as SystemInfo;
+      setSysInfo(data);
     } catch { /* ignore */ }
   }, []);
 
   // Auto-fetch when panel first opens
-  const [fetched, setFetched] = useState(false);
   if (open && !fetched) {
     setFetched(true);
-    fetchHealth();
-    fetchCrashCount();
+    void fetchHealth();
+    void fetchSysInfo();
   }
-  if (!open && fetched) setFetched(false);
 
-  const runFix = async (action: string) => {
-    setRunningFix(action);
-    try {
-      const res = await fetch('/api/debug/repair', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action }),
-      });
-      const data = await res.json() as { ok: boolean; message: string };
-      setFixResults(r => ({ ...r, [action]: { msg: data.message, ok: data.ok } }));
-      if (data.ok) fetchHealth();
-    } catch (err) {
-      setFixResults(r => ({ ...r, [action]: { msg: String(err), ok: false } }));
-    } finally {
-      setRunningFix(null);
-    }
-  };
+  // Reset fetched flag when closed so it re-fetches on next open
+  useEffect(() => {
+    if (!open) setFetched(false);
+  }, [open]);
 
-  // Issue count badge on Health tab
-  const issueCount = health ? health.checks.filter(c => c.status !== 'ok').length : 0;
+  const healthBadge = health?.overall === 'error' ? 'error' : health?.overall === 'warn' ? 'warn' : undefined;
+  const crashBadge  = undefined; // loaded lazily in CrashLogTab
 
   return (
     <AnimatePresence>
       {open && (
         <>
-          {/* Backdrop */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -820,7 +910,6 @@ export default function DebugPanel({ open, onClose }: DebugPanelProps) {
             className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm"
           />
 
-          {/* Panel */}
           <motion.div
             initial={{ x: '100%' }}
             animate={{ x: 0 }}
@@ -832,91 +921,41 @@ export default function DebugPanel({ open, onClose }: DebugPanelProps) {
             <div className="flex items-center justify-between px-4 py-3 border-b border-border flex-shrink-0">
               <div className="flex items-center gap-2">
                 <Wrench className="w-4 h-4 text-primary" />
-                <span className="text-sm font-semibold text-foreground">Diagnostics</span>
-                {health && issueCount > 0 && (
-                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
-                    health.overall === 'error' ? 'bg-destructive/20 text-destructive' : 'bg-yellow-500/20 text-yellow-400'
+                <span className="text-sm font-semibold text-foreground">Debug &amp; Diagnostics</span>
+                {health && (
+                  <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${
+                    health.overall === 'ok'    ? 'bg-green-500/20 text-green-400' :
+                    health.overall === 'warn'  ? 'bg-yellow-500/20 text-yellow-400' :
+                                                 'bg-destructive/20 text-destructive'
                   }`}>
-                    {issueCount} issue{issueCount !== 1 ? 's' : ''}
-                  </span>
-                )}
-                {health && issueCount === 0 && (
-                  <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-green-500/20 text-green-400">
-                    All OK
+                    {health.overall.toUpperCase()}
                   </span>
                 )}
               </div>
               <div className="flex items-center gap-1">
-                <button
-                  onClick={fetchHealth}
-                  disabled={loading}
-                  className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
-                  title="Refresh health checks"
-                >
-                  <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-                </button>
+                <CopyDiagnosticButton health={health} sysInfo={sysInfo} />
                 <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors">
                   <X className="w-3.5 h-3.5" />
                 </button>
               </div>
             </div>
 
-            {/* Tabs */}
-            <div className="flex border-b border-border flex-shrink-0">
-              {TABS.map(t => (
-                <button
-                  key={t.id}
-                  onClick={() => setTab(t.id)}
-                  className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-[11px] font-medium transition-colors relative ${
-                    tab === t.id
-                      ? 'text-primary'
-                      : 'text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  {t.icon}
-                  {t.label}
-                  {/* Badges */}
-                  {t.id === 'health' && issueCount > 0 && (
-                    <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-yellow-400" />
-                  )}
-                  {t.id === 'logs' && crashCount != null && crashCount > 0 && (
-                    <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-destructive" />
-                  )}
-                  {tab === t.id && (
-                    <motion.div
-                      layoutId="tab-indicator"
-                      className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-full"
-                    />
-                  )}
-                </button>
-              ))}
+            {/* Tab bar */}
+            <div className="flex items-center gap-1 px-3 py-2 border-b border-border flex-shrink-0 bg-background/50">
+              <TabBtn active={tab === 'health'}  onClick={() => setTab('health')}  icon={Activity}  label="Health"  badge={healthBadge} />
+              <TabBtn active={tab === 'fixes'}   onClick={() => setTab('fixes')}   icon={Wrench}    label="Fixes" />
+              <TabBtn active={tab === 'system'}  onClick={() => setTab('system')}  icon={Cpu}       label="System" />
+              <TabBtn active={tab === 'network'} onClick={() => setTab('network')} icon={Globe}     label="Network" />
+              <TabBtn active={tab === 'crashes'} onClick={() => setTab('crashes')} icon={Bug}       label="Crashes" badge={crashBadge} />
             </div>
 
             {/* Tab content */}
             <div className="flex-1 overflow-y-auto">
-              {tab === 'health' && (
-                <HealthTab
-                  health={health}
-                  loading={loading}
-                  onRefresh={fetchHealth}
-                  onRunFix={runFix}
-                  fixResults={fixResults}
-                  runningFix={runningFix}
-                />
-              )}
-              {tab === 'repair' && (
-                <RepairTab onRefreshHealth={fetchHealth} />
-              )}
-              {tab === 'system' && <SystemTab />}
-              {tab === 'logs' && <LogsTab />}
-            </div>
-
-            {/* Footer hint */}
-            <div className="px-4 py-2.5 border-t border-border flex-shrink-0 flex items-center gap-1.5">
-              <Info className="w-3 h-3 text-muted-foreground flex-shrink-0" />
-              <p className="text-[9px] text-muted-foreground leading-relaxed">
-                Health checks run in parallel with 5s timeouts. Repair actions are safe and reversible unless marked destructive.
-              </p>
+              {tab === 'health'  && <HealthTab health={health} loading={healthLoading} onRefresh={fetchHealth} />}
+              {tab === 'fixes'   && <QuickFixesTab />}
+              {tab === 'system'  && <SystemTab />}
+              {tab === 'network' && <NetworkTab />}
+              {tab === 'crashes' && <CrashLogTab />}
             </div>
           </motion.div>
         </>

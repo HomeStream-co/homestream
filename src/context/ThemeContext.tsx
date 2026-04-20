@@ -279,6 +279,8 @@ const KIDS_PLAYBACK_DEFAULTS: typeof PLAYBACK_DEFAULTS = {
   defaultQuality: 'auto',
   autoSkipIntro: false,
   autoResume: false,
+  defaultVolume: 100,
+  subtitleLanguage: 'off',
 };
 
 const SHARED_STORAGE_KEY = 'homestream-settings';
