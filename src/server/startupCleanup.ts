@@ -173,7 +173,7 @@ export function runStartupCleanup(): void {
   let changed = false;
 
   const cleaned = library.map(item => {
-    let result = { ...item };
+    const result = { ...item };
 
     // ── Reset stuck enrichment flag ──────────────────────────────────────────
     if (item.enriching) {
@@ -197,7 +197,8 @@ export function runStartupCleanup(): void {
     if (tcExists) {
       // Transcode finished before the restart — clear the flag
       console.log(`[startup]   ✓ "${item.title}" — _tc.mp4 found, clearing transcoding flag`);
-      const { transcoding: _t, transcodeError: _e, ...rest } = result;
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { transcoding: _transcoding, transcodeError: _transcodeError, ...rest } = result;
       return { ...rest, filename: tcFilename };
     }
 
@@ -240,7 +241,7 @@ export function runStartupCleanup(): void {
   // ── Retry missing metadata in background ────────────────────────────────────
   // Items imported while offline (needsMetadata: true) get a second chance
   // now that the server is up and network may be available.
-  setTimeout(async () => {
+  global.setTimeout(async () => {
     try {
       const { retryMissingMetadata } = await import('./mediaUtils.js');
       await retryMissingMetadata();

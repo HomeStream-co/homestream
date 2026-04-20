@@ -18,6 +18,7 @@
  */
 
 import { spawn, type ChildProcess } from 'child_process';
+import { createRequire } from 'module';
 
 // Resolve FFmpeg binary: prefer FFMPEG_PATH env var (set by Electron when
 // bundling ffmpeg-static), then try ffmpeg-static directly, then fall back
@@ -25,8 +26,10 @@ import { spawn, type ChildProcess } from 'child_process';
 function resolveFfmpeg(): string {
   if (process.env.FFMPEG_PATH) return process.env.FFMPEG_PATH;
   try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const p = require('ffmpeg-static') as string | null;
+    // Use createRequire so this ESM file can load the CJS ffmpeg-static package
+    // without triggering the no-require-imports lint rule.
+    const req = createRequire(import.meta.url);
+    const p = req('ffmpeg-static') as string | null;
     if (p) return p;
   } catch { /* not installed */ }
   return 'ffmpeg';
