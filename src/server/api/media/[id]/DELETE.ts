@@ -2,6 +2,7 @@ import type { Request, Response } from 'express';
 import fs from 'fs';
 import path from 'path';
 import { readLibrary, writeLibrary } from '../../../libraryStore.js';
+import { removeFromAllWatchlists } from '../../../watchlistStore.js';
 
 const UPLOADS_DIR  = path.resolve('./uploads');
 
@@ -35,6 +36,8 @@ export default async function handler(req: Request, res: Response) {
 
     // Remove from library (serialised through write queue)
     await writeLibrary(lib => lib.filter(m => m.id !== id));
+    // Remove from all profiles' watchlists
+    await removeFromAllWatchlists(id);
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: 'Failed to delete media', message: String(error) });

@@ -1,11 +1,25 @@
 /**
  * ThemeContext — manages the active color theme and all user preferences
- * that live in the settings panel. Persisted to localStorage.
+ * that live in the settings panel.
  *
- * Themes are defined as CSS variable overrides applied to :root at runtime,
- * so no page reload is needed when switching.
+ * STORAGE STRATEGY:
+ *   - Theme (themeId, syncPlayerColor, showStorageBadges, showEnrichmentTags)
+ *     is stored in 'homestream-settings' — shared across all profiles because
+ *     it's a device-level appearance preference.
+ *
+ *   - Playback settings (autoplayNext, autoSkipIntro, autoResume, defaultQuality)
+ *     are stored in 'homestream-playback-<profileId>' — per-profile because
+ *     Kids Mode should have different defaults (no autoplay, no auto-resume).
+ *
+ * The context exposes a single merged `settings` object and a single
+ * `updateSetting` function — callers don't need to know which bucket a key
+ * lives in.
  */
-import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from 'react';
+import {
+  createContext, useContext, useEffect, useState, useCallback,
+  type ReactNode,
+} from 'react';
+import { useProfile } from '@/context/ProfileContext';
 
 // ── Theme definitions ─────────────────────────────────────────────────────────
 
@@ -212,15 +226,18 @@ export const THEMES: ThemeDefinition[] = [
 // ── Settings state ────────────────────────────────────────────────────────────
 
 export interface AppSettings {
+  // ── Device-level (shared across all profiles) ──
   themeId: string;
   /** Tint the video player controls/UI to match the active theme's primary */
   syncPlayerColor: boolean;
   /** Show storage savings badges on library cards */
   showStorageBadges: boolean;
-  /** Auto-play next episode/recommendation after watch */
-  autoplayNext: boolean;
   /** Show AI enrichment tags on media cards in browse/home */
   showEnrichmentTags: boolean;
+
+  // ── Playback (per-profile) ──
+  /** Auto-play next episode/recommendation after watch */
+  autoplayNext: boolean;
   /** Default playback quality hint (passed to video element) */
   defaultQuality: 'auto' | '1080p' | '720p' | '480p';
   /** Skip intro automatically when Skip Intro button appears */
@@ -229,16 +246,51 @@ export interface AppSettings {
   autoResume: boolean;
 }
 
-const DEFAULT_SETTINGS: AppSettings = {
+/** Keys that are stored per-profile (playback preferences) */
+const PLAYBACK_KEYS: (keyof AppSettings)[] = [
+  'autoplayNext', 'defaultQuality', 'autoSkipIntro', 'autoResume',
+];
+
+const SHARED_DEFAULTS: Pick<AppSettings, 'themeId' | 'syncPlayerColor' | 'showStorageBadges' | 'showEnrichmentTags'> = {
   themeId: 'forest-green',
   syncPlayerColor: true,
   showStorageBadges: true,
-  autoplayNext: true,
   showEnrichmentTags: true,
+};
+
+const PLAYBACK_DEFAULTS: Pick<AppSettings, 'autoplayNext' | 'defaultQuality' | 'autoSkipIntro' | 'autoResume'> = {
+  autoplayNext: true,
   defaultQuality: 'auto',
   autoSkipIntro: false,
   autoResume: true,
 };
+
+/** Kids profile gets safer playback defaults */
+const KIDS_PLAYBACK_DEFAULTS: typeof PLAYBACK_DEFAULTS = {
+  autoplayNext: false,
+  defaultQuality: 'auto',
+  autoSkipIntro: false,
+  autoResume: false,
+};
+
+const SHARED_STORAGE_KEY = 'homestream-settings';
+
+function loadSharedSettings() {
+  try {
+    const raw = localStorage.getItem(SHARED_STORAGE_KEY);
+    if (raw) return { ...SHARED_DEFAULTS, ...JSON.parse(raw) };
+  } catch { /* ignore */ }
+  return { ...SHARED_DEFAULTS };
+}
+
+function loadPlaybackSettings(profileId: string) {
+  const defaults = profileId === 'kids' ? KIDS_PLAYBACK_DEFAULTS : PLAYBACK_DEFAULTS;
+  try {
+    const raw = localStorage.getItem(`homestream-playback-${profileId}`);
+    if (raw) return { ...defaults, ...JSON.parse(raw) };
+  } catch { /* ignore */ }
+  return { ...defaults };
+}
 
 // ── Context ───────────────────────────────────────────────────────────────────
 
@@ -251,16 +303,6 @@ interface ThemeContextValue {
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
-const STORAGE_KEY = 'homestream-settings';
-
-function loadSettings(): AppSettings {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return { ...DEFAULT_SETTINGS, ...JSON.parse(raw) };
-  } catch { /* ignore */ }
-  return DEFAULT_SETTINGS;
-}
-
 function applyThemeVars(theme: ThemeDefinition) {
   const root = document.documentElement;
   Object.entries(theme.vars).forEach(([key, value]) => {
@@ -268,27 +310,51 @@ function applyThemeVars(theme: ThemeDefinition) {
   });
 }
 
-export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [settings, setSettings] = useState<AppSettings>(loadSettings);
+type SharedSettings = typeof SHARED_DEFAULTS;
+type PlaybackSettings = typeof PLAYBACK_DEFAULTS;
 
-  const activeTheme = THEMES.find(t => t.id === settings.themeId) ?? THEMES[0];
+export function ThemeProvider({ children }: { children: ReactNode }) {
+  const { activeProfile } = useProfile();
+  const profileId = activeProfile?.id ?? 'adult';
+
+  const [sharedSettings, setSharedSettings] = useState<SharedSettings>(() => loadSharedSettings());
+  const [playbackSettings, setPlaybackSettings] = useState<PlaybackSettings>(() => loadPlaybackSettings(profileId));
+
+  // Merge into a single settings object for consumers
+  const settings: AppSettings = { ...sharedSettings, ...playbackSettings };
+
+  const activeTheme = THEMES.find(t => t.id === sharedSettings.themeId) ?? THEMES[0];
 
   // Apply CSS vars whenever theme changes
   useEffect(() => {
     applyThemeVars(activeTheme);
   }, [activeTheme]);
 
-  // Persist settings
+  // Persist shared settings
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
-  }, [settings]);
+    localStorage.setItem(SHARED_STORAGE_KEY, JSON.stringify(sharedSettings));
+  }, [sharedSettings]);
+
+  // Persist playback settings under the active profile's key
+  useEffect(() => {
+    localStorage.setItem(`homestream-playback-${profileId}`, JSON.stringify(playbackSettings));
+  }, [playbackSettings, profileId]);
+
+  // When profile changes, reload playback settings for the new profile
+  useEffect(() => {
+    setPlaybackSettings(loadPlaybackSettings(profileId));
+  }, [profileId]);
 
   const setTheme = useCallback((id: string) => {
-    setSettings(prev => ({ ...prev, themeId: id }));
+    setSharedSettings(prev => ({ ...prev, themeId: id }));
   }, []);
 
   const updateSetting = useCallback(<K extends keyof AppSettings>(key: K, value: AppSettings[K]) => {
-    setSettings(prev => ({ ...prev, [key]: value }));
+    if ((PLAYBACK_KEYS as string[]).includes(key)) {
+      setPlaybackSettings(prev => ({ ...prev, [key]: value }));
+    } else {
+      setSharedSettings(prev => ({ ...prev, [key]: value }));
+    }
   }, []);
 
   return (

@@ -36,7 +36,7 @@ export function MediaProvider({ children }: { children: ReactNode }) {
 
   // Profile-scoped localStorage keys — each profile gets its own cache bucket
   const progressKey = `homestream-progress-${profileId}`;
-  const watchlistKey = `homestream-watchlist`; // watchlist is shared across profiles
+  const watchlistKey = `homestream-watchlist-${profileId}`;
 
   // Watchlist — server is source of truth; localStorage is a fast initial value
   // that gets replaced on first successful server fetch.
@@ -52,21 +52,19 @@ export function MediaProvider({ children }: { children: ReactNode }) {
     } catch { return []; }
   });
 
-  // ── Fetch watchlist from server on mount ────────────────────────────────────
+  // ── Fetch watchlist from server on mount / profile change ───────────────────
   useEffect(() => {
-    fetch('/api/watchlist')
+    fetch(`/api/watchlist?profile=${encodeURIComponent(profileId)}`)
       .then(r => r.ok ? r.json() as Promise<string[]> : Promise.reject())
       .then(ids => {
         setWatchlist(ids);
-        // Keep localStorage in sync as a fast-load cache
         localStorage.setItem(watchlistKey, JSON.stringify(ids));
       })
       .catch(() => {
         // Server unavailable — keep localStorage value, will sync on next load
       });
-  // watchlistKey is stable (not profile-scoped) so this only runs once
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [profileId, watchlistKey]);
 
   const refreshLibrary = useCallback(async () => {
     try {
@@ -106,16 +104,20 @@ export function MediaProvider({ children }: { children: ReactNode }) {
     refreshLibrary();
   }, [refreshLibrary]);
 
-  // When the active profile changes, immediately seed continueWatching from
-  // that profile's localStorage cache so the UI doesn't flash the old profile's
-  // row before the server fetch completes.
+  // When the active profile changes, immediately seed continueWatching and
+  // watchlist from that profile's localStorage cache so the UI doesn't flash
+  // the old profile's data before the server fetch completes.
   useEffect(() => {
     try {
       const cached = JSON.parse(localStorage.getItem(progressKey) || '[]') as ContinueWatchingItem[];
       setContinueWatching(cached);
     } catch { /* ignore */ }
+    try {
+      const cachedWl = JSON.parse(localStorage.getItem(watchlistKey) || '[]') as string[];
+      setWatchlist(cachedWl);
+    } catch { /* ignore */ }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [progressKey]);
+  }, [progressKey, watchlistKey]);
 
   // ── Watchlist mutations — optimistic UI + server persist ───────────────────
 
@@ -128,7 +130,7 @@ export function MediaProvider({ children }: { children: ReactNode }) {
       return next;
     });
     // Persist to server
-    fetch(`/api/watchlist/${id}`, { method: 'PUT' })
+    fetch(`/api/watchlist/${id}?profile=${encodeURIComponent(profileId)}`, { method: 'PUT' })
       .then(r => r.ok ? r.json() as Promise<{ watchlist: string[] }> : Promise.reject())
       .then(({ watchlist: serverList }) => {
         setWatchlist(serverList);
@@ -143,7 +145,7 @@ export function MediaProvider({ children }: { children: ReactNode }) {
         });
       });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [watchlistKey]);
+  }, [profileId, watchlistKey]);
 
   const removeFromWatchlist = useCallback((id: string) => {
     // Optimistic update
@@ -153,7 +155,7 @@ export function MediaProvider({ children }: { children: ReactNode }) {
       return next;
     });
     // Persist to server
-    fetch(`/api/watchlist/${id}`, { method: 'DELETE' })
+    fetch(`/api/watchlist/${id}?profile=${encodeURIComponent(profileId)}`, { method: 'DELETE' })
       .then(r => r.ok ? r.json() as Promise<{ watchlist: string[] }> : Promise.reject())
       .then(({ watchlist: serverList }) => {
         setWatchlist(serverList);
@@ -168,7 +170,7 @@ export function MediaProvider({ children }: { children: ReactNode }) {
         });
       });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [watchlistKey]);
+  }, [profileId, watchlistKey]);
 
   const updateProgress = useCallback((id: string, progress: number, currentTime?: number, duration?: number) => {
     // If complete (≥95%), remove from Continue Watching

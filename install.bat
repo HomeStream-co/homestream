@@ -7,6 +7,9 @@ echo  ==========================================
 echo   HomeStream — Build Installer for Windows
 echo  ==========================================
 echo.
+echo  Features: Multi-profile watch history, per-profile watchlists,
+echo            per-profile playback settings, Kids Mode content filter
+echo.
 
 :: ── Check Node.js ─────────────────────────────────────────────────────────────
 where node >nul 2>&1
@@ -96,6 +99,12 @@ echo   Done! Installer is ready.
 echo  ==========================================
 echo.
 echo  Location: dist-electron\
+echo.
+echo  Data files (created on first run):
+echo    media-library.json        - your media library
+echo    homestream-profiles.json  - user profiles (up to 6)
+echo    homestream-watchlist.json - per-profile My List
+echo    homestream-config.json    - app configuration
 echo.
 
 :: Open the output folder
