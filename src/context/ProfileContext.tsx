@@ -1,127 +1,200 @@
 /**
- * ProfileContext
+ * ProfileContext — multi-user profile management
  *
- * Manages the two built-in profiles:
- *   - Adult  — sees everything; optionally PIN-locked
- *   - Kids   — only G and PG rated content is shown across all pages
+ * Profiles are stored server-side in homestream-profiles.json.
+ * Two built-in profiles (adult / kids) are always present.
+ * Users can create up to 6 custom profiles.
  *
  * Active profile is persisted to localStorage so it survives page refresh.
- * On first load (no profile chosen yet) the app shows the profile selector screen.
+ * On first load (no profile chosen) the app shows the profile selector screen.
  *
- * PIN lock (Adult profile):
- *   - PIN stored in localStorage under 'homestream-adult-pin'
- *   - If set, selecting Adult profile shows PinLock overlay
- *   - PIN management (set / change / clear) exposed via context
+ * PIN lock: PINs are hashed server-side with bcrypt.
+ *   Verifying a PIN calls POST /api/profiles/:id/pin { action: 'verify', pin }
  */
 import {
-  createContext, useContext, useState, useCallback,
+  createContext, useContext, useState, useCallback, useEffect,
   type ReactNode,
 } from 'react';
 
-// ── MPAA ratings that are safe for the Kids profile ──
+// ── MPAA ratings safe for Kids profile ───────────────────────────────────────
 export const KIDS_ALLOWED_RATINGS = ['G', 'PG', 'TV-Y', 'TV-Y7', 'TV-G', 'TV-PG'];
 
-export type ProfileId = 'adult' | 'kids';
-
+// ── Public profile shape (mirrors server PublicProfile) ──────────────────────
 export interface Profile {
-  id: ProfileId;
+  id: string;
   name: string;
-  avatar: string;           // emoji used as avatar
-  color: string;            // Tailwind bg class for avatar ring
-  restricted: boolean;      // true = apply content filter
-  allowedRatings: string[]; // empty = allow all
+  avatar: string;
+  color: string;
+  restricted: boolean;
+  isBuiltIn: boolean;
+  hasPin: boolean;
+  createdAt: string;
 }
 
-export const PROFILES: Profile[] = [
-  {
-    id: 'adult',
-    name: 'Adult',
-    avatar: '🎬',
-    color: 'ring-primary',
-    restricted: false,
-    allowedRatings: [],
-  },
-  {
-    id: 'kids',
-    name: 'Kids',
-    avatar: '🧒',
-    color: 'ring-yellow-400',
-    restricted: true,
-    allowedRatings: KIDS_ALLOWED_RATINGS,
-  },
-];
-
-const PIN_STORAGE_KEY = 'homestream-adult-pin';
-
+// ── Context type ─────────────────────────────────────────────────────────────
 interface ProfileContextType {
+  profiles: Profile[];
   activeProfile: Profile | null;
-  setActiveProfile: (id: ProfileId) => void;
+  loading: boolean;
+
+  /** Select a profile by id. Returns false if a PIN is required (caller must verify first). */
+  setActiveProfile: (id: string) => void;
   clearProfile: () => void;
+  refreshProfiles: () => Promise<void>;
+
   /** Returns true if the given MPAA rating is allowed for the active profile */
   isAllowed: (rated?: string) => boolean;
-  /** PIN management for Adult profile */
-  adultPinEnabled: boolean;
-  setAdultPin: (pin: string) => void;
-  clearAdultPin: () => void;
-  verifyAdultPin: (pin: string) => boolean;
+
+  /** Create a new custom profile */
+  createProfile: (data: { name: string; avatar: string; color: string; restricted: boolean }) => Promise<Profile>;
+  /** Update an existing profile */
+  updateProfile: (id: string, data: Partial<{ name: string; avatar: string; color: string; restricted: boolean }>) => Promise<Profile>;
+  /** Delete a custom profile */
+  deleteProfile: (id: string) => Promise<void>;
+
+  /** PIN operations — all talk to the server */
+  setPin: (id: string, pin: string) => Promise<void>;
+  verifyPin: (id: string, pin: string) => Promise<boolean>;
+  clearPin: (id: string, currentPin: string) => Promise<void>;
 }
 
 const ProfileContext = createContext<ProfileContextType | null>(null);
 
 const STORAGE_KEY = 'homestream-active-profile';
 
+// ── Provider ─────────────────────────────────────────────────────────────────
 export function ProfileProvider({ children }: { children: ReactNode }) {
-  const [activeProfileId, setActiveProfileId] = useState<ProfileId | null>(() => {
+  const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [activeProfileId, setActiveProfileId] = useState<string | null>(() => {
+    try { return localStorage.getItem(STORAGE_KEY); } catch { return null; }
+  });
+
+  // ── Load profiles from server ──
+  const refreshProfiles = useCallback(async () => {
     try {
-      const stored = localStorage.getItem(STORAGE_KEY) as ProfileId | null;
-      return stored && PROFILES.find(p => p.id === stored) ? stored : null;
-    } catch { return null; }
-  });
+      const res = await fetch('/api/profiles');
+      if (!res.ok) throw new Error('Failed to fetch profiles');
+      const data = await res.json() as { profiles: Profile[] };
+      setProfiles(data.profiles);
+    } catch {
+      // Fallback: seed built-ins so the app is never stuck
+      setProfiles([
+        { id: 'adult', name: 'Adult', avatar: '🎬', color: 'ring-primary', restricted: false, isBuiltIn: true, hasPin: false, createdAt: '' },
+        { id: 'kids',  name: 'Kids',  avatar: '🧒', color: 'ring-yellow-400', restricted: true,  isBuiltIn: true, hasPin: false, createdAt: '' },
+      ]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-  const [adultPinEnabled, setAdultPinEnabled] = useState(() => {
-    try { return !!localStorage.getItem(PIN_STORAGE_KEY); } catch { return false; }
-  });
+  useEffect(() => { refreshProfiles(); }, [refreshProfiles]);
 
-  const activeProfile = activeProfileId
-    ? PROFILES.find(p => p.id === activeProfileId) ?? null
-    : null;
+  const activeProfile = profiles.find(p => p.id === activeProfileId) ?? null;
 
-  const setActiveProfile = useCallback((id: ProfileId) => {
+  const setActiveProfile = useCallback((id: string) => {
     setActiveProfileId(id);
-    localStorage.setItem(STORAGE_KEY, id);
+    try { localStorage.setItem(STORAGE_KEY, id); } catch { /* ignore */ }
   }, []);
 
   const clearProfile = useCallback(() => {
     setActiveProfileId(null);
-    localStorage.removeItem(STORAGE_KEY);
+    try { localStorage.removeItem(STORAGE_KEY); } catch { /* ignore */ }
   }, []);
 
   const isAllowed = useCallback((rated?: string): boolean => {
-    if (!activeProfile || !activeProfile.restricted) return true;
+    if (!activeProfile?.restricted) return true;
     const normalized = (rated ?? '').trim().toUpperCase();
     if (!normalized || normalized === 'N/A' || normalized === 'UNKNOWN' || normalized === 'NR') return false;
-    return activeProfile.allowedRatings.includes(normalized);
+    return KIDS_ALLOWED_RATINGS.includes(normalized);
   }, [activeProfile]);
 
-  const setAdultPin = useCallback((pin: string) => {
-    localStorage.setItem(PIN_STORAGE_KEY, pin);
-    setAdultPinEnabled(true);
+  // ── CRUD ──
+  const createProfile = useCallback(async (data: { name: string; avatar: string; color: string; restricted: boolean }): Promise<Profile> => {
+    const res = await fetch('/api/profiles', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({})) as { error?: string };
+      throw new Error(err.error ?? 'Failed to create profile');
+    }
+    const { profile } = await res.json() as { profile: Profile };
+    await refreshProfiles();
+    return profile;
+  }, [refreshProfiles]);
+
+  const updateProfile = useCallback(async (id: string, data: Partial<{ name: string; avatar: string; color: string; restricted: boolean }>): Promise<Profile> => {
+    const res = await fetch(`/api/profiles/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({})) as { error?: string };
+      throw new Error(err.error ?? 'Failed to update profile');
+    }
+    const { profile } = await res.json() as { profile: Profile };
+    await refreshProfiles();
+    return profile;
+  }, [refreshProfiles]);
+
+  const deleteProfile = useCallback(async (id: string): Promise<void> => {
+    const res = await fetch(`/api/profiles/${id}`, { method: 'DELETE' });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({})) as { error?: string };
+      throw new Error(err.error ?? 'Failed to delete profile');
+    }
+    // If the deleted profile was active, clear it
+    if (activeProfileId === id) clearProfile();
+    await refreshProfiles();
+  }, [activeProfileId, clearProfile, refreshProfiles]);
+
+  // ── PIN ──
+  const setPin = useCallback(async (id: string, pin: string): Promise<void> => {
+    const res = await fetch(`/api/profiles/${id}/pin`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'set', pin }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({})) as { error?: string };
+      throw new Error(err.error ?? 'Failed to set PIN');
+    }
+    await refreshProfiles();
+  }, [refreshProfiles]);
+
+  const verifyPin = useCallback(async (id: string, pin: string): Promise<boolean> => {
+    const res = await fetch(`/api/profiles/${id}/pin`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'verify', pin }),
+    });
+    if (!res.ok) return false;
+    const { valid } = await res.json() as { valid: boolean };
+    return valid;
   }, []);
 
-  const clearAdultPin = useCallback(() => {
-    localStorage.removeItem(PIN_STORAGE_KEY);
-    setAdultPinEnabled(false);
-  }, []);
-
-  const verifyAdultPin = useCallback((pin: string): boolean => {
-    const stored = localStorage.getItem(PIN_STORAGE_KEY) ?? '';
-    return !stored || pin === stored;
-  }, []);
+  const clearPin = useCallback(async (id: string, currentPin: string): Promise<void> => {
+    const res = await fetch(`/api/profiles/${id}/pin`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'clear', pin: currentPin }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({})) as { error?: string };
+      throw new Error(err.error ?? 'Failed to clear PIN');
+    }
+    await refreshProfiles();
+  }, [refreshProfiles]);
 
   return (
     <ProfileContext.Provider value={{
-      activeProfile, setActiveProfile, clearProfile, isAllowed,
-      adultPinEnabled, setAdultPin, clearAdultPin, verifyAdultPin,
+      profiles, activeProfile, loading,
+      setActiveProfile, clearProfile, refreshProfiles, isAllowed,
+      createProfile, updateProfile, deleteProfile,
+      setPin, verifyPin, clearPin,
     }}>
       {children}
     </ProfileContext.Provider>
@@ -133,3 +206,6 @@ export function useProfile() {
   if (!ctx) throw new Error('useProfile must be used within ProfileProvider');
   return ctx;
 }
+
+// ── Legacy compat — ProfileId type still used in a few places ────────────────
+export type ProfileId = string;
