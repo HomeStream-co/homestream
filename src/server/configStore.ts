@@ -34,6 +34,10 @@ export interface AppConfig {
   preferredQuality: '720p' | '1080p' | '4k' | 'best';
   virusTotalApiKey: string;   // optional — activates Layer 2 hash lookup
   setupCompletedAt?: string;
+  // Storage organisation — percentage of total disk allocated per category (0–100, must sum ≤ 100)
+  storageMoviesPct: number;   // e.g. 60 → 60% of disk reserved for movies
+  storageTvPct: number;       // e.g. 30 → 30% of disk reserved for TV shows
+  // storageOtherPct is implied: 100 - movies - tv
 }
 
 const DEFAULTS: AppConfig = {
@@ -57,6 +61,8 @@ const DEFAULTS: AppConfig = {
   autoTranscode: true,
   preferredQuality: '1080p',
   virusTotalApiKey: process.env.VIRUSTOTAL_API_KEY || '',
+  storageMoviesPct: 60,
+  storageTvPct: 30,
 };
 
 export function readConfig(): AppConfig {

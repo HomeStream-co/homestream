@@ -86,6 +86,17 @@ export default async function handler(_req: Request, res: Response) {
 
     const diskStats = cfg.mediaDir ? getDiskStats(cfg.mediaDir) : null;
 
+    // Per-category storage breakdown
+    let movieBytes = 0;
+    let tvBytes = 0;
+    let otherBytes = 0;
+    for (const item of real) {
+      const sz = resolveFileSize(item);
+      if (item.type === 'movie') movieBytes += sz;
+      else if (item.type === 'series') tvBytes += sz;
+      else otherBytes += sz;
+    }
+
     // ── Codec breakdown ───────────────────────────────────────────────────────
     const codecMap = new Map<string, { count: number; bytes: number }>();
     for (const item of real) {
@@ -186,6 +197,14 @@ export default async function handler(_req: Request, res: Response) {
       diskFreeBytes:  diskStats?.free  ?? null,
       diskTotalBytes: diskStats?.total ?? null,
       mediaDir: cfg.mediaDir || null,
+      // Per-category storage
+      categoryBytes: { movies: movieBytes, tv: tvBytes, other: otherBytes },
+      // Storage allocation targets from config
+      storageAllocation: {
+        moviesPct: cfg.storageMoviesPct ?? 60,
+        tvPct:     cfg.storageTvPct     ?? 30,
+        otherPct:  Math.max(0, 100 - (cfg.storageMoviesPct ?? 60) - (cfg.storageTvPct ?? 30)),
+      },
 
       // Breakdown
       codecs,
