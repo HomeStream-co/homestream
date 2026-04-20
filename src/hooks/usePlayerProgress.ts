@@ -50,7 +50,7 @@ export function usePlayerProgress({
   autoplayTimerRef,
   autoplayCancelled,
   showEndOverlay,
-  autoplayCountdown,
+  autoplayCountdown: _autoplayCountdown,
   nextItemId,
   autoplayNext,
   autoSkipIntro,
