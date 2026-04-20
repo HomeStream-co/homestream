@@ -34,6 +34,13 @@ const store = {
 
 vi.mock('../../server/profilesStore', () => store);
 
+// ── Mock rateLimiter (always allow in tests) ──────────────────────────────────
+vi.mock('../../server/rateLimiter', () => ({
+  checkRateLimit: vi.fn(() => ({ allowed: true })),
+  recordFailure:  vi.fn(),
+  getFailureDelay: vi.fn(() => 0),
+}));
+
 // Import handlers AFTER mocking
 const { default: listHandler }      = await import('../../server/api/profiles/GET');
 const { default: createHandler }    = await import('../../server/api/profiles/POST');

@@ -23,6 +23,7 @@ export interface MockRes {
   end: ReturnType<typeof vi.fn>;
   redirect: ReturnType<typeof vi.fn>;
   setHeader: ReturnType<typeof vi.fn>;
+  set: ReturnType<typeof vi.fn>;
 }
 
 export function mockRes(): MockRes {
@@ -38,6 +39,7 @@ export function mockRes(): MockRes {
     end: vi.fn(),
     redirect: vi.fn(),
     setHeader: vi.fn(),
+    set: vi.fn(),
   };
 
   // status() returns `this` so callers can chain .json() / .send()
@@ -84,6 +86,7 @@ export function mockReq(overrides: Partial<Request> = {}): Request {
     body: {},
     headers: { host: 'localhost:3000' },
     protocol: 'http',
+    socket: { remoteAddress: '127.0.0.1' },
     ...overrides,
   } as unknown as Request;
 }
