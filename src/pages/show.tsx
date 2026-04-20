@@ -120,29 +120,32 @@ export default function ShowPage() {
   const [checkingNow, setCheckingNow] = useState(false);
 
   // Load existing subscription on mount
+  // Use imdbId if present, fall back to id (legacy items use id as IMDB ID)
+  const showImdbId = item?.imdbId ?? item?.id;
+
   useEffect(() => {
-    if (!item?.imdbId) return;
+    if (!showImdbId) return;
     fetch('/api/subscriptions')
       .then(r => r.json())
       .then((data: { subscriptions: Array<{ imdbId: string; schedule: string; enabled: boolean }> }) => {
-        const existing = data.subscriptions?.find(s => s.imdbId === item.imdbId);
+        const existing = data.subscriptions?.find(s => s.imdbId === showImdbId);
         if (existing) {
           setSubStatus('subscribed');
           setSubSchedule(existing.schedule);
         }
       })
       .catch(() => {/* non-fatal */});
-  }, [item?.imdbId]);
+  }, [showImdbId]);
 
   const handleSubscribe = async () => {
-    if (!item?.imdbId) return;
+    if (!item || !showImdbId) return;
     setSubStatus('loading');
     try {
       await fetch('/api/subscriptions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          imdbId: item.imdbId,
+          imdbId: showImdbId,
           title: item.title,
           poster: item.poster,
           totalSeasons: Math.max(...(item.episodes?.map(e => e.season) ?? [1])),
@@ -158,20 +161,20 @@ export default function ShowPage() {
   };
 
   const handleUnsubscribe = async () => {
-    if (!item?.imdbId) return;
+    if (!showImdbId) return;
     await fetch('/api/subscriptions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ imdbId: item.imdbId, action: 'unsubscribe' }),
+      body: JSON.stringify({ imdbId: showImdbId, action: 'unsubscribe' }),
     });
     setSubStatus('idle');
   };
 
   const handleCheckNow = async () => {
-    if (!item?.imdbId) return;
+    if (!showImdbId) return;
     setCheckingNow(true);
     try {
-      await fetch(`/api/subscriptions/${item.imdbId}/check`, { method: 'POST' });
+      await fetch(`/api/subscriptions/${showImdbId}/check`, { method: 'POST' });
     } finally {
       setCheckingNow(false);
     }

@@ -23,6 +23,8 @@ export interface ProfileProgressEntry {
 
 export interface MediaItem {
   id: string;
+  /** Explicit IMDB ID (e.g. "tt1234567"). Falls back to `id` for legacy items. */
+  imdbId?: string;
   filename: string;
   originalFilename?: string;
   filepath: string;
