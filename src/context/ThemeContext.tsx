@@ -245,11 +245,16 @@ export interface AppSettings {
   autoSkipIntro: boolean;
   /** Resume playback from last position automatically */
   autoResume: boolean;
+  /** Default volume level 0–100 */
+  defaultVolume: number;
+  /** Preferred subtitle language (ISO 639-1 code, e.g. 'en', 'es', or 'off') */
+  subtitleLanguage: string;
 }
 
 /** Keys that are stored per-profile (playback preferences) */
 const PLAYBACK_KEYS: (keyof AppSettings)[] = [
   'autoplayNext', 'defaultQuality', 'autoSkipIntro', 'autoResume',
+  'defaultVolume', 'subtitleLanguage',
 ];
 
 const SHARED_DEFAULTS: Pick<AppSettings, 'themeId' | 'syncPlayerColor' | 'showStorageBadges' | 'showEnrichmentTags'> = {
@@ -259,11 +264,13 @@ const SHARED_DEFAULTS: Pick<AppSettings, 'themeId' | 'syncPlayerColor' | 'showSt
   showEnrichmentTags: true,
 };
 
-const PLAYBACK_DEFAULTS: Pick<AppSettings, 'autoplayNext' | 'defaultQuality' | 'autoSkipIntro' | 'autoResume'> = {
+const PLAYBACK_DEFAULTS: Pick<AppSettings, 'autoplayNext' | 'defaultQuality' | 'autoSkipIntro' | 'autoResume' | 'defaultVolume' | 'subtitleLanguage'> = {
   autoplayNext: true,
   defaultQuality: 'auto',
   autoSkipIntro: false,
   autoResume: true,
+  defaultVolume: 100,
+  subtitleLanguage: 'off',
 };
 
 /** Kids profile gets safer playback defaults */

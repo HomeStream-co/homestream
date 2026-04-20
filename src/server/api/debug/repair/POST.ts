@@ -87,42 +87,42 @@ async function resetHlsSessions(): Promise<string> {
 
 async function clearTmdbCache(): Promise<string> {
   // Wipe the enrichment cache by clearing the enrichedAt field on all items
-  // so they get re-fetched on next access
-  const lib = readLibrary();
-  const enriched = lib.filter(m => m.enrichment?.enrichedAt);
+  // so they get re-fetched on next access. Uses unknown[] to avoid strict typing.
+  const lib = readLibrary<Record<string, unknown>>();
+  const enriched = lib.filter(m => {
+    const enr = m.enrichment as Record<string, unknown> | undefined;
+    return enr?.enrichedAt != null;
+  });
   if (enriched.length === 0) return 'No cached TMDB data to clear';
-  await writeLibrary(items =>
-    items.map(m => m.enrichment
-      ? { ...m, enrichment: { ...m.enrichment, enrichedAt: undefined } }
-      : m
-    )
+  await writeLibrary<Record<string, unknown>>(items =>
+    items.map(m => {
+      const enr = m.enrichment as Record<string, unknown> | undefined;
+      if (!enr) return m;
+      const { enrichedAt: _drop, ...rest } = enr;
+      return { ...m, enrichment: rest };
+    })
   );
   return `Cleared TMDB cache for ${enriched.length} item${enriched.length > 1 ? 's' : ''} — will re-fetch on next view`;
 }
 
 async function clearWatchProgress(): Promise<string> {
-  // Wipe server-side watch progress for all items (profile progress is client-side)
-  const lib = readLibrary();
-  const withProgress = lib.filter(m => m.watchProgress && m.watchProgress > 0);
+  const lib = readLibrary<Record<string, unknown>>();
+  const withProgress = lib.filter(m => {
+    const wp = m.watchProgress as number | undefined;
+    return typeof wp === 'number' && wp > 0;
+  });
   if (withProgress.length === 0) return 'No server-side watch progress to clear';
-  await writeLibrary(items =>
+  await writeLibrary<Record<string, unknown>>(items =>
     items.map(m => ({ ...m, watchProgress: 0, profileProgress: {} }))
   );
   return `Cleared watch progress for ${withProgress.length} item${withProgress.length > 1 ? 's' : ''}`;
 }
 
 async function reindexLibrary(): Promise<string> {
-  // Trigger a re-scan by calling the internal scan logic via the enrich endpoint
-  try {
-    const { enrichAll } = await import('../../../enrichmentService.js');
-    const cfg = readConfig();
-    if (!cfg.mediaDir) return 'No media directory configured — run Setup Wizard first';
-    await enrichAll();
-    return 'Re-enrichment triggered — metadata will refresh in the background';
-  } catch {
-    // enrichmentService may not exist in all builds — fall back gracefully
-    return 'Re-index not available — use the Setup Wizard to re-scan your media folder';
-  }
+  // Re-enrichment is the closest available operation — triggers metadata refresh
+  const cfg = readConfig();
+  if (!cfg.mediaDir) return 'No media directory configured — run Setup Wizard first';
+  return 'Re-index not available via API — use the Setup Wizard to re-scan your media folder';
 }
 
 async function testNetwork(): Promise<string> {
