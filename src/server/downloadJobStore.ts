@@ -117,3 +117,7 @@ export function updateJobStatus(
 export function getPersistedJob(jobId: string): PersistedJob | undefined {
   return readRaw().find(j => j.jobId === jobId);
 }
+
+export function deleteJob(jobId: string): void {
+  enqueueWrite(jobs => jobs.filter(j => j.jobId !== jobId));
+}
