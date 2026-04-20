@@ -118,13 +118,21 @@ export function clearCrashLog(): void {
 }
 
 // ── Process-level handlers ────────────────────────────────────────────────────
-// Call once at server startup. Safe to call multiple times (guards with a flag).
+// Call once at server startup. Guards via a process-level property so that
+// HMR module re-evaluation in dev mode does NOT register duplicate listeners
+// (which would trigger MaxListenersExceededWarning and connection drops).
 
-let handlersInstalled = false;
+const HANDLERS_KEY = '__homestreamCrashHandlersInstalled__' as keyof NodeJS.Process;
 
 export function installCrashHandlers(): void {
-  if (handlersInstalled) return;
-  handlersInstalled = true;
+  // Use a property on `process` itself — survives module cache invalidation
+  // during Vite HMR restarts, unlike a plain module-level boolean.
+  if ((process as Record<string, unknown>)[HANDLERS_KEY]) return;
+  (process as Record<string, unknown>)[HANDLERS_KEY] = true;
+
+  // Raise the listener limit slightly to accommodate other libraries that also
+  // attach process listeners (e.g. vite-plugin-api-routes, tsx watch mode).
+  process.setMaxListeners(20);
 
   process.on('uncaughtException', (err) => {
     logCrash('uncaughtException', err);

@@ -100,7 +100,11 @@ export default defineConfig(({ mode }) => ({
 		// html-to-image is dev-tools only and incompatible with Vite's dep optimizer.
 		// Excluding it prevents the "file does not exist in optimize deps directory"
 		// crash that disconnects the SSR transport and causes the recurring white-screen.
-		exclude: ["html-to-image"],
+		// clsx and tailwind-merge are excluded for the same reason — they ship as
+		// pure-ESM packages that the optimizer cannot reliably pre-bundle, causing
+		// "file does not exist in optimize deps directory" errors that drop the HMR
+		// websocket and show a "Network error / connection loss" in the preview.
+		exclude: ["html-to-image", "clsx", "tailwind-merge"],
 	},
 
 	ssr: {
