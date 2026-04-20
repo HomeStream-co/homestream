@@ -25,8 +25,28 @@ const CACHE_DIR = path.join(dataDir(), 'tmdb-cache');
 // Pre-baked cache shipped with the app — used as seed when /private cache is
 // missing or stale so the Discover page always has images on first load.
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const BAKED_CACHE_PATH = path.resolve(__dirname, '../../public/tmdb-cache-baked.json');
-const LOCAL_IMG_DIR   = path.resolve(__dirname, '../../public/tmdb-images');
+
+// Resolve paths to static assets that are part of the client bundle.
+//
+// Layout differences between environments:
+//   Dev / cloud: server bundle at dist/server.bundle.mjs → __dirname = dist/
+//                client files at dist/  (index.html, assets/, tmdb-images/, etc.)
+//
+//   Packaged Electron: server bundle at resources/server/server.bundle.mjs
+//                      client files at resources/client/
+//                      (copied by extraResources in electron-builder.yml)
+function resolveClientPath(...segments: string[]): string {
+  // process.resourcesPath is injected by Electron at runtime — not in Node types.
+  const resourcesPath = (process as NodeJS.Process & { resourcesPath?: string }).resourcesPath;
+  if (process.env.ELECTRON === '1' && resourcesPath) {
+    return path.join(resourcesPath, 'client', ...segments);
+  }
+  // Dev/cloud: client files are in the same dist/ directory as the server bundle
+  return path.join(__dirname, ...segments);
+}
+
+const BAKED_CACHE_PATH = resolveClientPath('tmdb-cache-baked.json');
+const LOCAL_IMG_DIR   = resolveClientPath('tmdb-images');
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 const TMDB_BASE = 'https://api.themoviedb.org/3';
 const TMDB_IMG = 'https://image.tmdb.org/t/p/w500';

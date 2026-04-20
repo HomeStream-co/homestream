@@ -7,7 +7,7 @@ import {
   Loader2, ExternalLink, AlertCircle, Eye, EyeOff, RefreshCw,
   XCircle, Zap, ScanSearch,
 } from 'lucide-react';
-import type { SetupStepProps } from './types';
+import type { SetupStepProps, KeyTestState } from './types';
 import { apiPost } from './types';
 
 export default function StepApiKeys({
@@ -18,36 +18,34 @@ export default function StepApiKeys({
   googleAiTest, setGoogleAiTest, googleAiTestMsg, setGoogleAiTestMsg,
   ollamaTest, setOllamaTest, ollamaTestMsg, setOllamaTestMsg,
 }: SetupStepProps) {
-  const testTmdbKey = async () => {
-    if (!form.tmdbApiKey.trim()) return;
-    setTmdbTest('testing'); setTmdbTestMsg('');
+  // ── Key tests run server-side so they work offline-detection-aware
+  // and avoid any browser CORS restrictions ──────────────────────────
+  const testKeyViaServer = async (
+    key: 'tmdb' | 'omdb' | 'googleai',
+    value: string,
+    setTest: (s: KeyTestState) => void,
+    setMsg: (s: string) => void,
+  ) => {
+    if (!value.trim()) return;
+    setTest('testing'); setMsg('');
     try {
-      const res = await fetch('https://api.themoviedb.org/3/configuration', { headers: { Authorization: `Bearer ${form.tmdbApiKey.trim()}` } });
-      if (res.ok) { setTmdbTest('ok'); setTmdbTestMsg('Key is valid — TMDB connected!'); }
-      else { const b = await res.json() as { status_message?: string }; setTmdbTest('error'); setTmdbTestMsg(b.status_message ?? `HTTP ${res.status}`); }
-    } catch { setTmdbTest('error'); setTmdbTestMsg('Network error — check your connection'); }
+      const res = await fetch('/api/setup/test-keys', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key, value: value.trim() }),
+      });
+      const data = await res.json() as { ok: boolean; message: string };
+      setTest(data.ok ? 'ok' : 'error');
+      setMsg(data.message);
+    } catch {
+      setTest('error');
+      setMsg('Could not reach the HomeStream server — is it running?');
+    }
   };
 
-  const testOmdbKey = async () => {
-    if (!form.omdbApiKey.trim()) return;
-    setOmdbTest('testing'); setOmdbTestMsg('');
-    try {
-      const res = await fetch(`https://www.omdbapi.com/?apikey=${form.omdbApiKey.trim()}&t=inception`);
-      const b = await res.json() as { Response: string; Error?: string; Title?: string };
-      if (b.Response === 'True') { setOmdbTest('ok'); setOmdbTestMsg(`Key is valid — fetched "${b.Title}" successfully`); }
-      else { setOmdbTest('error'); setOmdbTestMsg(b.Error ?? 'Invalid key'); }
-    } catch { setOmdbTest('error'); setOmdbTestMsg('Network error — check your connection'); }
-  };
-
-  const testGoogleAiKey = async () => {
-    if (!form.googleAiApiKey.trim()) return;
-    setGoogleAiTest('testing'); setGoogleAiTestMsg('');
-    try {
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${form.googleAiApiKey.trim()}`);
-      if (res.ok) { setGoogleAiTest('ok'); setGoogleAiTestMsg('Key is valid — Gemini API connected!'); }
-      else { const b = await res.json() as { error?: { message?: string } }; setGoogleAiTest('error'); setGoogleAiTestMsg(b.error?.message ?? `HTTP ${res.status}`); }
-    } catch { setGoogleAiTest('error'); setGoogleAiTestMsg('Network error — check your connection'); }
-  };
+  const testTmdbKey     = () => testKeyViaServer('tmdb',     form.tmdbApiKey,     setTmdbTest,     setTmdbTestMsg);
+  const testOmdbKey     = () => testKeyViaServer('omdb',     form.omdbApiKey,     setOmdbTest,     setOmdbTestMsg);
+  const testGoogleAiKey = () => testKeyViaServer('googleai', form.googleAiApiKey, setGoogleAiTest, setGoogleAiTestMsg);
 
   const testOllamaConnection = async () => {
     if (!form.ollamaUrl.trim()) return;

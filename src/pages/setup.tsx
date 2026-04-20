@@ -148,6 +148,14 @@ export default function SetupPage() {
 
   // ── Auto-scan when reaching finish step ──
   const runScan = useCallback(async (dir: string) => {
+    // Guard: don't scan if dir is empty or still the placeholder default
+    if (!dir || dir.trim() === '') {
+      setScanState('done');
+      setScanFound(0);
+      setScanSkipped(0);
+      setScanFiles([]);
+      return;
+    }
     setScanState('scanning');
     try {
       const res = await fetch('/api/setup', {
@@ -155,18 +163,36 @@ export default function SetupPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'scan_existing', mediaDir: dir }),
       });
+      if (!res.ok) {
+        // Server error (e.g. dir doesn't exist yet) — show 0 found, not an error
+        setScanFound(0);
+        setScanSkipped(0);
+        setScanFiles([]);
+        setScanState('done');
+        return;
+      }
       const data = await res.json() as {
         found: number; skipped: number;
         files: ScannedFile[];
+        error?: string;
       };
       setScanFound(data.found ?? 0);
       setScanSkipped(data.skipped ?? 0);
       setScanFiles(data.files ?? []);
       setScanState('done');
     } catch {
+      // Network error — don't block the user, just show 0 found
+      setScanFound(0);
+      setScanSkipped(0);
+      setScanFiles([]);
       setScanState('done');
     }
   }, []);
+
+  // Reset scan state whenever mediaDir changes so re-visiting step 8 re-scans
+  useEffect(() => {
+    setScanState('idle');
+  }, [form.mediaDir]);
 
   useEffect(() => {
     if (step === 8 && scanState === 'idle') {

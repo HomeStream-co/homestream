@@ -40,19 +40,29 @@ files:
   - electron/tray-icon.png
   - package.json
   # electron-updater and its deps must be resolvable by the main process at runtime.
-  # electron-builder includes package.json "dependencies" automatically, but listing
-  # them explicitly here ensures they are never accidentally excluded.
+  # electron-builder includes package.json "dependencies" automatically in the asar,
+  # but electron-updater needs to be accessible from the main process (outside asar)
+  # so we list it explicitly. The others are its transitive deps that must co-locate.
   - node_modules/electron-updater/**/*
   - node_modules/builder-util-runtime/**/*
   - node_modules/semver/**/*
-  - node_modules/js-yaml/**/*
-  - node_modules/lazy-val/**/*
 
 # Extra resources shipped alongside the app (available at process.resourcesPath at runtime)
 extraResources:
   # Server bundle — loaded by main.js as a child process
   - from: dist/server.bundle.mjs
     to: server/server.bundle.mjs
+  # Client bundle — Vite outputs to dist/ (index.html + assets/).
+  # We copy the whole dist/ folder to resources/client/ so configure.js can
+  # serve it with express.static when running as a packaged Electron app.
+  # Exclude the server bundle and sourcemaps to keep the installer lean.
+  - from: dist
+    to: client
+    filter:
+      - "**/*"
+      - "!server.bundle.mjs"
+      - "!server.bundle.mjs.map"
+      - "!app.js"
   # FFmpeg binary — ffmpeg-static resolves a local path that won't exist in the
   # packaged app, so we copy the binary into resources and point FFMPEG_PATH at it.
   # On Windows, ffmpeg-static installs ffmpeg.exe; on Linux/macOS it's just ffmpeg.
@@ -60,7 +70,6 @@ extraResources:
   # When building on Windows (npm run electron:win), ffmpeg-static provides ffmpeg.exe.
   - from: node_modules/ffmpeg-static/ffmpeg.exe
     to: ffmpeg/ffmpeg.exe
-    filter: ["**/*"]
 
 # ── Windows ───────────────────────────────────────────────────────────────────
 win:

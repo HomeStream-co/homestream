@@ -336,11 +336,6 @@ ipcMain.on('open-browser-lan',  (_, url)  => shell.openExternal(url));
 ipcMain.on('open-browser-page', (_, page) => shell.openExternal(`http://localhost:${SERVER_PORT}${page}`));
 ipcMain.on('request-status',    () => sendStatus());
 
-// Provide the setup wizard with a platform-appropriate default media directory.
-// The wizard calls GET /api/electron/platform-defaults to get this value.
-// We inject it via the server env so the API route can read it.
-// This is set before startServer() so the env var is available when the server spawns.
-
 // ── App lifecycle ─────────────────────────────────────────────────────────────
 
 app.whenReady().then(() => {
