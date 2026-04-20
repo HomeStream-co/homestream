@@ -19,10 +19,11 @@ import {
   Star, Download, Bookmark, BookmarkCheck, Play,
   ChevronLeft, ChevronRight, Loader2, Film, Trophy, Flame,
 } from 'lucide-react';
+import { X, Volume2, VolumeX } from 'lucide-react';
 import type { TMDBMovie } from '@/server/tmdbCache';
 import { useMedia } from '@/context/MediaContext';
 import { fetchTrailerKey } from '@/lib/trailerCache';
-import { X, Volume2, VolumeX } from 'lucide-react';
+import ImageWithFallback from '@/components/ImageWithFallback';
 
 // ── Genre definitions ─────────────────────────────────────────────────────────
 
@@ -122,10 +123,12 @@ function TrailerModal({
             )}
             {trailerKey === null && (
               <div className="absolute inset-0 flex items-center justify-center">
-                {movie.posterUrl
-                  ? <img src={movie.posterUrl} alt={movie.title} className="h-full w-full object-contain opacity-30" />
-                  : <Film className="w-16 h-16 text-muted-foreground/30" />
-                }
+                <ImageWithFallback
+                  src={movie.posterUrl}
+                  alt={movie.title}
+                  className="h-full w-full object-contain opacity-30"
+                  fallbackClassName="h-full w-full opacity-30"
+                />
                 <div className="absolute inset-0 flex items-center justify-center">
                   <p className="text-white/60 text-sm font-medium">No trailer available</p>
                 </div>
