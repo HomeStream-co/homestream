@@ -12,6 +12,8 @@ import SettingsPanel from '@/components/SettingsPanel';
 import StremioPanel from '@/components/StremioPanel';
 import SecurityPanel from '@/components/SecurityPanel';
 import PinLock from '@/components/PinLock';
+import NotificationBell from '@/components/NotificationBell';
+import { notify } from '@/lib/notificationStore';
 
 // DebugPanel is dev-only — excluded from production bundle
 const DebugPanel = import.meta.env.DEV
@@ -60,17 +62,35 @@ function useActiveDownloadCount(): number {
         for (const entry of allEntries) {
           const prev = prevStatuses.current.get(entry.hash);
           const isNowDone = entry.status === 'done' || entry.status === 'seeding';
+          const isNowError = entry.status === 'error';
           const wasActive = prev === 'downloading' || prev === 'queued';
 
           if (wasActive && isNowDone) {
             const label = entry.title || entry.name || 'Download';
+            // Push to persistent notification store (bell icon)
+            notify({
+              type: 'download_complete',
+              title: label,
+              message: 'Download complete — ready to watch',
+              ttl: 0,
+            });
+            // Also show a transient toast for immediate visibility
             toast.success(`"${label}" is ready to watch`, {
               description: 'Added to your library',
-              duration: 6000,
+              duration: 5000,
               action: { label: 'Go to Library', onClick: () => window.location.assign('/library') },
             });
-            // Refresh library so the new item appears immediately
             refreshLibrary?.();
+          }
+
+          if (wasActive && isNowError) {
+            const label = entry.title || entry.name || 'Download';
+            notify({
+              type: 'download_error',
+              title: label,
+              message: 'Download failed — check the Downloads page',
+              ttl: 0,
+            });
           }
         }
 
@@ -237,6 +257,9 @@ export default function Header({ onChatOpen: _onChatOpen }: HeaderProps) {
                 </span>
               )}
             </Link>
+
+            {/* Notification Bell */}
+            <NotificationBell />
 
             {/* ── Settings cog (Security Center + Debug Panel live inside) ── */}
             <SettingsPanel
