@@ -78,7 +78,7 @@ export default function MediaCard({ item, showProgress = false, size = 'sm' }: M
   const handleInfo = (e: React.MouseEvent) => { e.stopPropagation(); navigate(detailPath); };
   const handleWatchlist = (e: React.MouseEvent) => {
     e.stopPropagation();
-    inWatchlist ? removeFromWatchlist(item.id) : addToWatchlist(item.id);
+    if (inWatchlist) { removeFromWatchlist(item.id); } else { addToWatchlist(item.id); }
   };
 
   const FallbackIcon = item.type === 'series' ? Tv2 : Film;

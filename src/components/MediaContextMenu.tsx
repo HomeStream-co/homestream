@@ -118,7 +118,7 @@ export default function MediaContextMenu({ item, children, disabled = false }: M
   const handlePlay = () => { closeMenu(); navigate(playerPath); };
   const handleInfo = () => { closeMenu(); navigate(detailPath); };
   const handleFavorite = () => {
-    inWatchlist ? removeFromWatchlist(item.id) : addToWatchlist(item.id);
+    if (inWatchlist) { removeFromWatchlist(item.id); } else { addToWatchlist(item.id); }
     // Keep menu open so user can see the state change
   };
 

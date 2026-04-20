@@ -24,7 +24,7 @@ export default function AIChatAssistant() {
     try {
       const saved = sessionStorage.getItem('homestream-chat');
       if (saved) return JSON.parse(saved);
-    } catch {}
+    } catch { /* sessionStorage unavailable or JSON invalid — start fresh */ }
     return [];
   });
   const [input, setInput] = useState('');
@@ -43,7 +43,7 @@ export default function AIChatAssistant() {
   useEffect(() => {
     try {
       sessionStorage.setItem('homestream-chat', JSON.stringify(messages.slice(-20)));
-    } catch {}
+    } catch { /* sessionStorage quota exceeded or unavailable — non-fatal */ }
   }, [messages]);
 
   // Detect leaving the player page and fire post-watch recommendation

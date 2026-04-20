@@ -44,8 +44,9 @@ const UPLOADS_DIR = path.resolve('./uploads');
 function resolveFfmpeg(): string {
   if (process.env.FFMPEG_PATH) return process.env.FFMPEG_PATH;
   try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const p = require('ffmpeg-static') as string | null;
+    const { createRequire } = require('module') as typeof import('module');
+    const req = createRequire(import.meta.url);
+    const p = req('ffmpeg-static') as string | null;
     if (p) return p;
   } catch { /* not installed */ }
   return 'ffmpeg';

@@ -132,7 +132,7 @@ export default function RemotePage() {
   useEffect(() => {
     connect();
     return () => {
-      reconnectRef.current && clearTimeout(reconnectRef.current);
+      if (reconnectRef.current) clearTimeout(reconnectRef.current);
       wsRef.current?.close();
     };
   }, [connect]);
@@ -266,7 +266,7 @@ export default function RemotePage() {
             </p>
             {status === 'disconnected' && (
               <button
-                onClick={() => { reconnectRef.current && clearTimeout(reconnectRef.current); connect(); }}
+                onClick={() => { if (reconnectRef.current) clearTimeout(reconnectRef.current); connect(); }}
                 className="mt-4 flex items-center gap-1.5 mx-auto text-sm text-primary hover:text-primary/80 transition-colors"
               >
                 <RotateCcw className="w-3.5 h-3.5" /> Retry now
