@@ -28,12 +28,11 @@
  *       Docker: --cap-add=NET_ADMIN --device /dev/net/tun
  */
 
-import { spawn, exec } from 'child_process';
-import { promisify } from 'util';
+import { spawn } from 'child_process';
 import fs from 'fs/promises';
 import path from 'path';
-
-const execAsync = promisify(exec);
+import { execAsync } from './execHelper.js';
+import { pickFastestServer, patchOvpnRemote } from './vpnServerRanker.js';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -159,6 +158,10 @@ export interface VPNConfig {
   username?: string;           // for credential-based providers
   password?: string;           // for credential-based providers
   autoConnect: boolean;        // connect automatically when a download starts
+  /** When true, HomeStream picks the fastest available server before connecting */
+  autoFastest: boolean;
+  /** For OpenVPN credential providers: list of server hostnames to ping-rank */
+  knownServers?: string[];
 }
 
 export interface VPNStatus {
@@ -277,6 +280,46 @@ async function bringUp(config: VPNConfig): Promise<void> {
   else if (config.protocol === 'openvpn') await ovpnConnect(config);
 }
 
+/**
+ * Like bringUp but runs fastest-server selection first when autoFastest is on.
+ * For CLI providers the CLI itself handles the connection, so we skip bringUp.
+ * For ping/API providers we patch the config before connecting.
+ */
+async function bringUpFastest(config: VPNConfig): Promise<{ server?: string }> {
+  const result = await pickFastestServer(config);
+  console.log(`[vpn] Fastest server result:`, result);
+
+  if (result.strategy === 'cli') {
+    // CLI already connected — nothing more to do
+    return { server: result.server };
+  }
+
+  if (result.strategy === 'error' || result.strategy === 'manual') {
+    // Fall back to normal connect with whatever config we have
+    console.warn(`[vpn] Fastest-server selection unavailable: ${result.reason} — using current config`);
+    await bringUp(config);
+    return {};
+  }
+
+  // For ping/api strategies: patch the OpenVPN remote if applicable, then connect
+  let patchedConfig = config;
+  if (config.protocol === 'openvpn' && result.strategy === 'ping') {
+    patchedConfig = {
+      ...config,
+      configContent: patchOvpnRemote(config.configContent, result.server),
+    };
+    console.log(`[vpn] Patched OpenVPN remote → ${result.server} (${result.latencyMs}ms)`);
+  } else if (result.strategy === 'api') {
+    console.log(`[vpn] API-selected server: ${result.server}${result.latencyMs ? ` (${result.latencyMs}ms)` : ''}`);
+    // For WireGuard config-file providers (Mullvad/ProtonVPN), we can't auto-patch
+    // the config without the user's account token. Log the recommendation and
+    // connect with whatever config is uploaded.
+  }
+
+  await bringUp(patchedConfig);
+  return { server: result.server };
+}
+
 async function bringDown(protocol: VPNProtocol): Promise<void> {
   if (protocol === 'wireguard') await wgDisconnect();
   else if (protocol === 'openvpn') await ovpnDisconnect();
@@ -297,13 +340,19 @@ async function isUp(protocol: VPNProtocol): Promise<boolean> {
  */
 export async function connectForDownload(
   config: VPNConfig
-): Promise<{ ok: boolean; alreadyConnected?: boolean; error?: string }> {
+): Promise<{ ok: boolean; alreadyConnected?: boolean; server?: string; error?: string }> {
   if (!config.enabled) return { ok: true }; // VPN disabled — proceed without it
 
   try {
     const already = await isUp(config.protocol);
     if (!already) {
-      await bringUp(config);
+      if (config.autoFastest) {
+        const { server } = await bringUpFastest(config);
+        activeDownloadCount++;
+        return { ok: true, alreadyConnected: false, server };
+      } else {
+        await bringUp(config);
+      }
     }
     activeDownloadCount++;
     return { ok: true, alreadyConnected: already };

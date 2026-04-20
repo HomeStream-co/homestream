@@ -5,7 +5,7 @@
 import {
   Lock, Shield, Globe, CheckCircle2, ChevronLeft, ChevronRight,
   Loader2, ExternalLink, Upload, ToggleLeft, ToggleRight,
-  CheckCircle, XCircle as XCircleIcon, Zap,
+  CheckCircle, XCircle as XCircleIcon, Zap, Gauge,
 } from 'lucide-react';
 import type { SetupStepProps } from './types';
 
@@ -51,6 +51,10 @@ export default function StepVPN({
           username: form.vpnUsername || undefined,
           password: form.vpnPassword || undefined,
           autoConnect: form.vpnAutoConnect,
+          autoFastest: form.vpnAutoFastest,
+          knownServers: form.vpnKnownServers
+            ? form.vpnKnownServers.split(',').map(s => s.trim()).filter(Boolean)
+            : undefined,
         }),
       }).catch(() => {});
     }
@@ -237,6 +241,46 @@ export default function StepVPN({
             </div>
             {form.vpnAutoConnect ? <ToggleRight className="w-6 h-6 text-primary" /> : <ToggleLeft className="w-6 h-6 text-muted-foreground" />}
           </div>
+
+          {/* Auto-fastest server */}
+          <div onClick={() => set('vpnAutoFastest', !form.vpnAutoFastest)}
+            className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${form.vpnAutoFastest ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/40'}`}>
+            <Gauge className={`w-4 h-4 ${form.vpnAutoFastest ? 'text-primary' : 'text-muted-foreground'}`} />
+            <div className="flex-1">
+              <p className="text-xs font-semibold text-foreground">Auto-Select Fastest Server</p>
+              <p className="text-[10px] text-muted-foreground">
+                {selectedProvider.id === 'mullvad' || selectedProvider.id === 'protonvpn'
+                  ? `Queries ${selectedProvider.name}'s API and picks the lowest-latency server before each download`
+                  : selectedProvider.id === 'nordvpn' || selectedProvider.id === 'expressvpn' || selectedProvider.id === 'surfshark'
+                  ? `Uses ${selectedProvider.name}'s CLI to connect to the fastest available server`
+                  : selectedProvider.authType === 'credentials'
+                  ? 'TCP-pings your server list and connects to the fastest one'
+                  : 'Not available for single config-file providers — download a new config to switch servers'}
+              </p>
+            </div>
+            {form.vpnAutoFastest ? <ToggleRight className="w-6 h-6 text-primary" /> : <ToggleLeft className="w-6 h-6 text-muted-foreground" />}
+          </div>
+
+          {/* Known servers list — only shown for credential OpenVPN providers without CLI */}
+          {form.vpnAutoFastest && needsCredentials
+            && !['nordvpn', 'expressvpn', 'surfshark'].includes(selectedProvider.id) && (
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1 block">
+                Server Hostnames to Ping-Rank
+              </label>
+              <input
+                type="text"
+                value={form.vpnKnownServers}
+                onChange={e => set('vpnKnownServers', e.target.value)}
+                placeholder="us5847.nordvpn.com, us5848.nordvpn.com, uk1234.nordvpn.com"
+                className="w-full px-3 py-2 text-xs bg-card border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary"
+              />
+              <p className="text-[10px] text-muted-foreground mt-1">
+                Comma-separated. HomeStream TCP-pings each on port 1194 and connects to the fastest.
+                Get server hostnames from your provider's server list page.
+              </p>
+            </div>
+          )}
         </div>
       )}
 

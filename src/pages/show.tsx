@@ -672,7 +672,7 @@ export default function ShowPage() {
     </RestrictedContentGuard>
 
     {/* ── Download selector dialog ─────────────────────────────────────── */}
-    <DownloadDialog
+    <ShowDownloadDialog
       open={dlDialogOpen}
       onOpenChange={setDlDialogOpen}
       item={item}

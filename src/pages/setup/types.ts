@@ -39,6 +39,10 @@ export interface FormData {
   vpnUsername: string;
   vpnPassword: string;
   vpnAutoConnect: boolean;
+  /** Auto-select the fastest/lowest-latency server before each download */
+  vpnAutoFastest: boolean;
+  /** For OpenVPN credential providers: comma-separated list of server hostnames to ping-rank */
+  vpnKnownServers: string;
 }
 
 export type KeyTestState = 'idle' | 'testing' | 'ok' | 'error';

@@ -22,6 +22,8 @@ export default async function handler(req: Request, res: Response) {
       username?: string;
       password?: string;
       autoConnect?: boolean;
+      autoFastest?: boolean;
+      knownServers?: string[];
       enabled?: boolean;
     };
 
@@ -42,6 +44,10 @@ export default async function handler(req: Request, res: Response) {
         username: payload.username !== undefined ? payload.username : existing.username,
         password: payload.password !== undefined ? payload.password : existing.password,
         autoConnect: payload.autoConnect ?? existing.autoConnect ?? false,
+        autoFastest: payload.autoFastest ?? existing.autoFastest ?? true,
+        knownServers: payload.knownServers !== undefined
+          ? payload.knownServers
+          : existing.knownServers,
       };
       config.vpn = vpnConfig;
       await writeConfig(config);

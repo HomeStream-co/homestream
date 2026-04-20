@@ -81,6 +81,8 @@ export default function SetupPage() {
     vpnUsername: '',
     vpnPassword: '',
     vpnAutoConnect: false,
+    vpnAutoFastest: true,
+    vpnKnownServers: '',
   });
 
   const set = (key: keyof FormData, value: unknown) =>
