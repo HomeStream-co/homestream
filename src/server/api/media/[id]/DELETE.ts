@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { readLibrary, writeLibrary } from '../../../libraryStore.js';
 import { removeFromAllWatchlists } from '../../../watchlistStore.js';
+import { requireAuth } from '../../../authMiddleware.js';
 
 const UPLOADS_DIR  = path.resolve('./uploads');
 
@@ -17,6 +18,7 @@ function safeDelete(filename: string) {
 
 export default async function handler(req: Request, res: Response) {
   try {
+    if (!requireAuth(req, res)) return;
     const { id } = req.params;
     const data = readLibrary<Record<string, unknown>>();
     const item = data.find((m) => m.id === id);

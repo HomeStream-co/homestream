@@ -11,6 +11,7 @@
 import type { Request, Response } from 'express';
 import { readConfig } from '../../../configStore.js';
 import { scanExistingMedia, importExistingMedia } from '../../../existingMediaScanner.js';
+import { requireAuth } from '../../../authMiddleware.js';
 
 export default async function handler(_req: Request, res: Response) {
   try {

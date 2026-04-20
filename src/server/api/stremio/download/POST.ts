@@ -6,6 +6,7 @@ import { runPreDownloadScan } from '../../../security/threatScanner.js';
 import { connectForDownload, disconnectAfterDownload } from '../../../vpnService.js';
 import type { VPNConfig } from '../../../vpnService.js';
 import { upsertJob, getAllPersistedJobs } from '../../../downloadJobStore.js';
+import { requireAuth } from '../../../authMiddleware.js';
 
 /**
  * POST /api/stremio/download

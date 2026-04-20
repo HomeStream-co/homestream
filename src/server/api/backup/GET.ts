@@ -12,6 +12,7 @@
 import type { Request, Response } from 'express';
 import fs from 'fs';
 import path from 'path';
+import { requireAuth } from '../../authMiddleware.js';
 
 const LIBRARY_PATH  = path.resolve('./media-library.json');
 const CONFIG_PATH   = path.resolve('./homestream-config.json');

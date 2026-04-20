@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express';
 import fs from 'fs/promises';
 import path from 'path';
+import { requireAuth } from '../../../../authMiddleware.js';
 
 const LIBRARY_PATH = path.join(process.cwd(), 'media-library.json');
 
@@ -15,8 +16,8 @@ async function readLibrary() {
 
 export default async function handler(req: Request, res: Response) {
   try {
+    if (!requireAuth(req, res)) return;
     const { id } = req.params;
-    const library = await readLibrary();
     const item = library.find((m: { id: string }) => m.id === id);
 
     if (!item) {

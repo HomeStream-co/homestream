@@ -16,6 +16,7 @@ import type { Request, Response } from 'express';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { getSecret } from '#airo/secrets';
 import { readLibrary, writeLibrary } from '../../../libraryStore.js';
+import { requireAuth } from '../../../authMiddleware.js';
 
 interface MediaItem {
   id: string;

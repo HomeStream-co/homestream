@@ -14,6 +14,7 @@
 import type { Request, Response } from 'express';
 import { readLibrary, writeLibrary } from '../../libraryStore.js';
 import { DEMO_ITEM } from '../../demoItem.js';
+import { requireAuth } from '../../authMiddleware.js';
 
 // Seed once at module load — fires as soon as the API route is first imported,
 // which happens on the first request to any /api/* endpoint.
@@ -45,6 +46,7 @@ interface ProfileProgressEntry {
 
 export default function handler(req: Request, res: Response) {
   try {
+    if (!requireAuth(req, res)) return;
     ensureDemoSeeded();
     const library = readLibrary<Record<string, unknown>>();
 

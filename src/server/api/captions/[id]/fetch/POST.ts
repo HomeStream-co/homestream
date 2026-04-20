@@ -2,6 +2,7 @@ import type { Request, Response } from 'express';
 import fs from 'fs';
 import path from 'path';
 import { readLibrary } from '../../../../libraryStore.js';
+import { requireAuth } from '../../../../authMiddleware.js';
 
 /**
  * POST /api/captions/:id/fetch

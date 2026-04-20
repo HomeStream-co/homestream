@@ -9,6 +9,7 @@
 import type { Request, Response } from 'express';
 import { readLibrary, writeLibrary } from '../../../../libraryStore.js';
 import { fetchOMDB } from '../../../../mediaUtils.js';
+import { requireAuth } from '../../../../authMiddleware.js';
 
 interface MediaItem {
   id: string;
@@ -37,8 +38,8 @@ function writeLibraryLocal(data: MediaItem[]) {
 
 export default async function handler(req: Request, res: Response) {
   try {
+    if (!requireAuth(req, res)) return;
     const { id } = req.params;
-    const lib = readLibraryLocal();
     const idx = lib.findIndex(m => m.id === id);
 
     if (idx === -1) {

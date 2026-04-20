@@ -17,6 +17,7 @@ import type { Request, Response } from 'express';
 import fs from 'fs';
 import path from 'path';
 import { writeLibraryDirect } from '../../libraryStore.js';
+import { requireAuth } from '../../authMiddleware.js';
 
 const CONFIG_PATH   = path.resolve('./homestream-config.json');
 const PROFILES_PATH = path.resolve('./homestream-profiles.json');

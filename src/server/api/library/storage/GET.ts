@@ -11,6 +11,7 @@ import fs from 'fs';
 import { execSync } from 'child_process';
 import { readLibrary } from '../../../libraryStore.js';
 import { readConfig } from '../../../configStore.js';
+import { requireAuth } from '../../../authMiddleware.js';
 
 function getDiskStats(dir: string): { free: number; total: number } | null {
   try {

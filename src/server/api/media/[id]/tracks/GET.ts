@@ -12,11 +12,13 @@ import type { Request, Response } from 'express';
 import path from 'path';
 import fs from 'fs';
 import { probeFile } from '../../../../probeCache.js';
+import { requireAuth } from '../../../../authMiddleware.js';
 
 const UPLOADS_DIR = path.resolve('./uploads');
 
 export default async function handler(req: Request, res: Response) {
   try {
+    if (!requireAuth(req, res)) return;
     const { id } = req.params;
 
     const libPath = path.resolve('./media-library.json');

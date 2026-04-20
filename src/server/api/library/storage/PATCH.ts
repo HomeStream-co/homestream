@@ -8,6 +8,7 @@
 
 import type { Request, Response } from 'express';
 import { writeConfig } from '../../../configStore.js';
+import { requireAuth } from '../../../authMiddleware.js';
 
 export default async function handler(req: Request, res: Response) {
   try {

@@ -1,5 +1,6 @@
 import type { Request, Response } from 'express';
 import { deleteTorrent, isReachable } from '../../../../qbittorrentClient.js';
+import { requireAuth } from '../../../../authMiddleware.js';
 
 /**
  * DELETE /api/stremio/downloads/:hash

@@ -1,4 +1,5 @@
 import type { Request, Response } from 'express';
+import { requireAuth } from '../../authMiddleware.js';
 
 /**
  * POST /api/stremio/search

@@ -6,6 +6,7 @@
  */
 import type { Request, Response } from 'express';
 import { resumeTorrent, isReachable } from '../../../../qbittorrentClient.js';
+import { requireAuth } from '../../../../authMiddleware.js';
 
 export default async function handler(req: Request, res: Response) {
   const { hash } = req.body as { hash?: string };

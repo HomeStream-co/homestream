@@ -14,6 +14,7 @@
  */
 import type { Request, Response } from 'express';
 import { readLibrary } from '../../libraryStore.js';
+import { requireAuth } from '../../authMiddleware.js';
 
 interface ProfileProgressEntry {
   progress: number;

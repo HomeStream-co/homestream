@@ -18,6 +18,7 @@
 import type { Request, Response } from 'express';
 import dgram from 'dgram';
 import http from 'http';
+import { requireAuth } from '../../authMiddleware.js';
 import { URL } from 'url';
 
 const SSDP_ADDR = '239.255.255.250';

@@ -2,6 +2,7 @@ import type { Request, Response } from 'express';
 import { getAllJobs } from '../../../torrentManager.js';
 import { getAllTorrents, getTransferInfo, isReachable } from '../../../qbittorrentClient.js';
 import { getQbitJobs } from '../download/POST.js';
+import { requireAuth } from '../../../authMiddleware.js';
 
 /**
  * GET /api/stremio/downloads
