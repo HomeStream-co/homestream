@@ -10,14 +10,23 @@
  *   - Similar shows in library + AI suggestions
  */
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Play, Plus, Check, Star, Calendar, Tv2,
   ArrowLeft, Tag, Zap, AlertTriangle, Users, ChevronRight,
   BookOpen, Heart, Layers, CheckCircle2, ListVideo, Download,
+  Bell, BellOff, RefreshCw,
 } from 'lucide-react';
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+} from '@/components/ui/dialog';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
+import { Button } from '@/components/ui/button';
+import { useAuth } from '@/context/AuthContext';
 import { useMedia } from '@/context/MediaContext';
 import { useProfile } from '@/context/ProfileContext';
 import { useTheme } from '@/context/ThemeContext';

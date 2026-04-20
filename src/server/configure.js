@@ -103,6 +103,13 @@ export const serverBefore = (server) => {
     console.warn('[jellyfin-discovery] Failed to start (non-fatal):', err.message);
   });
 
+  // Start episode auto-download scheduler
+  import('./episodeScheduler.js').then(({ scheduleAllSubscriptions }) => {
+    scheduleAllSubscriptions();
+  }).catch(err => {
+    console.warn('[scheduler] Failed to start (non-fatal):', err.message);
+  });
+
   // Start mDNS so users can access HomeStream at homestream.local
   import('./mdnsService.js').then(({ startMDNS }) => {
     const port = parseInt(process.env.PORT || '3000');
