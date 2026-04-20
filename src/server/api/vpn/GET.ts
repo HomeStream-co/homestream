@@ -22,6 +22,9 @@ export default async function handler(_req: Request, res: Response) {
       protocol: vpnCfg.protocol,
       provider: vpnCfg.provider,
       autoConnect: vpnCfg.autoConnect,
+      autoFastest: vpnCfg.autoFastest ?? true,
+      serverType: vpnCfg.serverType ?? 'p2p',
+      knownServers: vpnCfg.knownServers ?? [],
       hasConfig: !!vpnCfg.configContent,
       hasCredentials: !!(vpnCfg.username && vpnCfg.password),
     } : null;

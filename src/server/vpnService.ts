@@ -149,6 +149,8 @@ export const VPN_PROVIDERS: VPNProviderMeta[] = [
   },
 ];
 
+export type VPNServerType = 'p2p' | 'standard' | 'obfuscated' | 'double' | 'tor';
+
 export interface VPNConfig {
   enabled: boolean;
   downloadOnly: true;          // ALWAYS true — VPN only used for downloads, never streaming
@@ -160,6 +162,16 @@ export interface VPNConfig {
   autoConnect: boolean;        // connect automatically when a download starts
   /** When true, HomeStream picks the fastest available server before connecting */
   autoFastest: boolean;
+  /**
+   * Preferred server type for providers that support multiple categories.
+   * - p2p        → optimised for torrenting (most providers have dedicated P2P nodes)
+   * - standard   → general-purpose server, no special routing
+   * - obfuscated → traffic disguised as HTTPS — useful in restrictive networks
+   * - double     → traffic routed through two VPN hops (slower, more private)
+   * - tor        → exit through the Tor network (very slow — not recommended for downloads)
+   * Defaults to 'p2p'. Falls back to 'standard' if the provider doesn't support the type.
+   */
+  serverType: VPNServerType;
   /** For OpenVPN credential providers: list of server hostnames to ping-rank */
   knownServers?: string[];
 }

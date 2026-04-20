@@ -36,7 +36,7 @@
 
 import net from 'net';
 import { execAsync } from './execHelper.js';
-import type { VPNConfig, VPNProviderType } from './vpnService.js';
+import type { VPNConfig, VPNProviderType, VPNServerType } from './vpnService.js';
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
@@ -89,22 +89,40 @@ async function pingAll(
 
 // ── CLI providers ─────────────────────────────────────────────────────────────
 
-const CLI_FASTEST: Partial<Record<VPNProviderType, () => Promise<string>>> = {
-  nordvpn: async () => {
-    // NordVPN CLI: `nordvpn connect --group P2P` picks the fastest P2P server
-    const { stdout } = await execAsync('nordvpn connect --group P2P 2>&1', { timeout: 30_000 });
+/**
+ * Map our serverType to NordVPN group names.
+ * NordVPN CLI: `nordvpn connect --group <group>`
+ */
+function nordvpnGroup(serverType: VPNServerType): string {
+  switch (serverType) {
+    case 'p2p':        return 'P2P';
+    case 'obfuscated': return 'Obfuscated_Servers';
+    case 'double':     return 'Double_VPN';
+    case 'tor':        return 'Onion_Over_VPN';
+    default:           return 'P2P'; // standard falls back to P2P for downloads
+  }
+}
+
+const CLI_FASTEST: Partial<Record<VPNProviderType, (serverType: VPNServerType) => Promise<string>>> = {
+  nordvpn: async (serverType) => {
+    const group = nordvpnGroup(serverType);
+    const { stdout } = await execAsync(`nordvpn connect --group ${group} 2>&1`, { timeout: 30_000 });
     // Output: "Connecting to United States #5847 (us5847.nordvpn.com) ..."
     const match = stdout.match(/\(([^)]+)\)/);
-    return match?.[1] ?? 'nordvpn-fastest';
+    return match?.[1] ?? `nordvpn-${group.toLowerCase()}`;
   },
-  expressvpn: async () => {
-    // ExpressVPN CLI: `expressvpn connect smart` picks the recommended server
+  expressvpn: async (serverType) => {
+    // ExpressVPN CLI: `expressvpn connect smart` always picks the recommended server.
+    // There's no server-type flag in the CLI — type is handled by the config file chosen.
+    const _ = serverType; // acknowledged — not used
     const { stdout } = await execAsync('expressvpn connect smart 2>&1', { timeout: 30_000 });
     const match = stdout.match(/Connected to (.+)/i);
     return match?.[1]?.trim() ?? 'expressvpn-smart';
   },
-  surfshark: async () => {
-    // Surfshark CLI (Linux): `surfshark-vpn attack` = fastest server
+  surfshark: async (serverType) => {
+    // Surfshark CLI (Linux): `surfshark-vpn attack` = fastest server.
+    // Obfuscated mode requires a different command.
+    const _ = serverType;
     const { stdout } = await execAsync('surfshark-vpn attack 2>&1', { timeout: 30_000 });
     const match = stdout.match(/Connected to (.+)/i);
     return match?.[1]?.trim() ?? 'surfshark-fastest';
@@ -118,9 +136,14 @@ interface MullvadRelay {
   ipv4_addr_in: string;
   active: boolean;
   type: string;   // 'wireguard' | 'openvpn' | 'bridge'
+  /** Mullvad doesn't expose a P2P flag — all relays allow P2P */
 }
 
-async function mullvadFastest(protocol: 'wireguard' | 'openvpn'): Promise<RankResult> {
+async function mullvadFastest(
+  protocol: 'wireguard' | 'openvpn',
+  _serverType: VPNServerType,
+): Promise<RankResult> {
+  // Mullvad: all relays support P2P. Obfuscated/double/tor not available via config-file flow.
   try {
     const res = await fetch('https://api.mullvad.net/www/relays/all/', {
       signal: AbortSignal.timeout(8_000),
@@ -145,7 +168,6 @@ async function mullvadFastest(protocol: 'wireguard' | 'openvpn'): Promise<RankRe
       return { strategy: 'manual', reason: 'All Mullvad servers unreachable from this host' };
     }
 
-    // Map IP back to hostname
     const winner = relays.find(r => r.ipv4_addr_in === ranked[0].host);
     return {
       strategy: 'api',
@@ -163,13 +185,19 @@ interface ProtonServer {
   Name: string;
   Domain: string;
   Score: number;
-  Features: number;  // bitmask: 4 = P2P, 2 = Secure Core, 1 = Tor
+  Features: number;  // bitmask: 4 = P2P, 2 = Secure Core (double-hop), 1 = Tor, 8 = Streaming
   Status: number;    // 1 = online
 }
 
-const PROTON_P2P_FLAG = 4;
+const PROTON_FEATURE: Record<VPNServerType, number> = {
+  p2p:        4,
+  standard:   0,   // no special feature — just online servers
+  obfuscated: 0,   // ProtonVPN doesn't expose obfuscation as a server feature flag
+  double:     2,   // Secure Core = double-hop
+  tor:        1,
+};
 
-async function protonFastest(): Promise<RankResult> {
+async function protonFastest(serverType: VPNServerType): Promise<RankResult> {
   try {
     const res = await fetch('https://api.protonvpn.ch/vpn/logicals', {
       signal: AbortSignal.timeout(8_000),
@@ -178,13 +206,22 @@ async function protonFastest(): Promise<RankResult> {
     if (!res.ok) throw new Error(`ProtonVPN API ${res.status}`);
     const data = await res.json() as { LogicalServers: ProtonServer[] };
 
+    const featureFlag = PROTON_FEATURE[serverType];
     const candidates = (data.LogicalServers ?? [])
-      .filter(s => s.Status === 1 && (s.Features & PROTON_P2P_FLAG) !== 0)
+      .filter(s => {
+        if (s.Status !== 1) return false;
+        if (featureFlag === 0) return true; // standard — any online server
+        return (s.Features & featureFlag) !== 0;
+      })
       .sort((a, b) => a.Score - b.Score)
       .slice(0, MAX_SERVERS);
 
     if (candidates.length === 0) {
-      return { strategy: 'manual', reason: 'No online ProtonVPN P2P servers found' };
+      // Fall back to any online server if the requested type has none
+      return {
+        strategy: 'manual',
+        reason: `No online ProtonVPN ${serverType} servers found — try 'standard' or 'p2p'`,
+      };
     }
 
     // TCP-ping the top candidates on port 51820 (WireGuard)
@@ -240,12 +277,13 @@ async function pingBasedFastest(servers: string[]): Promise<RankResult> {
  */
 export async function pickFastestServer(config: VPNConfig): Promise<RankResult> {
   const { provider, protocol } = config;
+  const serverType: VPNServerType = config.serverType ?? 'p2p';
 
   // ── CLI providers — let the CLI decide ──────────────────────────────────
   const cliFn = CLI_FASTEST[provider];
   if (cliFn) {
     try {
-      const server = await cliFn();
+      const server = await cliFn(serverType);
       return { strategy: 'cli', server };
     } catch (err) {
       return { strategy: 'error', reason: `CLI fastest failed: ${String(err)}` };
@@ -254,12 +292,12 @@ export async function pickFastestServer(config: VPNConfig): Promise<RankResult> 
 
   // ── Mullvad ──────────────────────────────────────────────────────────────
   if (provider === 'mullvad') {
-    return mullvadFastest(protocol === 'wireguard' ? 'wireguard' : 'openvpn');
+    return mullvadFastest(protocol === 'wireguard' ? 'wireguard' : 'openvpn', serverType);
   }
 
   // ── ProtonVPN ────────────────────────────────────────────────────────────
   if (provider === 'protonvpn') {
-    return protonFastest();
+    return protonFastest(serverType);
   }
 
   // ── OpenVPN credential providers with known server list ──────────────────

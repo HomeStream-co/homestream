@@ -8,7 +8,7 @@
 import type { Request, Response } from 'express';
 import { readConfig, writeConfig } from '../../configStore.js';
 import { connectVPN, disconnectVPN, testVPNConfig } from '../../vpnService.js';
-import type { VPNConfig, VPNProtocol, VPNProviderType } from '../../vpnService.js';
+import type { VPNConfig, VPNProtocol, VPNProviderType, VPNServerType } from '../../vpnService.js';
 import { requireAuth } from '../../authMiddleware.js';
 
 export default async function handler(req: Request, res: Response) {
@@ -23,6 +23,7 @@ export default async function handler(req: Request, res: Response) {
       password?: string;
       autoConnect?: boolean;
       autoFastest?: boolean;
+      serverType?: VPNServerType;
       knownServers?: string[];
       enabled?: boolean;
     };
@@ -45,6 +46,7 @@ export default async function handler(req: Request, res: Response) {
         password: payload.password !== undefined ? payload.password : existing.password,
         autoConnect: payload.autoConnect ?? existing.autoConnect ?? false,
         autoFastest: payload.autoFastest ?? existing.autoFastest ?? true,
+        serverType: payload.serverType ?? existing.serverType ?? 'p2p',
         knownServers: payload.knownServers !== undefined
           ? payload.knownServers
           : existing.knownServers,
