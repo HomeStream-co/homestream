@@ -23,7 +23,7 @@ jobs:
         run: npm run build
 
       - name: Package installer
-        run: npx electron-builder --win --config electron/electron-builder.yml --publish always
+        run: npx electron-builder --win -c electron/electron-builder.yml --publish always
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
           HOMESTREAM_GH_OWNER: ${{ secrets.GH_OWNER }}
