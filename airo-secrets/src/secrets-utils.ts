@@ -1,122 +1,119 @@
-import { readFileSync, existsSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 /**
- * Secret stored in config.json (cloud format)
+ * Secret stored in config.json
  */
 interface StoredSecret {
   VALUE: string | object;
   SYSTEM_MANAGED: boolean;
 }
 
+/**
+ * Config storage structure
+ */
 interface ConfigStorage {
-  [key: string]: StoredSecret | unknown;
+  [key: string]: StoredSecret | any;
 }
 
-const CONFIG_PATH = '/alloc/config.json';
-
+/**
+ * Read and parse the task-local config.json file.
+ *
+ * @returns Parsed config object
+ * @throws Error if file cannot be read or parsed
+ */
 function readConfig(): ConfigStorage {
+  const configPath = join(process.env.NOMAD_TASK_DIR || '/local', 'config.json');
   try {
-    const content = readFileSync(CONFIG_PATH, 'utf8');
+    const content = readFileSync(configPath, 'utf8');
     return JSON.parse(content);
-  } catch {
-    return {};
+  } catch (error) {
+    throw new Error(`Failed to read config from ${configPath}: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
 
-function isNonSystemManagedSecret(value: unknown): value is StoredSecret {
+/**
+ * Check if a config entry is a valid non-system-managed secret
+ *
+ * @param value - Config entry to check
+ * @returns True if entry is a non-system-managed secret
+ */
+function isNonSystemManagedSecret(value: any): value is StoredSecret {
   return (
     value !== null &&
     typeof value === 'object' &&
-    'VALUE' in (value as object) &&
-    'SYSTEM_MANAGED' in (value as object) &&
-    (value as StoredSecret).SYSTEM_MANAGED === false
+    'VALUE' in value &&
+    'SYSTEM_MANAGED' in value &&
+    value.SYSTEM_MANAGED === false
   );
 }
 
 /**
- * Load .env file from the project root into process.env (local installs only).
- * This runs once on first call and is a no-op in cloud environments where
- * /alloc/config.json exists.
- */
-let dotenvLoaded = false;
-function loadDotenv() {
-  if (dotenvLoaded) return;
-  dotenvLoaded = true;
-  if (existsSync(CONFIG_PATH)) return; // cloud env — skip
-  // Walk up from this file to find the project root .env
-  const candidates = [
-    resolve(process.cwd(), '.env'),
-    resolve(process.cwd(), '..', '.env'),
-  ];
-  for (const envPath of candidates) {
-    if (!existsSync(envPath)) continue;
-    try {
-      const lines = readFileSync(envPath, 'utf8').split('\n');
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (!trimmed || trimmed.startsWith('#')) continue;
-        const eqIdx = trimmed.indexOf('=');
-        if (eqIdx === -1) continue;
-        const key = trimmed.slice(0, eqIdx).trim();
-        const val = trimmed.slice(eqIdx + 1).trim().replace(/^["']|["']$/g, '');
-        if (key && !(key in process.env)) {
-          process.env[key] = val;
-        }
-      }
-    } catch { /* ignore parse errors */ }
-    break;
-  }
-}
-
-/**
- * Get a secret by name.
+ * Get a non-system-managed secret value by name
  *
- * Resolution order:
- *  1. Cloud: /alloc/config.json (Airo platform)
- *  2. Local: process.env (populated from .env file on first call)
+ * Fetches a secret from config.json if it exists and is not system-managed.
  *
- * This means the same codebase works both in the cloud builder and
- * as a self-hosted local install with a .env file.
+ * @param secretName - Name of the secret to retrieve
+ * @returns Secret value (string or object) if found and non-system-managed, null otherwise
+ *
+ * @example
+ * ```typescript
+ * const apiKey = getSecret('OPENAI_API_KEY');
+ * if (apiKey) {
+ *   console.log('API Key:', apiKey);
+ * }
+ * ```
  */
 export function getSecret(secretName: string): string | object | null {
-  // 1. Try cloud config
-  const config = readConfig();
-  if (secretName in config) {
+  try {
+    const config = readConfig();
+
+    if (!(secretName in config)) {
+      return null;
+    }
+
     const entry = config[secretName];
-    if (isNonSystemManagedSecret(entry)) return entry.VALUE;
+
+    if (!isNonSystemManagedSecret(entry)) {
+      return null;
+    }
+
+    return entry.VALUE;
+  } catch (error) {
+    console.error(`Failed to get secret '${secretName}':`, error);
+    return null;
   }
-
-  // 2. Fall back to process.env / .env file
-  loadDotenv();
-  const envVal = process.env[secretName];
-  if (envVal !== undefined && envVal !== '') return envVal;
-
-  return null;
 }
 
 /**
- * List all available secret names (cloud + local env).
+ * List all non-system-managed secret names
+ *
+ * Returns an array of secret names from config.json that are marked as
+ * non-system-managed (SYSTEM_MANAGED: false).
+ *
+ * @returns Array of non-system-managed secret names
+ *
+ * @example
+ * ```typescript
+ * const secretNames = listSecretNames();
+ * console.log('Available secrets:', secretNames);
+ * // Output: ['OPENAI_API_KEY', 'STRIPE_SECRET_KEY', 'DATABASE_URL']
+ * ```
  */
 export function listSecretNames(): string[] {
-  loadDotenv();
-  const names = new Set<string>();
-
-  // Cloud secrets
   try {
     const config = readConfig();
+    const secretNames: string[] = [];
+
     for (const [key, value] of Object.entries(config)) {
-      if (isNonSystemManagedSecret(value)) names.add(key);
+      if (isNonSystemManagedSecret(value)) {
+        secretNames.push(key);
+      }
     }
-  } catch { /* ignore */ }
 
-  // Common env keys that are likely secrets (not system vars)
-  const systemPrefixes = ['npm_', 'NODE_', 'PATH', 'HOME', 'USER', 'SHELL', 'PWD', 'TERM'];
-  for (const key of Object.keys(process.env)) {
-    if (!systemPrefixes.some(p => key.startsWith(p))) {
-      names.add(key);
-    }
+    return secretNames.sort();
+  } catch (error) {
+    console.error('Failed to list secret names:', error);
+    return [];
   }
-
-  return [...names].sort();
 }
