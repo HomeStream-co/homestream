@@ -30,6 +30,8 @@ export interface RemoteHandlers {
   /** track = -1 means off */
   onSubtitle?: (track: number) => void;
   onCast?: () => void;
+  /** Launch a specific media item — navigate to its player page */
+  onLaunch?: (mediaId: string) => void;
 }
 
 export interface PlayerStatePayload {
@@ -84,7 +86,7 @@ export function useRemoteControl(
 
       ws.onmessage = (e) => {
         try {
-          const msg = JSON.parse(e.data) as { type: string; position?: number; level?: number; seconds?: number; rate?: number; track?: number };
+          const msg = JSON.parse(e.data) as { type: string; position?: number; level?: number; seconds?: number; rate?: number; track?: number; mediaId?: string };
           const h = handlersRef.current;
           switch (msg.type) {
             case 'play':         h.onPlay?.(); break;
@@ -99,6 +101,7 @@ export function useRemoteControl(
             case 'speed':        h.onSpeed?.(msg.rate ?? 1); break;
             case 'subtitle':     h.onSubtitle?.(msg.track ?? -1); break;
             case 'cast':         h.onCast?.(); break;
+            case 'launch':       h.onLaunch?.(msg.mediaId ?? ''); break;
           }
         } catch { /* ignore */ }
       };

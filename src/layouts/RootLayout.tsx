@@ -12,6 +12,7 @@ import { ProfileProvider, useProfile } from '@/context/ProfileContext';
 import { ThemeProvider } from '@/context/ThemeContext';
 import { TMDBProvider } from '@/context/TMDBContext';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
+import { useGlobalRemoteLaunch } from '@/hooks/useGlobalRemoteLaunch';
 
 interface RootLayoutProps {
   children: ReactElement;
@@ -56,6 +57,9 @@ export default function RootLayout({ children }: RootLayoutProps) {
   const location = useLocation();
   const isPlayer = location.pathname.startsWith('/player/');
   const isProfiles = location.pathname === '/profiles';
+
+  // Global listener: phone Browse tab sends 'launch' → navigate TV to player
+  useGlobalRemoteLaunch();
 
   return (
     <ProfileProvider>
