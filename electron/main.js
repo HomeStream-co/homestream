@@ -1,0 +1,1006 @@
+/**
+ * HomeStream Electron Main Process
+ *
+ * Wraps the HomeStream Express server + React frontend in a native desktop app.
+ * No auto-updater — users download new versions manually.
+ *
+ * Architecture:
+ *  - Shows a control panel window: server status, LAN IP, log viewer, start/stop
+ *  - Spawns the HomeStream server (dist/server.bundle.mjs) as a child process
+ *  - System tray icon with quick-access menu
+ *  - "Open HomeStream" button launches the browser UI at http://localhost:3000 (or next free port)
+ *
+ * Supported platforms: Windows (.exe), macOS (.dmg), Linux (.AppImage)
+ */
+
+const { app, BrowserWindow, Tray, Menu, shell, nativeImage, ipcMain } = require('electron');
+const path = require('path');
+const { spawn } = require('child_process');
+const http = require('http');
+const os = require('os');
+const fs = require('fs');
+const { setupAutoUpdater, teardown: teardownUpdater } = require('./updater');
+
+// ── Electron-side crash logger ────────────────────────────────────────────────
+// Captures crashes in the Electron main process itself (not the server child).
+// Writes to the same crash-log.json the server uses so everything is in one place.
+
+function getElectronCrashLogPath() {
+  // Try persistent storage first (same as server), fall back to userData
+  const persistent = '/shared-storage/public/assets/crash-log.json';
+  try {
+    if (fs.existsSync(path.dirname(persistent))) return persistent;
+  } catch { /* ignore */ }
+  return path.join(app.getPath('userData'), 'crash-log.json');
+}
+
+function logElectronCrash(type, err) {
+  try {
+    const logPath = getElectronCrashLogPath();
+    let entries = [];
+    try { entries = JSON.parse(fs.readFileSync(logPath, 'utf-8')); } catch { /* empty */ }
+    const entry = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      timestamp: new Date().toISOString(),
+      type,
+      message: err?.message ?? String(err),
+      stack: err?.stack,
+      context: 'Electron main process',
+      nodeVersion: process.version,
+      platform: `${os.platform()} ${os.arch()} (${os.release()})`,
+      uptime: Math.floor(process.uptime()),
+    };
+    const updated = [entry, ...entries].slice(0, 100);
+    const dir = path.dirname(logPath);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(logPath, JSON.stringify(updated, null, 2));
+  } catch (writeErr) {
+    process.stderr.write(`[electron-crash] Failed to write log: ${writeErr}\n`);
+  }
+}
+
+process.on('uncaughtException', (err) => {
+  logElectronCrash('uncaughtException', err);
+  process.stderr.write(`[Electron CRASH] uncaughtException: ${err?.stack ?? err}\n`);
+});
+
+process.on('unhandledRejection', (reason) => {
+  logElectronCrash('unhandledRejection', reason instanceof Error ? reason : new Error(String(reason)));
+  process.stderr.write(`[Electron CRASH] unhandledRejection: ${reason}\n`);
+});
+// ffmpeg-static ships a pre-built binary for the current platform.
+// In a packaged Electron app, node_modules is NOT included — the binary is
+// copied into resources/ffmpeg/ via extraResources in electron-builder.yml.
+// In dev mode we fall back to the node_modules copy directly.
+function getFfmpegPath() {
+  if (app.isPackaged) {
+    // Packaged: binary is in resources/ffmpeg/ffmpeg (or ffmpeg.exe on Windows)
+    const base = path.join(process.resourcesPath, 'ffmpeg', 'ffmpeg');
+    const win  = base + '.exe';
+    if (fs.existsSync(win))  return win;
+    if (fs.existsSync(base)) return base;
+    // Shouldn't happen — log and fall back to system PATH
+    pushLog('WARNING: Bundled ffmpeg not found in resources — falling back to system ffmpeg', 'warn');
+    return 'ffmpeg';
+  }
+  // Dev mode: use ffmpeg-static from node_modules
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const p = require('ffmpeg-static');
+    if (p && fs.existsSync(p)) return p;
+  } catch { /* not installed */ }
+  return 'ffmpeg';
+}
+
+// ── Config ────────────────────────────────────────────────────────────────────
+
+const PREFERRED_PORT = 3000;
+const PORT_SCAN_MAX  = 3099;   // try 3000–3099 before giving up
+const SERVER_READY_TIMEOUT = 30_000;
+const MAX_LOG_LINES = 200;
+
+let controlWindow = null;
+let tray = null;
+let serverProcess = null;
+let serverRunning = false;
+let logBuffer = [];
+// Resolved at startup — may differ from PREFERRED_PORT if 3000 is taken
+let activePort = PREFERRED_PORT;
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function getLanIp() {
+  const interfaces = os.networkInterfaces();
+  for (const iface of Object.values(interfaces)) {
+    if (!iface) continue;
+    for (const addr of iface) {
+      if (addr.family === 'IPv4' && !addr.internal) return addr.address;
+    }
+  }
+  return '127.0.0.1';
+}
+
+function pushLog(line, level = 'info') {
+  const entry = { time: new Date().toLocaleTimeString(), line, level };
+  logBuffer.push(entry);
+  if (logBuffer.length > MAX_LOG_LINES) logBuffer.shift();
+  controlWindow?.webContents.send('log', entry);
+}
+
+// ── Port availability check ───────────────────────────────────────────────────
+// Returns true if the port is free, false if already in use.
+function isPortFree(port) {
+  return new Promise(resolve => {
+    const server = require('net').createServer();
+    server.once('error', () => resolve(false));
+    server.once('listening', () => { server.close(); resolve(true); });
+    server.listen(port, '127.0.0.1');
+  });
+}
+
+// Scans ports from `start` up to `max` and resolves with the first free one.
+// Rejects if every port in the range is occupied.
+async function findFreePort(start = PREFERRED_PORT, max = PORT_SCAN_MAX) {
+  for (let port = start; port <= max; port++) {
+    if (await isPortFree(port)) return port;
+  }
+  throw new Error(`No free port found in range ${start}–${max}. Close some applications and try again.`);
+}
+
+// ── Server management ─────────────────────────────────────────────────────────
+
+async function startServer() {
+  if (serverProcess) return;
+
+  // In packaged app: server bundle is in resources/server/server.bundle.mjs
+  // In dev: use the Vite dev server instead
+  const isDev = !app.isPackaged;
+  if (isDev) {
+    pushLog('Development mode — use npm run dev to start the server', 'warn');
+    serverRunning = true;
+    sendStatus();
+    return;
+  }
+
+  // Find a free port, starting at the preferred port (3000).
+  // If 3000 is taken, we silently try 3001, 3002, … up to 3099.
+  let port;
+  try {
+    port = await findFreePort(PREFERRED_PORT, PORT_SCAN_MAX);
+  } catch (err) {
+    pushLog(`ERROR: ${err.message}`, 'error');
+    serverRunning = false;
+    sendStatus();
+    return;
+  }
+
+  if (port !== PREFERRED_PORT) {
+    pushLog(`Port ${PREFERRED_PORT} is in use — using port ${port} instead`, 'warn');
+  }
+
+  activePort = port;
+
+  const serverPath = path.join(process.resourcesPath, 'server', 'server.bundle.mjs');
+  pushLog(`Starting server on port ${activePort}: ${serverPath}`);
+
+  serverProcess = spawn(process.execPath, [serverPath], {
+    env: {
+      ...process.env,
+      PORT: String(activePort),
+      NODE_ENV: 'production',
+      ELECTRON: '1',
+      // Tell all server stores where to write data files.
+      // app.getPath('userData') resolves to the OS user-data folder:
+      //   Windows: %APPDATA%\HomeStream
+      //   macOS:   ~/Library/Application Support/HomeStream
+      //   Linux:   ~/.config/HomeStream
+      HOMESTREAM_DATA: app.getPath('userData'),
+      // Inject the bundled ffmpeg path so the server uses it automatically.
+      // This means users do NOT need to install FFmpeg manually.
+      FFMPEG_PATH: getFfmpegPath() ?? 'ffmpeg',
+      // Inject platform info so the setup wizard can suggest the right default
+      // media directory for the user's OS (Windows vs macOS vs Linux).
+      HOMESTREAM_PLATFORM: process.platform,
+      HOMESTREAM_DEFAULT_MEDIA_DIR: (() => {
+        const videos = app.getPath('videos');
+        return path.join(videos, 'HomeStream');
+      })(),
+    },
+    stdio: 'pipe',
+  });
+
+  serverProcess.stdout?.on('data', d => {
+    d.toString().split('\n').filter(Boolean).forEach(line => pushLog(line, 'info'));
+  });
+  serverProcess.stderr?.on('data', d => {
+    d.toString().split('\n').filter(Boolean).forEach(line => pushLog(line, 'error'));
+  });
+  serverProcess.on('exit', code => {
+    pushLog(`Server exited with code ${code}`, code === 0 ? 'info' : 'error');
+    serverProcess = null;
+    serverRunning = false;
+    sendStatus();
+  });
+
+  waitForServer(activePort).then(() => {
+    serverRunning = true;
+    pushLog(`Server ready at http://localhost:${activePort}`, 'success');
+    pushLog(`LAN address: http://${getLanIp()}:${activePort}`, 'success');
+    sendStatus();
+
+    // On first run (no config file yet) automatically open the setup wizard
+    // so the user doesn't have to figure out what to do next.
+    // Use the same userData path that the server stores data in.
+    const configPath = path.join(app.getPath('userData'), 'homestream-config.json');
+    const isFirstRun = !fs.existsSync(configPath);
+    const startPage = isFirstRun ? '/setup' : '/';
+    shell.openExternal(`http://localhost:${activePort}${startPage}`);
+    if (isFirstRun) pushLog('First run detected — opening setup wizard in browser', 'info');
+  }).catch(err => {
+    pushLog(`Server failed to start: ${err.message}`, 'error');
+    serverRunning = false;
+    sendStatus();
+  });
+}
+
+function stopServer() {
+  if (!serverProcess) return;
+  pushLog('Stopping server…', 'warn');
+  // On Windows, SIGTERM is mapped to an immediate kill (no graceful shutdown).
+  // We send a graceful shutdown request via HTTP first, then kill after a timeout.
+  // This gives the server a chance to clean up HLS temp segments.
+  const proc = serverProcess;
+  const port = activePort;
+  serverProcess = null;
+  serverRunning = false;
+  sendStatus();
+
+  // Try graceful HTTP shutdown first (server listens for this)
+  const gracefulReq = http.get(`http://localhost:${port}/api/shutdown`, () => {
+    // Server acknowledged — give it 3 seconds to clean up then kill
+    setTimeout(() => { try { proc.kill(); } catch { /* already dead */ } }, 3000);
+  });
+  gracefulReq.setTimeout(1000, () => {
+    gracefulReq.destroy();
+    // No response — kill immediately
+    try { proc.kill(); } catch { /* already dead */ }
+  });
+  gracefulReq.on('error', () => {
+    // Server not responding — kill immediately
+    try { proc.kill(); } catch { /* already dead */ }
+  });
+}
+
+function waitForServer(port, timeout = SERVER_READY_TIMEOUT) {
+  return new Promise((resolve, reject) => {
+    const start = Date.now();
+    const check = () => {
+      // /api/health is intentionally open (no auth required) — safe to poll here
+      const req = http.get(`http://localhost:${port}/api/health`, res => {
+        if (res.statusCode === 200) resolve(true);
+        else retry();
+        // Consume response body so the socket is released
+        res.resume();
+      });
+      // Per-request timeout: if the server accepts the connection but hangs,
+      // destroy the socket after 2 seconds so we retry rather than freezing.
+      req.setTimeout(2000, () => {
+        req.destroy();
+        retry();
+      });
+      req.on('error', retry);
+    };
+    const retry = () => {
+      if (Date.now() - start > timeout) return reject(new Error(`Server startup timeout after ${timeout / 1000}s — port ${port} may be in use by another app`));
+      setTimeout(check, 500);
+    };
+    check();
+  });
+}
+
+function sendStatus() {
+  const lanIp = getLanIp();
+  controlWindow?.webContents.send('status', {
+    running: serverRunning,
+    lanUrl: `http://${lanIp}:${activePort}`,
+    localUrl: `http://localhost:${activePort}`,
+    lanIp,
+    port: activePort,
+  });
+}
+
+// ── Control Panel Window ──────────────────────────────────────────────────────
+
+function createControlWindow() {
+  controlWindow = new BrowserWindow({
+    width: 680,
+    height: 560,
+    minWidth: 560,
+    minHeight: 460,
+    backgroundColor: '#0a0a0a',
+    title: 'HomeStream — Control Panel',
+    titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      preload: path.join(__dirname, 'preload.js'),
+    },
+    resizable: true,
+    show: false,
+  });
+
+  // Load the inline control panel HTML
+  controlWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(CONTROL_PANEL_HTML)}`);
+
+  controlWindow.once('ready-to-show', () => {
+    controlWindow.show();
+    sendStatus();
+    // Send buffered logs
+    logBuffer.forEach(entry => controlWindow.webContents.send('log', entry));
+  });
+
+  controlWindow.on('close', (e) => {
+    // Minimize to tray instead of closing
+    e.preventDefault();
+    controlWindow.hide();
+  });
+}
+
+// ── Tray ──────────────────────────────────────────────────────────────────────
+
+function createTray() {
+  // Generate a simple programmatic tray icon if no file exists
+  const iconPath = path.join(__dirname, 'tray-icon.png');
+  let icon;
+  try {
+    icon = nativeImage.createFromPath(iconPath);
+    if (icon.isEmpty()) throw new Error('empty');
+  } catch {
+    // Fallback: create a simple 16×16 colored square as the tray icon
+    icon = nativeImage.createFromDataURL(TRAY_ICON_DATA_URL);
+  }
+
+  tray = new Tray(icon);
+  tray.setToolTip('HomeStream');
+
+  const updateMenu = () => {
+    const menu = Menu.buildFromTemplate([
+      { label: 'HomeStream Control Panel', enabled: false },
+      { type: 'separator' },
+      {
+        label: 'Open Control Panel',
+        click: () => { controlWindow?.show(); controlWindow?.focus(); },
+      },
+      {
+        label: `Open in Browser (http://localhost:${activePort})`,
+        click: () => shell.openExternal(`http://localhost:${activePort}`),
+        enabled: serverRunning,
+      },
+      { type: 'separator' },
+      {
+        label: serverRunning ? 'Stop Server' : 'Start Server',
+        click: () => serverRunning ? stopServer() : startServer(),
+      },
+      { type: 'separator' },
+      { label: 'Quit HomeStream', click: () => { app.isQuitting = true; app.quit(); } },
+    ]);
+    tray.setContextMenu(menu);
+  };
+
+  updateMenu();
+  tray.on('double-click', () => { controlWindow?.show(); controlWindow?.focus(); });
+
+  // Update tray menu when server state changes
+  ipcMain.on('request-status', () => sendStatus());
+
+  return updateMenu;
+}
+
+// ── IPC handlers ──────────────────────────────────────────────────────────────
+
+ipcMain.on('start-server',      () => startServer().catch(err => pushLog(`Start failed: ${err.message}`, 'error')));
+ipcMain.on('stop-server',       () => stopServer());
+ipcMain.on('open-browser',      () => shell.openExternal(`http://localhost:${activePort}`));
+ipcMain.on('open-browser-lan',  (_, url)  => shell.openExternal(url));
+ipcMain.on('open-browser-page', (_, page) => shell.openExternal(`http://localhost:${activePort}${page}`));
+ipcMain.on('request-status',    () => sendStatus());
+
+// ── App lifecycle ─────────────────────────────────────────────────────────────
+
+app.whenReady().then(async () => {
+  createControlWindow();
+  createTray();
+  await startServer();
+
+  // Set up auto-updater after window exists so it can send IPC events to it.
+  // Passes a getter (not the window directly) so it always uses the current
+  // window reference even if the window is recreated.
+  setupAutoUpdater({
+    controlWindowGetter: () => controlWindow,
+    pushLog,
+  });
+});
+
+app.on('window-all-closed', () => {
+  // Keep running in tray — don't quit
+});
+
+app.on('activate', () => {
+  controlWindow?.show();
+});
+
+app.on('before-quit', () => {
+  app.isQuitting = true;
+  teardownUpdater();
+  stopServer();
+});
+
+// ── Control Panel HTML ────────────────────────────────────────────────────────
+// Self-contained HTML/CSS/JS for the control panel window.
+// Uses IPC via the preload script to communicate with the main process.
+
+const CONTROL_PANEL_HTML = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HomeStream Control Panel</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #0a0a0a;
+    color: #e5e5e5;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    user-select: none;
+  }
+  .header {
+    padding: 16px 20px 14px;
+    border-bottom: 1px solid #1f1f1f;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    -webkit-app-region: drag;
+    flex-shrink: 0;
+  }
+  .logo { font-size: 1.25rem; font-weight: 700; letter-spacing: 2px; color: #fff; }
+  .logo span { color: #7c3aed; }
+  .subtitle { font-size: 0.65rem; color: #555; letter-spacing: 1px; text-transform: uppercase; margin-top: 2px; }
+  .version-badge {
+    font-size: 0.65rem; color: #444; background: #141414;
+    border: 1px solid #222; border-radius: 4px; padding: 2px 7px;
+    -webkit-app-region: no-drag;
+    cursor: pointer; transition: border-color 0.2s, color 0.2s;
+  }
+  .version-badge:hover { border-color: #444; color: #888; }
+
+  /* ── Status row ── */
+  .status-bar {
+    padding: 12px 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border-bottom: 1px solid #1f1f1f;
+    flex-wrap: wrap;
+    flex-shrink: 0;
+  }
+  .status-dot {
+    width: 9px; height: 9px; border-radius: 50%;
+    background: #ef4444; flex-shrink: 0;
+    transition: background 0.3s;
+  }
+  .status-dot.running { background: #22c55e; box-shadow: 0 0 8px #22c55e88; animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.6; } }
+  .status-text { font-size: 0.82rem; color: #aaa; flex: 1; min-width: 120px; }
+  .status-text strong { color: #fff; }
+  .url-chip {
+    background: #111; border: 1px solid #2a2a2a; border-radius: 6px;
+    padding: 3px 9px; font-size: 0.72rem; color: #7c3aed;
+    cursor: pointer; transition: border-color 0.2s;
+    -webkit-app-region: no-drag;
+    white-space: nowrap;
+  }
+  .url-chip:hover { border-color: #7c3aed; color: #9d5cf6; }
+
+  /* ── Access panel (QR + addresses) ── */
+  .access-panel {
+    padding: 14px 20px;
+    border-bottom: 1px solid #1f1f1f;
+    display: none;
+    gap: 16px;
+    align-items: flex-start;
+    flex-shrink: 0;
+  }
+  .access-panel.visible { display: flex; }
+  .qr-wrap {
+    background: #fff;
+    border-radius: 8px;
+    padding: 6px;
+    flex-shrink: 0;
+    width: 80px; height: 80px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+  }
+  .qr-wrap img { width: 68px; height: 68px; display: block; }
+  .qr-wrap .qr-placeholder {
+    width: 68px; height: 68px;
+    background: repeating-linear-gradient(
+      45deg, #ddd 0, #ddd 2px, #fff 2px, #fff 8px
+    );
+    border-radius: 4px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.55rem; color: #999; text-align: center; padding: 4px;
+  }
+  .access-info { flex: 1; min-width: 0; }
+  .access-row {
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 8px;
+  }
+  .access-label {
+    font-size: 0.62rem; color: #555; text-transform: uppercase;
+    letter-spacing: 0.8px; width: 52px; flex-shrink: 0;
+  }
+  .access-url {
+    font-size: 0.75rem; color: #7c3aed; cursor: pointer;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    flex: 1;
+  }
+  .access-url:hover { color: #9d5cf6; text-decoration: underline; }
+  .copy-btn {
+    background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 4px;
+    color: #666; font-size: 0.6rem; padding: 2px 6px; cursor: pointer;
+    flex-shrink: 0; -webkit-app-region: no-drag;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .copy-btn:hover { color: #aaa; border-color: #444; }
+  .copy-btn.copied { color: #22c55e; border-color: #22c55e44; }
+  .qr-hint {
+    font-size: 0.62rem; color: #444; margin-top: 4px; line-height: 1.5;
+  }
+
+  /* ── First-run banner ── */
+  .first-run-banner {
+    margin: 0 20px 0;
+    background: linear-gradient(135deg, #1a0f2e, #0f1a2e);
+    border: 1px solid #3b2a6e;
+    border-radius: 8px;
+    padding: 12px 14px;
+    display: none;
+    flex-shrink: 0;
+  }
+  .first-run-banner.visible { display: block; }
+  .first-run-title {
+    font-size: 0.78rem; font-weight: 600; color: #a78bfa;
+    margin-bottom: 6px; display: flex; align-items: center; gap: 6px;
+  }
+  .first-run-steps {
+    font-size: 0.7rem; color: #8888aa; line-height: 1.8;
+    list-style: none;
+  }
+  .first-run-steps li::before { content: "→ "; color: #7c3aed; }
+
+  /* ── Action buttons ── */
+  .actions {
+    padding: 12px 20px;
+    display: flex;
+    gap: 8px;
+    border-bottom: 1px solid #1f1f1f;
+    flex-wrap: wrap;
+    flex-shrink: 0;
+  }
+  button {
+    padding: 7px 16px; border-radius: 7px; border: none;
+    font-size: 0.8rem; font-weight: 600; cursor: pointer;
+    transition: opacity 0.15s, transform 0.1s;
+    -webkit-app-region: no-drag;
+  }
+  button:active { transform: scale(0.97); }
+  button:disabled { opacity: 0.35; cursor: not-allowed; }
+  .btn-primary { background: #7c3aed; color: #fff; }
+  .btn-primary:hover:not(:disabled) { background: #6d28d9; }
+  .btn-secondary { background: #1a1a1a; color: #e5e5e5; border: 1px solid #2a2a2a; }
+  .btn-secondary:hover:not(:disabled) { background: #242424; }
+  .btn-danger { background: #1a1a1a; color: #ef4444; border: 1px solid #3f1f1f; }
+  .btn-danger:hover:not(:disabled) { background: #2a1010; }
+
+  /* ── Log ── */
+  .log-section { flex: 1; display: flex; flex-direction: column; overflow: hidden; padding: 0 20px 14px; min-height: 0; }
+  .log-label {
+    font-size: 0.62rem; color: #444; text-transform: uppercase; letter-spacing: 1px;
+    padding: 10px 0 6px; display: flex; align-items: center; justify-content: space-between;
+    flex-shrink: 0;
+  }
+  .log-clear { cursor: pointer; color: #333; font-size: 0.62rem; }
+  .log-clear:hover { color: #777; }
+  .log-box {
+    flex: 1; overflow-y: auto; background: #050505; border: 1px solid #181818;
+    border-radius: 7px; padding: 8px 10px; font-family: 'SF Mono', 'Cascadia Code', 'Fira Code', monospace;
+    font-size: 0.7rem; line-height: 1.65; min-height: 0;
+  }
+  .log-box::-webkit-scrollbar { width: 3px; }
+  .log-box::-webkit-scrollbar-track { background: transparent; }
+  .log-box::-webkit-scrollbar-thumb { background: #222; border-radius: 2px; }
+  .log-entry { display: flex; gap: 8px; }
+  .log-time { color: #333; flex-shrink: 0; }
+  .log-line.info { color: #888; }
+  .log-line.success { color: #22c55e; }
+  .log-line.warn { color: #f59e0b; }
+  .log-line.error { color: #ef4444; }
+  .empty-log { color: #2a2a2a; font-style: italic; }
+
+  /* ── Update panel ── */
+  .update-panel {
+    margin: 0 20px 0;
+    border-radius: 8px;
+    padding: 11px 14px;
+    display: none;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+  }
+  .update-panel.visible { display: flex; }
+  .update-panel.state-available {
+    background: linear-gradient(135deg, #0f1a2e, #0a1520);
+    border: 1px solid #1e4a7a;
+  }
+  .update-panel.state-downloading {
+    background: linear-gradient(135deg, #0f1a2e, #0a1520);
+    border: 1px solid #1e4a7a;
+  }
+  .update-panel.state-ready {
+    background: linear-gradient(135deg, #0f2e1a, #0a1510);
+    border: 1px solid #1e7a3a;
+  }
+  .update-panel.state-error {
+    background: linear-gradient(135deg, #2e0f0f, #1a0a0a);
+    border: 1px solid #7a1e1e;
+  }
+  .update-icon { font-size: 1.1rem; flex-shrink: 0; }
+  .update-body { flex: 1; min-width: 0; }
+  .update-title {
+    font-size: 0.78rem; font-weight: 600; margin-bottom: 3px;
+  }
+  .state-available  .update-title { color: #60a5fa; }
+  .state-downloading .update-title { color: #60a5fa; }
+  .state-ready      .update-title { color: #4ade80; }
+  .state-error      .update-title { color: #f87171; }
+  .update-sub { font-size: 0.68rem; color: #666; }
+  .update-progress {
+    height: 3px; background: #1a2a3a; border-radius: 2px;
+    margin-top: 6px; overflow: hidden;
+  }
+  .update-progress-bar {
+    height: 100%; background: #3b82f6; border-radius: 2px;
+    transition: width 0.3s ease;
+  }
+  .update-actions { display: flex; gap: 6px; flex-shrink: 0; }
+  .btn-update {
+    padding: 5px 12px; border-radius: 6px; border: none;
+    font-size: 0.72rem; font-weight: 600; cursor: pointer;
+    transition: opacity 0.15s; -webkit-app-region: no-drag;
+  }
+  .btn-update-primary { background: #3b82f6; color: #fff; }
+  .btn-update-primary:hover { background: #2563eb; }
+  .btn-update-success { background: #22c55e; color: #fff; }
+  .btn-update-success:hover { background: #16a34a; }
+  .btn-update-dismiss {
+    background: transparent; color: #444; border: 1px solid #222;
+  }
+  .btn-update-dismiss:hover { color: #888; border-color: #444; }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <div>
+    <div class="logo">HOME<span>STREAM</span></div>
+    <div class="subtitle">Control Panel</div>
+  </div>
+  <div class="version-badge" id="version-badge" onclick="checkForUpdate()" title="Click to check for updates">v${app.getVersion()}</div>
+</div>
+
+<!-- Status row -->
+<div class="status-bar">
+  <div class="status-dot" id="dot"></div>
+  <div class="status-text" id="status-text">Starting…</div>
+  <div class="url-chip" id="local-url" style="display:none" onclick="openBrowser()">localhost:3000</div>
+</div>
+
+<!-- Access panel: QR code + addresses (shown when running) -->
+<div class="access-panel" id="access-panel">
+  <div class="qr-wrap" id="qr-wrap" onclick="openLan()" title="Click to open on this PC">
+    <div class="qr-placeholder">Scan to open on phone</div>
+  </div>
+  <div class="access-info">
+    <div class="access-row">
+      <span class="access-label">This PC</span>
+      <span class="access-url" id="local-link" onclick="openBrowser()">http://localhost:3000</span>
+      <button class="copy-btn" onclick="copyUrl('local')">Copy</button>
+    </div>
+    <div class="access-row">
+      <span class="access-label">Network</span>
+      <span class="access-url" id="lan-link" onclick="openLan()">—</span>
+      <button class="copy-btn" onclick="copyUrl('lan')">Copy</button>
+    </div>
+    <div class="qr-hint">
+      📱 Scan QR with your phone to use as a remote control.<br>
+      Both devices must be on the same WiFi network.
+    </div>
+  </div>
+</div>
+
+<!-- First-run banner (shown on first launch) -->
+<div class="first-run-banner" id="first-run-banner">
+  <div class="first-run-title">🎬 Welcome to HomeStream!</div>
+  <ul class="first-run-steps">
+    <li>The setup wizard has opened in your browser</li>
+    <li>Follow the steps to point HomeStream at your media folder</li>
+    <li>Add your TMDB API key for movie/show artwork (free)</li>
+    <li>Come back here anytime — this window stays in your system tray</li>
+  </ul>
+</div>
+
+<!-- Update notification panel (hidden until an update event fires) -->
+<div class="update-panel" id="update-panel">
+  <div class="update-icon" id="update-icon">⬆️</div>
+  <div class="update-body">
+    <div class="update-title" id="update-title">Update available</div>
+    <div class="update-sub"  id="update-sub"></div>
+    <div class="update-progress" id="update-progress" style="display:none">
+      <div class="update-progress-bar" id="update-progress-bar" style="width:0%"></div>
+    </div>
+  </div>
+  <div class="update-actions" id="update-actions"></div>
+</div>
+
+<!-- Action buttons -->
+<div class="actions">
+  <button class="btn-primary" id="btn-open" disabled onclick="openBrowser()">Open HomeStream</button>
+  <button class="btn-secondary" id="btn-setup" disabled onclick="openSetup()">Setup Wizard</button>
+  <button class="btn-secondary" id="btn-stop" disabled onclick="toggleServer()">Stop Server</button>
+</div>
+
+<!-- Server log -->
+<div class="log-section">
+  <div class="log-label">
+    Server Log
+    <span class="log-clear" onclick="clearLog()">Clear</span>
+  </div>
+  <div class="log-box" id="log-box">
+    <div class="empty-log">Waiting for server…</div>
+  </div>
+</div>
+
+<script>
+  let isRunning = false;
+  let lanUrl = '';
+  let localUrl = '';
+  let currentPort = 3000;
+  let isFirstRun = false;
+  let qrLoaded = false;
+
+  function openBrowser()  { window.electronAPI?.openBrowser(); }
+  function openSetup()    { window.electronAPI?.openBrowserPage('/setup'); }
+  function openLan()      { if (lanUrl) window.electronAPI?.openBrowserLan(lanUrl); }
+
+  function toggleServer() {
+    if (isRunning) window.electronAPI?.stopServer();
+    else           window.electronAPI?.startServer();
+  }
+
+  function copyUrl(which) {
+    const url = which === 'lan' ? lanUrl : localUrl;
+    if (!url) return;
+    navigator.clipboard?.writeText(url).catch(() => {});
+    const btn = document.querySelector('.copy-btn[onclick="copyUrl(\\''+which+'\\')"]');
+    if (btn) {
+      btn.textContent = 'Copied!';
+      btn.classList.add('copied');
+      setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 1500);
+    }
+  }
+
+  function clearLog() {
+    const box = document.getElementById('log-box');
+    box.innerHTML = '<div class="empty-log">Log cleared</div>';
+  }
+
+  function appendLog(entry) {
+    const box = document.getElementById('log-box');
+    const empty = box.querySelector('.empty-log');
+    if (empty) empty.remove();
+    const div = document.createElement('div');
+    div.className = 'log-entry';
+    div.innerHTML =
+      '<span class="log-time">' + entry.time + '</span>' +
+      '<span class="log-line ' + entry.level + '">' + escHtml(entry.line) + '</span>';
+    box.appendChild(div);
+    box.scrollTop = box.scrollHeight;
+
+    // Detect first run from log message
+    if (entry.line && entry.line.includes('First run detected')) {
+      isFirstRun = true;
+      document.getElementById('first-run-banner').classList.add('visible');
+    }
+  }
+
+  function loadQrCode(networkUrl) {
+    if (qrLoaded || !networkUrl) return;
+    qrLoaded = true;
+    const wrap = document.getElementById('qr-wrap');
+    // Fetch QR from the server's built-in QR endpoint
+    const qrUrl = networkUrl + '/api/remote/qr?size=200';
+    const img = document.createElement('img');
+    img.src = qrUrl;
+    img.alt = 'QR code';
+    img.onerror = () => {
+      // QR endpoint needs auth — show a manual hint instead
+      wrap.innerHTML = '<div class="qr-placeholder">Open network URL on phone</div>';
+    };
+    img.onload = () => {
+      wrap.innerHTML = '';
+      wrap.appendChild(img);
+    };
+  }
+
+  function escHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  function updateStatus(status) {
+    isRunning = status.running;
+    lanUrl = status.lanUrl || '';
+    localUrl = status.localUrl || '';
+    currentPort = status.port || 3000;
+
+    const dot        = document.getElementById('dot');
+    const text       = document.getElementById('status-text');
+    const localChip  = document.getElementById('local-url');
+    const accessPanel = document.getElementById('access-panel');
+    const localLink  = document.getElementById('local-link');
+    const lanLink    = document.getElementById('lan-link');
+    const btnOpen    = document.getElementById('btn-open');
+    const btnSetup   = document.getElementById('btn-setup');
+    const btnStop    = document.getElementById('btn-stop');
+
+    dot.className = 'status-dot' + (isRunning ? ' running' : '');
+    text.innerHTML = isRunning
+      ? '<strong>Running</strong> — ready to stream'
+      : '<strong>Stopped</strong>';
+
+    if (isRunning) {
+      localChip.style.display = 'block';
+      localChip.textContent = \`localhost:\${currentPort}\`;
+      accessPanel.classList.add('visible');
+      localLink.textContent = localUrl;
+      if (lanUrl) {
+        lanLink.textContent = lanUrl;
+        loadQrCode(lanUrl);
+      } else {
+        lanLink.textContent = 'Not connected to a network';
+      }
+    } else {
+      localChip.style.display = 'none';
+      accessPanel.classList.remove('visible');
+    }
+
+    btnOpen.disabled  = !isRunning;
+    btnSetup.disabled = !isRunning;
+    btnStop.disabled  = false;
+    btnStop.textContent = isRunning ? 'Stop Server' : 'Start Server';
+    btnStop.className   = isRunning ? 'btn-danger' : 'btn-secondary';
+  }
+
+  window.electronAPI?.onStatus(updateStatus);
+  window.electronAPI?.onLog(appendLog);
+  window.electronAPI?.requestStatus();
+
+  // ── Auto-updater UI ────────────────────────────────────────────────────────
+
+  let updateState = 'idle';
+
+  function checkForUpdate() {
+    window.electronAPI?.checkForUpdate();
+    // Show a brief "checking" indicator on the version badge
+    const badge = document.getElementById('version-badge');
+    if (badge) { badge.textContent = 'Checking…'; setTimeout(() => { badge.textContent = badge.dataset.version || 'v?'; }, 4000); }
+  }
+
+  function handleUpdateStatus(data) {
+    updateState = data.state;
+    const panel    = document.getElementById('update-panel');
+    const title    = document.getElementById('update-title');
+    const sub      = document.getElementById('update-sub');
+    const icon     = document.getElementById('update-icon');
+    const progress = document.getElementById('update-progress');
+    const bar      = document.getElementById('update-progress-bar');
+    const actions  = document.getElementById('update-actions');
+
+    // Reset panel classes
+    panel.className = 'update-panel';
+    progress.style.display = 'none';
+    actions.innerHTML = '';
+
+    switch (data.state) {
+      case 'checking':
+        panel.classList.add('visible', 'state-available');
+        icon.textContent = '🔄';
+        title.textContent = 'Checking for updates…';
+        sub.textContent = '';
+        break;
+
+      case 'available':
+        panel.classList.add('visible', 'state-available');
+        icon.textContent = '⬆️';
+        title.textContent = \`Update available — v\${data.version}\`;
+        sub.textContent = 'A new version of HomeStream is ready to download.';
+        actions.innerHTML =
+          '<button class="btn-update btn-update-primary" onclick="window.electronAPI?.downloadUpdate()">Download</button>' +
+          '<button class="btn-update btn-update-dismiss" onclick="dismissUpdate()">Later</button>';
+        break;
+
+      case 'downloading': {
+        panel.classList.add('visible', 'state-downloading');
+        icon.textContent = '⬇️';
+        const pct = data.percent ?? 0;
+        title.textContent = \`Downloading update — \${pct}%\`;
+        const mbps = data.bytesPerSecond ? (data.bytesPerSecond / 1_048_576).toFixed(1) + ' MB/s' : '';
+        sub.textContent = mbps ? \`Downloading at \${mbps}\` : 'Downloading…';
+        progress.style.display = 'block';
+        bar.style.width = pct + '%';
+        break;
+      }
+
+      case 'ready':
+        panel.classList.add('visible', 'state-ready');
+        icon.textContent = '✅';
+        title.textContent = \`v\${data.version} ready to install\`;
+        sub.textContent = 'HomeStream will restart to apply the update.';
+        actions.innerHTML =
+          '<button class="btn-update btn-update-success" onclick="window.electronAPI?.installUpdate()">Restart & Install</button>' +
+          '<button class="btn-update btn-update-dismiss" onclick="dismissUpdate()">Later</button>';
+        break;
+
+      case 'not-available':
+        panel.classList.add('visible', 'state-available');
+        icon.textContent = '✓';
+        title.textContent = 'HomeStream is up to date';
+        sub.textContent = '';
+        // Auto-dismiss after 4 seconds
+        setTimeout(dismissUpdate, 4_000);
+        break;
+
+      case 'error':
+        panel.classList.add('visible', 'state-error');
+        icon.textContent = '⚠️';
+        title.textContent = 'Update check failed';
+        sub.textContent = data.error ?? 'Could not reach update server.';
+        actions.innerHTML =
+          '<button class="btn-update btn-update-dismiss" onclick="dismissUpdate()">Dismiss</button>';
+        break;
+
+      case 'idle':
+      default:
+        // Hide panel
+        break;
+    }
+  }
+
+  function dismissUpdate() {
+    const panel = document.getElementById('update-panel');
+    panel.className = 'update-panel'; // remove 'visible'
+    updateState = 'idle';
+  }
+
+  window.electronAPI?.onUpdateStatus(handleUpdateStatus);
+</script>
+</body>
+</html>`;
+
+// ── Minimal tray icon (16×16 purple square as data URL) ───────────────────────
+// Used as fallback when tray-icon.png doesn't exist (B3 fix)
+const TRAY_ICON_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABmJLR0QA/wD/AP+gvaeTAAAAI0lEQVQ4jWNgYGD4z8BAgGIqGDUAXxqNBqMGjBowasCoAQCZAAQAAWiHlwAAAABJRU5ErkJggg==';
