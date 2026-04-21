@@ -305,6 +305,20 @@ const QUICK_FIXES: QuickFix[] = [
     icon: <Trash2 className="w-3.5 h-3.5" />,
     variant: 'destructive',
   },
+  {
+    id: 'purge_orphaned_uploads',
+    label: 'Purge Orphaned Upload Files',
+    description: 'Deletes video files in the uploads folder that have no library entry — reclaims disk space from failed or partial uploads',
+    icon: <Trash2 className="w-3.5 h-3.5" />,
+    variant: 'warning',
+    confirmMsg: 'This will permanently delete video files not tracked in the library. Make sure your library is up to date first. Continue?',
+  },
+  {
+    id: 'prune_tmdb_cache',
+    label: 'Prune Stale TMDB Cache',
+    description: 'Removes TMDB metadata cache files older than 90 days — safe to run any time, frees up space from deleted library items',
+    icon: <RefreshCw className="w-3.5 h-3.5" />,
+  },
 ];
 
 function QuickFixesTab() {

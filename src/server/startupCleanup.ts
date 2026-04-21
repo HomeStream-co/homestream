@@ -235,16 +235,30 @@ function cleanupOrphanedUploads(library: MediaRecord[]): void {
 export function runStartupCleanup(): void {
   // ── HLS orphan cleanup ───────────────────────────────────────────────────────
   // Runs first so disk space is reclaimed before anything else.
-  // HLS_BASE_DIR is derived the same way hlsTranscoder.ts does it, so the
-  // path is always consistent without needing a dynamic import.
   cleanupHlsOrphans();
 
   const library = readLibrary();
 
+  // ── Orphaned upload file cleanup ─────────────────────────────────────────────
+  // Must run AFTER readLibrary so we have the full known-files set.
+  // Runs unconditionally — doesn't depend on stuck flags.
+  cleanupOrphanedUploads(library);
+
+  // ── Stale TMDB cache file pruner ─────────────────────────────────────────────
+  // Removes per-item TMDB cache files older than 90 days from the cache dir.
+  // The in-memory cache and baked cache are unaffected — only stale file-backed
+  // entries are pruned. Keeps the cache dir from growing unbounded over time.
+  pruneStaleTmdbCache();
+
   const stuckTranscoding = library.filter(m => m.transcoding === true);
   const stuckEnriching   = library.filter(m => m.enriching === true);
 
-  if (stuckTranscoding.length === 0 && stuckEnriching.length === 0) return;
+  // Note: do NOT early-return here — orphan and TMDB cleanup already ran above.
+  // Only skip the library-write section if there's nothing to fix.
+  if (stuckTranscoding.length === 0 && stuckEnriching.length === 0) {
+    scheduleMetadataRetry();
+    return;
+  }
 
   if (stuckTranscoding.length > 0) {
     console.log(`[startup] Found ${stuckTranscoding.length} item(s) with transcoding:true — checking disk…`);
@@ -320,7 +334,63 @@ export function runStartupCleanup(): void {
     console.log('[startup] Library cleanup complete.');
   }
 
-  // ── Retry missing metadata in background ────────────────────────────────────
+  scheduleMetadataRetry();
+}
+
+// ── Stale TMDB cache file pruner ──────────────────────────────────────────────
+
+const NINETY_DAYS_MS = 90 * 24 * 60 * 60 * 1000;
+
+/**
+ * Remove per-item TMDB cache files that haven't been modified in 90 days.
+ *
+ * The TMDB cache dir (dataPath('tmdb-cache')) holds one JSON file per item,
+ * named by a hash of the TMDB ID. After items are deleted from the library
+ * these files are never cleaned up and accumulate indefinitely.
+ *
+ * 90 days is generous — the in-memory cache TTL is 30 days, so anything
+ * older than 90 days is definitely stale and safe to remove.
+ * Only .json files are touched; the baked cache is a build-time asset.
+ */
+export function pruneStaleTmdbCache(): void {
+  const cacheDir = dataPath('tmdb-cache');
+  if (!fs.existsSync(cacheDir)) return;
+
+  let entries: fs.Dirent[];
+  try {
+    entries = fs.readdirSync(cacheDir, { withFileTypes: true });
+  } catch {
+    return;
+  }
+
+  const now = Date.now();
+  let pruned = 0;
+  let totalBytes = 0;
+
+  for (const entry of entries) {
+    if (!entry.isFile() || !entry.name.endsWith('.json')) continue;
+    const filePath = path.join(cacheDir, entry.name);
+    try {
+      const stat = fs.statSync(filePath);
+      if (now - stat.mtimeMs > NINETY_DAYS_MS) {
+        totalBytes += stat.size;
+        fs.unlinkSync(filePath);
+        pruned++;
+      }
+    } catch { /* ignore */ }
+  }
+
+  if (pruned > 0) {
+    const kb = (totalBytes / 1024).toFixed(1);
+    console.log(`[startup] TMDB cache prune: removed ${pruned} stale file(s) (${kb} KB reclaimed).`);
+  } else {
+    console.log('[startup] TMDB cache prune: no stale files found.');
+  }
+}
+
+// ── Metadata retry helper ─────────────────────────────────────────────────────
+
+function scheduleMetadataRetry(): void {
   // Items imported while offline (needsMetadata: true) get a second chance
   // now that the server is up and network may be available.
   global.setTimeout(async () => {

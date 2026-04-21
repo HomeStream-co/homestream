@@ -16,17 +16,22 @@
  *   reindex_library          — re-scan media dir and reconcile library
  *   clear_crash_log          — wipe the crash log
  *   test_network             — ping TMDB + Torrentio, return latency
+ *   purge_orphaned_uploads   — delete video files in uploads/ with no library entry
+ *   prune_tmdb_cache         — delete TMDB cache files older than 90 days
  */
 
 import type { Request, Response } from 'express';
 import https from 'https';
 import http from 'http';
+import fs from 'fs';
+import path from 'path';
 import { requireAuth } from '../../../authMiddleware.js';
 import { readLibrary, writeLibrary } from '../../../libraryStore.js';
 import { getAllJobs } from '../../../torrentManager.js';
 import { deleteJob } from '../../../downloadJobStore.js';
 import { clearCrashLog } from '../../../crashLogger.js';
 import { readConfig } from '../../../configStore.js';
+import { pruneStaleTmdbCache } from '../../../startupCleanup.js';
 import type { TorrentJob } from '../../../torrentManager.js';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -138,6 +143,68 @@ async function testNetwork(): Promise<string> {
   return results.join(' · ');
 }
 
+async function purgeOrphanedUploads(): Promise<string> {
+  const uploadsDir = path.resolve('./uploads');
+  if (!fs.existsSync(uploadsDir)) return 'Uploads directory does not exist — nothing to purge';
+
+  const VIDEO_EXTENSIONS = new Set(['.mp4', '.mkv', '.avi', '.mov', '.webm', '.m4v', '.ts']);
+  const lib = readLibrary<{
+    filename?: string;
+    originalFilename?: string;
+    episodes?: Array<{ filename?: string }>;
+  }>();
+
+  const knownFiles = new Set<string>();
+  for (const item of lib) {
+    if (item.filename)         knownFiles.add(path.basename(item.filename));
+    if (item.originalFilename) knownFiles.add(path.basename(item.originalFilename));
+    if (Array.isArray(item.episodes)) {
+      for (const ep of item.episodes) {
+        if (ep.filename) knownFiles.add(path.basename(ep.filename));
+      }
+    }
+  }
+
+  const entries = fs.readdirSync(uploadsDir, { withFileTypes: true });
+  const orphans = entries.filter(e => {
+    if (!e.isFile()) return false;
+    const ext = path.extname(e.name).toLowerCase();
+    return VIDEO_EXTENSIONS.has(ext) && !knownFiles.has(e.name);
+  });
+
+  if (orphans.length === 0) return 'No orphaned video files found';
+
+  let removed = 0;
+  let totalBytes = 0;
+  for (const orphan of orphans) {
+    const filePath = path.join(uploadsDir, orphan.name);
+    try {
+      totalBytes += fs.statSync(filePath).size;
+      fs.unlinkSync(filePath);
+      removed++;
+    } catch { /* skip */ }
+  }
+  const mb = (totalBytes / 1024 / 1024).toFixed(1);
+  return `Removed ${removed} orphaned file${removed !== 1 ? 's' : ''} (${mb} MB reclaimed)`;
+}
+
+async function pruneTmdbCacheFiles(): Promise<string> {
+  // Capture console output by temporarily intercepting it
+  const messages: string[] = [];
+  const origLog = console.log;
+  console.log = (...args: unknown[]) => {
+    messages.push(args.join(' '));
+    origLog(...args);
+  };
+  try {
+    pruneStaleTmdbCache();
+  } finally {
+    console.log = origLog;
+  }
+  const msg = messages.find(m => m.includes('[startup] TMDB cache prune'));
+  return msg?.replace('[startup] TMDB cache prune: ', '') ?? 'TMDB cache prune complete';
+}
+
 // ── Handler ───────────────────────────────────────────────────────────────────
 
 const ACTIONS: Record<string, () => Promise<string>> = {
@@ -150,6 +217,8 @@ const ACTIONS: Record<string, () => Promise<string>> = {
   reindex_library:         reindexLibrary,
   clear_crash_log:         async () => { clearCrashLog(); return 'Crash log cleared'; },
   test_network:            testNetwork,
+  purge_orphaned_uploads:  purgeOrphanedUploads,
+  prune_tmdb_cache:        pruneTmdbCacheFiles,
 };
 
 export default async function handler(req: Request, res: Response) {

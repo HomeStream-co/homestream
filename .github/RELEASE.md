@@ -36,15 +36,17 @@ https://github.com/YOUR_ORG/homestream/releases/tag/v1.1.0
 5. Scopes: check **`repo`** (the whole block — needed to create releases and upload assets)
 6. Click **Generate token** — copy it immediately, you won't see it again
 
-### 2. Add the token as a repo secret
+### 2. Add three secrets to your GitHub repo
 
-1. Go to your GitHub repo → **Settings** → **Secrets and variables** → **Actions**
-2. Click **New repository secret**
-3. Name: `GH_TOKEN`
-4. Value: paste the token from step 1
-5. Click **Add secret**
+Go to your repo → **Settings → Secrets and variables → Actions → New repository secret**
 
-That's the only required secret. The workflow won't run without it.
+| Secret name | Value | Why |
+|---|---|---|
+| `GH_TOKEN` | The token from step 1 | Authenticates electron-builder to create releases |
+| `GH_OWNER` | Your GitHub username or org (e.g. `john-doe`) | Baked into the .exe so the auto-updater knows where to check for updates |
+| `GH_REPO` | Your repo name (e.g. `homestream`) | Same — must match exactly |
+
+All three are required. The build will succeed without `GH_OWNER`/`GH_REPO` but the auto-updater inside the app will be silently disabled.
 
 ---
 

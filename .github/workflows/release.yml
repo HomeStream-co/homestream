@@ -91,3 +91,50 @@ jobs:
           name: HomeStream-Windows-${{ github.ref_name }}
           path: dist-electron/HomeStream-Setup-*.exe
           retention-days: 30
+
+      # ── 8. Annotate the GitHub Release with auto-generated release notes ──────
+      # Generates a changelog from commits since the last tag and appends it to
+      # the release body that electron-builder created. Users see a real changelog
+      # instead of an empty release page.
+      - name: Generate release notes
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GH_TOKEN }}
+          script: |
+            const tag = context.ref.replace('refs/tags/', '');
+            // Find the release electron-builder just created
+            const releases = await github.rest.repos.listReleases({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              per_page: 5,
+            });
+            const release = releases.data.find(r => r.tag_name === tag);
+            if (!release) { console.log('Release not found — skipping notes'); return; }
+
+            // Generate notes from GitHub's built-in changelog generator
+            const notes = await github.rest.repos.generateReleaseNotes({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              tag_name: tag,
+            });
+
+            // Prepend install instructions then append the changelog
+            const body = [
+              '## Install',
+              '',
+              `Download **HomeStream-Setup-${tag.replace('v','')}.exe** below and run it.`,
+              'Windows may show a SmartScreen warning — click **More info → Run anyway**.',
+              '',
+              '## What\'s Changed',
+              '',
+              notes.data.body,
+            ].join('\n');
+
+            await github.rest.repos.updateRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              release_id: release.id,
+              body,
+            });
+            console.log(`Release notes updated for ${tag}`);
+
