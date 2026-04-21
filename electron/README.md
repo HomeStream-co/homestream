@@ -42,9 +42,7 @@ Output files land in `dist-electron/`:
 
 | File | Description |
 |------|-------------|
-| `HomeStream-Setup-1.0.0.exe` | NSIS installer — creates Start Menu + Desktop shortcuts |
-| `HomeStream-1.0.0-portable.exe` | Portable — no install needed, run from anywhere |
-| `HomeStream-1.0.0-win.zip` | ZIP archive for manual deployment |
+| `HomeStream-Setup-1.x.x.exe` | NSIS installer — creates Start Menu + Desktop shortcuts |
 
 ---
 
@@ -55,6 +53,24 @@ npm run electron:mac    # macOS .dmg (must run on macOS)
 npm run electron:linux  # Linux .AppImage + .deb
 npm run electron:build  # All platforms (requires platform-specific runners)
 ```
+
+---
+
+## ESM / CJS note (important for contributors)
+
+`package.json` has `"type": "module"` which makes Node treat all `.js` files
+as ES modules. Electron's main process requires CommonJS (`require()`), so all
+Electron entry files use the `.cjs` extension to opt out of ESM:
+
+| File | Purpose |
+|------|---------|
+| `electron/main.cjs` | Electron main process |
+| `electron/updater.cjs` | Auto-updater logic |
+| `electron/preload.cjs` | Context bridge (renderer ↔ main) |
+
+The `.js` copies are kept as backups but are **not used** by the build.
+`package.json` `"main"` field points to `electron/main.cjs`.
+`electron-builder.yml` `files` array references `.cjs` filenames.
 
 ---
 
@@ -79,24 +95,63 @@ Files stored there:
 
 ---
 
-## Auto-updater (optional)
+## Windows Defender SmartScreen
 
-By default the auto-updater is **disabled** — the placeholder `owner`/`repo`
-values in `electron-builder.yml` are detected and skipped gracefully.
+Unsigned `.exe` files trigger a SmartScreen warning ("Windows protected your PC")
+on first run. Users can click **More info → Run anyway** to bypass it.
 
-To enable it:
-1. Create a GitHub repo for your HomeStream fork
-2. Edit `electron/electron-builder.yml`:
-   ```yaml
-   publish:
-     owner: your-github-username
-     repo: your-repo-name
-   ```
-3. Set `GH_TOKEN` env var when publishing:
-   ```powershell
-   $env:GH_TOKEN="ghp_yourtoken"
-   npm run electron:publish
-   ```
+To eliminate the warning permanently, add an Authenticode code-signing cert:
+
+1. Get a free OV cert from **Certum Open Source Code Signing**:
+   https://www.certum.eu/en/cert_offer_en_open_source_cs.xml
+2. Export the cert as a PFX file
+3. Base64-encode it: `certutil -encode cert.pfx cert.b64`
+4. Add two GitHub Actions secrets:
+   - `WIN_CSC_LINK` — the base64 PFX content
+   - `WIN_CSC_KEY_PASSWORD` — the PFX password
+5. Uncomment the signing lines in `electron-builder.yml` and `release.yml`
+
+---
+
+## Auto-updater
+
+The auto-updater checks GitHub Releases on startup (10-second delay) and
+notifies the control panel if a newer version is available. Users choose
+when to download and install.
+
+GitHub repo is configured in `electron-builder.yml`:
+```yaml
+publish:
+  owner: trevorrossworn-code
+  repo: homestream
+```
+
+Required GitHub Actions secrets: `GH_TOKEN`, `GH_OWNER`, `GH_REPO`
+
+---
+
+## Releasing a new version
+
+```bash
+# Bump version in package.json, commit, then tag:
+git add package.json
+git commit -m "chore: bump to v1.2.0"
+git push origin main
+git tag v1.2.0
+git push origin v1.2.0
+```
+
+GitHub Actions (`release.yml`) will build and publish the installer automatically.
+
+### Re-tagging (rebuild the same version after a fix)
+
+```bash
+git pull origin main
+git tag -d v1.1.0
+git push origin --delete v1.1.0
+git tag v1.1.0
+git push origin v1.1.0
+```
 
 ---
 

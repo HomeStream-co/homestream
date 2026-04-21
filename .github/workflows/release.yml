@@ -1,5 +1,14 @@
 name: Release
 
+# Triggered by pushing a version tag: git tag v1.2.0 && git push origin v1.2.0
+#
+# Re-tag cycle (if you need to rebuild the same version):
+#   git pull origin main
+#   git tag -d v1.1.0
+#   git push origin --delete v1.1.0
+#   git tag v1.1.0
+#   git push origin v1.1.0
+
 on:
   push:
     tags:
@@ -8,6 +17,7 @@ on:
 jobs:
   release-windows:
     runs-on: windows-latest
+
     steps:
       - uses: actions/checkout@v4
 
@@ -21,6 +31,8 @@ jobs:
 
       - name: Build app
         run: npm run build
+        env:
+          CI: true
 
       - name: Package installer
         run: npx electron-builder --win -c electron/electron-builder.yml --publish always
@@ -28,3 +40,18 @@ jobs:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
           HOMESTREAM_GH_OWNER: ${{ secrets.GH_OWNER }}
           HOMESTREAM_GH_REPO: ${{ secrets.GH_REPO }}
+          # Code signing — uncomment when WIN_CSC_LINK secret is added (v1.2)
+          # WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+          # WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
+
+      # Upload the installer as a GitHub Actions artifact as a safety net.
+      # If the GitHub Release publish step fails for any reason, the .exe is
+      # still downloadable from the Actions run for 30 days.
+      - name: Upload installer artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: HomeStream-Windows-Installer
+          path: dist-electron/*.exe
+          retention-days: 30
+          if-no-files-found: warn

@@ -74,10 +74,14 @@ extraResources:
       - "!server.bundle.mjs.map"
       - "!app.js"
   # FFmpeg binary — copied into resources/ffmpeg/ so users don't need to install it.
-  # ffmpeg-static provides ffmpeg.exe on Windows builds.
-  - from: node_modules/ffmpeg-static/ffmpeg.exe
-    to: ffmpeg/ffmpeg.exe
-    filter: "**/*"
+  # ffmpeg-static provides the platform-appropriate binary (ffmpeg.exe on Windows,
+  # ffmpeg on macOS/Linux). We use a glob so the build doesn't fail when the
+  # platform binary doesn't match the current OS (e.g. building on Linux for Windows).
+  - from: node_modules/ffmpeg-static
+    to: ffmpeg
+    filter:
+      - "ffmpeg"
+      - "ffmpeg.exe"
 
 # ── Windows ───────────────────────────────────────────────────────────────────
 win:
@@ -88,6 +92,27 @@ win:
       arch: [x64]
   # electron-builder auto-converts icon.png → .ico if no .ico is provided
   icon: electron/assets/icon.png
+  #
+  # ── Code Signing (v1.2 — activate when cert is ready) ──────────────────────
+  # Without a valid Authenticode cert, Windows Defender SmartScreen will show
+  # a "Windows protected your PC" warning on first run. Users can click
+  # "More info → Run anyway" to bypass it, but it erodes trust.
+  #
+  # Recommended path: Certum Open Source Code Signing (free for OSS projects)
+  #   https://www.certum.eu/en/cert_offer_en_open_source_cs.xml
+  #
+  # Once you have a PFX cert:
+  #   1. Add the PFX as a GitHub Actions secret: WIN_CSC_LINK (base64-encoded)
+  #   2. Add the password as: WIN_CSC_KEY_PASSWORD
+  #   3. Uncomment the four lines below
+  #   4. Add to release.yml env block:
+  #        WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+  #        WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
+  #
+  # certificateSubjectName: "HomeStream"
+  # signingHashAlgorithms: [sha256]
+  # rfc3161TimeStampServer: http://timestamp.certum.pl
+  # signDlls: false
 
 nsis:
   oneClick: false
