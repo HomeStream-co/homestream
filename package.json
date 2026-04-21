@@ -1,6 +1,8 @@
 {
   "name": "homestream",
   "version": "1.1.0",
+  "description": "Self-hosted Netflix-style family media streaming app",
+  "author": "HomeStream",
   "type": "module",
   "main": "electron/main.js",
   "imports": {
