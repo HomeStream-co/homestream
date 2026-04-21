@@ -57,6 +57,21 @@ const OPEN_ENDPOINTS = new Set([
   // Profile PIN endpoint — must be open so the PIN numpad can verify
   // without a session (the PIN IS the auth for profile switching)
   'src/server/api/profiles/[id]/pin/POST.ts',
+
+  // Electron platform info — returns only OS/platform metadata (no library
+  // data, no secrets). Called by the setup wizard before any auth exists to
+  // pre-populate the default media directory for the user's OS.
+  'src/server/api/electron/GET.ts',
+
+  // Graceful shutdown — only accepts requests from 127.0.0.1/::1 (enforced
+  // in handler). Called by the Electron main process before killing the server
+  // child process on Windows (SIGTERM is an immediate kill on Windows).
+  'src/server/api/shutdown/GET.ts',
+
+  // API key tester — called from the setup wizard (step 4) before setup is
+  // complete and before any admin password exists. Tests TMDB/OMDB/GoogleAI
+  // keys server-side so the browser doesn't need cross-origin access.
+  'src/server/api/setup/test-keys/POST.ts',
 ]);
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

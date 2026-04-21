@@ -27,13 +27,13 @@ function serverBundlePlugin(): Plugin {
 				name: "externalize-problem-imports",
 				setup(build) {
 					// Externalize anything starting with # (Node package imports like #airo/secrets)
-					build.onResolve({ filter: /^#/ }, args => ({ path: args.path, external: true }));
+					build.onResolve({ filter: /^#/ }, (_args) => ({ path: _args.path, external: true }));
 					// Externalize webtorrent regardless of how it was aliased
-					build.onResolve({ filter: /webtorrent/ }, args => ({ path: "webtorrent", external: true }));
+					build.onResolve({ filter: /webtorrent/ }, (_args) => ({ path: "webtorrent", external: true }));
 					// Externalize webrtc-polyfill
-					build.onResolve({ filter: /webrtc-polyfill/ }, args => ({ path: "webrtc-polyfill", external: true }));
+					build.onResolve({ filter: /webrtc-polyfill/ }, (_args) => ({ path: "webrtc-polyfill", external: true }));
 					// Externalize node-datachannel
-					build.onResolve({ filter: /node-datachannel/ }, args => ({ path: "node-datachannel", external: true }));
+					build.onResolve({ filter: /node-datachannel/ }, (_args) => ({ path: "node-datachannel", external: true }));
 				},
 			};
 

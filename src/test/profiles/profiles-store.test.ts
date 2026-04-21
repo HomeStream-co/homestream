@@ -29,6 +29,8 @@ vi.mock('fs', () => ({
       mockFileContent = data;
       mockFileExists = true;
     }),
+    // dataDir.ts calls mkdirSync to create the data directory on first access
+    mkdirSync: vi.fn(),
   },
 }));
 
