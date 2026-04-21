@@ -19,9 +19,6 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Generate NSIS images
-        run: node scripts/resize-nsis-images.mjs
-
       - name: Build app
         run: npm run build
 
