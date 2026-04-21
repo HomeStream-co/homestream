@@ -87,7 +87,7 @@ export default defineConfig(({ mode }) => ({
 	},
 	ssr: {
 		noExternal: [],
-		external: ["html-to-image"],
+		external: ["html-to-image", "#airo/secrets"],
 	},
 	server: {
 		host: process.env.HOST || "0.0.0.0",
