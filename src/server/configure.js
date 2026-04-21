@@ -4,6 +4,12 @@ import { fileURLToPath } from "node:url";
 import { dirname, join, extname } from "node:path";
 import zlib from "node:zlib";
 
+// Install console capture FIRST — before anything else logs — so we
+// capture all startup output for GET /api/dev/logs remote diagnostics.
+import('./consoleCapture.js').then(({ installConsoleCapture }) => {
+  installConsoleCapture();
+}).catch(() => {});
+
 // Install process-level crash handlers as early as possible so even
 // errors during startup are captured to the persistent crash log.
 import('./crashLogger.js').then(({ installCrashHandlers }) => {

@@ -21,6 +21,7 @@ import {
   Activity, Zap, Globe, MemoryStick, Clock, Terminal,
   RotateCcw, ShieldOff, Play,
 } from 'lucide-react';
+import { DevVersionTrigger, DevDrawer } from './DevDrawer';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -875,6 +876,7 @@ export default function DebugPanel({ open, onClose }: DebugPanelProps) {
   const [healthLoading, setHealthLoading] = useState(false);
   const [sysInfo, setSysInfo] = useState<SystemInfo | null>(null);
   const [fetched, setFetched] = useState(false);
+  const [devDrawerOpen, setDevDrawerOpen] = useState(false);
 
   const fetchHealth = useCallback(async () => {
     setHealthLoading(true);
@@ -945,6 +947,11 @@ export default function DebugPanel({ open, onClose }: DebugPanelProps) {
                     {health.overall.toUpperCase()}
                   </span>
                 )}
+                {/* Secret dev trigger — Shift+hold the version number for 2s */}
+                <DevVersionTrigger
+                  version="1.1.0"
+                  onUnlock={() => setDevDrawerOpen(v => !v)}
+                />
               </div>
               <div className="flex items-center gap-1">
                 <CopyDiagnosticButton health={health} sysInfo={sysInfo} />
@@ -965,6 +972,15 @@ export default function DebugPanel({ open, onClose }: DebugPanelProps) {
 
             {/* Tab content */}
             <div className="flex-1 overflow-y-auto">
+              {/* Hidden dev drawer — opened by Shift+hold on version number */}
+              <AnimatePresence>
+                {devDrawerOpen && (
+                  <div className="p-3 border-b border-violet-500/20">
+                    <DevDrawer onClose={() => setDevDrawerOpen(false)} />
+                  </div>
+                )}
+              </AnimatePresence>
+
               {tab === 'health'  && <HealthTab health={health} loading={healthLoading} onRefresh={fetchHealth} />}
               {tab === 'fixes'   && <QuickFixesTab />}
               {tab === 'system'  && <SystemTab />}
