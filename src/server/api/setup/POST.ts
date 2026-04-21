@@ -7,6 +7,7 @@ import { testConnection as testQbit } from '../../qbittorrentClient.js';
 import { startWatcher, stopWatcher } from '../../folderWatcher.js';
 import { scanExistingMedia, importExistingMedia, type ScannedFile } from '../../existingMediaScanner.js';
 import { requireAuth } from '../../authMiddleware.js';
+import { isDeveloperLocked } from '../../ownershipSeed.js';
 
 // In-memory store for scan results so import can reference them
 let lastScanFiles: ScannedFile[] = [];
@@ -65,8 +66,17 @@ export default async function handler(req: Request, res: Response) {
         for (const key of allowed) {
           if (fields[key] !== undefined) updates[key] = fields[key];
         }
-        // Hash admin password with bcrypt before saving
+        // Hash admin password with bcrypt before saving.
+        // DEVELOPER_LOCK: if the developer has locked ownership via the
+        // DEVELOPER_LOCK=true env var, refuse to overwrite the seeded password.
+        // This prevents any end-user from locking the developer out of their app.
         if (fields.adminPassword) {
+          if (isDeveloperLocked()) {
+            res.status(403).json({
+              error: 'Admin password is locked by the developer and cannot be changed via the setup wizard.',
+            });
+            return;
+          }
           updates.adminPassword = await bcrypt.hash(fields.adminPassword, 12);
         }
         // Boolean coercion

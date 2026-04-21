@@ -75,6 +75,14 @@ function gzipMiddleware(req, res, next) {
 
 export const viteServerBefore = (server, _viteServer) => {
   console.log('[HomeStream] Dev server starting...');
+
+  // Seed ownership on dev server too so local testing reflects production behaviour
+  import('./ownershipSeed.js').then(({ runOwnershipSeed }) => {
+    runOwnershipSeed().catch(err => {
+      console.warn('[ownership] Dev seed failed (non-fatal):', err.message);
+    });
+  }).catch(() => {});
+
   server.use(cookieParser());
   server.use(express.json({ limit: '50mb' }));
   server.use(express.urlencoded({ extended: true, limit: '50mb' }));
@@ -85,6 +93,16 @@ export const viteServerAfter = (_server, _viteServer) => {};
 // ── Production server hooks ────────────────────────────────────────────────
 
 export const serverBefore = (server) => {
+  // Developer ownership seed — runs before any request is served.
+  // Seeds admin password + API keys from platform secrets on first boot.
+  import('./ownershipSeed.js').then(({ runOwnershipSeed }) => {
+    runOwnershipSeed().catch(err => {
+      console.warn('[ownership] Seed failed (non-fatal):', err.message);
+    });
+  }).catch(err => {
+    console.warn('[ownership] Could not load ownershipSeed (non-fatal):', err.message);
+  });
+
   // Startup cleanup: reset any items stuck with transcoding:true
   import('./startupCleanup.js').then(({ runStartupCleanup }) => {
     runStartupCleanup();
