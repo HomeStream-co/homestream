@@ -140,6 +140,7 @@ export default defineConfig(({ mode }) => ({
 
 	build: {
 		rollupOptions: {
+			external: ["#airo/secrets"],
 			output: {
 				manualChunks: {
 					"react-vendor": ["react", "react-dom", "react-router-dom"],
