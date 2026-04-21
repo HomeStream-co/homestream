@@ -45,17 +45,16 @@ directories:
 # them outside the asar at resources/client/ and resources/server/. Including
 # dist/ here would double-ship ~10MB of client assets inside the asar for no benefit.
 files:
-  - electron/main.js
-  - electron/preload.js
-  - electron/tray-icon.png
-  - package.json
-  # electron-updater and its deps must be resolvable by the main process at runtime.
-  # electron-builder includes package.json "dependencies" automatically in the asar,
-  # but electron-updater needs to be accessible from the main process (outside asar)
-  # so we list it explicitly. The others are its transitive deps that must co-locate.
-  - node_modules/electron-updater/**/*
-  - node_modules/builder-util-runtime/**/*
-  - node_modules/semver/**/*
+  - from: "."
+    to: "."
+    filter:
+      - "electron/main.js"
+      - "electron/preload.js"
+      - "electron/tray-icon.png"
+      - "package.json"
+      - "node_modules/electron-updater/**/*"
+      - "node_modules/builder-util-runtime/**/*"
+      - "node_modules/semver/**/*"
 
 # Extra resources shipped alongside the app (available at process.resourcesPath at runtime)
 extraResources:
