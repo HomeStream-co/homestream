@@ -1,184 +1,84 @@
-# HomeStream Release Builder
+# ── HomeStream Release Workflow ───────────────────────────────────────────────
 #
-# Triggered by pushing a version tag: git tag v1.2.3 && git push --tags
+# Triggers on any tag push matching v* (e.g. v1.1.0, v2.0.0-beta.1).
 #
-# Builds Electron installers for all three platforms in parallel:
-#   Windows  → HomeStream-Setup-x.x.x.exe  (NSIS)
-#   macOS    → HomeStream-x.x.x.dmg
-#   Linux    → HomeStream-x.x.x.AppImage + .deb
+# What it does:
+#   1. Builds the React frontend + Express server bundle (npm run build)
+#   2. Packages a Windows NSIS installer via electron-builder
+#   3. Creates a GitHub Release and uploads the .exe as a release asset
 #
-# All artifacts are uploaded to the GitHub Release created by the tag.
+# Required GitHub repo secrets (Settings → Secrets → Actions):
+#   GH_TOKEN  — a GitHub Personal Access Token with `repo` scope.
+#               Used by electron-builder to create the release and upload assets.
+#               Generate at: https://github.com/settings/tokens
 #
-# Prerequisites:
-#   - macOS builds require a macOS runner (macos-latest)
-#   - Windows builds require a Windows runner (windows-latest)
-#   - Linux builds run on ubuntu-latest
-#   - No code-signing configured (add CSC_LINK / APPLE_ID secrets for that)
+# Optional secrets (only needed if you want the app to work out-of-the-box):
+#   TMDB_API_KEY      — baked into the installer as a default; users can override
+#                       in the setup wizard. If omitted, users must enter their own.
+#
+# How to trigger a release:
+#   git tag v1.1.0
+#   git push origin v1.1.0
+#
+# The workflow will:
+#   - Build on windows-latest (required for Windows .exe + correct ffmpeg binary)
+#   - Produce:  dist-electron/HomeStream-Setup-1.1.0.exe
+#   - Create:   GitHub Release "v1.1.0" with the .exe attached
+#   - Users with auto-updater will be notified of the new release automatically
 
 name: Release
 
 on:
   push:
     tags:
-      - 'v*.*.*'
-
-permissions:
-  contents: write   # needed to create/upload release assets
+      - 'v*'
 
 jobs:
-  # ── Create the GitHub Release ────────────────────────────────────────────────
-  create-release:
-    name: Create Release
-    runs-on: ubuntu-latest
-    outputs:
-      upload_url: ${{ steps.create_release.outputs.upload_url }}
-      version: ${{ steps.get_version.outputs.version }}
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Get version from tag
-        id: get_version
-        run: echo "version=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
-
-      - name: Create GitHub Release
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ github.ref }}
-          release_name: HomeStream v${{ steps.get_version.outputs.version }}
-          draft: false
-          prerelease: ${{ contains(github.ref, '-beta') || contains(github.ref, '-alpha') || contains(github.ref, '-rc') }}
-          body: |
-            ## HomeStream v${{ steps.get_version.outputs.version }}
-
-            ### Downloads
-            | Platform | File |
-            |----------|------|
-            | Windows  | `HomeStream-Setup-${{ steps.get_version.outputs.version }}.exe` |
-            | macOS    | `HomeStream-${{ steps.get_version.outputs.version }}.dmg` |
-            | Linux    | `HomeStream-${{ steps.get_version.outputs.version }}.AppImage` |
-            | Linux    | `homestream_${{ steps.get_version.outputs.version }}_amd64.deb` |
-
-            ### Installation
-            - **Windows**: Run the `.exe` installer
-            - **macOS**: Open the `.dmg` and drag HomeStream to Applications
-            - **Linux**: Make the `.AppImage` executable (`chmod +x`) and run it, or install the `.deb`
-
-  # ── Windows build ────────────────────────────────────────────────────────────
-  build-windows:
-    name: Build Windows
+  release-windows:
+    name: Build & Release Windows .exe
     runs-on: windows-latest
-    needs: create-release
-    steps:
-      - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+    steps:
+      # ── 1. Checkout ──────────────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── 2. Node.js ───────────────────────────────────────────────────────────
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '20'
           cache: 'npm'
 
+      # ── 3. Install dependencies ───────────────────────────────────────────────
+      # Must run on Windows so ffmpeg-static downloads the Windows ffmpeg.exe.
+      # A node_modules copied from macOS/Linux has the wrong binary.
       - name: Install dependencies
         run: npm ci
 
-      - name: Build Windows installer
-        run: npm run electron:win
-        env:
-          CI: true
+      # ── 4. Regenerate NSIS branding images ───────────────────────────────────
+      # Ensures header (150×57) and sidebar (164×314) PNGs are valid before
+      # electron-builder tries to embed them in the installer.
+      - name: Generate NSIS branding images
+        run: node scripts/resize-nsis-images.mjs
 
-      - name: Upload Windows installer
-        uses: actions/upload-release-asset@v1
+      # ── 5. Build frontend + server bundle ────────────────────────────────────
+      - name: Build app
+        run: npm run build
+
+      # ── 6. Package Windows installer ─────────────────────────────────────────
+      # --publish always  → electron-builder creates the GitHub Release and
+      #                     uploads the .exe + latest.yml (used by auto-updater).
+      # GH_TOKEN is passed via env so electron-builder can authenticate.
+      - name: Package Windows installer
+        run: npx electron-builder --win --config electron/electron-builder.yml --publish always
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+
+      # ── 7. Upload artifact (backup — also available in GitHub Release) ────────
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
         with:
-          upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: dist-electron/HomeStream-Setup-${{ needs.create-release.outputs.version }}.exe
-          asset_name: HomeStream-Setup-${{ needs.create-release.outputs.version }}.exe
-          asset_content_type: application/octet-stream
-
-  # ── macOS build ──────────────────────────────────────────────────────────────
-  build-macos:
-    name: Build macOS
-    runs-on: macos-latest
-    needs: create-release
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build macOS DMG
-        run: npm run electron:mac
-        env:
-          CI: true
-          # Disable code signing for unsigned builds
-          CSC_IDENTITY_AUTO_DISCOVERY: false
-
-      - name: Upload macOS DMG
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: dist-electron/HomeStream-${{ needs.create-release.outputs.version }}.dmg
-          asset_name: HomeStream-${{ needs.create-release.outputs.version }}.dmg
-          asset_content_type: application/octet-stream
-
-  # ── Linux build ──────────────────────────────────────────────────────────────
-  build-linux:
-    name: Build Linux
-    runs-on: ubuntu-latest
-    needs: create-release
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: 'npm'
-
-      - name: Install Linux build dependencies
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends \
-            libgtk-3-dev \
-            libnotify-dev \
-            libnss3 \
-            libxss1 \
-            libxtst6 \
-            xauth \
-            xvfb
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build Linux packages
-        run: npm run electron:linux
-        env:
-          CI: true
-
-      - name: Upload AppImage
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: dist-electron/HomeStream-${{ needs.create-release.outputs.version }}.AppImage
-          asset_name: HomeStream-${{ needs.create-release.outputs.version }}.AppImage
-          asset_content_type: application/octet-stream
-
-      - name: Upload .deb package
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: dist-electron/homestream_${{ needs.create-release.outputs.version }}_amd64.deb
-          asset_name: homestream_${{ needs.create-release.outputs.version }}_amd64.deb
-          asset_content_type: application/octet-stream
+          name: HomeStream-Windows-${{ github.ref_name }}
+          path: dist-electron/HomeStream-Setup-*.exe
+          retention-days: 30

@@ -1,0 +1,56 @@
+# ── HomeStream Build Check Workflow ──────────────────────────────────────────
+#
+# Runs on every push to main/develop and on every pull request.
+# Catches TypeScript errors, lint errors, and build failures before they
+# reach a release tag.
+#
+# Does NOT produce an installer — that's the release.yml job.
+# Runs on ubuntu-latest (faster + cheaper than windows-latest for checks).
+
+name: Build Check
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+      - 'v*'          # also run on version branches like v1.1
+  pull_request:
+    branches:
+      - main
+      - develop
+
+jobs:
+  check:
+    name: Type-check, Lint & Build
+    runs-on: ubuntu-latest
+
+    steps:
+      # ── 1. Checkout ──────────────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── 2. Node.js ───────────────────────────────────────────────────────────
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      # ── 3. Install dependencies ───────────────────────────────────────────────
+      - name: Install dependencies
+        run: npm ci
+
+      # ── 4. TypeScript ─────────────────────────────────────────────────────────
+      - name: Type-check
+        run: npm run type-check
+
+      # ── 5. Lint ───────────────────────────────────────────────────────────────
+      - name: Lint
+        run: npm run lint
+
+      # ── 6. Build (frontend + server bundle) ───────────────────────────────────
+      # Verifies the full production build succeeds — catches missing imports,
+      # bad dynamic requires, and esbuild bundling errors.
+      - name: Build
+        run: npm run build
