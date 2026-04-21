@@ -1,6 +1,6 @@
 import type { Request, Response } from 'express';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { getSecret } from '#airo/secrets';
+// No #airo/secrets — reads from process.env directly for full portability
 import { readConfig } from '../../configStore.js';
 import { requireAuth } from '../../authMiddleware.js';
 
@@ -240,7 +240,7 @@ export default async function handler(req: Request, res: Response) {
     }
 
     // ── Gemini (default) ──
-    const apiKey = getSecret('GOOGLE_AI_API_KEY') || config.googleAiApiKey;
+    const apiKey = process.env.GOOGLE_AI_API_KEY || config.googleAiApiKey;
 
     if (!apiKey) {
       const fallback = fallbackResponse(message, lib);

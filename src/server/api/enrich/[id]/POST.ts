@@ -14,7 +14,7 @@
  */
 import type { Request, Response } from 'express';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { getSecret } from '#airo/secrets';
+// No #airo/secrets — reads from process.env directly for full portability
 import { readLibrary, writeLibrary } from '../../../libraryStore.js';
 import { requireAuth } from '../../../authMiddleware.js';
 
@@ -111,7 +111,7 @@ export default async function handler(req: Request, res: Response) {
     // ── Step 2: Gemini AI analysis ──
     send('ai', 'running', 'Running AI deep analysis…');
 
-    const apiKey = getSecret('GOOGLE_AI_API_KEY') as string;
+    const apiKey = (process.env.GOOGLE_AI_API_KEY || '') as string;
     if (!apiKey) {
       send('ai', 'error', 'GOOGLE_AI_API_KEY not configured');
       updateItem(id, { enriching: false });

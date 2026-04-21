@@ -13,7 +13,7 @@
 
 import path from 'path';
 import { randomUUID } from 'crypto';
-import { getSecret } from '#airo/secrets';
+// No #airo/secrets — reads from process.env directly for full portability
 
 // ─── Title extraction ─────────────────────────────────────────────────────────
 
@@ -78,7 +78,7 @@ export interface OMDBData {
  */
 export async function fetchOMDB(title: string, year?: string): Promise<OMDBData | null> {
   // Check env first, then secrets store
-  const apiKey = process.env.OMDB_API_KEY || getSecret('OMDB_API_KEY');
+  const apiKey = process.env.OMDB_API_KEY;
   if (!apiKey || typeof apiKey !== 'string') return null;
 
   try {
@@ -191,7 +191,7 @@ export function buildMediaItem(input: MediaItemInput): MediaItem {
  * logic stays in one place. Fire-and-forget — never throws.
  */
 export async function runEnrichmentInBackground(mediaId: string): Promise<void> {
-  const googleAiKey = process.env.GOOGLE_AI_API_KEY || getSecret('GOOGLE_AI_API_KEY');
+  const googleAiKey = process.env.GOOGLE_AI_API_KEY;
   if (!googleAiKey) return;
 
   // Small delay so the library item is definitely written before enrichment reads it

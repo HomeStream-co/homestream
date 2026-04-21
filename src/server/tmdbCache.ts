@@ -16,7 +16,7 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import { fileURLToPath } from 'url';
-import { getSecret } from '#airo/secrets';
+// No #airo/secrets — reads from process.env directly for full portability
 import { dataDir } from './dataDir.js';
 
 // Use persistent storage so the cache survives deploys and restarts.
@@ -181,7 +181,8 @@ function normaliseMovie(m: Record<string, unknown>): TMDBMovie {
 }
 
 async function tmdbGet(endpoint: string, params: Record<string, string> = {}): Promise<unknown> {
-  const apiKey = getSecret('TMDB_API_KEY') as string;
+  const cfg = (await import('./configStore.js')).readConfig();
+  const apiKey = cfg.tmdbApiKey || process.env.TMDB_API_KEY || '';
   if (!apiKey) throw new Error('TMDB_API_KEY not configured');
   const url = new URL(`${TMDB_BASE}${endpoint}`);
   url.searchParams.set('api_key', apiKey);

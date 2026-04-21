@@ -79,6 +79,8 @@ media-library.json
 homestream-config.json
 homestream-watchlist.json
 homestream-profiles.json
+homestream-sessions.json
+crash-log.json
 tmdb-cache/
 uploads/
 hls-segments/

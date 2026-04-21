@@ -5,7 +5,7 @@
  * Returns { trailerKey: string | null }
  */
 import type { Request, Response } from 'express';
-import { getSecret } from '#airo/secrets';
+// No #airo/secrets — reads from process.env directly for full portability
 import { readConfig } from '../../../configStore.js';
 import { requireAuth } from '../../../authMiddleware.js';
 
@@ -15,7 +15,7 @@ export default async function handler(req: Request, res: Response) {
   if (!title) return res.status(400).json({ error: 'title required' });
 
   const cfg = readConfig();
-  const apiKey = cfg.tmdbApiKey || getSecret('TMDB_API_KEY') || '';
+  const apiKey = cfg.tmdbApiKey || process.env.TMDB_API_KEY || '';
   if (!apiKey) return res.json({ trailerKey: null });
 
   try {

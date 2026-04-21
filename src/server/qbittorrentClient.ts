@@ -10,7 +10,7 @@
  *   Session auto-renews on 403 (cookie expired)
  */
 
-import { getSecret } from '#airo/secrets';
+// No #airo/secrets — reads from process.env directly for full portability
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -54,8 +54,8 @@ function getQbitUrl(): string {
 }
 
 function getCredentials(): { username: string; password: string } {
-  const u = process.env.QBIT_USERNAME ?? getSecret('QBIT_USERNAME') ?? 'admin';
-  const p = process.env.QBIT_PASSWORD ?? getSecret('QBIT_PASSWORD') ?? 'homestream';
+  const u = process.env.QBIT_USERNAME ?? 'admin';
+  const p = process.env.QBIT_PASSWORD ?? 'homestream';
   return {
     username: typeof u === 'string' ? u : 'admin',
     password: typeof p === 'string' ? p : 'homestream',
