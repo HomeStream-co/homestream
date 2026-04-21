@@ -8,7 +8,7 @@
  *  - Shows a control panel window: server status, LAN IP, log viewer, start/stop
  *  - Spawns the HomeStream server (dist/server.bundle.mjs) as a child process
  *  - System tray icon with quick-access menu
- *  - "Open HomeStream" button launches the browser UI at http://localhost:3000
+ *  - "Open HomeStream" button launches the browser UI at http://localhost:3000 (or next free port)
  *
  * Supported platforms: Windows (.exe), macOS (.dmg), Linux (.AppImage)
  */
@@ -94,7 +94,8 @@ function getFfmpegPath() {
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
-const SERVER_PORT = 3000;
+const PREFERRED_PORT = 3000;
+const PORT_SCAN_MAX  = 3099;   // try 3000–3099 before giving up
 const SERVER_READY_TIMEOUT = 30_000;
 const MAX_LOG_LINES = 200;
 
@@ -103,6 +104,8 @@ let tray = null;
 let serverProcess = null;
 let serverRunning = false;
 let logBuffer = [];
+// Resolved at startup — may differ from PREFERRED_PORT if 3000 is taken
+let activePort = PREFERRED_PORT;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -125,8 +128,7 @@ function pushLog(line, level = 'info') {
 }
 
 // ── Port availability check ───────────────────────────────────────────────────
-// Checks if a port is already in use before spawning the server.
-// Returns a promise that resolves to true if the port is free, false if busy.
+// Returns true if the port is free, false if already in use.
 function isPortFree(port) {
   return new Promise(resolve => {
     const server = require('net').createServer();
@@ -134,6 +136,15 @@ function isPortFree(port) {
     server.once('listening', () => { server.close(); resolve(true); });
     server.listen(port, '127.0.0.1');
   });
+}
+
+// Scans ports from `start` up to `max` and resolves with the first free one.
+// Rejects if every port in the range is occupied.
+async function findFreePort(start = PREFERRED_PORT, max = PORT_SCAN_MAX) {
+  for (let port = start; port <= max; port++) {
+    if (await isPortFree(port)) return port;
+  }
+  throw new Error(`No free port found in range ${start}–${max}. Close some applications and try again.`);
 }
 
 // ── Server management ─────────────────────────────────────────────────────────
@@ -151,23 +162,31 @@ async function startServer() {
     return;
   }
 
-  // Pre-check: is port 3000 already in use?
-  const portFree = await isPortFree(SERVER_PORT);
-  if (!portFree) {
-    pushLog(`ERROR: Port ${SERVER_PORT} is already in use by another application.`, 'error');
-    pushLog(`Close the app using port ${SERVER_PORT} and restart HomeStream, or change the port in settings.`, 'warn');
+  // Find a free port, starting at the preferred port (3000).
+  // If 3000 is taken, we silently try 3001, 3002, … up to 3099.
+  let port;
+  try {
+    port = await findFreePort(PREFERRED_PORT, PORT_SCAN_MAX);
+  } catch (err) {
+    pushLog(`ERROR: ${err.message}`, 'error');
     serverRunning = false;
     sendStatus();
     return;
   }
 
+  if (port !== PREFERRED_PORT) {
+    pushLog(`Port ${PREFERRED_PORT} is in use — using port ${port} instead`, 'warn');
+  }
+
+  activePort = port;
+
   const serverPath = path.join(process.resourcesPath, 'server', 'server.bundle.mjs');
-  pushLog(`Starting server: ${serverPath}`);
+  pushLog(`Starting server on port ${activePort}: ${serverPath}`);
 
   serverProcess = spawn(process.execPath, [serverPath], {
     env: {
       ...process.env,
-      PORT: String(SERVER_PORT),
+      PORT: String(activePort),
       NODE_ENV: 'production',
       ELECTRON: '1',
       // Tell all server stores where to write data files.
@@ -203,10 +222,10 @@ async function startServer() {
     sendStatus();
   });
 
-  waitForServer().then(() => {
+  waitForServer(activePort).then(() => {
     serverRunning = true;
-    pushLog(`Server ready at http://localhost:${SERVER_PORT}`, 'success');
-    pushLog(`LAN address: http://${getLanIp()}:${SERVER_PORT}`, 'success');
+    pushLog(`Server ready at http://localhost:${activePort}`, 'success');
+    pushLog(`LAN address: http://${getLanIp()}:${activePort}`, 'success');
     sendStatus();
 
     // On first run (no config file yet) automatically open the setup wizard
@@ -215,7 +234,7 @@ async function startServer() {
     const configPath = path.join(app.getPath('userData'), 'homestream-config.json');
     const isFirstRun = !fs.existsSync(configPath);
     const startPage = isFirstRun ? '/setup' : '/';
-    shell.openExternal(`http://localhost:${SERVER_PORT}${startPage}`);
+    shell.openExternal(`http://localhost:${activePort}${startPage}`);
     if (isFirstRun) pushLog('First run detected — opening setup wizard in browser', 'info');
   }).catch(err => {
     pushLog(`Server failed to start: ${err.message}`, 'error');
@@ -231,12 +250,13 @@ function stopServer() {
   // We send a graceful shutdown request via HTTP first, then kill after a timeout.
   // This gives the server a chance to clean up HLS temp segments.
   const proc = serverProcess;
+  const port = activePort;
   serverProcess = null;
   serverRunning = false;
   sendStatus();
 
   // Try graceful HTTP shutdown first (server listens for this)
-  const gracefulReq = http.get(`http://localhost:${SERVER_PORT}/api/shutdown`, () => {
+  const gracefulReq = http.get(`http://localhost:${port}/api/shutdown`, () => {
     // Server acknowledged — give it 3 seconds to clean up then kill
     setTimeout(() => { try { proc.kill(); } catch { /* already dead */ } }, 3000);
   });
@@ -251,12 +271,12 @@ function stopServer() {
   });
 }
 
-function waitForServer(timeout = SERVER_READY_TIMEOUT) {
+function waitForServer(port, timeout = SERVER_READY_TIMEOUT) {
   return new Promise((resolve, reject) => {
     const start = Date.now();
     const check = () => {
       // /api/health is intentionally open (no auth required) — safe to poll here
-      const req = http.get(`http://localhost:${SERVER_PORT}/api/health`, res => {
+      const req = http.get(`http://localhost:${port}/api/health`, res => {
         if (res.statusCode === 200) resolve(true);
         else retry();
         // Consume response body so the socket is released
@@ -271,7 +291,7 @@ function waitForServer(timeout = SERVER_READY_TIMEOUT) {
       req.on('error', retry);
     };
     const retry = () => {
-      if (Date.now() - start > timeout) return reject(new Error(`Server startup timeout after ${timeout / 1000}s — port ${SERVER_PORT} may be in use by another app`));
+      if (Date.now() - start > timeout) return reject(new Error(`Server startup timeout after ${timeout / 1000}s — port ${port} may be in use by another app`));
       setTimeout(check, 500);
     };
     check();
@@ -282,10 +302,10 @@ function sendStatus() {
   const lanIp = getLanIp();
   controlWindow?.webContents.send('status', {
     running: serverRunning,
-    lanUrl: `http://${lanIp}:${SERVER_PORT}`,
-    localUrl: `http://localhost:${SERVER_PORT}`,
+    lanUrl: `http://${lanIp}:${activePort}`,
+    localUrl: `http://localhost:${activePort}`,
     lanIp,
-    port: SERVER_PORT,
+    port: activePort,
   });
 }
 
@@ -352,8 +372,8 @@ function createTray() {
         click: () => { controlWindow?.show(); controlWindow?.focus(); },
       },
       {
-        label: `Open in Browser (http://localhost:${SERVER_PORT})`,
-        click: () => shell.openExternal(`http://localhost:${SERVER_PORT}`),
+        label: `Open in Browser (http://localhost:${activePort})`,
+        click: () => shell.openExternal(`http://localhost:${activePort}`),
         enabled: serverRunning,
       },
       { type: 'separator' },
@@ -380,9 +400,9 @@ function createTray() {
 
 ipcMain.on('start-server',      () => startServer().catch(err => pushLog(`Start failed: ${err.message}`, 'error')));
 ipcMain.on('stop-server',       () => stopServer());
-ipcMain.on('open-browser',      () => shell.openExternal(`http://localhost:${SERVER_PORT}`));
+ipcMain.on('open-browser',      () => shell.openExternal(`http://localhost:${activePort}`));
 ipcMain.on('open-browser-lan',  (_, url)  => shell.openExternal(url));
-ipcMain.on('open-browser-page', (_, page) => shell.openExternal(`http://localhost:${SERVER_PORT}${page}`));
+ipcMain.on('open-browser-page', (_, page) => shell.openExternal(`http://localhost:${activePort}${page}`));
 ipcMain.on('request-status',    () => sendStatus());
 
 // ── App lifecycle ─────────────────────────────────────────────────────────────
@@ -758,7 +778,8 @@ const CONTROL_PANEL_HTML = `<!DOCTYPE html>
 <script>
   let isRunning = false;
   let lanUrl = '';
-  let localUrl = 'http://localhost:3000';
+  let localUrl = '';
+  let currentPort = 3000;
   let isFirstRun = false;
   let qrLoaded = false;
 
@@ -833,7 +854,8 @@ const CONTROL_PANEL_HTML = `<!DOCTYPE html>
   function updateStatus(status) {
     isRunning = status.running;
     lanUrl = status.lanUrl || '';
-    localUrl = status.localUrl || 'http://localhost:3000';
+    localUrl = status.localUrl || '';
+    currentPort = status.port || 3000;
 
     const dot        = document.getElementById('dot');
     const text       = document.getElementById('status-text');
@@ -852,7 +874,7 @@ const CONTROL_PANEL_HTML = `<!DOCTYPE html>
 
     if (isRunning) {
       localChip.style.display = 'block';
-      localChip.textContent = 'localhost:3000';
+      localChip.textContent = \`localhost:\${currentPort}\`;
       accessPanel.classList.add('visible');
       localLink.textContent = localUrl;
       if (lanUrl) {
