@@ -9,16 +9,18 @@ function serverBundlePlugin(): Plugin {
 	return {
 		name: "server-bundle",
 		apply: "build",
-closeBundle: async function() { 
-	 if (built) return; 
-	  const fs0 = await import("fs"); 
-	   const appJsPath = path.resolve(__dirname, "dist", "app.js"); 
-	    if (!fs0.existsSync(appJsPath)) { 
-			 console.log("Skipping server bundle — dist/app.js not yet generated."); 
-			  return; 
-			} 
-			 built = true; 
-console.log("Bundling server code with esbuild...");
+		closeBundle: async function() {
+			// @ts-ignore
+			if (!this?.meta?.watchMode === false && built) return;
+			if (built) return;
+			// Only run after SSR build (app.js must exist)
+			const fs0 = await import("fs");
+			const appJsPath = path.resolve(__dirname, "dist", "app.js");
+			if (!fs0.existsSync(appJsPath)) {
+				console.log("Skipping server bundle — dist/app.js not yet generated.");
+				return;
+			}
+			built = true;
 			console.log("Bundling server code with esbuild...");
 			const outfile = path.resolve(__dirname, "dist", "server.bundle.mjs");
 			await esbuild.build({
@@ -31,28 +33,38 @@ console.log("Bundling server code with esbuild...");
 				packages: "bundle",
 				sourcemap: true,
 				alias: {
-					"webrtc-polyfill": path.resolve(__dirname, "src/server/stubs/webrtc-polyfill-stub.js"),
-					"webtorrent": path.resolve(__dirname, "src/server/stubs/webtorrent-stub.js"),
+					"webrtc-polyfill": path.resolve(
+						__dirname,
+						"src/server/stubs/webrtc-polyfill-stub.js"
+					),
+					"webtorrent": path.resolve(
+						__dirname,
+						"src/server/stubs/webtorrent-stub.js"
+					),
 				},
 				external: ["node-datachannel"],
 				banner: {
 					js: `import { createRequire as __airo_createRequire } from 'module';\nconst require = __airo_createRequire(import.meta.url);`,
 				},
 			});
-			const fs2 = await import("fs");
-			let src = fs2.readFileSync(outfile, "utf8");
-			let firstSeen = false;
-			src = src.replace(
-				/^import \{ createRequire(?: as \w+)? \} from ["']module["'];?\r?\n/gm,
-				(match) => {
-					if (!firstSeen) { firstSeen = true; return match; }
-					return "";
+
+			// Post-process: deduplicate `import { createRequire } from "module"` lines.
+			{
+				const fs2 = await import("fs");
+				let src = fs2.readFileSync(outfile, "utf8");
+				let firstSeen = false;
+				src = src.replace(
+					/^import \{ createRequire(?: as \w+)? \} from ["']module["'];?\r?\n/gm,
+					(match) => {
+						if (!firstSeen) { firstSeen = true; return match; }
+						return "";
+					}
+				);
+				if (!firstSeen) {
+					src = `import { createRequire } from "module";\nconst require = createRequire(import.meta.url);\n` + src;
 				}
-			);
-			if (!firstSeen) {
-				src = `import { createRequire } from "module";\nconst require = createRequire(import.meta.url);\n` + src;
+				fs2.writeFileSync(outfile, src);
 			}
-			fs2.writeFileSync(outfile, src);
 			console.log("Server bundle created at dist/server.bundle.mjs");
 		},
 	};
@@ -63,6 +75,7 @@ const corsOrigins = ["*"];
 
 export default defineConfig(({ mode }) => ({
 	envPrefix: ["VITE_", "SITE_"],
+
 	plugins: [
 		react(),
 		apiRoutes({
@@ -73,6 +86,7 @@ export default defineConfig(({ mode }) => ({
 		}),
 		serverBundlePlugin(),
 	],
+
 	resolve: {
 		dedupe: ["react", "react-dom", "react-router-dom"],
 		alias: {
@@ -81,14 +95,17 @@ export default defineConfig(({ mode }) => ({
 			"@": path.resolve(__dirname, "./src"),
 		},
 	},
+
 	optimizeDeps: {
 		include: ["react", "react-dom", "react-router-dom"],
 		exclude: ["html-to-image", "clsx", "tailwind-merge"],
 	},
+
 	ssr: {
 		noExternal: [],
 		external: ["html-to-image", "#airo/secrets"],
 	},
+
 	server: {
 		host: process.env.HOST || "0.0.0.0",
 		port: parseInt(process.env.PORT || "5173"),
@@ -100,9 +117,14 @@ export default defineConfig(({ mode }) => ({
 			methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
 			allowedHeaders: ["Content-Type", "Authorization", "Accept", "User-Agent"],
 		},
-		hmr: { overlay: false },
-		watch: { ignored: ["**/dist/**", "**/.api/**"] },
+		hmr: {
+			overlay: false,
+		},
+		watch: {
+			ignored: ["**/dist/**", "**/.api/**"],
+		},
 	},
+
 	preview: {
 		host: process.env.HOST || "0.0.0.0",
 		port: parseInt(process.env.PORT || "5173"),
@@ -115,10 +137,14 @@ export default defineConfig(({ mode }) => ({
 			allowedHeaders: ["Content-Type", "Authorization", "Accept", "User-Agent"],
 		},
 	},
+
 	build: {
 		rollupOptions: {
+			external: ["#airo/secrets"],
 			output: {
-				manualChunks: { "react-vendor": ["react", "react-dom", "react-router-dom"] },
+				manualChunks: {
+					"react-vendor": ["react", "react-dom", "react-router-dom"],
+				},
 			},
 		},
 	},
