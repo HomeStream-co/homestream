@@ -4,104 +4,176 @@
 
 ---
 
-## Install (Desktop App — Easiest)
+## ⚠️ BEFORE YOU START — Read This First
 
-HomeStream runs as a native desktop app on Windows, macOS, and Linux.  
-No Docker, no command line, no configuration files needed.
-
-### Windows
-
-1. Download **`HomeStream-Setup-x.x.x.exe`** from the [Releases page](https://github.com/homestream-app/homestream/releases/latest)
-2. Double-click the installer and follow the prompts
-3. HomeStream launches automatically and opens the setup wizard in your browser
-
-### macOS
-
-1. Download **`HomeStream-x.x.x.dmg`** from the [Releases page](https://github.com/homestream-app/homestream/releases/latest)
-2. Open the `.dmg` and drag **HomeStream** to your Applications folder
-3. Open HomeStream from Applications — the setup wizard opens in your browser
-
-> **macOS Gatekeeper:** If you see "unidentified developer", right-click the app → Open → Open anyway.
-
-### Linux
-
-1. Download **`HomeStream-x.x.x.AppImage`** from the [Releases page](https://github.com/homestream-app/homestream/releases/latest)
-2. Make it executable and run it:
-   ```bash
-   chmod +x HomeStream-*.AppImage
-   ./HomeStream-*.AppImage
-   ```
-3. The setup wizard opens in your browser automatically
-
-> A `.deb` package is also available for Debian/Ubuntu: `sudo dpkg -i HomeStream-*.deb`
+You need a **free GitHub account** to download HomeStream. If you don't have one:
+1. Go to **https://github.com**
+2. Click the big green **Sign up** button
+3. Follow the steps — it's free and takes 2 minutes
 
 ---
 
-## First Run — Setup Wizard
+## 🪟 Install on Windows (Step-by-Step)
 
-On first launch, HomeStream automatically opens a **setup wizard** in your browser that walks you through:
+> ⏱ Takes about **10 minutes** from start to watching your first video.
 
-1. **Media Folder** — point HomeStream at your video files
-2. **qBittorrent** *(optional)* — connect your torrent client for downloads
-3. **Jellyfin** *(optional)* — enable Jellyfin API compatibility for TV apps
-4. **VPN** *(optional)* — configure VPN kill-switch for downloads
-5. **API Keys** *(optional)* — OMDB/TMDB for metadata, Gemini for AI features
-6. **HTTPS** *(optional)* — enable HTTPS for remote access
+### Step 1 — Go to the Releases page
 
-Everything is optional except the media folder. You can skip any step and configure it later in Settings.
+1. Open your web browser (Chrome, Edge, Firefox — any of them)
+2. Go to: **https://github.com/trevorrossworn-code/homestream/releases/latest**
+3. You'll see a page that says **"HomeStream v1.1.0"** at the top
 
----
+### Step 2 — Download the installer
 
-## Features
+1. Scroll down on that page until you see a section called **"Assets"**
+2. Click on the file named **`HomeStream-Setup-1.1.0.exe`**
+3. Your browser will download it — check your **Downloads** folder
 
-| Feature | Details |
+### Step 3 — Run the installer
+
+1. Open your **Downloads** folder
+2. Double-click **`HomeStream-Setup-1.1.0.exe`**
+3. Windows will show a blue warning that says **"Windows protected your PC"**
+   - This is normal — the app just isn't signed yet
+   - Click **"More info"** (it's a small link in the middle of the box)
+   - Then click the **"Run anyway"** button that appears
+4. The installer opens — click **Next**, then **Install**, then **Finish**
+5. HomeStream starts automatically and opens in your browser
+
+### Step 4 — Run the Setup Wizard
+
+HomeStream will open a setup page in your browser automatically. It has **5 steps**:
+
+| Step | What to do |
 |---|---|
-| **Video Player** | Custom controls, ±10s seek, speed 0.5×–3×, keyboard shortcuts |
-| **Closed Captions** | Auto-fetch EN/ES WebVTT, SRT upload, one-key CC cycling |
-| **Resume Playback** | Saves progress every 10s; resumes to exact second |
-| **Multi-Profile** | Up to 6 profiles; Kids Mode filters G/PG content only |
-| **PIN Lock** | Optional 4-digit PIN on Adult profiles |
-| **Watch History** | Full history with per-item removal |
-| **Watchlist** | Bookmark titles to watch later |
-| **AI Enrichment** | Gemini-powered tags, mood, themes, summaries, similar titles |
-| **AI Chat** | Ask for recommendations from your library |
-| **Torrent Downloads** | Stremio/Torrentio + qBittorrent integration |
-| **Security Scanning** | Extension check → VirusTotal → magic bytes → archive inspection |
-| **DLNA Casting** | Cast to any DLNA/UPnP TV on your network |
-| **Chromecast** | Cast to Chromecast devices |
-| **Phone Remote** | WebSocket touch remote — scan QR code from your phone |
-| **Stats Dashboard** | Codec breakdown, storage, resolution split, watch time |
-| **Transcoding** | FFmpeg H.264 re-encode for browser compatibility; HEVC via HLS |
-| **Jellyfin API** | Compatible with Infuse, Jellyfin apps, and other Jellyfin clients |
-| **Dark Themes** | 6 built-in themes |
+| **1. Requirements** | Just click **Next** — it checks your system automatically |
+| **2. Media Folder** | Click **Browse** and pick the folder where your movies/shows are saved |
+| **3. Optional Services** | Click **Skip** unless you have qBittorrent or Jellyfin installed |
+| **4. API Keys** | Click **Skip** for now — you can add these later |
+| **5. Finish** | Click **Finish** — HomeStream scans your media folder |
+
+### Step 5 — Start watching
+
+1. HomeStream takes you to the home screen
+2. Your movies and TV shows appear automatically (posters load in the background)
+3. Click any title to start watching
 
 ---
 
-## Media Folder Structure
+## 🍎 Install on Mac
 
-HomeStream scans your media folder recursively. Supported formats: `.mp4`, `.mkv`, `.avi`, `.webm`, `.mov`, `.m4v`
+### Step 1 — Download
+
+1. Go to **https://github.com/trevorrossworn-code/homestream/releases/latest**
+2. Scroll to **Assets** and click **`HomeStream-1.1.0.dmg`**
+
+### Step 2 — Install
+
+1. Open your **Downloads** folder and double-click the `.dmg` file
+2. A window opens showing the HomeStream icon and an Applications folder
+3. Drag the **HomeStream** icon onto the **Applications** folder icon
+4. Wait for it to copy, then close the window
+
+### Step 3 — Open it
+
+1. Open your **Applications** folder
+2. Double-click **HomeStream**
+3. Mac will say **"HomeStream can't be opened because it's from an unidentified developer"**
+   - Don't panic — this is normal
+   - **Right-click** the HomeStream icon → click **Open** → click **Open** again
+4. HomeStream opens in your browser — follow the Setup Wizard (same 5 steps as Windows above)
+
+---
+
+## 🐧 Install on Linux
+
+```bash
+# Download the AppImage
+chmod +x HomeStream-1.1.0.AppImage
+./HomeStream-1.1.0.AppImage
+```
+
+A `.deb` package is also available: `sudo dpkg -i HomeStream-1.1.0.deb`
+
+---
+
+## 🔄 Updates
+
+HomeStream updates itself automatically. When a new version is available:
+1. A notification appears in the **HomeStream Control Panel** (the icon in your system tray)
+2. Click **"Install Update"**
+3. HomeStream downloads and restarts — takes about 2 minutes
+4. Your settings and watch history are never affected by updates
+
+---
+
+## 📁 How to Organize Your Media Files
+
+HomeStream finds your movies and shows automatically if you name them like this:
 
 ```
 /your-media-folder
 ├── movies/
 │   ├── Inception (2010).mkv
 │   ├── The Dark Knight (2008).mp4
-│   └── ...
+│   └── Interstellar (2014).mkv
 └── tv/
     ├── Breaking Bad S01E01.mkv
     ├── Breaking Bad S01E02.mkv
-    └── ...
+    └── Stranger Things S02E03.mp4
 ```
 
-**Naming tips for best metadata matching:**
-- Movies: `Title (Year).ext` → `Inception (2010).mkv`
-- TV Shows: `Show Name S01E01.ext` → `Breaking Bad S01E01.mkv`
+**Naming tips:**
+- Movies → `Movie Name (Year).mp4` — example: `Toy Story (1995).mp4`
+- TV Shows → `Show Name S01E01.mp4` — example: `Friends S03E12.mp4`
+
+Supported file types: `.mp4` `.mkv` `.avi` `.webm` `.mov` `.m4v`
 
 ---
 
-## Docker Deployment (Headless / Server)
+## ✨ Features
 
-If you want to run HomeStream on a server without a desktop, use Docker:
+| Feature | What it does |
+|---|---|
+| **Video Player** | Play, pause, rewind 10s, fast forward, change speed |
+| **Subtitles** | Auto-downloads captions in English and Spanish |
+| **Resume Playback** | Picks up exactly where you left off |
+| **Multiple Profiles** | Up to 6 profiles — one for each family member |
+| **Kids Mode** | Hides anything rated above PG automatically |
+| **PIN Lock** | Add a 4-digit PIN to any profile |
+| **Download Movies** | Download via qBittorrent integration |
+| **Cast to TV** | Chromecast and DLNA/smart TV support |
+| **Phone Remote** | Control playback from your phone — scan a QR code |
+| **AI Chat** | Ask for movie recommendations from your library |
+| **Stats** | See how much storage you're using and what you've watched |
+
+---
+
+## 🔧 Troubleshooting
+
+**Video is stuck on a loading spinner**
+Go to **Settings → Debug Panel → Quick Fixes → Fix Stuck Transcodes** and click the button.
+
+**No movie posters or info showing**
+Go to **Settings → API Keys** and add a free TMDB key from [themoviedb.org](https://www.themoviedb.org/settings/api).
+
+**HomeStream can't find my files**
+Go to **Settings → Scan for New Files**.
+
+**Running out of disk space**
+Go to **Settings → Debug Panel → Quick Fixes → Purge Orphaned Upload Files**.
+
+**Something looks wrong with movie info**
+Go to **Settings → Debug Panel → Quick Fixes → Clear TMDB Cache**.
+
+**Check if everything is working**
+Open your browser and go to `http://localhost:5173/api/health`
+
+---
+
+## 🐳 Run on a Server (Advanced)
+
+If you want HomeStream running 24/7 on a home server or NAS without a desktop, use Docker:
 
 ```yaml
 # docker-compose.yml
@@ -118,10 +190,9 @@ services:
       - homestream-data:/data
     environment:
       MEDIA_DIR: /media
-      ADMIN_PASSWORD: ""        # set a strong password if exposing to internet
-      OMDB_API_KEY: ""          # https://www.omdbapi.com/apikey.aspx (free)
-      TMDB_API_KEY: ""          # https://www.themoviedb.org/settings/api (free)
-      GEMINI_API_KEY: ""        # https://aistudio.google.com/app/apikey (free)
+      ADMIN_PASSWORD: ""
+      TMDB_API_KEY: ""
+      GEMINI_API_KEY: ""
 
 volumes:
   homestream-data:
@@ -134,50 +205,31 @@ docker compose up -d
 
 ---
 
-## Security
-
-- **Admin Password** — set in Settings to require login before accessing the app
-- **Profile PINs** — 4-digit PIN to lock Adult profiles on shared devices
-- **Kids Mode** — automatically filters content rated above PG
-
-> Always set an Admin Password if exposing HomeStream to the internet.
-
----
-
-## Troubleshooting
-
-**Video won't play / shows transcoding spinner**
-FFmpeg is re-encoding the file for browser compatibility. This happens once per file. If stuck, go to **Settings → Debug Panel → Fix Stuck Transcodes**.
-
-**No poster or metadata**
-Add an OMDB API key in **Settings → API Keys**. Free tier: 1,000 requests/day.
-
-**Can't find media files**
-Use **Settings → Scan for New Files** to trigger a manual scan.
-
-**Health check**
-Visit `/api/health` in your browser for a live status of all subsystems.
-
----
-
-## Building from Source
+## 🛠 Build from Source (Developers)
 
 ```bash
-# Clone
-git clone https://github.com/homestream-app/homestream.git
+git clone https://github.com/trevorrossworn-code/homestream.git
 cd homestream
+npm install
 
-# macOS / Linux — builds the installer automatically
-bash install.sh
+# Run in development mode
+npm run dev
 
-# Windows — builds the installer automatically
-install.bat
+# Build the Windows installer (must run on Windows)
+npm run electron:win
 ```
 
-> **FFmpeg is bundled automatically** via `ffmpeg-static` — no manual install needed.
+**Automated releases via GitHub Actions** — push a version tag and the installer builds itself:
+
+```bash
+npm version 1.2.0
+git push origin main --tags
+```
+
+See [`.github/RELEASE.md`](.github/RELEASE.md) for the one-time secrets setup.
 
 ---
 
-## License
+## 📄 License
 
 MIT — use freely, modify freely, no warranty.
