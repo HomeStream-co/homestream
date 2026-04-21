@@ -101,7 +101,7 @@ nsis:
   # Installer branding images
   # headerImage: shown top-right on every wizard page (150×57 px, BMP or PNG)
   # installerSidebar: shown left side on Welcome/Finish pages (164×314 px, BMP or PNG)
-  headerImage: electron/assets/nsis-header.png
+  installerHeader: electron/assets/nsis-header.png
   installerSidebar: electron/assets/nsis-sidebar.png
 
 # ── macOS ─────────────────────────────────────────────────────────────────────
@@ -131,6 +131,7 @@ linux:
   category: AudioVideo
   description: Self-hosted media streaming server
   desktop:
-    Name: HomeStream
-    Comment: Stream your personal media collection
-    Categories: AudioVideo;Video;Player;
+    entry:
+      Name: HomeStream
+      Comment: Stream your personal media collection
+      Categories: AudioVideo;Video;Player;
