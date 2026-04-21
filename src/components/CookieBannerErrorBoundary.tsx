@@ -1,11 +1,25 @@
-/**
- * CookieBannerErrorBoundary — stub for local installs.
- * Analytics are not used locally; this renders children directly.
- */
-import { Component, type ReactNode } from 'react';
+import { Component, type ErrorInfo, type ReactNode } from 'react';
 
-interface Props { children: ReactNode; }
+export default class CookieBannerErrorBoundary extends Component<
+  { children: ReactNode },
+  { hasError: boolean }
+> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
 
-export default class CookieBannerErrorBoundary extends Component<Props> {
-  render() { return this.props.children; }
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  static getDerivedStateFromError(_error: unknown): { hasError: boolean } {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.warn('CookieBanner error boundary caught an error:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) return null;
+    return this.props.children;
+  }
 }
