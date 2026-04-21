@@ -14,6 +14,28 @@ import('./crashLogger.js').then(({ installCrashHandlers }) => {
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
+// Resolve the directory where the built client files (index.html, assets/) live.
+//
+// Layout differences between environments:
+//   Dev / cloud (vite-plugin-api-routes):
+//     Server entry: dist/app.js  →  __dirname = dist/
+//     Client files: dist/index.html, dist/assets/  →  join(__dirname, '.')
+//
+//   Packaged Electron (.exe):
+//     Server bundle: resources/server/server.bundle.mjs
+//     Client files:  resources/client/index.html, resources/client/assets/
+//     (copied there by extraResources in electron-builder.yml)
+//
+// We detect the Electron case via the ELECTRON env var injected by main.js.
+function resolveClientDir() {
+  if (process.env.ELECTRON === '1' && process.resourcesPath) {
+    return join(process.resourcesPath, 'client');
+  }
+  // Dev/cloud: client files are in the same dist/ directory as app.js
+  return __dirname;
+}
+const CLIENT_DIR = resolveClientDir();
+
 /**
  * Lightweight gzip middleware for JSON API responses.
  * Skips video streams (handled separately with range requests).
@@ -47,19 +69,6 @@ function gzipMiddleware(req, res, next) {
   };
 
   next();
-}
-
-async function seedDemoItem() {
-  try {
-    const { readLibrary, writeLibrary } = await import('./libraryStore.js');
-    const { DEMO_ITEM } = await import('./demoItem.js');
-    const library = readLibrary();
-    if (library.find(m => m.id === 'demo-bbb')) return; // already seeded
-    await writeLibrary(lib => { lib.unshift(DEMO_ITEM); return lib; });
-    console.log('[demo] Big Buck Bunny seeded into library');
-  } catch (err) {
-    console.warn('[demo] Seed failed (non-fatal):', err.message);
-  }
 }
 
 // ── Vite dev server hooks ──────────────────────────────────────────────────
@@ -157,15 +166,17 @@ export const serverBefore = (server) => {
         'X-Frame-Options': 'SAMEORIGIN',
         'X-XSS-Protection': '1; mode=block',
         'Referrer-Policy': 'strict-origin-when-cross-origin',
-        // Permissive CSP for local network — allows LAN IPs, localhost, and
-        // external sources needed for TMDB posters and Google Fonts
+        // Permissive CSP for local network — allows LAN IPs, localhost.
+        // All TMDB poster/backdrop images are served locally from /tmdb-images/
+        // so no external image.tmdb.org origin is needed.
+        // connect-src still allows api.themoviedb.org for metadata fetches.
         'Content-Security-Policy': [
           "default-src 'self'",
           "script-src 'self' 'unsafe-inline' 'unsafe-eval'", // Vite HMR needs unsafe-eval in dev
           "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
           "font-src 'self' https://fonts.gstatic.com data:",
-          "img-src 'self' data: blob: https://image.tmdb.org https://img.omdbapi.com https://m.media-amazon.com",
-          "media-src 'self' blob: https://download.blender.org",
+          "img-src 'self' data: blob:",
+          "media-src 'self' blob:",
           "connect-src 'self' ws: wss: https://api.themoviedb.org https://torrentio.strem.fun",
           "frame-ancestors 'none'",
         ].join('; '),
@@ -174,7 +185,7 @@ export const serverBefore = (server) => {
     next();
   });
 
-  server.use(express.static(join(__dirname, "client"), {
+  server.use(express.static(CLIENT_DIR, {
     setHeaders(res, filePath) {
       res.set("Cache-Control", filePath.includes("/assets/")
         ? "public, max-age=31536000, immutable"
@@ -193,7 +204,7 @@ export const serverAfter = (server) => {
     if (req.method !== 'GET') return next();
     if (req.path.startsWith('/api')) return next();
     if (extname(req.path)) return next();
-    res.sendFile(join(__dirname, 'client', 'index.html'));
+    res.sendFile(join(CLIENT_DIR, 'index.html'));
   });
 
   const errorHandler = (err, req, res, next) => {
@@ -218,7 +229,4 @@ export const serverListening = (server) => {
   }).catch(err => {
     console.warn('[remote] Failed to attach remote control (non-fatal):', err.message);
   });
-
-  // Seed demo item once server is ready (single call — not duplicated in serverBefore)
-  seedDemoItem();
 };
