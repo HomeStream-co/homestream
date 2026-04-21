@@ -8,13 +8,17 @@
 #   3. Creates a GitHub Release and uploads the .exe as a release asset
 #
 # Required GitHub repo secrets (Settings → Secrets → Actions):
-#   GH_TOKEN  — a GitHub Personal Access Token with `repo` scope.
-#               Used by electron-builder to create the release and upload assets.
-#               Generate at: https://github.com/settings/tokens
+#   GH_TOKEN        — Personal Access Token with `repo` scope. Used by
+#                     electron-builder to create the release and upload assets.
+#                     Generate at: https://github.com/settings/tokens
+#   GH_OWNER        — Your GitHub username or org (e.g. "john-doe").
+#                     Baked into the .exe so the auto-updater knows where to
+#                     check for new releases. Must match the repo owner exactly.
+#   GH_REPO         — Your GitHub repo name (e.g. "homestream").
+#                     Baked into the .exe alongside GH_OWNER.
 #
-# Optional secrets (only needed if you want the app to work out-of-the-box):
-#   TMDB_API_KEY      — baked into the installer as a default; users can override
-#                       in the setup wizard. If omitted, users must enter their own.
+# Optional secrets:
+#   TMDB_API_KEY    — Baked in as a default; users can override in setup wizard.
 #
 # How to trigger a release:
 #   git tag v1.1.0
@@ -70,10 +74,15 @@ jobs:
       # --publish always  → electron-builder creates the GitHub Release and
       #                     uploads the .exe + latest.yml (used by auto-updater).
       # GH_TOKEN is passed via env so electron-builder can authenticate.
+      # HOMESTREAM_GH_OWNER + HOMESTREAM_GH_REPO are read by updater.js at
+      # runtime to know which GitHub repo to poll for new releases.
+      # They must be baked in at build time — the yml config is not shipped.
       - name: Package Windows installer
         run: npx electron-builder --win --config electron/electron-builder.yml --publish always
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          HOMESTREAM_GH_OWNER: ${{ secrets.GH_OWNER }}
+          HOMESTREAM_GH_REPO: ${{ secrets.GH_REPO }}
 
       # ── 7. Upload artifact (backup — also available in GitHub Release) ────────
       - name: Upload installer artifact

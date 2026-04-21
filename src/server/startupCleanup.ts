@@ -32,6 +32,18 @@
  * Fix: On startup, delete every subdirectory inside HLS_BASE_DIR. The
  * directories are cheap to recreate (FFmpeg regenerates them on next play)
  * and there is no value in keeping stale segments from a previous run.
+ *
+ * Problem 5: Orphaned upload files — video files sitting in the uploads/
+ * directory that have no corresponding entry in media-library.json. These
+ * accumulate when:
+ *   a) A user uploads a file but the library write fails mid-way.
+ *   b) A transcode produces a _tc.mp4 but the original is never deleted.
+ *   c) A media item is deleted from the library but the file deletion fails.
+ *
+ * Fix: On startup, scan the uploads directory and delete any video file whose
+ * basename doesn't match any `filename` or `originalFilename` in the library.
+ * Only video extensions are considered — subtitles and other assets are left
+ * alone. Deletion is logged with the total disk space reclaimed.
  */
 
 import fs from 'fs';
@@ -148,7 +160,77 @@ function cleanupHlsOrphans(): void {
   }
 }
 
-// ── Main export ───────────────────────────────────────────────────────────────
+// ── Orphaned upload file cleanup ──────────────────────────────────────────────
+
+const VIDEO_EXTENSIONS = new Set(['.mp4', '.mkv', '.avi', '.mov', '.webm', '.m4v', '.ts']);
+
+/**
+ * Delete video files in the uploads directory that have no library entry.
+ *
+ * Safe because:
+ *  - We only delete files whose extension is in VIDEO_EXTENSIONS.
+ *  - We cross-reference every file against ALL filenames in the library
+ *    (both `filename` and `originalFilename`) before deleting.
+ *  - Subtitle files (.srt, .vtt, .ass) and thumbnails are never touched.
+ *  - Non-existent uploads dir is silently skipped.
+ */
+function cleanupOrphanedUploads(library: MediaRecord[]): void {
+  if (!fs.existsSync(UPLOADS_DIR)) return;
+
+  // Build a set of every filename the library knows about
+  const knownFiles = new Set<string>();
+  for (const item of library) {
+    if (item.filename)         knownFiles.add(path.basename(item.filename));
+    if (item.originalFilename) knownFiles.add(path.basename(item.originalFilename as string));
+    // Also protect episode files for TV shows
+    if (Array.isArray(item.episodes)) {
+      for (const ep of item.episodes as Array<{ filename?: string }>) {
+        if (ep.filename) knownFiles.add(path.basename(ep.filename));
+      }
+    }
+  }
+
+  let entries: fs.Dirent[];
+  try {
+    entries = fs.readdirSync(UPLOADS_DIR, { withFileTypes: true });
+  } catch (err) {
+    console.warn(`[startup] Could not read uploads dir: ${err}`);
+    return;
+  }
+
+  const orphans = entries.filter(e => {
+    if (!e.isFile()) return false;
+    const ext = path.extname(e.name).toLowerCase();
+    if (!VIDEO_EXTENSIONS.has(ext)) return false;
+    return !knownFiles.has(e.name);
+  });
+
+  if (orphans.length === 0) {
+    console.log('[startup] Orphaned upload cleanup: no orphaned video files found.');
+    return;
+  }
+
+  let removed = 0;
+  let totalBytes = 0;
+
+  for (const orphan of orphans) {
+    const filePath = path.join(UPLOADS_DIR, orphan.name);
+    try {
+      const stat = fs.statSync(filePath);
+      totalBytes += stat.size;
+      fs.unlinkSync(filePath);
+      removed++;
+      console.log(`[startup]   🗑 Orphan removed: ${orphan.name} (${(stat.size / 1024 / 1024).toFixed(1)} MB)`);
+    } catch (err) {
+      console.warn(`[startup]   ⚠ Could not delete orphan ${orphan.name}: ${err}`);
+    }
+  }
+
+  const mb = (totalBytes / 1024 / 1024).toFixed(1);
+  console.log(`[startup] Orphaned upload cleanup: removed ${removed} file(s) (${mb} MB reclaimed).`);
+}
+
+
 
 export function runStartupCleanup(): void {
   // ── HLS orphan cleanup ───────────────────────────────────────────────────────

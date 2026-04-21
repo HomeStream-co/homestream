@@ -76,15 +76,19 @@ function setupAutoUpdater({ controlWindowGetter, pushLog }) {
     return;
   }
 
-  // Skip if the GitHub repo hasn't been configured yet (placeholder values).
-  // The owner/repo are baked in at build time via the HOMESTREAM_GH_OWNER and
-  // HOMESTREAM_GH_REPO env vars (set in CI). Reading electron-builder.yml at
-  // runtime is NOT possible — the file is not shipped inside the packaged asar.
-  const owner = process.env.HOMESTREAM_GH_OWNER || '';
-  const repo  = process.env.HOMESTREAM_GH_REPO  || '';
+  // Skip if the GitHub repo hasn't been configured yet.
+  // Owner/repo are baked in two ways (first found wins):
+  //   1. HOMESTREAM_GH_OWNER / HOMESTREAM_GH_REPO env vars (set by CI at build time)
+  //   2. package.json build.ghOwner / build.ghRepo (written via extraMetadata in electron-builder.yml)
+  // If neither is set, the auto-updater is silently disabled.
+  let pkg = {};
+  try { pkg = require('../package.json'); } catch { /* ignore */ }
 
-  if (!owner || owner === 'homestream-app' || !repo || repo === 'homestream' || !repo) {
-    log('Auto-updater not configured — skipping. Set HOMESTREAM_GH_OWNER and HOMESTREAM_GH_REPO env vars at build time to enable.', 'info');
+  const owner = process.env.HOMESTREAM_GH_OWNER || pkg?.build?.ghOwner || '';
+  const repo  = process.env.HOMESTREAM_GH_REPO  || pkg?.build?.ghRepo  || '';
+
+  if (!owner || !repo) {
+    log('Auto-updater not configured — set GH_OWNER + GH_REPO as GitHub Actions secrets to enable.', 'info');
     sendStatus('idle');
     return;
   }
