@@ -97,6 +97,13 @@ export default defineConfig(({ mode }) => ({
 			nothing: "/src/fallbacks/missingModule.ts",
 			"@/api": path.resolve(__dirname, "./src/server/api"),
 			"@": path.resolve(__dirname, "./src"),
+			// Dev shim for the platform secret store.
+			// In production the real #airo/secrets module is provided by the
+			// platform runtime. In dev (Vite SSR module runner) it can't be
+			// resolved, so we alias it to a shim that reads from process.env.
+			// The production build externalizes #airo/secrets so this alias
+			// is never bundled into the production server bundle.
+			"#airo/secrets": path.resolve(__dirname, "./src/server/airo-secrets-shim.ts"),
 		},
 	},
 

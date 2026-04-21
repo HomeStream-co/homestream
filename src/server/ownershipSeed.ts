@@ -30,9 +30,15 @@
 import bcrypt from 'bcryptjs';
 import { readConfig, writeConfig } from './configStore.js';
 
-// getSecret is intercepted by the esbuild plugin at build time.
-// It reads from the platform secret store — never from .env files.
-import { getSecret } from '#airo/secrets';
+// Resolve a secret value from process.env.
+// The platform injects all secrets as environment variables at runtime,
+// so process.env is the correct and only source needed here.
+// (getSecret from #airo/secrets is only needed in files that are bundled
+// by esbuild for the production server bundle — configure.js is not bundled
+// that way, so we use process.env directly.)
+function resolveSecret(name: string): string | undefined {
+  return process.env[name] || undefined;
+}
 
 export async function runOwnershipSeed(): Promise<void> {
   const cfg = readConfig();
@@ -40,9 +46,7 @@ export async function runOwnershipSeed(): Promise<void> {
   let didSeed = false;
 
   // ── 1. Admin password ──────────────────────────────────────────────────────
-  // Only seed if no password is stored yet. Once set, DEVELOPER_LOCK prevents
-  // the setup wizard from overwriting it.
-  const secretPassword = getSecret('ADMIN_PASSWORD') as string | undefined;
+  const secretPassword = resolveSecret('ADMIN_PASSWORD');
   if (secretPassword && !cfg.adminPassword) {
     const hashed = await bcrypt.hash(secretPassword, 12);
     updates.adminPassword = hashed;
@@ -51,7 +55,7 @@ export async function runOwnershipSeed(): Promise<void> {
   }
 
   // ── 2. TMDB API key ────────────────────────────────────────────────────────
-  const secretTmdb = getSecret('TMDB_API_KEY') as string | undefined;
+  const secretTmdb = resolveSecret('TMDB_API_KEY');
   if (secretTmdb && !cfg.tmdbApiKey) {
     updates.tmdbApiKey = secretTmdb;
     didSeed = true;
@@ -59,7 +63,7 @@ export async function runOwnershipSeed(): Promise<void> {
   }
 
   // ── 3. Google AI API key ───────────────────────────────────────────────────
-  const secretGoogleAi = getSecret('GOOGLE_AI_API_KEY') as string | undefined;
+  const secretGoogleAi = resolveSecret('GOOGLE_AI_API_KEY');
   if (secretGoogleAi && !cfg.googleAiApiKey) {
     updates.googleAiApiKey = secretGoogleAi;
     didSeed = true;
@@ -72,7 +76,7 @@ export async function runOwnershipSeed(): Promise<void> {
   }
 
   // ── 4. Developer lock status ───────────────────────────────────────────────
-  const locked = process.env.DEVELOPER_LOCK === 'true';
+  const locked = resolveSecret('DEVELOPER_LOCK') === 'true';
   if (locked) {
     console.log('[ownership] DEVELOPER_LOCK=true — setup wizard cannot overwrite admin password');
   }
@@ -81,6 +85,7 @@ export async function runOwnershipSeed(): Promise<void> {
 /**
  * Returns true if DEVELOPER_LOCK=true is set.
  * Used by the setup POST handler to refuse password overwrites.
+ * Synchronous — reads process.env only (no async needed at request time).
  */
 export function isDeveloperLocked(): boolean {
   return process.env.DEVELOPER_LOCK === 'true';
