@@ -20,7 +20,7 @@ You need a **free GitHub account** to download HomeStream. If you don't have one
 ### Step 1 — Go to the Releases page
 
 1. Open your web browser (Chrome, Edge, Firefox — any of them)
-2. Go to: **https://github.com/YOUR_USERNAME/YOUR_REPO/releases/latest**
+2. Go to: **https://github.com/trevorrossworn-code/homestream/releases/latest**
 3. You'll see a page that says **"HomeStream v1.1.0"** at the top
 
 ### Step 2 — Download the installer
@@ -64,7 +64,7 @@ HomeStream will open a setup page in your browser automatically. It has **5 step
 
 ### Step 1 — Download
 
-1. Go to **https://github.com/YOUR_USERNAME/YOUR_REPO/releases/latest**
+1. Go to **https://github.com/trevorrossworn-code/homestream/releases/latest**
 2. Scroll to **Assets** and click **`HomeStream-1.1.0.dmg`**
 
 ### Step 2 — Install
@@ -208,7 +208,7 @@ docker compose up -d
 ## 🛠 Build from Source (Developers)
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/YOUR_REPO.git
+git clone https://github.com/trevorrossworn-code/homestream.git
 cd homestream
 npm install
 
