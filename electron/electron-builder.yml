@@ -22,9 +22,8 @@ copyright: Copyright © 2026 HomeStream
 # updater.js reads process.env.HOMESTREAM_GH_OWNER at runtime (Electron passes
 # all extraMetadata fields as env vars automatically via electron-builder).
 extraMetadata:
-  build:
-    ghOwner: ${HOMESTREAM_GH_OWNER}
-    ghRepo: ${HOMESTREAM_GH_REPO}
+  ghOwner: ${HOMESTREAM_GH_OWNER}
+  ghRepo: ${HOMESTREAM_GH_REPO}
 
 # ── Auto-updater (electron-updater via GitHub Releases) ───────────────────────
 # Set GH_TOKEN env var when publishing: npm run electron:publish
