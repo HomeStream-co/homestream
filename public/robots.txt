@@ -1,0 +1,5 @@
+# HomeStream — self-hosted media server
+# This is a private local-network application.
+# Crawlers should not index it.
+User-agent: *
+Disallow: /

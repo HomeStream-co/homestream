@@ -1,0 +1,102 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* HomeStream — Forest Green (default; overridden at runtime by ThemeContext) */
+    --background: 0 0% 3%;
+    --foreground: 140 8% 94%;
+    --card: 140 10% 6%;
+    --card-foreground: 140 8% 94%;
+    --popover: 140 10% 6%;
+    --popover-foreground: 140 8% 94%;
+    --primary: 145 60% 22%;
+    --primary-foreground: 140 8% 94%;
+    --secondary: 140 8% 11%;
+    --secondary-foreground: 140 8% 94%;
+    --muted: 140 8% 11%;
+    --muted-foreground: 140 5% 48%;
+    --accent: 145 45% 30%;
+    --accent-foreground: 140 8% 94%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 140 8% 14%;
+    --input: 140 8% 14%;
+    --ring: 145 60% 22%;
+
+    /* Extended Colors */
+    --chart-1: 0 86% 47%;
+    --chart-2: 45 100% 54%;
+    --chart-3: 220 70% 50%;
+    --chart-4: 160 60% 45%;
+    --chart-5: 280 65% 60%;
+
+    /* Sidebar Colors */
+    --sidebar: 140 10% 6%;
+    --sidebar-foreground: 140 8% 94%;
+    --sidebar-primary: 145 60% 22%;
+    --sidebar-primary-foreground: 140 8% 94%;
+    --sidebar-accent: 140 8% 11%;
+    --sidebar-accent-foreground: 140 8% 94%;
+    --sidebar-border: 140 8% 14%;
+    --sidebar-ring: 145 60% 22%;
+
+    /* Typography */
+    --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    --font-heading: "Bebas Neue", "Inter", sans-serif;
+    --font-serif: ui-serif, Georgia, "Times New Roman", serif;
+    --font-mono: ui-monospace, "SF Mono", Monaco, "Cascadia Code", "Roboto Mono", Consolas, "Courier New", monospace;
+
+    /* Border Radius */
+    --radius: 0.5rem;
+
+    /* Shadows */
+    --shadow-2xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);
+    --shadow-xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);
+    --shadow-sm: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 1px 2px -1px hsl(0 0% 0% / 0.10);
+    --shadow: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 1px 2px -1px hsl(0 0% 0% / 0.10);
+    --shadow-md: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 2px 4px -1px hsl(0 0% 0% / 0.10);
+    --shadow-lg: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 4px 6px -1px hsl(0 0% 0% / 0.10);
+    --shadow-xl: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 8px 10px -1px hsl(0 0% 0% / 0.10);
+    --shadow-2xl: 0 1px 3px 0px hsl(0 0% 0% / 0.25);
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-heading) !important;
+  }
+}
+
+/* Custom utility classes */
+@layer utilities {
+  .animate-in {
+    animation-duration: 0.2s;
+    animation-fill-mode: both;
+  }
+
+  .fade-in {
+    animation-name: fadeIn;
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+}
+
+/* Unless told otherwise, keep it for smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
