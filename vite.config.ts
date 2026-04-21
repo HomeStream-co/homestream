@@ -10,8 +10,6 @@ function serverBundlePlugin(): Plugin {
 		name: "server-bundle",
 		apply: "build",
 		closeBundle: async function() {
-			// @ts-ignore
-			if (!this?.meta?.watchMode === false && built) return;
 			if (built) return;
 			// Only run after SSR build (app.js must exist)
 			const fs0 = await import("fs");
@@ -23,6 +21,22 @@ function serverBundlePlugin(): Plugin {
 			built = true;
 			console.log("Bundling server code with esbuild...");
 			const outfile = path.resolve(__dirname, "dist", "server.bundle.mjs");
+
+			// esbuild plugin to intercept unresolvable imports at bundle time
+			const externalizePlugin: esbuild.Plugin = {
+				name: "externalize-problem-imports",
+				setup(build) {
+					// Externalize anything starting with # (Node package imports like #airo/secrets)
+					build.onResolve({ filter: /^#/ }, args => ({ path: args.path, external: true }));
+					// Externalize webtorrent regardless of how it was aliased
+					build.onResolve({ filter: /webtorrent/ }, args => ({ path: "webtorrent", external: true }));
+					// Externalize webrtc-polyfill
+					build.onResolve({ filter: /webrtc-polyfill/ }, args => ({ path: "webrtc-polyfill", external: true }));
+					// Externalize node-datachannel
+					build.onResolve({ filter: /node-datachannel/ }, args => ({ path: "node-datachannel", external: true }));
+				},
+			};
+
 			await esbuild.build({
 				entryPoints: [path.resolve(__dirname, "dist", "app.js")],
 				bundle: true,
@@ -32,10 +46,7 @@ function serverBundlePlugin(): Plugin {
 				outfile,
 				packages: "bundle",
 				sourcemap: true,
-				alias: {
-					"webrtc-polyfill": path.resolve(__dirname, "src/server/stubs/webrtc-polyfill-stub.js"),
-				},
-				external: ["node-datachannel", "#airo/secrets", "webtorrent", /^#/],
+				plugins: [externalizePlugin],
 				banner: {
 					js: `import { createRequire as __airo_createRequire } from 'module';\nconst require = __airo_createRequire(import.meta.url);`,
 				},
