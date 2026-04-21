@@ -1,0 +1,137 @@
+# electron-builder configuration for HomeStream
+#
+# Build commands (run from project root):
+#   All platforms:  npm run electron:build
+#   Windows only:   npm run electron:win
+#   macOS only:     npm run electron:mac
+#   Linux only:     npm run electron:linux
+#
+# Output: dist-electron/
+#   Windows → HomeStream-Setup-x.x.x.exe  (NSIS installer)
+#   macOS   → HomeStream-x.x.x.dmg
+#   Linux   → HomeStream-x.x.x.AppImage + .deb
+
+appId: com.homestream.app
+productName: HomeStream
+copyright: Copyright © 2026 HomeStream
+
+# Bake the GitHub owner/repo into the packaged app so the auto-updater knows
+# where to check for new releases. Set GH_OWNER and GH_REPO as GitHub Actions
+# secrets — they are injected via HOMESTREAM_GH_OWNER / HOMESTREAM_GH_REPO
+# env vars in the release workflow and written into package.json inside the asar.
+# updater.js reads process.env.HOMESTREAM_GH_OWNER at runtime (Electron passes
+# all extraMetadata fields as env vars automatically via electron-builder).
+extraMetadata:
+  build:
+    ghOwner: ${HOMESTREAM_GH_OWNER}
+    ghRepo: ${HOMESTREAM_GH_REPO}
+
+# ── Auto-updater (electron-updater via GitHub Releases) ───────────────────────
+# Set GH_TOKEN env var when publishing: npm run electron:publish
+# Users get notified of new releases automatically; they choose when to install.
+publish:
+  provider: github
+  owner: homestream-app       # ← replace with your GitHub org/username
+  repo: homestream            # ← replace with your GitHub repo name
+  releaseType: release        # only stable releases trigger updates (not pre-releases)
+
+# Directories
+directories:
+  output: dist-electron
+  buildResources: electron/assets
+
+# Files to include in the asar package (the Electron app itself).
+# NOTE: Do NOT include dist/ here — the client bundle (dist/) and server bundle
+# (dist/server.bundle.mjs) are both shipped via extraResources below, which puts
+# them outside the asar at resources/client/ and resources/server/. Including
+# dist/ here would double-ship ~10MB of client assets inside the asar for no benefit.
+files:
+  - electron/main.js
+  - electron/preload.js
+  - electron/tray-icon.png
+  - package.json
+  # electron-updater and its deps must be resolvable by the main process at runtime.
+  # electron-builder includes package.json "dependencies" automatically in the asar,
+  # but electron-updater needs to be accessible from the main process (outside asar)
+  # so we list it explicitly. The others are its transitive deps that must co-locate.
+  - node_modules/electron-updater/**/*
+  - node_modules/builder-util-runtime/**/*
+  - node_modules/semver/**/*
+
+# Extra resources shipped alongside the app (available at process.resourcesPath at runtime)
+extraResources:
+  # Server bundle — loaded by main.js as a child process
+  - from: dist/server.bundle.mjs
+    to: server/server.bundle.mjs
+  # Client bundle — Vite outputs to dist/ (index.html + assets/).
+  # We copy the whole dist/ folder to resources/client/ so configure.js can
+  # serve it with express.static when running as a packaged Electron app.
+  # Exclude the server bundle and sourcemaps to keep the installer lean.
+  - from: dist
+    to: client
+    filter:
+      - "**/*"
+      - "!server.bundle.mjs"
+      - "!server.bundle.mjs.map"
+      - "!app.js"
+  # FFmpeg binary — ffmpeg-static resolves a local path that won't exist in the
+  # packaged app, so we copy the binary into resources and point FFMPEG_PATH at it.
+  # On Windows, ffmpeg-static installs ffmpeg.exe; on Linux/macOS it's just ffmpeg.
+  # electron-builder resolves the from path relative to the project root at build time.
+  # When building on Windows (npm run electron:win), ffmpeg-static provides ffmpeg.exe.
+  - from: node_modules/ffmpeg-static/ffmpeg.exe
+    to: ffmpeg/ffmpeg.exe
+
+# ── Windows ───────────────────────────────────────────────────────────────────
+win:
+  target:
+    # Full NSIS installer — creates Start Menu + Desktop shortcuts, uninstallable
+    # This is the primary deliverable: HomeStream-Setup-x.x.x.exe inside a ZIP.
+    - target: nsis
+      arch: [x64]
+  # electron-builder auto-converts icon.png → .ico if no .ico is provided
+  icon: electron/assets/icon.png
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: HomeStream
+  runAfterFinish: true
+  # Installer branding images
+  # headerImage: shown top-right on every wizard page (150×57 px, BMP or PNG)
+  # installerSidebar: shown left side on Welcome/Finish pages (164×314 px, BMP or PNG)
+  headerImage: electron/assets/nsis-header.png
+  installerSidebar: electron/assets/nsis-sidebar.png
+
+# ── macOS ─────────────────────────────────────────────────────────────────────
+mac:
+  target:
+    - target: dmg
+      arch: [x64, arm64]
+  # electron-builder auto-converts icon.png → .icns on macOS
+  icon: electron/assets/icon.png
+  category: public.app-category.entertainment
+  darkModeSupport: true
+
+dmg:
+  title: HomeStream
+  window:
+    width: 540
+    height: 380
+
+# ── Linux ─────────────────────────────────────────────────────────────────────
+linux:
+  target:
+    - target: AppImage
+      arch: [x64, arm64]
+    - target: deb
+      arch: [x64]
+  icon: electron/assets/icon.png
+  category: AudioVideo
+  description: Self-hosted media streaming server
+  desktop:
+    Name: HomeStream
+    Comment: Stream your personal media collection
+    Categories: AudioVideo;Video;Player;
