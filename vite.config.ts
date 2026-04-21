@@ -35,7 +35,7 @@ function serverBundlePlugin(): Plugin {
 				alias: {
 					"webrtc-polyfill": path.resolve(__dirname, "src/server/stubs/webrtc-polyfill-stub.js"),
 				},
-				external: ["node-datachannel", "#airo/secrets", "webtorrent"],
+				external: ["node-datachannel", "#airo/secrets", "webtorrent", /^#/],
 				banner: {
 					js: `import { createRequire as __airo_createRequire } from 'module';\nconst require = __airo_createRequire(import.meta.url);`,
 				},
