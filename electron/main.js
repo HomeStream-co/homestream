@@ -700,7 +700,7 @@ const CONTROL_PANEL_HTML = `<!DOCTYPE html>
     <div class="logo">HOME<span>STREAM</span></div>
     <div class="subtitle">Control Panel</div>
   </div>
-  <div class="version-badge" id="version-badge" onclick="checkForUpdate()" title="Click to check for updates">v1.0.0</div>
+  <div class="version-badge" id="version-badge" onclick="checkForUpdate()" title="Click to check for updates">v${app.getVersion()}</div>
 </div>
 
 <!-- Status row -->
@@ -907,7 +907,7 @@ const CONTROL_PANEL_HTML = `<!DOCTYPE html>
     window.electronAPI?.checkForUpdate();
     // Show a brief "checking" indicator on the version badge
     const badge = document.getElementById('version-badge');
-    if (badge) { badge.textContent = 'Checking…'; setTimeout(() => { badge.textContent = 'v1.0.0'; }, 4000); }
+    if (badge) { badge.textContent = 'Checking…'; setTimeout(() => { badge.textContent = badge.dataset.version || 'v?'; }, 4000); }
   }
 
   function handleUpdateStatus(data) {

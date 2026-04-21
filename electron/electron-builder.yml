@@ -30,9 +30,9 @@ extraMetadata:
 # Users get notified of new releases automatically; they choose when to install.
 publish:
   provider: github
-  owner: homestream-app       # ← replace with your GitHub org/username
-  repo: homestream            # ← replace with your GitHub repo name
-  releaseType: release        # only stable releases trigger updates (not pre-releases)
+  owner: trevorrossworn-code
+  repo: homestream
+  releaseType: release
 
 # Directories
 directories:
@@ -73,13 +73,11 @@ extraResources:
       - "!server.bundle.mjs"
       - "!server.bundle.mjs.map"
       - "!app.js"
-  # FFmpeg binary — ffmpeg-static resolves a local path that won't exist in the
-  # packaged app, so we copy the binary into resources and point FFMPEG_PATH at it.
-  # On Windows, ffmpeg-static installs ffmpeg.exe; on Linux/macOS it's just ffmpeg.
-  # electron-builder resolves the from path relative to the project root at build time.
-  # When building on Windows (npm run electron:win), ffmpeg-static provides ffmpeg.exe.
+  # FFmpeg binary — copied into resources/ffmpeg/ so users don't need to install it.
+  # ffmpeg-static provides ffmpeg.exe on Windows builds.
   - from: node_modules/ffmpeg-static/ffmpeg.exe
     to: ffmpeg/ffmpeg.exe
+    filter: "**/*"
 
 # ── Windows ───────────────────────────────────────────────────────────────────
 win:
@@ -98,11 +96,9 @@ nsis:
   createStartMenuShortcut: true
   shortcutName: HomeStream
   runAfterFinish: true
-  # Installer branding images
-  # headerImage: shown top-right on every wizard page (150×57 px, BMP or PNG)
-  # installerSidebar: shown left side on Welcome/Finish pages (164×314 px, BMP or PNG)
-  installerHeader: electron/assets/nsis-header.png
-  installerSidebar: electron/assets/nsis-sidebar.png
+  # Branding images (optional — remove these lines if the files don't exist)
+  # installerHeaderBitmap: electron/assets/nsis-header.bmp   (150×57 BMP)
+  # installerSidebar: electron/assets/nsis-sidebar.bmp       (164×314 BMP)
 
 # ── macOS ─────────────────────────────────────────────────────────────────────
 mac:
