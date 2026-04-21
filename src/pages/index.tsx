@@ -20,7 +20,7 @@
 
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Play, Plus, Check, Star, Upload, Clock, Search, X, SlidersHorizontal, Bookmark, Smartphone, QrCode } from 'lucide-react';
+import { Play, Plus, Check, Star, Upload, Clock, Search, X, SlidersHorizontal, Bookmark, Smartphone, QrCode, Copy } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useMedia } from '@/context/MediaContext';
 import { useProfile } from '@/context/ProfileContext';
@@ -56,6 +56,15 @@ const SORT_OPTIONS = [
 function RemoteQRWidget() {
   const [qr, setQr] = useState<{ url: string; qr: string } | null>(null);
   const [expanded, setExpanded] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  function copyUrl() {
+    if (!qr) return;
+    navigator.clipboard.writeText(qr.url).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
 
   useEffect(() => {
     fetch('/api/remote/qr?format=svg')
@@ -75,7 +84,7 @@ function RemoteQRWidget() {
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.85, y: 10 }}
             transition={{ duration: 0.2 }}
-            className="bg-card border border-border rounded-2xl p-4 shadow-2xl flex flex-col items-center gap-3 w-52"
+            className="bg-card border border-border rounded-2xl p-4 shadow-2xl flex flex-col items-center gap-3 w-56"
           >
             <div className="flex items-center gap-2 w-full">
               <Smartphone className="w-4 h-4 text-primary flex-shrink-0" />
@@ -93,18 +102,32 @@ function RemoteQRWidget() {
               dangerouslySetInnerHTML={{ __html: qr.qr.replace(/fill="none"/g, 'fill="#ffffff"') }}
             />
             <p className="text-[10px] text-muted-foreground text-center leading-relaxed">
-              Scan with your phone to control HomeStream from your couch
+              Scan with your phone camera to open the remote instantly
             </p>
-            <div className="flex gap-2 w-full">
-              <a
-                href={qr.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex-1 text-center text-[10px] bg-primary/10 text-primary rounded-lg py-1.5 font-medium hover:bg-primary/20 transition-colors"
-              >
-                Open on this device
-              </a>
-            </div>
+
+            {/* URL — tap to copy */}
+            <button
+              onClick={copyUrl}
+              title="Tap to copy"
+              className="w-full flex items-center gap-1.5 bg-muted hover:bg-muted/80 rounded-lg px-2.5 py-2 transition-colors group"
+            >
+              <code className="flex-1 text-[10px] text-muted-foreground truncate text-left font-mono">
+                {qr.url}
+              </code>
+              {copied
+                ? <Check className="w-3 h-3 text-green-400 flex-shrink-0" />
+                : <Copy className="w-3 h-3 text-muted-foreground flex-shrink-0 group-hover:text-foreground transition-colors" />
+              }
+            </button>
+
+            <a
+              href={qr.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full text-center text-[10px] bg-primary/10 text-primary rounded-lg py-1.5 font-medium hover:bg-primary/20 transition-colors"
+            >
+              Open on this device
+            </a>
           </motion.div>
         )}
       </AnimatePresence>
