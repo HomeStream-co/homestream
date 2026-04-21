@@ -31,6 +31,7 @@ const SPEED_OPTIONS = [3, 2, 1.5, 1.25, 1, 0.75, 0.5];
 interface MediaItem {
   id: string;
   title: string;
+  type?: string;
   year: string | number;
   genre: string[];
   filename?: string;
@@ -134,7 +135,11 @@ export default function PlayerControlsOverlay({
       {/* ── Top bar ── */}
       <div className="bg-gradient-to-b from-black/70 to-transparent px-4 pt-4 pb-8 flex items-center gap-3">
         <button
-          onClick={() => fadeAndNavigate('/')}
+          onClick={() => {
+            // Navigate to the detail page (movie or show), not always home
+            const backTo = item.type === 'series' ? `/show/${item.id}` : `/movie/${item.id}`;
+            fadeAndNavigate(backTo);
+          }}
           className="p-2 hover:bg-white/10 rounded-full transition-colors"
         >
           <ArrowLeft className="w-5 h-5 text-white" />

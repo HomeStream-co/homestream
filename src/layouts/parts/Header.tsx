@@ -181,22 +181,29 @@ export default function Header({ onChatOpen: _onChatOpen }: HeaderProps) {
 
           {/* Desktop Nav */}
           <nav className="hidden md:flex items-center gap-6">
-            {navLinks.map(link => (
-              <Link
-                key={link.to}
-                to={link.to}
-                className={`relative text-sm font-medium transition-colors hover:text-foreground ${
-                  location.pathname === link.to ? 'text-foreground' : 'text-muted-foreground'
-                }`}
-              >
-                {link.label}
-                {link.to === '/downloads' && activeDownloads > 0 && (
-                  <span className="absolute -top-2 -right-3 min-w-[16px] h-4 bg-blue-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center px-0.5 animate-pulse">
-                    {activeDownloads > 9 ? '9+' : activeDownloads}
-                  </span>
-                )}
-              </Link>
-            ))}
+            {navLinks.map(link => {
+              const isActive = link.to === '/'
+                ? location.pathname === '/'
+                : location.pathname.startsWith(link.to);
+              return (
+                <Link
+                  key={link.to}
+                  to={link.to}
+                  className={`relative text-sm font-medium transition-colors hover:text-foreground pb-0.5 ${
+                    isActive
+                      ? 'text-foreground after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-primary after:rounded-full'
+                      : 'text-muted-foreground'
+                  }`}
+                >
+                  {link.label}
+                  {link.to === '/downloads' && activeDownloads > 0 && (
+                    <span className="absolute -top-2 -right-3 min-w-[16px] h-4 bg-blue-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center px-0.5 animate-pulse">
+                      {activeDownloads > 9 ? '9+' : activeDownloads}
+                    </span>
+                  )}
+                </Link>
+              );
+            })}
           </nav>
 
           {/* Right Actions */}

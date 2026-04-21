@@ -20,32 +20,27 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
-import { CheckCircle2, Film } from 'lucide-react';
+import { CheckCircle2 } from 'lucide-react';
 
 import type {
   FormData, StepStatus, KeyTestState, ScanState, ScannedFile,
 } from './setup/types';
 import StepSysReqs     from './setup/StepSysReqs';
-import StepWelcome     from './setup/StepWelcome';
 import StepMediaFolder from './setup/StepMediaFolder';
-import StepQBittorrent from './setup/StepQBittorrent';
-import StepJellyfin    from './setup/StepJellyfin';
-import StepVPN         from './setup/StepVPN';
+import StepOptional    from './setup/StepOptional';
 import StepApiKeys     from './setup/StepApiKeys';
-import StepHttps       from './setup/StepHttps';
 import StepFinish      from './setup/StepFinish';
 
 // ── Step metadata ─────────────────────────────────────────────────────────────
+// Collapsed from 9 steps → 5 steps. Optional services (qBit, Jellyfin, VPN,
+// HTTPS) are merged into a single "Optional Services" step so the minimum
+// happy path is: Requirements → Media Folder → API Keys → Finish.
 
 const STEPS = [
   { id: 'sysreqs',  label: 'Requirements' },
-  { id: 'welcome',  label: 'Welcome' },
   { id: 'media',    label: 'Media Folder' },
-  { id: 'qbit',     label: 'qBittorrent' },
-  { id: 'jellyfin', label: 'Jellyfin' },
-  { id: 'vpn',      label: 'VPN' },
+  { id: 'optional', label: 'Optional Services' },
   { id: 'apikeys',  label: 'API Keys' },
-  { id: 'https',    label: 'HTTPS' },
   { id: 'finish',   label: 'Finish' },
 ];
 
@@ -134,9 +129,14 @@ export default function SetupPage() {
 
   // ── Redirect if already set up ──
   useEffect(() => {
-    fetch('/api/setup').then(r => r.json()).then((data: { setupComplete?: boolean }) => {
+    fetch('/api/setup').then(r => r.json()).then((data: { setupComplete?: boolean; config?: { tmdbApiKey?: string } }) => {
       if (data.setupComplete) navigate('/');
+      // Auto-populate TMDB key if the server already has it (env var or prior save)
+      if (data.config?.tmdbApiKey && !form.tmdbApiKey) {
+        setForm(f => ({ ...f, tmdbApiKey: data.config!.tmdbApiKey! }));
+      }
     }).catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [navigate]);
 
   // ── Fetch platform-aware default media directory from Electron ──
@@ -201,7 +201,7 @@ export default function SetupPage() {
   }, [form.mediaDir]);
 
   useEffect(() => {
-    if (step === 8 && scanState === 'idle') {
+    if (step === 4 && scanState === 'idle') {
       runScan(form.mediaDir);
     }
   }, [step, scanState, form.mediaDir, runScan]);
@@ -239,7 +239,7 @@ export default function SetupPage() {
       {/* Logo */}
       <div className="flex items-center gap-2.5 mb-8">
         <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center">
-          <Film className="w-5 h-5 text-primary-foreground" />
+          <span className="text-primary-foreground font-bold text-lg">▶</span>
         </div>
         <span className="text-2xl font-heading font-bold text-foreground">HomeStream</span>
       </div>
@@ -277,14 +277,10 @@ export default function SetupPage() {
             className="bg-card border border-border rounded-2xl p-8 shadow-2xl max-h-[80vh] overflow-y-auto"
           >
             {step === 0 && <StepSysReqs     {...stepProps} />}
-            {step === 1 && <StepWelcome     {...stepProps} />}
-            {step === 2 && <StepMediaFolder {...stepProps} />}
-            {step === 3 && <StepQBittorrent {...stepProps} />}
-            {step === 4 && <StepJellyfin    {...stepProps} />}
-            {step === 5 && <StepVPN         {...stepProps} />}
-            {step === 6 && <StepApiKeys     {...stepProps} />}
-            {step === 7 && <StepHttps       {...stepProps} />}
-            {step === 8 && <StepFinish      {...stepProps} />}
+            {step === 1 && <StepMediaFolder {...stepProps} />}
+            {step === 2 && <StepOptional    {...stepProps} />}
+            {step === 3 && <StepApiKeys     {...stepProps} />}
+            {step === 4 && <StepFinish      {...stepProps} />}
           </motion.div>
         </AnimatePresence>
       </div>

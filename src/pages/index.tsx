@@ -251,7 +251,7 @@ export default function HomePage() {
           </div>
           <h1 className="text-3xl font-heading text-foreground mb-3">Your library is empty</h1>
           <p className="text-muted-foreground mb-6 max-w-sm">
-            Upload your first movie or show to get started. We'll automatically fetch the poster and info.
+            Add your first video file, or browse trending movies and shows to download.
           </p>
           <div className="flex flex-col sm:flex-row gap-3">
             <button
@@ -259,7 +259,13 @@ export default function HomePage() {
               className="flex items-center gap-2 bg-primary hover:bg-primary/80 text-white px-6 py-3 rounded font-medium transition-colors"
             >
               <Upload className="w-4 h-4" />
-              Upload Your First Movie
+              Upload a Video File
+            </button>
+            <button
+              onClick={() => navigate('/discover')}
+              className="flex items-center gap-2 bg-card hover:bg-muted border border-border text-foreground px-6 py-3 rounded font-medium transition-colors"
+            >
+              Browse &amp; Download
             </button>
           </div>
         </div>
@@ -304,7 +310,7 @@ export default function HomePage() {
           {/* My List shortcut */}
           {myList.length > 0 && !isSearching && (
             <button
-              onClick={() => { setTypeFilter('all'); setGenre('All'); setQuery(''); setShowFilters(false); }}
+              onClick={() => navigate('/watchlist')}
               className="flex items-center gap-1.5 px-3 py-2.5 rounded-lg border border-border bg-card text-muted-foreground hover:text-foreground text-sm transition-colors"
               title="My Watchlist"
             >

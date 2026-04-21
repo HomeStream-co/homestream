@@ -47,6 +47,7 @@ interface UsePlayerKeyboardOptions {
   resetControlsTimer: (isPlaying: boolean) => void;
   togglePiP: () => void;
   fadeAndNavigate: (to: string) => void;
+  backPath: string;
   playing: boolean;
 }
 
@@ -78,6 +79,7 @@ export function usePlayerKeyboard({
   resetControlsTimer,
   togglePiP,
   fadeAndNavigate,
+  backPath,
   playing,
 }: UsePlayerKeyboardOptions) {
   useEffect(() => {
@@ -186,7 +188,7 @@ export function usePlayerKeyboard({
           e.preventDefault();
           if (!tvFocus) { if (video.paused) video.play(); else video.pause(); break; }
           switch (tvFocus) {
-            case 'back':       fadeAndNavigate('/'); break;
+            case 'back':       fadeAndNavigate(backPath); break;
             case 'play':       if (video.paused) video.play(); else video.pause(); break;
             case 'rewind':     video.currentTime = Math.max(video.currentTime - 10, 0); flashSeek('back'); break;
             case 'forward':    video.currentTime = Math.min(video.currentTime + 10, video.duration); flashSeek('forward'); break;

@@ -7,7 +7,7 @@
  * File budget: ~350 lines (down from 2,350).
  */
 
-import { useEffect, useCallback, useRef } from 'react';
+import { useEffect, useCallback, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'motion/react';
 import { Cpu, FastForward, Rewind, RotateCcw, SkipForward, X as XIcon } from 'lucide-react';
@@ -391,6 +391,12 @@ export default function PlayerPage() {
     ps.doubleTapTimerRef.current = setTimeout(() => { ps.doubleTapCountRef.current = { side: 'forward', count: 0 }; ps.setSeekFlash(null); ps.setSeekFlashCount(0); }, 700);
   }, [ps]);
 
+  // ── Back navigation — goes to movie/show detail page, not always home ────
+  const backPath = useMemo(() => {
+    if (!item) return '/';
+    return item.type === 'series' ? `/show/${item.id}` : `/movie/${item.id}`;
+  }, [item]);
+
   // ── Keyboard shortcuts ────────────────────────────────────────────────────
   usePlayerKeyboard({
     videoRef: ps.videoRef,
@@ -417,6 +423,7 @@ export default function PlayerPage() {
     resetControlsTimer,
     togglePiP,
     fadeAndNavigate,
+    backPath,
     playing: ps.playing,
   });
 
@@ -436,7 +443,6 @@ export default function PlayerPage() {
     }
   }, [id, ps]);
 
-  // ── Control helpers ───────────────────────────────────────────────────────
   const togglePlay = () => { if (!ps.videoRef.current) return; if (ps.playing) ps.videoRef.current.pause(); else ps.videoRef.current.play(); };
   const toggleMute = () => { if (!ps.videoRef.current) return; ps.videoRef.current.muted = !ps.muted; ps.setMuted(!ps.muted); };
   const toggleFullscreen = () => { if (!ps.containerRef.current) return; if (!document.fullscreenElement) ps.containerRef.current.requestFullscreen(); else document.exitFullscreen(); };
@@ -477,7 +483,7 @@ export default function PlayerPage() {
           <p className="text-white/30 text-xs">HomeStream is converting this file to H.264 for instant streaming.<br />This usually takes a few minutes. Come back soon.</p>
         </div>
         <div className="flex gap-3 mt-2">
-          <button onClick={() => navigate('/')} className="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-white text-sm transition-colors">← Back to Home</button>
+        <button onClick={() => navigate(-1)} className="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-white text-sm transition-colors">← Back</button>
           <button onClick={() => window.location.reload()} className="px-4 py-2 rounded-lg bg-primary hover:bg-primary/80 text-white text-sm transition-colors">Check Again</button>
         </div>
       </div>
