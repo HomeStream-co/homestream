@@ -116,4 +116,3 @@ export default defineConfig(({ mode }) => ({
 		},
 	},
 }));
->>>>>>> c43e763a99b3fc64b230911cee22a60e44da7e20
