@@ -878,6 +878,35 @@ export default function DebugPanel({ open, onClose }: DebugPanelProps) {
   const [fetched, setFetched] = useState(false);
   const [devDrawerOpen, setDevDrawerOpen] = useState(false);
 
+  // ── DEVELOPER_LOCK gate ────────────────────────────────────────────────────
+  // Dev drawer is only available when DEVELOPER_LOCK=true on the server.
+  // On a public/family install (no lock), the drawer is completely absent —
+  // no trigger, no gesture, nothing in the DOM.
+  const [devLocked, setDevLocked] = useState(false);
+
+  useEffect(() => {
+    // Check once on mount — result is stable for the lifetime of the session
+    fetch('/api/admin/status', { credentials: 'include' })
+      .then(r => r.ok ? r.json() : null)
+      .then((data: { developerLock?: boolean } | null) => {
+        if (data?.developerLock) setDevLocked(true);
+      })
+      .catch(() => {});
+  }, []);
+
+  // ── Electron IPC: Ctrl+Shift+Alt+D shortcut ───────────────────────────────
+  // When running inside the packaged Electron app, the main process registers
+  // a global keyboard shortcut and sends 'toggle-dev-drawer' via IPC.
+  // This lets you open the drawer from anywhere on your home server — even
+  // when the browser window is not focused.
+  useEffect(() => {
+    const api = (window as unknown as { electronAPI?: { onToggleDevDrawer?: (cb: () => void) => void } }).electronAPI;
+    if (!api?.onToggleDevDrawer) return;
+    api.onToggleDevDrawer(() => {
+      if (devLocked) setDevDrawerOpen(v => !v);
+    });
+  }, [devLocked]);
+
   const fetchHealth = useCallback(async () => {
     setHealthLoading(true);
     try {
@@ -947,11 +976,15 @@ export default function DebugPanel({ open, onClose }: DebugPanelProps) {
                     {health.overall.toUpperCase()}
                   </span>
                 )}
-                {/* Secret dev trigger — Shift+hold the version number for 2s */}
-                <DevVersionTrigger
-                  version="1.1.0"
-                  onUnlock={() => setDevDrawerOpen(v => !v)}
-                />
+                {/* Secret dev trigger — only rendered when DEVELOPER_LOCK=true.
+                    Shift+hold the version number for 2s to open the dev drawer.
+                    On a public/family install this element is completely absent. */}
+                {devLocked && (
+                  <DevVersionTrigger
+                    version="1.1.0"
+                    onUnlock={() => setDevDrawerOpen(v => !v)}
+                  />
+                )}
               </div>
               <div className="flex items-center gap-1">
                 <CopyDiagnosticButton health={health} sysInfo={sysInfo} />
@@ -972,9 +1005,11 @@ export default function DebugPanel({ open, onClose }: DebugPanelProps) {
 
             {/* Tab content */}
             <div className="flex-1 overflow-y-auto">
-              {/* Hidden dev drawer — opened by Shift+hold on version number */}
+              {/* Hidden dev drawer — only available when DEVELOPER_LOCK=true.
+                  Opened by: Shift+hold version number (browser) or
+                  Ctrl+Shift+Alt+D global shortcut (Electron on home server). */}
               <AnimatePresence>
-                {devDrawerOpen && (
+                {devLocked && devDrawerOpen && (
                   <div className="p-3 border-b border-violet-500/20">
                     <DevDrawer onClose={() => setDevDrawerOpen(false)} />
                   </div>

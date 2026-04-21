@@ -13,7 +13,7 @@
  * Supported platforms: Windows (.exe), macOS (.dmg), Linux (.AppImage)
  */
 
-const { app, BrowserWindow, Tray, Menu, shell, nativeImage, ipcMain } = require('electron');
+const { app, BrowserWindow, Tray, Menu, shell, nativeImage, ipcMain, globalShortcut } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
 const http = require('http');
@@ -412,6 +412,28 @@ app.whenReady().then(async () => {
   createTray();
   await startServer();
 
+  // ── Dev Drawer global shortcut ─────────────────────────────────────────────
+  // Ctrl+Shift+Alt+D (Windows/Linux) / Cmd+Shift+Alt+D (macOS)
+  // Opens/closes the hidden Dev Drawer in the HomeStream browser UI.
+  // Only fires when DEVELOPER_LOCK=true — the React side enforces the gate.
+  // Registered globally so it works even when the browser window is not focused.
+  const DEV_SHORTCUT = process.platform === 'darwin'
+    ? 'Command+Shift+Alt+D'
+    : 'Ctrl+Shift+Alt+D';
+
+  const registered = globalShortcut.register(DEV_SHORTCUT, () => {
+    // Open the HomeStream browser window if it isn't already open
+    shell.openExternal(`http://localhost:${activePort}`);
+    // Send IPC to the control panel window — it relays to the React app
+    // via a custom event the preload script forwards to the renderer
+    controlWindow?.webContents.send('toggle-dev-drawer');
+    pushLog(`Dev drawer shortcut triggered (${DEV_SHORTCUT})`, 'info');
+  });
+
+  if (!registered) {
+    pushLog(`Warning: Could not register dev shortcut ${DEV_SHORTCUT} — key may be in use`, 'warn');
+  }
+
   // Set up auto-updater after window exists so it can send IPC events to it.
   // Passes a getter (not the window directly) so it always uses the current
   // window reference even if the window is recreated.
@@ -431,6 +453,7 @@ app.on('activate', () => {
 
 app.on('before-quit', () => {
   app.isQuitting = true;
+  globalShortcut.unregisterAll();
   teardownUpdater();
   stopServer();
 });

@@ -28,4 +28,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Event listener — receives { state, version?, percent?, error? }
   onUpdateStatus: (callback) => ipcRenderer.on('update-status', (_event, data) => callback(data)),
+
+  // ── Dev Drawer (Ctrl+Shift+Alt+D global shortcut) ───────────────────────────
+  // The main process sends 'toggle-dev-drawer' when the global shortcut fires.
+  // The React DebugPanel listens via this callback and toggles the hidden drawer.
+  // Only active when DEVELOPER_LOCK=true — the React side enforces the gate.
+  onToggleDevDrawer: (callback) => ipcRenderer.on('toggle-dev-drawer', () => callback()),
 });
