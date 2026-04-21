@@ -11,13 +11,13 @@ No Docker, no command line, no configuration files needed.
 
 ### Windows
 
-1. Download **`HomeStream-Setup-x.x.x.exe`** from the [Releases page](https://github.com/homestream-app/homestream/releases/latest)
+1. Download **`HomeStream-Setup-1.1.0.exe`** from the [Releases page](https://github.com/YOUR_USERNAME/YOUR_REPO/releases/latest)
 2. Double-click the installer and follow the prompts
 3. HomeStream launches automatically and opens the setup wizard in your browser
 
 ### macOS
 
-1. Download **`HomeStream-x.x.x.dmg`** from the [Releases page](https://github.com/homestream-app/homestream/releases/latest)
+1. Download **`HomeStream-1.1.0.dmg`** from the [Releases page](https://github.com/YOUR_USERNAME/YOUR_REPO/releases/latest)
 2. Open the `.dmg` and drag **HomeStream** to your Applications folder
 3. Open HomeStream from Applications — the setup wizard opens in your browser
 
@@ -25,7 +25,7 @@ No Docker, no command line, no configuration files needed.
 
 ### Linux
 
-1. Download **`HomeStream-x.x.x.AppImage`** from the [Releases page](https://github.com/homestream-app/homestream/releases/latest)
+1. Download **`HomeStream-1.1.0.AppImage`** from the [Releases page](https://github.com/YOUR_USERNAME/YOUR_REPO/releases/latest)
 2. Make it executable and run it:
    ```bash
    chmod +x HomeStream-*.AppImage
@@ -39,14 +39,13 @@ No Docker, no command line, no configuration files needed.
 
 ## First Run — Setup Wizard
 
-On first launch, HomeStream automatically opens a **setup wizard** in your browser that walks you through:
+On first launch, HomeStream automatically opens a **5-step setup wizard** in your browser:
 
-1. **Media Folder** — point HomeStream at your video files
-2. **qBittorrent** *(optional)* — connect your torrent client for downloads
-3. **Jellyfin** *(optional)* — enable Jellyfin API compatibility for TV apps
-4. **VPN** *(optional)* — configure VPN kill-switch for downloads
-5. **API Keys** *(optional)* — OMDB/TMDB for metadata, Gemini for AI features
-6. **HTTPS** *(optional)* — enable HTTPS for remote access
+1. **Requirements** — checks FFmpeg and system dependencies
+2. **Media Folder** — point HomeStream at your video files
+3. **Optional Services** *(optional)* — connect qBittorrent and/or Jellyfin
+4. **API Keys** *(optional)* — TMDB for metadata, Gemini for AI features
+5. **Finish** — saves config and kicks off your first library scan
 
 Everything is optional except the media folder. You can skip any step and configure it later in Settings.
 
@@ -147,13 +146,19 @@ docker compose up -d
 ## Troubleshooting
 
 **Video won't play / shows transcoding spinner**
-FFmpeg is re-encoding the file for browser compatibility. This happens once per file. If stuck, go to **Settings → Debug Panel → Fix Stuck Transcodes**.
+FFmpeg is re-encoding the file for browser compatibility. This happens once per file. If stuck, go to **Settings → Debug Panel → Quick Fixes → Fix Stuck Transcodes**.
 
 **No poster or metadata**
-Add an OMDB API key in **Settings → API Keys**. Free tier: 1,000 requests/day.
+Add a TMDB API key in **Settings → API Keys**. Free tier at [themoviedb.org](https://www.themoviedb.org/settings/api).
 
 **Can't find media files**
 Use **Settings → Scan for New Files** to trigger a manual scan.
+
+**Disk space filling up**
+Go to **Settings → Debug Panel → Quick Fixes → Purge Orphaned Upload Files** to reclaim space from failed or partial uploads.
+
+**Stale or missing metadata**
+Go to **Settings → Debug Panel → Quick Fixes → Clear TMDB Cache** to force a full re-fetch.
 
 **Health check**
 Visit `/api/health` in your browser for a live status of all subsystems.
@@ -164,17 +169,31 @@ Visit `/api/health` in your browser for a live status of all subsystems.
 
 ```bash
 # Clone
-git clone https://github.com/homestream-app/homestream.git
+git clone https://github.com/YOUR_USERNAME/YOUR_REPO.git
 cd homestream
 
-# macOS / Linux — builds the installer automatically
-bash install.sh
+# Install dependencies
+npm install
 
-# Windows — builds the installer automatically
-install.bat
+# Run in development mode (browser only)
+npm run dev
+
+# Build the Windows installer (must run on Windows)
+npm run electron:win
 ```
 
 > **FFmpeg is bundled automatically** via `ffmpeg-static` — no manual install needed.
+
+### Automated releases via GitHub Actions
+
+Push a version tag and GitHub Actions builds and publishes the installer automatically:
+
+```bash
+npm version 1.2.0          # bumps package.json + creates tag
+git push origin main --tags # triggers the build
+```
+
+See [`.github/RELEASE.md`](.github/RELEASE.md) for the one-time secrets setup required.
 
 ---
 
