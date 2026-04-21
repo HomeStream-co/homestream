@@ -224,6 +224,19 @@ export const serverBefore = (server) => {
 };
 
 export const serverAfter = (server) => {
+  // ── API 404 handler ────────────────────────────────────────────────────────
+  // Any /api/* route that wasn't matched by a real handler returns a clean JSON
+  // 404 instead of silently falling through to the SPA and returning index.html
+  // with a 200 — which would confuse the client and hide typos in fetch URLs.
+  server.use('/api', (req, res) => {
+    res.status(404).json({
+      error: 'API endpoint not found',
+      method: req.method,
+      path: req.path,
+    });
+  });
+
+  // ── SPA fallback ───────────────────────────────────────────────────────────
   server.use((req, res, next) => {
     if (req.method !== 'GET') return next();
     if (req.path.startsWith('/api')) return next();

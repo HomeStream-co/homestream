@@ -104,6 +104,7 @@ let tray = null;
 let serverProcess = null;
 let serverRunning = false;
 let logBuffer = [];
+let watchdogRestarts = 0; // tracks consecutive crash-restarts for exponential backoff
 // Resolved at startup — may differ from PREFERRED_PORT if 3000 is taken
 let activePort = PREFERRED_PORT;
 
@@ -220,6 +221,26 @@ async function startServer() {
     serverProcess = null;
     serverRunning = false;
     sendStatus();
+
+    // ── Watchdog: auto-restart on unexpected crash ─────────────────────────
+    // If the server exits with a non-zero code AND the app isn't quitting,
+    // restart it automatically with exponential backoff (2s → 4s → 8s → max 30s).
+    // This keeps HomeStream running on your home server even after a transient
+    // crash (OOM, ffmpeg error, etc.) without needing manual intervention.
+    if (code !== 0 && !app.isQuitting) {
+      watchdogRestarts++;
+      const delay = Math.min(2000 * Math.pow(2, watchdogRestarts - 1), 30000);
+      pushLog(`Watchdog: restarting server in ${delay / 1000}s (attempt ${watchdogRestarts})…`, 'warn');
+      setTimeout(() => {
+        if (!app.isQuitting && !serverProcess) {
+          pushLog('Watchdog: restarting server now…', 'warn');
+          startServer().catch(err => pushLog(`Watchdog restart failed: ${err.message}`, 'error'));
+        }
+      }, delay);
+    } else if (code === 0) {
+      // Clean exit — reset restart counter
+      watchdogRestarts = 0;
+    }
   });
 
   waitForServer(activePort).then(() => {
