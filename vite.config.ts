@@ -9,9 +9,16 @@ function serverBundlePlugin(): Plugin {
 	return {
 		name: "server-bundle",
 		apply: "build",
-		closeBundle: async () => {
-			if (built) return;
-			built = true;
+closeBundle: async function() { 
+	 if (built) return; 
+	  const fs0 = await import("fs"); 
+	   const appJsPath = path.resolve(__dirname, "dist", "app.js"); 
+	    if (!fs0.existsSync(appJsPath)) { 
+			 console.log("Skipping server bundle — dist/app.js not yet generated."); 
+			  return; 
+			} 
+			 built = true; 
+console.log("Bundling server code with esbuild...");
 			console.log("Bundling server code with esbuild...");
 			const outfile = path.resolve(__dirname, "dist", "server.bundle.mjs");
 			await esbuild.build({
