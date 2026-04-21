@@ -4,7 +4,7 @@
   "description": "Self-hosted Netflix-style family media streaming app",
   "author": "HomeStream",
   "type": "module",
-  "main": "electron/main.js",
+  "main": "electron/main.cjs",
   "imports": {
     "#airo/secrets": "./airo-secrets/src/index.ts"
   },

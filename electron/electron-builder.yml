@@ -48,8 +48,9 @@ files:
   - from: "."
     to: "."
     filter:
-      - "electron/main.js"
-      - "electron/preload.js"
+      - "electron/main.cjs"
+      - "electron/updater.cjs"
+      - "electron/preload.cjs"
       - "electron/tray-icon.png"
       - "package.json"
       - "node_modules/electron-updater/**/*"
