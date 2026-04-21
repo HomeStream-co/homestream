@@ -20,7 +20,7 @@
 
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Play, Plus, Check, Star, Upload, Clock, Search, X, SlidersHorizontal, Bookmark } from 'lucide-react';
+import { Play, Plus, Check, Star, Upload, Clock, Search, X, SlidersHorizontal, Bookmark, Smartphone, QrCode } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useMedia } from '@/context/MediaContext';
 import { useProfile } from '@/context/ProfileContext';
@@ -48,6 +48,84 @@ const SORT_OPTIONS = [
   { value: 'title',  label: 'Title A–Z' },
   { value: 'year',   label: 'Year' },
 ];
+
+// ── Phone Remote QR Widget ────────────────────────────────────────────────────
+// Shown in the bottom-right corner of the TV home screen.
+// Scan with your phone → opens the remote instantly.
+
+function RemoteQRWidget() {
+  const [qr, setQr] = useState<{ url: string; qr: string } | null>(null);
+  const [expanded, setExpanded] = useState(false);
+
+  useEffect(() => {
+    fetch('/api/remote/qr?format=svg')
+      .then(r => r.json())
+      .then(data => setQr(data))
+      .catch(() => {});
+  }, []);
+
+  if (!qr) return null;
+
+  return (
+    <div className="fixed bottom-6 right-6 z-40 flex flex-col items-end gap-2">
+      <AnimatePresence>
+        {expanded && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.85, y: 10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.85, y: 10 }}
+            transition={{ duration: 0.2 }}
+            className="bg-card border border-border rounded-2xl p-4 shadow-2xl flex flex-col items-center gap-3 w-52"
+          >
+            <div className="flex items-center gap-2 w-full">
+              <Smartphone className="w-4 h-4 text-primary flex-shrink-0" />
+              <p className="text-xs font-semibold text-foreground">Phone Remote</p>
+              <button
+                onClick={() => setExpanded(false)}
+                className="ml-auto text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+            {/* QR code */}
+            <div
+              className="w-36 h-36 [&_svg]:w-full [&_svg]:h-full rounded-xl overflow-hidden bg-white p-1"
+              dangerouslySetInnerHTML={{ __html: qr.qr.replace(/fill="none"/g, 'fill="#ffffff"') }}
+            />
+            <p className="text-[10px] text-muted-foreground text-center leading-relaxed">
+              Scan with your phone to control HomeStream from your couch
+            </p>
+            <div className="flex gap-2 w-full">
+              <a
+                href={qr.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-1 text-center text-[10px] bg-primary/10 text-primary rounded-lg py-1.5 font-medium hover:bg-primary/20 transition-colors"
+              >
+                Open on this device
+              </a>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Toggle button */}
+      <motion.button
+        onClick={() => setExpanded(v => !v)}
+        whileTap={{ scale: 0.92 }}
+        className={`flex items-center gap-2 rounded-full px-4 py-2.5 shadow-lg border transition-all ${
+          expanded
+            ? 'bg-primary text-primary-foreground border-primary'
+            : 'bg-card text-foreground border-border hover:border-primary/50'
+        }`}
+        title="Open phone remote"
+      >
+        <QrCode className="w-4 h-4" />
+        <span className="text-xs font-semibold hidden sm:inline">Phone Remote</span>
+      </motion.button>
+    </div>
+  );
+}
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
@@ -470,6 +548,9 @@ export default function HomePage() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* ── Phone Remote QR — always visible on TV home screen ── */}
+      <RemoteQRWidget />
     </div>
   );
 }

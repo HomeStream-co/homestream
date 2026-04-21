@@ -31,6 +31,13 @@
       "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
     },
     {
+      "name": "Search Library",
+      "short_name": "Search",
+      "description": "Search and launch movies & shows by voice or keyboard",
+      "url": "/remote?tab=search",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
       "name": "Browse Library",
       "short_name": "Browse",
       "description": "Browse and play movies & shows",
@@ -38,10 +45,10 @@
       "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
     },
     {
-      "name": "Discover & Download",
-      "short_name": "Discover",
-      "description": "Find and download new content",
-      "url": "/discover",
+      "name": "Ask AI",
+      "short_name": "Ask AI",
+      "description": "Ask the AI what to watch tonight",
+      "url": "/remote?tab=ai",
       "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
     }
   ],

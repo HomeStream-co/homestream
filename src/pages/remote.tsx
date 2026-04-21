@@ -23,12 +23,13 @@ import {
   Wifi, WifiOff, Film, FastForward, ChevronRight, Zap,
   RotateCcw, QrCode, X, ExternalLink, Subtitles,
   Maximize2, Cast, ChevronUp, ChevronDown, Tv2, Square,
-  Tv, Search, SlidersHorizontal, Star,
+  Tv, Search, SlidersHorizontal, Star, Mic,
+  Bot as _Bot, Send, Loader2, Sparkles,
 } from 'lucide-react';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type RemoteTab = 'remote' | 'browse';
+type RemoteTab = 'remote' | 'browse' | 'search' | 'ai';
 
 interface LibraryItem {
   id: string;
@@ -176,6 +177,515 @@ function VolumeFlash({ dir, pct }: { dir: 'up' | 'down'; pct: number }) {
         <span className="text-sm font-bold">{pct}%</span>
       </div>
     </motion.div>
+  );
+}
+
+// ── Search Tab (keyboard + voice) ─────────────────────────────────────────────
+
+// Extend window type for Web Speech API (not in all TypeScript lib versions)
+declare global {
+  interface Window {
+    SpeechRecognition?: new () => SpeechRecognition;
+    webkitSpeechRecognition?: new () => SpeechRecognition;
+  }
+  interface SpeechRecognition extends EventTarget {
+    continuous: boolean;
+    interimResults: boolean;
+    lang: string;
+    start(): void;
+    stop(): void;
+    onresult: ((e: SpeechRecognitionEvent) => void) | null;
+    onerror: ((e: Event) => void) | null;
+    onend: (() => void) | null;
+  }
+  interface SpeechRecognitionEvent extends Event {
+    results: SpeechRecognitionResultList;
+  }
+}
+
+function SearchTab({ send }: { send: (cmd: Record<string, unknown>) => void }) {
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState<LibraryItem[]>([]);
+  const [allItems, setAllItems] = useState<LibraryItem[]>([]);
+  const [listening, setListening] = useState(false);
+  const [voiceSupported, setVoiceSupported] = useState(false);
+  const [launching, setLaunching] = useState<string | null>(null);
+  const [interimText, setInterimText] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
+
+  // Load library once
+  useEffect(() => {
+    fetch('/api/media')
+      .then(r => r.json())
+      .then((data: LibraryItem[]) => setAllItems(Array.isArray(data) ? data : []))
+      .catch(() => {});
+    // Check voice support
+    const SR = window.SpeechRecognition ?? window.webkitSpeechRecognition;
+    setVoiceSupported(!!SR);
+    // Auto-focus search input
+    setTimeout(() => inputRef.current?.focus(), 100);
+  }, []);
+
+  // Live search filter
+  useEffect(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) { setResults([]); return; }
+    setResults(
+      allItems.filter(i =>
+        i.title.toLowerCase().includes(q) ||
+        i.genre?.some(g => g.toLowerCase().includes(q))
+      ).slice(0, 30)
+    );
+  }, [query, allItems]);
+
+  const startVoice = useCallback(() => {
+    const SR = window.SpeechRecognition ?? window.webkitSpeechRecognition;
+    if (!SR) return;
+    haptic([30, 20, 60]);
+    const recognition = new SR();
+    recognitionRef.current = recognition;
+    recognition.continuous = false;
+    recognition.interimResults = true;
+    recognition.lang = 'en-US';
+    setListening(true);
+    setInterimText('');
+
+    recognition.onresult = (e) => {
+      let interim = '';
+      let final = '';
+      for (let i = e.results.length - 1; i >= 0; i--) {
+        if (e.results[i].isFinal) { final = e.results[i][0].transcript; break; }
+        else interim = e.results[i][0].transcript;
+      }
+      if (final) { setQuery(final); setInterimText(''); haptic(30); }
+      else setInterimText(interim);
+    };
+    recognition.onerror = () => { setListening(false); setInterimText(''); };
+    recognition.onend = () => { setListening(false); setInterimText(''); };
+    recognition.start();
+  }, []);
+
+  const stopVoice = useCallback(() => {
+    recognitionRef.current?.stop();
+    setListening(false);
+    setInterimText('');
+  }, []);
+
+  const launch = useCallback((item: LibraryItem) => {
+    haptic([30, 20, 30]);
+    setLaunching(item.id);
+    send({ type: 'launch', mediaId: item.id, title: item.title });
+    setTimeout(() => setLaunching(null), 2000);
+  }, [send]);
+
+  return (
+    <div className="flex flex-col gap-4">
+      {/* Search input + mic */}
+      <div className="relative flex items-center gap-2">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+          <input
+            ref={inputRef}
+            type="search"
+            placeholder={listening ? 'Listening…' : 'Search movies & shows…'}
+            value={listening ? interimText || query : query}
+            onChange={e => setQuery(e.target.value)}
+            className="w-full bg-card border border-border rounded-xl pl-9 pr-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+          />
+          {query && !listening && (
+            <button
+              onClick={() => { setQuery(''); setResults([]); inputRef.current?.focus(); }}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+
+        {/* Mic button */}
+        {voiceSupported && (
+          <motion.button
+            onPointerDown={startVoice}
+            onPointerUp={stopVoice}
+            onPointerLeave={stopVoice}
+            whileTap={{ scale: 0.9 }}
+            className={`flex-shrink-0 w-12 h-12 rounded-xl flex items-center justify-center border transition-all ${
+              listening
+                ? 'bg-red-500/20 border-red-500/50 text-red-400'
+                : 'bg-card border-border text-muted-foreground hover:text-foreground hover:border-primary/50'
+            }`}
+            title="Hold to speak"
+          >
+            <AnimatePresence mode="wait">
+              {listening ? (
+                <motion.div key="on" initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }}>
+                  <Mic className="w-5 h-5 animate-pulse" />
+                </motion.div>
+              ) : (
+                <motion.div key="off" initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }}>
+                  <Mic className="w-5 h-5" />
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </motion.button>
+        )}
+      </div>
+
+      {/* Voice listening indicator */}
+      <AnimatePresence>
+        {listening && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="flex items-center gap-3 bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3"
+          >
+            <div className="flex gap-1 items-end h-5">
+              {[0, 1, 2, 3].map(i => (
+                <motion.div
+                  key={i}
+                  className="w-1 bg-red-400 rounded-full"
+                  animate={{ height: ['4px', '16px', '4px'] }}
+                  transition={{ duration: 0.6, delay: i * 0.1, repeat: Infinity }}
+                />
+              ))}
+            </div>
+            <p className="text-sm text-red-400 font-medium">
+              {interimText || 'Listening… say a movie or show name'}
+            </p>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Voice tip */}
+      {voiceSupported && !listening && !query && (
+        <p className="text-xs text-muted-foreground text-center">
+          Hold the mic button and say a title, genre, or actor name
+        </p>
+      )}
+
+      {/* Results */}
+      {results.length > 0 && (
+        <div className="flex flex-col gap-2">
+          <p className="text-xs text-muted-foreground">{results.length} result{results.length !== 1 ? 's' : ''}</p>
+          <div className="flex flex-col gap-1.5">
+            {results.map(item => (
+              <motion.button
+                key={item.id}
+                onClick={() => launch(item)}
+                whileTap={{ scale: 0.98 }}
+                className="relative flex items-center gap-3 bg-card border border-border rounded-xl p-3 text-left hover:border-primary/40 transition-colors overflow-hidden"
+              >
+                {item.poster ? (
+                  <img src={item.poster} alt="" className="w-10 h-14 object-cover rounded-lg flex-shrink-0" />
+                ) : (
+                  <div className="w-10 h-14 bg-muted rounded-lg flex items-center justify-center flex-shrink-0">
+                    <Film className="w-4 h-4 text-muted-foreground" />
+                  </div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-foreground truncate">{item.title}</p>
+                  <p className="text-xs text-muted-foreground">{item.year} · {item.type === 'series' ? 'TV Show' : 'Movie'}</p>
+                  {item.imdbRating && item.imdbRating !== 'N/A' && (
+                    <div className="flex items-center gap-1 mt-0.5">
+                      <Star className="w-3 h-3 text-yellow-400 fill-yellow-400" />
+                      <span className="text-[10px] text-muted-foreground">{item.imdbRating}</span>
+                    </div>
+                  )}
+                </div>
+                <div className="flex-shrink-0 text-muted-foreground">
+                  <Tv2 className="w-4 h-4" />
+                </div>
+
+                {/* Launch overlay */}
+                <AnimatePresence>
+                  {launching === item.id && (
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="absolute inset-0 bg-primary/80 flex items-center justify-center gap-2 rounded-xl"
+                    >
+                      <Tv2 className="w-5 h-5 text-white animate-pulse" />
+                      <span className="text-white text-sm font-semibold">Launching on TV…</span>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </motion.button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {query && results.length === 0 && (
+        <div className="text-center py-10">
+          <p className="text-muted-foreground text-sm">No results for "{query}"</p>
+          <p className="text-xs text-muted-foreground mt-1">Try a different title or genre</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── AI Recommendation Tab ─────────────────────────────────────────────────────
+
+interface AIChatMessage {
+  role: 'user' | 'ai';
+  text: string;
+  recommendations?: LibraryItem[];
+}
+
+function AITab({ send }: { send: (cmd: Record<string, unknown>) => void }) {
+  const [messages, setMessages] = useState<AIChatMessage[]>([
+    {
+      role: 'ai',
+      text: "Hey! I know your entire HomeStream library. Ask me anything — what's good for tonight, something for the kids, a thriller under 2 hours, whatever you're in the mood for.",
+    },
+  ]);
+  const [input, setInput] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [library, setLibrary] = useState<LibraryItem[]>([]);
+  const [listening, setListening] = useState(false);
+  const [voiceSupported, setVoiceSupported] = useState(false);
+  const [launching, setLaunching] = useState<string | null>(null);
+  const historyRef = useRef<Array<{ role: 'user' | 'model'; parts: [{ text: string }] }>>([]);
+  const bottomRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
+
+  useEffect(() => {
+    fetch('/api/media')
+      .then(r => r.json())
+      .then((data: LibraryItem[]) => setLibrary(Array.isArray(data) ? data : []))
+      .catch(() => {});
+    const SR = window.SpeechRecognition ?? window.webkitSpeechRecognition;
+    setVoiceSupported(!!SR);
+  }, []);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, loading]);
+
+  const sendMessage = useCallback(async (text: string) => {
+    if (!text.trim() || loading) return;
+    haptic(20);
+    const userMsg: AIChatMessage = { role: 'user', text };
+    setMessages(prev => [...prev, userMsg]);
+    setInput('');
+    setLoading(true);
+
+    // Build library payload for AI (same shape as desktop chat)
+    const libraryPayload = library.map(item => ({
+      id: item.id,
+      title: item.title,
+      genre: item.genre ?? [],
+      plot: '',
+      imdbRating: item.imdbRating ?? 'N/A',
+      type: item.type,
+      year: item.year ?? '',
+      director: '',
+      actors: '',
+      poster: item.poster ?? '',
+      watchProgress: item.watchProgress ?? 0,
+    }));
+
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: text,
+          library: libraryPayload,
+          history: historyRef.current,
+        }),
+      });
+      const data = await res.json() as { reply?: string; error?: string };
+      const reply = data.reply ?? data.error ?? 'Sorry, something went wrong.';
+
+      // Update history for multi-turn conversation
+      historyRef.current = [
+        ...historyRef.current,
+        { role: 'user', parts: [{ text }] },
+        { role: 'model', parts: [{ text: reply }] },
+      ];
+
+      // Extract any title mentions that match library items
+      const mentioned = library.filter(item =>
+        reply.toLowerCase().includes(item.title.toLowerCase())
+      ).slice(0, 4);
+
+      setMessages(prev => [...prev, { role: 'ai', text: reply, recommendations: mentioned }]);
+    } catch {
+      setMessages(prev => [...prev, { role: 'ai', text: 'Could not reach the AI. Make sure your Google AI API key is configured.' }]);
+    } finally {
+      setLoading(false);
+    }
+  }, [library, loading]);
+
+  const startVoice = useCallback(() => {
+    const SR = window.SpeechRecognition ?? window.webkitSpeechRecognition;
+    if (!SR) return;
+    haptic([30, 20, 60]);
+    const recognition = new SR();
+    recognitionRef.current = recognition;
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.lang = 'en-US';
+    setListening(true);
+    recognition.onresult = (e) => {
+      const transcript = e.results[0]?.[0]?.transcript ?? '';
+      if (transcript) { sendMessage(transcript); haptic(30); }
+    };
+    recognition.onerror = () => setListening(false);
+    recognition.onend = () => setListening(false);
+    recognition.start();
+  }, [sendMessage]);
+
+  const launch = useCallback((item: LibraryItem) => {
+    haptic([30, 20, 30]);
+    setLaunching(item.id);
+    send({ type: 'launch', mediaId: item.id, title: item.title });
+    setTimeout(() => setLaunching(null), 2000);
+  }, [send]);
+
+  const QUICK_PROMPTS = [
+    "What's good for tonight?",
+    "Something for the whole family",
+    "Best thriller in my library",
+    "Short movie under 90 min",
+  ];
+
+  return (
+    <div className="flex flex-col h-[calc(100vh-180px)] min-h-0">
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto flex flex-col gap-3 pb-2">
+        {messages.map((msg, i) => (
+          <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+            <div className={`max-w-[85%] ${msg.role === 'user' ? '' : 'flex flex-col gap-2'}`}>
+              {msg.role === 'ai' && (
+                <div className="flex items-center gap-1.5 mb-1">
+                  <Sparkles className="w-3 h-3 text-primary" />
+                  <span className="text-[10px] text-muted-foreground font-medium">HomeStream AI</span>
+                </div>
+              )}
+              <div className={`rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed ${
+                msg.role === 'user'
+                  ? 'bg-primary text-primary-foreground rounded-br-sm'
+                  : 'bg-card border border-border text-foreground rounded-bl-sm'
+              }`}>
+                {msg.text}
+              </div>
+
+              {/* Recommended titles — tap to launch */}
+              {msg.recommendations && msg.recommendations.length > 0 && (
+                <div className="flex flex-col gap-1.5 mt-1">
+                  {msg.recommendations.map(item => (
+                    <motion.button
+                      key={item.id}
+                      onClick={() => launch(item)}
+                      whileTap={{ scale: 0.97 }}
+                      className="relative flex items-center gap-2.5 bg-card border border-primary/30 rounded-xl p-2.5 text-left hover:border-primary/60 transition-colors overflow-hidden"
+                    >
+                      {item.poster ? (
+                        <img src={item.poster} alt="" className="w-8 h-11 object-cover rounded-lg flex-shrink-0" />
+                      ) : (
+                        <div className="w-8 h-11 bg-muted rounded-lg flex items-center justify-center flex-shrink-0">
+                          <Film className="w-3 h-3 text-muted-foreground" />
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-semibold text-foreground truncate">{item.title}</p>
+                        <p className="text-[10px] text-muted-foreground">{item.year}</p>
+                      </div>
+                      <div className="flex-shrink-0 bg-primary/10 rounded-lg p-1.5">
+                        <Tv2 className="w-3.5 h-3.5 text-primary" />
+                      </div>
+                      <AnimatePresence>
+                        {launching === item.id && (
+                          <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="absolute inset-0 bg-primary/80 flex items-center justify-center gap-1.5 rounded-xl"
+                          >
+                            <Tv2 className="w-4 h-4 text-white animate-pulse" />
+                            <span className="text-white text-xs font-semibold">Launching…</span>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </motion.button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+
+        {loading && (
+          <div className="flex justify-start">
+            <div className="bg-card border border-border rounded-2xl rounded-bl-sm px-4 py-3 flex items-center gap-2">
+              <Loader2 className="w-3.5 h-3.5 text-primary animate-spin" />
+              <span className="text-xs text-muted-foreground">Thinking…</span>
+            </div>
+          </div>
+        )}
+
+        {/* Quick prompts — only on first message */}
+        {messages.length === 1 && !loading && (
+          <div className="flex flex-col gap-1.5 mt-1">
+            <p className="text-[10px] text-muted-foreground px-1">Quick questions:</p>
+            {QUICK_PROMPTS.map(p => (
+              <button
+                key={p}
+                onClick={() => sendMessage(p)}
+                className="text-left text-xs bg-card border border-border rounded-xl px-3.5 py-2.5 text-foreground hover:border-primary/40 transition-colors"
+              >
+                {p}
+              </button>
+            ))}
+          </div>
+        )}
+
+        <div ref={bottomRef} />
+      </div>
+
+      {/* Input bar */}
+      <div className="flex items-center gap-2 pt-3 border-t border-border">
+        <div className="relative flex-1">
+          <input
+            ref={inputRef}
+            type="text"
+            placeholder="Ask anything about your library…"
+            value={input}
+            onChange={e => setInput(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(input); } }}
+            className="w-full bg-card border border-border rounded-xl px-3.5 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 pr-10"
+          />
+        </div>
+
+        {/* Voice button */}
+        {voiceSupported && (
+          <button
+            onPointerDown={startVoice}
+            className={`w-10 h-10 rounded-xl flex items-center justify-center border flex-shrink-0 transition-all ${
+              listening ? 'bg-red-500/20 border-red-500/50 text-red-400' : 'bg-card border-border text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <Mic className={`w-4 h-4 ${listening ? 'animate-pulse' : ''}`} />
+          </button>
+        )}
+
+        {/* Send button */}
+        <button
+          onClick={() => sendMessage(input)}
+          disabled={!input.trim() || loading}
+          className="w-10 h-10 rounded-xl flex items-center justify-center bg-primary text-primary-foreground flex-shrink-0 disabled:opacity-40 transition-opacity"
+        >
+          {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -811,6 +1321,35 @@ export default function RemotePage() {
               </motion.div>
             )}
           </AnimatePresence>
+
+          {/* ── Search tab content ── */}
+          <AnimatePresence mode="wait">
+            {activeTab === 'search' && (
+              <motion.div
+                key="search"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+              >
+                <SearchTab send={send} />
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* ── AI tab content ── */}
+          <AnimatePresence mode="wait">
+            {activeTab === 'ai' && (
+              <motion.div
+                key="ai"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                className="flex flex-col"
+              >
+                <AITab send={send} />
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       )}
 
@@ -820,7 +1359,7 @@ export default function RemotePage() {
           <div className="flex max-w-sm mx-auto">
             <button
               onClick={() => { haptic(20); setActiveTab('remote'); }}
-              className={`flex-1 flex flex-col items-center gap-1 py-3 text-xs font-medium transition-colors relative ${
+              className={`flex-1 flex flex-col items-center gap-1 py-2.5 text-[10px] font-medium transition-colors relative ${
                 activeTab === 'remote' ? 'text-primary' : 'text-muted-foreground'
               }`}
             >
@@ -831,13 +1370,31 @@ export default function RemotePage() {
               )}
             </button>
             <button
+              onClick={() => { haptic(20); setActiveTab('search'); }}
+              className={`flex-1 flex flex-col items-center gap-1 py-2.5 text-[10px] font-medium transition-colors ${
+                activeTab === 'search' ? 'text-primary' : 'text-muted-foreground'
+              }`}
+            >
+              <Search className="w-5 h-5" />
+              Search
+            </button>
+            <button
               onClick={() => { haptic(20); setActiveTab('browse'); }}
-              className={`flex-1 flex flex-col items-center gap-1 py-3 text-xs font-medium transition-colors ${
+              className={`flex-1 flex flex-col items-center gap-1 py-2.5 text-[10px] font-medium transition-colors ${
                 activeTab === 'browse' ? 'text-primary' : 'text-muted-foreground'
               }`}
             >
               <Film className="w-5 h-5" />
               Browse
+            </button>
+            <button
+              onClick={() => { haptic(20); setActiveTab('ai'); }}
+              className={`flex-1 flex flex-col items-center gap-1 py-2.5 text-[10px] font-medium transition-colors ${
+                activeTab === 'ai' ? 'text-primary' : 'text-muted-foreground'
+              }`}
+            >
+              <Sparkles className="w-5 h-5" />
+              Ask AI
             </button>
           </div>
           {/* Safe area spacer for iOS home indicator */}
