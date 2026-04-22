@@ -11,7 +11,7 @@
  *   - Config store: sequential partial writes merge, no field loss
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Rate limiter ──────────────────────────────────────────────────────────────
 
@@ -86,21 +86,35 @@ describe('Rate limiter — back-to-back login attempts', () => {
 
 describe('Download job store — back-to-back upserts', () => {
   let upsertJob:          (job: Record<string, unknown>) => void;
-  let getJob:             (id: string) => Record<string, unknown> | undefined;
-  let getAllJobs:          () => Record<string, unknown>[];
+  let getPersistedJob:    (id: string) => Record<string, unknown> | undefined;
+  let getAllPersistedJobs: () => Record<string, unknown>[];
   let findJobByInfoHash:  (hash: string) => Record<string, unknown> | undefined;
   let markJobInterrupted: (id: string) => void;
   let getInterruptedJobs: () => Record<string, unknown>[];
 
   beforeEach(async () => {
     vi.resetModules();
+    // Mock fs so no disk I/O — store operates purely in-memory via the cache
+    vi.doMock('fs', () => ({
+      default: { existsSync: vi.fn(() => false), readFileSync: vi.fn(() => '[]'), writeFileSync: vi.fn(), mkdirSync: vi.fn() },
+      existsSync: vi.fn(() => false), readFileSync: vi.fn(() => '[]'), writeFileSync: vi.fn(), mkdirSync: vi.fn(),
+    }));
+    vi.doMock('node:fs', () => ({
+      default: { existsSync: vi.fn(() => false), readFileSync: vi.fn(() => '[]'), writeFileSync: vi.fn(), mkdirSync: vi.fn() },
+      existsSync: vi.fn(() => false), readFileSync: vi.fn(() => '[]'), writeFileSync: vi.fn(), mkdirSync: vi.fn(),
+    }));
     const mod = await import('../../server/downloadJobStore.js');
     upsertJob          = mod.upsertJob          as typeof upsertJob;
-    getJob             = mod.getJob             as typeof getJob;
-    getAllJobs          = mod.getAllJobs          as typeof getAllJobs;
+    getPersistedJob    = mod.getPersistedJob    as typeof getPersistedJob;
+    getAllPersistedJobs = mod.getAllPersistedJobs as typeof getAllPersistedJobs;
     findJobByInfoHash  = mod.findJobByInfoHash  as typeof findJobByInfoHash;
     markJobInterrupted = mod.markJobInterrupted as typeof markJobInterrupted;
     getInterruptedJobs = mod.getInterruptedJobs as typeof getInterruptedJobs;
+  });
+
+  afterEach(() => {
+    vi.doUnmock('fs');
+    vi.doUnmock('node:fs');
   });
 
   it('50 sequential upserts to same jobId → final state is last write', async () => {
@@ -109,7 +123,7 @@ describe('Download job store — back-to-back upserts', () => {
       upsertJob({ jobId, infoHash: 'abc', title: `Title ${i}`, status: 'queued', addedAt: new Date().toISOString() });
       await Promise.resolve();
     }
-    const job = getJob(jobId);
+    const job = getPersistedJob(jobId);
     expect(job).toBeDefined();
     expect((job as { title: string }).title).toBe('Title 49');
   });
@@ -120,7 +134,7 @@ describe('Download job store — back-to-back upserts', () => {
       upsertJob({ jobId: id, infoHash: `hash-${id}`, title: `Movie ${id}`, status: 'queued', addedAt: new Date().toISOString() });
     }
     await Promise.resolve();
-    for (const id of ids) expect(getJob(id)).toBeDefined();
+    for (const id of ids) expect(getPersistedJob(id)).toBeDefined();
   });
 
   it('duplicate infoHash detection across rapid sequential adds', async () => {
@@ -152,21 +166,23 @@ describe('Download job store — back-to-back upserts', () => {
     markJobInterrupted('idem-1');
     markJobInterrupted('idem-1');
     await Promise.resolve();
-    expect((getJob('idem-1') as { interrupted: boolean }).interrupted).toBe(true);
+    expect((getPersistedJob('idem-1') as { interrupted: boolean }).interrupted).toBe(true);
   });
 
-  it('getAllJobs returns all upserted jobs', async () => {
+  it('getAllPersistedJobs returns all upserted jobs', async () => {
     for (let i = 0; i < 5; i++) {
       upsertJob({ jobId: `bulk-${i}`, infoHash: `bh${i}`, title: `Bulk ${i}`, status: 'queued', addedAt: new Date().toISOString() });
     }
     await Promise.resolve();
-    const all = getAllJobs();
+    const all = getAllPersistedJobs();
     const bulkJobs = all.filter(j => (j as { jobId: string }).jobId.startsWith('bulk-'));
     expect(bulkJobs.length).toBe(5);
   });
 });
 
 // ── Session store — back-to-back session creation ─────────────────────────────
+// sessionStore uses a write-through in-memory cache + async write queue.
+// We mock fs so no disk I/O, then flush the queue with Promise.resolve() chains.
 
 describe('Session store — back-to-back session creation', () => {
   let createSession:    () => string;
@@ -176,47 +192,74 @@ describe('Session store — back-to-back session creation', () => {
 
   beforeEach(async () => {
     vi.resetModules();
+    vi.doMock('fs', () => ({
+      default: { existsSync: vi.fn(() => false), readFileSync: vi.fn(() => '{}'), writeFileSync: vi.fn(), mkdirSync: vi.fn() },
+      existsSync: vi.fn(() => false), readFileSync: vi.fn(() => '{}'), writeFileSync: vi.fn(), mkdirSync: vi.fn(),
+    }));
+    vi.doMock('node:fs', () => ({
+      default: { existsSync: vi.fn(() => false), readFileSync: vi.fn(() => '{}'), writeFileSync: vi.fn(), mkdirSync: vi.fn() },
+      existsSync: vi.fn(() => false), readFileSync: vi.fn(() => '{}'), writeFileSync: vi.fn(), mkdirSync: vi.fn(),
+    }));
     const mod = await import('../../server/sessionStore.js');
     createSession    = mod.createSession;
     isValidSession   = mod.isValidSession;
     getSessionCount  = mod.getSessionCount;
     clearAllSessions = mod.clearAllSessions;
-    clearAllSessions();
+    // Flush the startup prune write
+    await Promise.resolve();
+    await Promise.resolve();
   });
 
-  it('100 sequential createSession calls → 100 unique tokens', () => {
+  afterEach(() => {
+    vi.doUnmock('fs');
+    vi.doUnmock('node:fs');
+  });
+
+  it('100 sequential createSession calls → 100 unique tokens', async () => {
     const tokens = new Set<string>();
     for (let i = 0; i < 100; i++) tokens.add(createSession());
+    await Promise.resolve();
     expect(tokens.size).toBe(100);
   });
 
-  it('all created sessions are valid immediately after creation', () => {
+  it('all created sessions are valid immediately after creation', async () => {
     const tokens: string[] = [];
     for (let i = 0; i < 20; i++) tokens.push(createSession());
+    // Flush write queue so cache is updated
+    await Promise.resolve();
+    await Promise.resolve();
     for (const t of tokens) expect(isValidSession(t)).toBe(true);
   });
 
-  it('isValidSession returns false for unknown token', () => {
+  it('isValidSession returns false for unknown token', async () => {
     createSession();
+    await Promise.resolve();
     expect(isValidSession('totally-fake-token-xyz')).toBe(false);
     expect(isValidSession('')).toBe(false);
   });
 
-  it('getSessionCount reflects correct count after bulk creation', () => {
+  it('getSessionCount reflects correct count after bulk creation', async () => {
     for (let i = 0; i < 15; i++) createSession();
+    await Promise.resolve();
+    await Promise.resolve();
     expect(getSessionCount()).toBe(15);
   });
 
-  it('clearAllSessions wipes all sessions created in bulk', () => {
+  it('clearAllSessions wipes all sessions created in bulk', async () => {
     for (let i = 0; i < 30; i++) createSession();
+    await Promise.resolve();
+    await Promise.resolve();
     expect(getSessionCount()).toBe(30);
     clearAllSessions();
+    await Promise.resolve();
+    await Promise.resolve();
     expect(getSessionCount()).toBe(0);
   });
 });
 
 // ── Config store — back-to-back writes ───────────────────────────────────────
-// Uses vi.doMock + vi.resetModules for full fs isolation per test.
+// configStore.writeConfig is synchronous — reads and writes happen immediately.
+// We mock fs before importing so the module never touches disk.
 
 describe('Config store — back-to-back writes', () => {
   let readConfig:  () => Record<string, unknown>;

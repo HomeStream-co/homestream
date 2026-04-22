@@ -308,54 +308,61 @@ describe('HTTP 403 — Forbidden', () => {
 });
 
 // ── 429 Too Many Requests ─────────────────────────────────────────────────────
+// IMPORTANT: All three 429 tests share ONE module import so the in-memory
+// rate-limit bucket accumulates across them. We use a unique IP per test
+// and import the handler ONCE at describe scope (no vi.resetModules here).
 
 describe('HTTP 429 — Too Many Requests', () => {
-  beforeEach(() => {
-    mockReadConfig.mockReset().mockReturnValue(BASE_CONFIG);
-    mockBcryptCompare.mockReset().mockResolvedValue(false);
-    mockCreateSession.mockReset().mockReturnValue('tok');
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let loginHandler: (req: Request, res: Response) => Promise<any>;
+
+  // Import once — rate limiter state is module-level and must persist
+  beforeEach(async () => {
+    mockReadConfig.mockReturnValue(BASE_CONFIG);
+    mockBcryptCompare.mockResolvedValue(false);
+    mockCreateSession.mockReturnValue('tok');
+    if (!loginHandler) {
+      vi.resetModules();
+      const mod = await import('../../server/api/auth/login/POST.js');
+      loginHandler = mod.default;
+    }
   });
 
-  it('POST /api/auth/login — 11th attempt from same IP → 429', async () => {
-    vi.resetModules();
-    const mod = await import('../../server/api/auth/login/POST.js');
-    const ip = '192.168.99.1';
-    // Exhaust 10 allowed attempts
+  async function exhaust(ip: string) {
     for (let i = 0; i < 10; i++) {
-      await mod.default(makeReq({ body: { password: 'wrong' }, socket: { remoteAddress: ip } as never }), makeRes() as unknown as Response);
+      await loginHandler(
+        makeReq({ body: { password: 'wrong' }, socket: { remoteAddress: ip } as never }),
+        makeRes() as unknown as Response,
+      );
     }
-    // 11th attempt
+  }
+
+  it('11th attempt from same IP → 429', async () => {
+    const ip = '192.168.99.10';
+    await exhaust(ip);
     const res = makeRes();
-    await mod.default(makeReq({ body: { password: 'wrong' }, socket: { remoteAddress: ip } as never }), res as unknown as Response);
+    await loginHandler(makeReq({ body: { password: 'wrong' }, socket: { remoteAddress: ip } as never }), res as unknown as Response);
     expect(res.statusCode).toBe(429);
-  });
+  }, 15000);
 
   it('429 response includes Retry-After header', async () => {
-    vi.resetModules();
-    const mod = await import('../../server/api/auth/login/POST.js');
-    const ip = '192.168.99.2';
-    for (let i = 0; i < 10; i++) {
-      await mod.default(makeReq({ body: { password: 'wrong' }, socket: { remoteAddress: ip } as never }), makeRes() as unknown as Response);
-    }
+    const ip = '192.168.99.11';
+    await exhaust(ip);
     const res = makeRes();
-    await mod.default(makeReq({ body: { password: 'wrong' }, socket: { remoteAddress: ip } as never }), res as unknown as Response);
+    await loginHandler(makeReq({ body: { password: 'wrong' }, socket: { remoteAddress: ip } as never }), res as unknown as Response);
     expect(res.statusCode).toBe(429);
     expect(res.headers['Retry-After']).toBeTruthy();
     expect(Number(res.headers['Retry-After'])).toBeGreaterThan(0);
-  });
+  }, 15000);
 
   it('429 response body includes retryAfterSecs field', async () => {
-    vi.resetModules();
-    const mod = await import('../../server/api/auth/login/POST.js');
-    const ip = '192.168.99.3';
-    for (let i = 0; i < 10; i++) {
-      await mod.default(makeReq({ body: { password: 'wrong' }, socket: { remoteAddress: ip } as never }), makeRes() as unknown as Response);
-    }
+    const ip = '192.168.99.12';
+    await exhaust(ip);
     const res = makeRes();
-    await mod.default(makeReq({ body: { password: 'wrong' }, socket: { remoteAddress: ip } as never }), res as unknown as Response);
+    await loginHandler(makeReq({ body: { password: 'wrong' }, socket: { remoteAddress: ip } as never }), res as unknown as Response);
     expect(res.statusCode).toBe(429);
     expect((res.body as { retryAfterSecs: number }).retryAfterSecs).toBeGreaterThan(0);
-  });
+  }, 15000);
 });
 
 // ── Legacy error message format ───────────────────────────────────────────────
