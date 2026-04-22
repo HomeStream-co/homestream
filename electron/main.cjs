@@ -13,7 +13,7 @@
  * Supported platforms: Windows (.exe), macOS (.dmg), Linux (.AppImage)
  */
 
-const { app, BrowserWindow, Tray, Menu, shell, nativeImage, ipcMain, globalShortcut, dialog } = require('electron');
+const { app, BrowserWindow, Tray, Menu, shell, nativeImage, ipcMain, globalShortcut, dialog, utilityProcess } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
 const http = require('http');
@@ -204,7 +204,7 @@ async function startServer() {
   const cleanEnv = { ...process.env };
   for (const key of BUILD_TIME_SECRETS) delete cleanEnv[key];
 
-  serverProcess = spawn(process.execPath, [serverPath], {
+  serverProcess = utilityProcess.fork(serverPath, [], {
     env: {
       ...cleanEnv,
       PORT: String(activePort),
