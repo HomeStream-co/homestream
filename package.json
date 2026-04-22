@@ -1,6 +1,6 @@
 {
   "name": "homestream",
-  "version": "1.3.2",
+  "version": "1.3.3",
   "description": "Self-hosted Netflix-style family media streaming app",
   "author": "HomeStream",
   "type": "module",
