@@ -23,13 +23,16 @@ const UPLOADS_DIR = path.resolve('./uploads');
 function safeDelete(fileRef: string): void {
   if (!fileRef) return;
 
+  // Reject path traversal attempts BEFORE normalisation.
+  // path.normalize resolves '..' segments so checking the normalised path
+  // is insufficient — '/media/../../etc/passwd' normalises to '/etc/passwd'
+  // with no '..' remaining. We must check the raw string first.
+  if (fileRef.includes('..')) return;
+
   // Normalise to an absolute path
   const resolved = path.isAbsolute(fileRef)
     ? path.normalize(fileRef)
     : path.resolve(UPLOADS_DIR, path.basename(fileRef));
-
-  // Reject path traversal attempts
-  if (resolved.includes('..')) return;
 
   try {
     if (fs.existsSync(resolved)) fs.unlinkSync(resolved);
