@@ -38,6 +38,9 @@ export interface AppConfig {
   preferredQuality: '720p' | '1080p' | '4k' | 'best';
   virusTotalApiKey: string;   // optional — activates Layer 2 hash lookup
   setupCompletedAt?: string;
+  // VPN interface binding — torrent traffic is locked to this adapter
+  vpnInterface?: string;      // e.g. "Norton Secure VPN" — Windows adapter name
+  vpnKillSwitch?: boolean;    // pause downloads if vpnInterface goes down
   // Storage organisation — percentage of total disk allocated per category (0–100, must sum ≤ 100)
   storageMoviesPct: number;   // e.g. 60 → 60% of disk reserved for movies
   storageTvPct: number;       // e.g. 30 → 30% of disk reserved for TV shows

@@ -143,6 +143,13 @@ export const serverBefore = (server) => {
     console.warn('[scheduler] Failed to start (non-fatal):', err.message);
   });
 
+  // Start VPN kill-switch monitor (pauses torrents if VPN drops)
+  import('./vpnKillSwitch.js').then(({ startVpnKillSwitch }) => {
+    startVpnKillSwitch();
+  }).catch(err => {
+    console.warn('[vpn-killswitch] Failed to start (non-fatal):', err.message);
+  });
+
   // Start mDNS so users can access HomeStream at homestream.local
   import('./mdnsService.js').then(({ startMDNS }) => {
     const port = parseInt(process.env.PORT || '3000');

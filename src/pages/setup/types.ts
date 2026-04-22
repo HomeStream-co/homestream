@@ -45,6 +45,8 @@ export interface FormData {
   vpnAutoFastest: boolean;
   /** For OpenVPN credential providers: comma-separated list of server hostnames to ping-rank */
   vpnKnownServers: string;
+  /** VPN interface binding — Windows adapter name (e.g. "Norton Secure VPN") */
+  vpnInterface?: string;
 }
 
 export type KeyTestState = 'idle' | 'testing' | 'ok' | 'error';

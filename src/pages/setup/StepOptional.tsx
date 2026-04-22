@@ -1,16 +1,24 @@
 /**
  * Setup Step 2 — Optional Services (merged)
  *
- * Combines qBittorrent + Jellyfin into one step with a prominent
- * "Skip all — I'll set these up later" fast path at the top.
- * VPN and HTTPS are accessible from Settings after setup.
+ * Combines qBittorrent + Jellyfin + VPN interface binding into one step
+ * with a prominent "Skip all — I'll set these up later" fast path at the top.
  */
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Wifi, Tv2, ChevronLeft, ChevronRight, CheckCircle2,
   XCircle, Loader2, RefreshCw, Eye, EyeOff, SkipForward,
+  Shield, AlertTriangle,
 } from 'lucide-react';
 import type { SetupStepProps } from './types';
+
+interface NetworkInterface {
+  name: string;
+  address: string;
+  family: 'IPv4' | 'IPv6';
+  internal: boolean;
+  likelyVpn: boolean;
+}
 
 export default function StepOptional({
   form, set, status: _status, setStatus, onNext, onBack,
@@ -21,6 +29,22 @@ export default function StepOptional({
 }: SetupStepProps) {
   const [qbitTest, setQbitTest] = useState<'idle' | 'testing' | 'ok' | 'error'>('idle');
   const [jellyfinTest, setJellyfinTest] = useState<'idle' | 'testing' | 'ok' | 'error'>('idle');
+
+  // VPN interface state
+  const [interfaces, setInterfaces] = useState<NetworkInterface[]>([]);
+  const [ifaceLoading, setIfaceLoading] = useState(false);
+  const [vpnBindState, setVpnBindState] = useState<'idle' | 'saving' | 'ok' | 'error'>('idle');
+  const [vpnBindMsg, setVpnBindMsg] = useState('');
+
+  // Load network interfaces when component mounts
+  useEffect(() => {
+    setIfaceLoading(true);
+    fetch('/api/vpn/interfaces')
+      .then(r => r.json())
+      .then((d: { interfaces: NetworkInterface[] }) => setInterfaces(d.interfaces.filter(i => !i.internal && i.family === 'IPv4')))
+      .catch(() => {})
+      .finally(() => setIfaceLoading(false));
+  }, []);
 
   const testQbit = async () => {
     setQbitTest('testing'); setTestError('');
@@ -76,6 +100,24 @@ export default function StepOptional({
     } catch {
       setJellyfinTest('error');
       setTestError('Cannot reach Jellyfin — is it running?');
+    }
+  };
+
+  const bindVpnInterface = async (ifaceName: string | null) => {
+    setVpnBindState('saving');
+    setVpnBindMsg('');
+    try {
+      const res = await fetch('/api/vpn/bind', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ interface: ifaceName }),
+      });
+      const data = await res.json() as { ok: boolean; message: string; qbitUpdated: boolean };
+      setVpnBindState(data.ok ? 'ok' : 'error');
+      setVpnBindMsg(data.message);
+    } catch {
+      setVpnBindState('error');
+      setVpnBindMsg('Could not save VPN binding');
     }
   };
 
@@ -208,6 +250,83 @@ export default function StepOptional({
         </button>
         {jellyfinTest === 'error' && testError && (
           <p className="text-[11px] text-destructive">{testError}</p>
+        )}
+      </div>
+
+      {/* ── VPN Interface Binding ── */}
+      <div className="rounded-xl border border-border bg-muted/20 p-4 flex flex-col gap-3">
+        <div className="flex items-center gap-2">
+          <div className="w-7 h-7 rounded-lg bg-green-500/10 flex items-center justify-center">
+            <Shield className="w-3.5 h-3.5 text-green-400" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-foreground">VPN Kill-Switch</p>
+            <p className="text-[10px] text-muted-foreground">Lock downloads to your VPN adapter — pauses if VPN drops</p>
+          </div>
+        </div>
+
+        <p className="text-[11px] text-muted-foreground leading-relaxed">
+          Connect your VPN (Norton, NordVPN, etc.) first, then select its network adapter below.
+          HomeStream will bind qBittorrent to that adapter only — if the VPN disconnects, all downloads
+          pause automatically so your real IP is never exposed.
+        </p>
+
+        {ifaceLoading ? (
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <Loader2 className="w-3.5 h-3.5 animate-spin" />Detecting network adapters…
+          </div>
+        ) : interfaces.length === 0 ? (
+          <p className="text-[11px] text-muted-foreground">No network adapters detected. Make sure your VPN is connected and try again.</p>
+        ) : (
+          <div className="flex flex-col gap-2">
+            <label className="text-[10px] font-medium text-muted-foreground">Select VPN Adapter</label>
+            <select
+              value={form.vpnInterface ?? ''}
+              onChange={e => {
+                const val = e.target.value || undefined;
+                set('vpnInterface', val);
+                setVpnBindState('idle');
+                setVpnBindMsg('');
+              }}
+              className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary"
+            >
+              <option value="">— Skip / No VPN binding —</option>
+              {interfaces.map(i => (
+                <option key={`${i.name}-${i.address}`} value={i.name}>
+                  {i.likelyVpn ? '🔒 ' : ''}{i.name} ({i.address})
+                </option>
+              ))}
+            </select>
+
+            {form.vpnInterface && (
+              <div className="flex items-start gap-2 p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                <AlertTriangle className="w-3.5 h-3.5 text-amber-400 mt-0.5 shrink-0" />
+                <p className="text-[11px] text-amber-300">
+                  Make sure your VPN is connected before starting any downloads.
+                  If it disconnects, downloads will pause automatically.
+                </p>
+              </div>
+            )}
+
+            <button
+              onClick={() => bindVpnInterface(form.vpnInterface ?? null)}
+              disabled={vpnBindState === 'saving'}
+              className="flex items-center justify-center gap-1.5 py-2 rounded-lg bg-muted hover:bg-muted/80 text-foreground text-xs font-medium transition-colors disabled:opacity-40"
+            >
+              {vpnBindState === 'saving'
+                ? <><Loader2 className="w-3.5 h-3.5 animate-spin" />Saving…</>
+                : vpnBindState === 'ok'
+                  ? <><CheckCircle2 className="w-3.5 h-3.5 text-green-400" />Saved</>
+                  : <><Shield className="w-3.5 h-3.5" />Apply VPN Binding</>
+              }
+            </button>
+
+            {vpnBindMsg && (
+              <p className={`text-[11px] ${vpnBindState === 'error' ? 'text-destructive' : 'text-green-400'}`}>
+                {vpnBindMsg}
+              </p>
+            )}
+          </div>
         )}
       </div>
 

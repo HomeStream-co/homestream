@@ -73,6 +73,11 @@ const OPEN_ENDPOINTS = new Set([
   // complete and before any admin password exists. Tests TMDB/OMDB/GoogleAI
   // keys server-side so the browser doesn't need cross-origin access.
   'src/server/api/setup/test-keys/POST.ts',
+
+  // VPN interface list — called from the setup wizard before auth exists so
+  // the user can pick their VPN adapter during initial setup.
+  // Returns only OS network interface names and IP addresses (no secrets).
+  'src/server/api/vpn/interfaces/GET.ts',
 ]);
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
