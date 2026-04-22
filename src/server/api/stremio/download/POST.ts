@@ -5,7 +5,7 @@ import { readConfig } from '../../../configStore.js';
 import { runPreDownloadScan } from '../../../security/threatScanner.js';
 import { connectForDownload, disconnectAfterDownload } from '../../../vpnService.js';
 import type { VPNConfig } from '../../../vpnService.js';
-import { upsertJob, getAllPersistedJobs } from '../../../downloadJobStore.js';
+import { upsertJob, getAllPersistedJobs, findJobByInfoHash } from '../../../downloadJobStore.js';
 import { requireAuth } from '../../../authMiddleware.js';
 
 /**
@@ -289,6 +289,23 @@ export default async function handler(req: Request, res: Response) {
     }
   };
 
+  // ── Duplicate detection helper ─────────────────────────────────────────────
+  // Returns true (and sends 409) if the infoHash is already active.
+  const checkDuplicate = (infoHash: string, label: string): boolean => {
+    const existing = findJobByInfoHash(infoHash);
+    if (existing) {
+      console.log(`[download] Duplicate detected for "${label}" — infoHash ${infoHash} already ${existing.status}`);
+      res.status(409).json({
+        error: 'duplicate',
+        message: `"${label}" is already in the download queue (${existing.status})`,
+        existingJobId: existing.jobId,
+        infoHash,
+      });
+      return true;
+    }
+    return false;
+  };
+
   try {
     if (type === 'movie') {
       let streams = preloadedStreams;
@@ -303,6 +320,8 @@ export default async function handler(req: Request, res: Response) {
       }
 
       if (useQbit) {
+        // ── Duplicate check ───────────────────────────────────────────────────
+        if (checkDuplicate(best.infoHash, title)) { await releaseVPN(); return; }
         // ── Security scan before queuing ──────────────────────────────────────
         const scan = await runPreDownloadScan({ infoHash: best.infoHash, title });
         if (!scan.allowed) {
@@ -320,6 +339,8 @@ export default async function handler(req: Request, res: Response) {
         await releaseVPN();
         res.json({ queued: 1, jobs: [job], backend: 'qbittorrent', securityScan: scan, vpnUsed: vpnConnected });
       } else {
+        // ── Duplicate check ───────────────────────────────────────────────────
+        if (checkDuplicate(best.infoHash, title)) { await releaseVPN(); return; }
         // ── Security scan before queuing ──────────────────────────────────────
         const scan = await runPreDownloadScan({ infoHash: best.infoHash, title });
         if (!scan.allowed) {
@@ -360,6 +381,7 @@ export default async function handler(req: Request, res: Response) {
           return;
         }
         if (useQbit) {
+          if (checkDuplicate(best.infoHash, epTitle)) { await releaseVPN(); return; }
           const job = await queueViaQbit({ infoHash: best.infoHash, magnet: best.magnet, quality: best.quality, title: epTitle, type: 'series', season, episode, imdbId, poster });
           await releaseVPN();
           res.json({ queued: 1, jobs: [job], backend: 'qbittorrent', vpnUsed: vpnConnected });
@@ -427,12 +449,21 @@ export default async function handler(req: Request, res: Response) {
               console.warn(`[security] Blocked episode ${epTitle}: ${scan.reason}`);
               continue; // skip this episode, continue with others
             }
+            // Skip duplicates silently in batch mode
+            if (findJobByInfoHash(best.infoHash)) {
+              console.log(`[download] Skipping duplicate episode ${epTitle}`);
+              continue;
+            }
             const job = await queueViaQbit({ infoHash: best.infoHash, magnet: best.magnet, quality: best.quality, title: epTitle, type: 'series', season: s, episode: ep, imdbId, poster });
             queuedJobs.push(job);
           } else {
             const scan = await runPreDownloadScan({ infoHash: best.infoHash, title: epTitle });
             if (!scan.allowed) {
               console.warn(`[security] Blocked episode ${epTitle}: ${scan.reason}`);
+              continue;
+            }
+            if (findJobByInfoHash(best.infoHash)) {
+              console.log(`[download] Skipping duplicate episode ${epTitle}`);
               continue;
             }
             const { queueDownload } = await import('../../../torrentManager.js');

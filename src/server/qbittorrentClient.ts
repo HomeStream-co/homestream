@@ -282,3 +282,21 @@ export async function isReachable(): Promise<boolean> {
     return false;
   }
 }
+
+/**
+ * Generic authenticated request to qBittorrent API.
+ * Exposed for endpoints that need to call qBit APIs not covered above.
+ */
+export async function qbitRequest<T = unknown>(
+  path: string,
+  method: 'GET' | 'POST' = 'GET',
+  body?: URLSearchParams,
+): Promise<T> {
+  return request<T>(path, {
+    method,
+    ...(body ? {
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: body.toString(),
+    } : {}),
+  });
+}

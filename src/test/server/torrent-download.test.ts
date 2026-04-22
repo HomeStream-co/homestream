@@ -71,6 +71,7 @@ vi.mock('../../server/downloadJobStore.js', () => ({
   upsertJob:             (...args: unknown[]) => mockUpsertJob(...args),
   getAllPersistedJobs:    () => [],
   updateJobStatus:       vi.fn(),
+  findJobByInfoHash:     () => undefined, // no duplicates by default
 }));
 
 vi.mock('../../server/authMiddleware.js', () => ({

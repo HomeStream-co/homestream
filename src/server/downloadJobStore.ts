@@ -121,3 +121,39 @@ export function getPersistedJob(jobId: string): PersistedJob | undefined {
 export function deleteJob(jobId: string): void {
   enqueueWrite(jobs => jobs.filter(j => j.jobId !== jobId));
 }
+
+/**
+ * Check whether an infoHash is already queued or downloading.
+ * Used for duplicate detection before adding a new torrent.
+ * Returns the existing job if found, undefined otherwise.
+ */
+export function findJobByInfoHash(infoHash: string): PersistedJob | undefined {
+  return readRaw().find(j =>
+    j.infoHash.toLowerCase() === infoHash.toLowerCase() &&
+    (j.status === 'queued' || j.status === 'downloading')
+  );
+}
+
+/**
+ * Mark a job as interrupted so the UI can offer a resume/retry button.
+ * Called when a download is interrupted mid-way (server restart, network drop).
+ */
+export function markJobInterrupted(jobId: string): void {
+  enqueueWrite(jobs => {
+    const job = jobs.find(j => j.jobId === jobId);
+    if (job && (job.status === 'queued' || job.status === 'downloading')) {
+      job.status = 'error';
+      (job as PersistedJob & { interrupted?: boolean }).interrupted = true;
+    }
+    return jobs;
+  });
+}
+
+/**
+ * Return all jobs that were interrupted (status=error AND interrupted=true).
+ * These are candidates for the "Resume" button.
+ */
+export function getInterruptedJobs(): (PersistedJob & { interrupted?: boolean })[] {
+  return (readRaw() as (PersistedJob & { interrupted?: boolean })[])
+    .filter(j => j.status === 'error' && j.interrupted === true);
+}

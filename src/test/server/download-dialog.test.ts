@@ -38,6 +38,7 @@ vi.mock('../../server/downloadJobStore.js', () => ({
   updateJob:           vi.fn(),
   removeJob:           vi.fn(),
   persistJobs:         vi.fn(),
+  findJobByInfoHash:   () => undefined, // no duplicates by default
 }));
 
 // Torrentio mock — returns deterministic streams
