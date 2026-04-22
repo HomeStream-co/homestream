@@ -16,6 +16,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openBrowserPage:(page) => ipcRenderer.send('open-browser-page', page),
   requestStatus:  () => ipcRenderer.send('request-status'),
 
+  // Crash log
+  readCrashLog:        () => ipcRenderer.invoke('read-crash-log'),
+  openCrashLogFolder:  () => ipcRenderer.send('open-crash-log-folder'),
+
   // Event listeners
   onStatus: (callback) => ipcRenderer.on('status', (_event, data)  => callback(data)),
   onLog:    (callback) => ipcRenderer.on('log',    (_event, entry) => callback(entry)),

@@ -502,6 +502,23 @@ ipcMain.on('open-browser-lan',  (_, url)  => shell.openExternal(url));
 ipcMain.on('open-browser-page', (_, page) => shell.openExternal(`http://localhost:${activePort}${page}`));
 ipcMain.on('request-status',    () => sendStatus());
 
+// Read crash log from disk and send to renderer
+ipcMain.handle('read-crash-log', () => {
+  const logPath = path.join(app.getPath('userData'), 'crash-log.json');
+  try {
+    if (!fs.existsSync(logPath)) return { entries: [], path: logPath };
+    const entries = JSON.parse(fs.readFileSync(logPath, 'utf-8'));
+    return { entries: entries.slice(0, 20), path: logPath };
+  } catch (e) {
+    return { entries: [], path: logPath, error: String(e) };
+  }
+});
+
+// Open crash log folder in Explorer/Finder
+ipcMain.on('open-crash-log-folder', () => {
+  shell.openPath(app.getPath('userData'));
+});
+
 // ── App lifecycle ─────────────────────────────────────────────────────────────
 
 app.whenReady().then(async () => {
@@ -882,6 +899,21 @@ const CONTROL_PANEL_HTML = `<!DOCTYPE html>
   <button class="btn-primary" id="btn-open" disabled onclick="openBrowser()">Open HomeStream</button>
   <button class="btn-secondary" id="btn-setup" disabled onclick="openSetup()">Setup Wizard</button>
   <button class="btn-secondary" id="btn-stop" disabled onclick="toggleServer()">Stop Server</button>
+  <button class="btn-secondary" id="btn-crashlog" onclick="toggleCrashLog()" title="View crash log to diagnose startup errors">Crash Log</button>
+</div>
+
+<!-- Crash log panel (hidden by default) -->
+<div id="crash-panel" style="display:none; flex-direction:column; padding:0 20px 10px; flex-shrink:0; max-height:220px;">
+  <div style="font-size:0.62rem;color:#444;text-transform:uppercase;letter-spacing:1px;padding:8px 0 6px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
+    <span>Crash Log <span id="crash-path" style="color:#333;font-size:0.58rem;margin-left:6px;"></span></span>
+    <span style="display:flex;gap:10px;">
+      <span style="cursor:pointer;color:#333;font-size:0.62rem;" onclick="openCrashFolder()">Open Folder</span>
+      <span style="cursor:pointer;color:#333;font-size:0.62rem;" onclick="refreshCrashLog()">Refresh</span>
+    </span>
+  </div>
+  <div id="crash-box" style="flex:1;overflow-y:auto;background:#050505;border:1px solid #2a0a0a;border-radius:7px;padding:8px 10px;font-family:'SF Mono','Cascadia Code','Fira Code',monospace;font-size:0.68rem;line-height:1.6;min-height:80px;max-height:160px;">
+    <div style="color:#333;font-style:italic;">Click Crash Log to load…</div>
+  </div>
 </div>
 
 <!-- Server log -->
@@ -945,6 +977,10 @@ const CONTROL_PANEL_HTML = `<!DOCTYPE html>
     if (entry.line && entry.line.includes('First run detected')) {
       isFirstRun = true;
       document.getElementById('first-run-banner').classList.add('visible');
+    }
+    // Auto-open crash log panel when a crash loop is detected
+    if (entry.level === 'error' && entry.line && (entry.line.includes('fast crash') || entry.line.includes('crash loop') || entry.line.includes('Watchdog'))) {
+      if (!crashPanelOpen) toggleCrashLog();
     }
   }
 
@@ -1117,6 +1153,55 @@ const CONTROL_PANEL_HTML = `<!DOCTYPE html>
   }
 
   window.electronAPI?.onUpdateStatus(handleUpdateStatus);
+
+  // ── Crash log panel ────────────────────────────────────────────────────────
+  let crashPanelOpen = false;
+
+  function toggleCrashLog() {
+    crashPanelOpen = !crashPanelOpen;
+    const panel = document.getElementById('crash-panel');
+    panel.style.display = crashPanelOpen ? 'flex' : 'none';
+    if (crashPanelOpen) refreshCrashLog();
+  }
+
+  function openCrashFolder() {
+    window.electronAPI?.openCrashLogFolder();
+  }
+
+  async function refreshCrashLog() {
+    const box = document.getElementById('crash-box');
+    box.innerHTML = '<div style="color:#555;font-style:italic;">Loading…</div>';
+    try {
+      const result = await window.electronAPI?.readCrashLog();
+      const pathEl = document.getElementById('crash-path');
+      if (pathEl && result?.path) pathEl.textContent = result.path;
+
+      if (!result || result.entries.length === 0) {
+        box.innerHTML = '<div style="color:#22c55e;font-style:italic;">No crashes recorded — server is healthy.</div>';
+        return;
+      }
+      box.innerHTML = '';
+      result.entries.forEach(e => {
+        const div = document.createElement('div');
+        div.style.cssText = 'margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid #1a0a0a;';
+        const ts = new Date(e.timestamp).toLocaleString();
+        const typeColor = e.type === 'uncaughtException' ? '#ef4444' : e.type === 'startup' ? '#f59e0b' : '#f87171';
+        div.innerHTML =
+          '<div style="display:flex;gap:8px;align-items:baseline;margin-bottom:3px;">' +
+            '<span style="color:' + typeColor + ';font-weight:700;font-size:0.65rem;text-transform:uppercase;">' + escHtml(e.type) + '</span>' +
+            '<span style="color:#444;font-size:0.62rem;">' + escHtml(ts) + '</span>' +
+            '<span style="color:#333;font-size:0.6rem;">uptime:' + e.uptime + 's</span>' +
+          '</div>' +
+          '<div style="color:#ef4444;margin-bottom:3px;">' + escHtml(e.message) + '</div>' +
+          (e.stack ? '<div style="color:#555;font-size:0.62rem;white-space:pre-wrap;word-break:break-all;">' + escHtml(e.stack.split('\\n').slice(0,4).join('\\n')) + '</div>' : '') +
+          (e.context ? '<div style="color:#444;font-size:0.6rem;margin-top:2px;">context: ' + escHtml(e.context) + '</div>' : '');
+        box.appendChild(div);
+      });
+    } catch(err) {
+      box.innerHTML = '<div style="color:#ef4444;">Failed to read crash log: ' + escHtml(String(err)) + '</div>';
+    }
+  }
+
 </script>
 </body>
 </html>`;
