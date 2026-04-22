@@ -93,7 +93,11 @@ async function importFile(filePath: string): Promise<void> {
     try { return fs.statSync(filePath).size; } catch { return 0; }
   })();
 
-  // Build library record — initially points at source file
+  // Build library record — initially points at source file.
+  // Always mark transcoding:true so the UI shows "Optimizing…" while the
+  // transcoder runs. The transcoder itself decides whether to skip, remux,
+  // or re-encode based on codec analysis — it may finish instantly for
+  // already-efficient H.264 MP4 files.
   const mediaItem = buildMediaItem({
     filename,
     originalFilename: filename,
@@ -102,7 +106,7 @@ async function importFile(filePath: string): Promise<void> {
     omdb,
     extractedTitle,
     extractedYear,
-    transcoding: ext !== '.mp4', // only flag as transcoding if not already mp4
+    transcoding: true,
     importedFrom: 'folder_watcher',
   });
 

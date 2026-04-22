@@ -79,8 +79,20 @@ function readLibrary(): MediaRecord[] {
   catch { return []; }
 }
 
-function writeLibrary(data: MediaRecord[]): void {
-  fs.writeFileSync(LIBRARY_PATH, JSON.stringify(data, null, 2));
+/**
+ * Write library via the shared queue so startup cleanup never races with
+ * concurrent upload/progress writes that may already be in flight.
+ * Falls back to direct write if the queue module can't be loaded (e.g. very
+ * early startup before the module graph is initialised).
+ */
+async function writeLibrarySafe(data: MediaRecord[]): Promise<void> {
+  try {
+    const { writeLibraryDirect } = await import('./libraryStore.js');
+    await writeLibraryDirect(data as unknown as Record<string, unknown>[]);
+  } catch {
+    // Fallback: direct write (startup is single-threaded at this point)
+    fs.writeFileSync(LIBRARY_PATH, JSON.stringify(data, null, 2));
+  }
 }
 
 // ── HLS orphan cleanup ────────────────────────────────────────────────────────
@@ -330,7 +342,9 @@ export function runStartupCleanup(): void {
   });
 
   if (changed) {
-    writeLibrary(cleaned);
+    writeLibrarySafe(cleaned).catch(err =>
+      console.error('[startup] Library write failed:', err)
+    );
     console.log('[startup] Library cleanup complete.');
   }
 

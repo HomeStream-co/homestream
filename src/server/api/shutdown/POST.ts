@@ -1,11 +1,14 @@
 /**
- * GET /api/shutdown
+ * POST /api/shutdown
  *
  * Graceful shutdown endpoint called by the Electron main process before
  * killing the server child process. Gives the server a chance to:
  *   1. Stop all active HLS transcoding jobs
  *   2. Clean up /tmp/homestream-hls/ segments
  *   3. Flush any pending writes
+ *
+ * POST (not GET) to prevent CSRF — a malicious page cannot trigger shutdown
+ * via <img src="/api/shutdown"> or similar cross-origin GET requests.
  *
  * This is needed on Windows because SIGTERM is mapped to an immediate kill
  * (no graceful shutdown signal), so we use HTTP instead.

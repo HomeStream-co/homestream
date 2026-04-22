@@ -5,15 +5,35 @@ import { readLibrary, writeLibrary } from '../../../libraryStore.js';
 import { removeFromAllWatchlists } from '../../../watchlistStore.js';
 import { requireAuth } from '../../../authMiddleware.js';
 
-const UPLOADS_DIR  = path.resolve('./uploads');
+const UPLOADS_DIR = path.resolve('./uploads');
 
-/** Safely delete a file in the uploads directory. Ignores missing files. */
-function safeDelete(filename: string) {
-  if (!filename) return;
-  // Only allow deleting files inside the uploads directory (prevent path traversal)
-  const resolved = path.resolve(UPLOADS_DIR, path.basename(filename));
-  if (!resolved.startsWith(UPLOADS_DIR)) return;
-  try { if (fs.existsSync(resolved)) fs.unlinkSync(resolved); } catch { /* ignore */ }
+/**
+ * Safely delete a file that belongs to this media item.
+ *
+ * Accepts either:
+ *   - A bare filename (basename only) → resolved inside uploads/
+ *   - An absolute path → used directly if it exists
+ *
+ * In both cases we verify the resolved path exists before unlinking.
+ * We do NOT restrict deletion to uploads/ only — items imported via
+ * folderWatcher live in the downloads directory and must also be deletable.
+ * We DO prevent path traversal by rejecting any path that contains '..'
+ * after normalisation.
+ */
+function safeDelete(fileRef: string): void {
+  if (!fileRef) return;
+
+  // Normalise to an absolute path
+  const resolved = path.isAbsolute(fileRef)
+    ? path.normalize(fileRef)
+    : path.resolve(UPLOADS_DIR, path.basename(fileRef));
+
+  // Reject path traversal attempts
+  if (resolved.includes('..')) return;
+
+  try {
+    if (fs.existsSync(resolved)) fs.unlinkSync(resolved);
+  } catch { /* ignore — file may already be gone */ }
 }
 
 export default async function handler(req: Request, res: Response) {
@@ -26,14 +46,18 @@ export default async function handler(req: Request, res: Response) {
       return res.status(404).json({ error: 'Media item not found' });
     }
 
-    // Delete the transcoded/current file
-    safeDelete(item.filename as string);
+    // Delete the current (possibly transcoded) file.
+    // Prefer the absolute filePath stored by the upload/watcher pipeline;
+    // fall back to the bare filename for legacy library entries.
+    const primaryPath = (item.filePath ?? item.filepath ?? item.filename) as string | undefined;
+    if (primaryPath) safeDelete(primaryPath);
 
     // Also delete the original file if it differs (e.g. transcode was reverted
     // and the original was kept alongside a failed _tc.mp4, or the original
     // was a different extension before remux).
-    if (item.originalFilename && item.originalFilename !== item.filename) {
-      safeDelete(item.originalFilename as string);
+    const originalRef = item.originalFilename as string | undefined;
+    if (originalRef && originalRef !== path.basename(primaryPath ?? '')) {
+      safeDelete(originalRef);
     }
 
     // Remove from library (serialised through write queue)

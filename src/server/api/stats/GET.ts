@@ -42,8 +42,14 @@ interface LibraryItem {
 }
 
 function getDiskStats(dir: string): { free: number; total: number } | null {
+  // Sanitise dir to prevent shell injection — only allow safe path characters.
+  // The path comes from the user-configured mediaDir in homestream-config.json.
+  const safePath = dir.replace(/[`$\\|;&<>(){}!]/g, '');
+  if (safePath !== dir) {
+    console.warn('[stats] getDiskStats: suspicious characters in path, sanitised');
+  }
   try {
-    const out = execSync(`df -k "${dir}" 2>/dev/null | tail -1`, { timeout: 3000 }).toString().trim();
+    const out = execSync(`df -k "${safePath}" 2>/dev/null | tail -1`, { timeout: 3000 }).toString().trim();
     const parts = out.split(/\s+/);
     if (parts.length >= 4) {
       const total = parseInt(parts[1]) * 1024;

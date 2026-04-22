@@ -12,6 +12,33 @@
 
 import { spawn } from 'child_process';
 import fs from 'fs';
+import path from 'path';
+import { createRequire } from 'module';
+
+// Resolve ffprobe binary: prefer FFMPEG_PATH env var (Electron sets this),
+// then look for ffprobe alongside the bundled ffmpeg-static binary,
+// then fall back to system 'ffprobe' on PATH.
+function resolveFfprobe(): string {
+  if (process.env.FFMPEG_PATH) {
+    const dir = path.dirname(process.env.FFMPEG_PATH);
+    const ext = process.platform === 'win32' ? '.exe' : '';
+    const candidate = path.join(dir, `ffprobe${ext}`);
+    if (fs.existsSync(candidate)) return candidate;
+  }
+  try {
+    const req = createRequire(import.meta.url);
+    const ffmpegPath = req('ffmpeg-static') as string | null;
+    if (ffmpegPath) {
+      const dir = path.dirname(ffmpegPath);
+      const ext = process.platform === 'win32' ? '.exe' : '';
+      const candidate = path.join(dir, `ffprobe${ext}`);
+      if (fs.existsSync(candidate)) return candidate;
+    }
+  } catch { /* not installed */ }
+  return 'ffprobe';
+}
+
+const FFPROBE = resolveFfprobe();
 
 export interface ProbeResult {
   codec: string;
@@ -77,7 +104,7 @@ function langLabel(code?: string): string {
 
 function runProbe(filePath: string): Promise<ProbeResult> {
   return new Promise(resolve => {
-    const proc = spawn('ffprobe', [
+    const proc = spawn(FFPROBE, [
       '-v', 'quiet',
       '-print_format', 'json',
       '-show_format',

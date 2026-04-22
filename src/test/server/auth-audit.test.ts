@@ -66,7 +66,8 @@ const OPEN_ENDPOINTS = new Set([
   // Graceful shutdown — only accepts requests from 127.0.0.1/::1 (enforced
   // in handler). Called by the Electron main process before killing the server
   // child process on Windows (SIGTERM is an immediate kill on Windows).
-  'src/server/api/shutdown/GET.ts',
+  // Changed from GET to POST to prevent CSRF.
+  'src/server/api/shutdown/POST.ts',
 
   // API key tester — called from the setup wizard (step 4) before setup is
   // complete and before any admin password exists. Tests TMDB/OMDB/GoogleAI

@@ -126,6 +126,7 @@ export default function handler(req: Request, res: Response) {
         'Cache-Control':      'private, max-age=3600, no-transform',
         'ETag':               etag,
         'Last-Modified':      lastModified,
+        'Vary':               'Range',
         'Connection':         'keep-alive',
         'X-Content-Duration': String(stat.size),
       });
@@ -145,6 +146,7 @@ export default function handler(req: Request, res: Response) {
           'Cache-Control':  'private, max-age=3600, no-transform',
           'ETag':           etag,
           'Last-Modified':  lastModified,
+          'Vary':           'Range',
           'Connection':     'keep-alive',
         });
         fs.createReadStream(filePath, { start: 0, end, highWaterMark: CHUNK_SIZE }).pipe(res);
@@ -156,6 +158,7 @@ export default function handler(req: Request, res: Response) {
           'Cache-Control':  'private, max-age=3600, no-transform',
           'ETag':           etag,
           'Last-Modified':  lastModified,
+          'Vary':           'Range',
           'Connection':     'keep-alive',
         });
         fs.createReadStream(filePath, { highWaterMark: CHUNK_SIZE }).pipe(res);

@@ -51,7 +51,31 @@ function resolveFfmpeg(): string {
   } catch { /* not installed */ }
   return 'ffmpeg';
 }
+
+// Resolve ffprobe binary: same directory as ffmpeg.
+function resolveFfprobe(): string {
+  if (process.env.FFMPEG_PATH) {
+    const dir = path.dirname(process.env.FFMPEG_PATH);
+    const ext = process.platform === 'win32' ? '.exe' : '';
+    const candidate = path.join(dir, `ffprobe${ext}`);
+    if (fs.existsSync(candidate)) return candidate;
+  }
+  try {
+    const { createRequire } = require('module') as typeof import('module');
+    const req = createRequire(import.meta.url);
+    const ffmpegPath = req('ffmpeg-static') as string | null;
+    if (ffmpegPath) {
+      const dir = path.dirname(ffmpegPath);
+      const ext = process.platform === 'win32' ? '.exe' : '';
+      const candidate = path.join(dir, `ffprobe${ext}`);
+      if (fs.existsSync(candidate)) return candidate;
+    }
+  } catch { /* not installed */ }
+  return 'ffprobe';
+}
+
 const FFMPEG = resolveFfmpeg();
+const FFPROBE = resolveFfprobe();
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -87,7 +111,7 @@ type EncodeStrategy = 'remux' | 'encode_h264' | 'skip_remux_only';
  */
 async function probeFile(filePath: string): Promise<VideoInfo> {
   return new Promise(resolve => {
-    const probe = spawn('ffprobe', [
+    const probe = spawn(FFPROBE, [
       '-v', 'quiet',
       '-print_format', 'json',
       '-show_format',

@@ -87,7 +87,8 @@ async function fetchStreamsForEpisode(
 
 function pickBestStream(streams: StreamResult[]): StreamResult | null {
   if (streams.length === 0) return null;
-  const prefer = ['2160p', '4K', '1080p', '720p'];
+  // Prefer 1080p → 720p → 4K (4K last to avoid wasting storage on TV episodes)
+  const prefer = ['1080p', '720p', '2160p', '4K'];
   for (const q of prefer) {
     const match = streams.find(s => s.quality.includes(q));
     if (match) return match;

@@ -28,7 +28,7 @@ export default async function handler(req: Request, res: Response) {
       enabled?: boolean;
     };
 
-    const config = await readConfig() as unknown as Record<string, unknown>;
+    const config = readConfig() as unknown as Record<string, unknown>;
 
     if (action === 'save') {
       const existing = (config.vpn ?? {}) as Partial<VPNConfig>;
@@ -52,7 +52,8 @@ export default async function handler(req: Request, res: Response) {
           : existing.knownServers,
       };
       config.vpn = vpnConfig;
-      await writeConfig(config);
+      // writeConfig expects Partial<AppConfig> — cast through unknown
+      writeConfig(config as unknown as import('../../configStore.js').AppConfig);
       return res.json({ ok: true });
     }
 

@@ -84,13 +84,14 @@ export function readConfig(): AppConfig {
   }
 }
 
-// ── Write queue ───────────────────────────────────────────────────────────────
-
-let writeQueue: Promise<void> = Promise.resolve();
+// ── Write ─────────────────────────────────────────────────────────────────────
 
 /**
- * Write config updates. All writes are serialised through a promise queue
- * to prevent concurrent saves from corrupting homestream-config.json.
+ * Write config updates. Writes synchronously to disk so the next readConfig()
+ * call always sees the updated values — no async queue needed here because
+ * config writes are rare (setup wizard, settings page) and the file is tiny.
+ *
+ * Returns the merged config so callers can use it immediately.
  */
 export function writeConfig(updates: Partial<AppConfig>): AppConfig {
   const current = readConfig();
@@ -102,12 +103,11 @@ export function writeConfig(updates: Partial<AppConfig>): AppConfig {
     next.libraryDir = next.libraryDir || path.join(updates.mediaDir, 'library');
   }
 
-  // Enqueue the write — non-blocking, returns the computed next config immediately
-  writeQueue = writeQueue.then(() => {
+  try {
     fs.writeFileSync(CONFIG_PATH, JSON.stringify(next, null, 2));
-  }).catch(err => {
+  } catch (err) {
     console.error('[configStore] Write failed:', err);
-  });
+  }
 
   return next;
 }

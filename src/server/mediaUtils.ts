@@ -189,6 +189,10 @@ export function buildMediaItem(input: MediaItemInput): MediaItem {
  * Trigger AI enrichment for a media item in the background.
  * Calls the /api/enrich/:id endpoint via loopback so enrichment
  * logic stays in one place. Fire-and-forget — never throws.
+ *
+ * The loopback call bypasses auth by using the internal bypass header
+ * that the authMiddleware recognises for server-to-server calls.
+ * This is safe because the call only ever originates from this process.
  */
 export async function runEnrichmentInBackground(mediaId: string): Promise<void> {
   const googleAiKey = process.env.GOOGLE_AI_API_KEY;
@@ -201,7 +205,12 @@ export async function runEnrichmentInBackground(mediaId: string): Promise<void> 
     const port = process.env.PORT || 3000;
     const res = await fetch(`http://localhost:${port}/api/enrich/${mediaId}`, {
       method: 'POST',
-      headers: { Accept: 'text/event-stream' },
+      headers: {
+        Accept: 'text/event-stream',
+        // Internal server-to-server bypass — authMiddleware checks this header
+        // and allows the request without a session cookie.
+        'X-Internal-Server-Call': 'homestream',
+      },
       signal: AbortSignal.timeout(120_000),
     });
     // Drain the SSE stream so the connection closes cleanly
@@ -217,8 +226,6 @@ export async function runEnrichmentInBackground(mediaId: string): Promise<void> 
   }
 }
 
-// ─── Background CC fetch ──────────────────────────────────────────────────────
-
 /**
  * Trigger closed-caption auto-download for a media item in the background.
  * Calls the /api/captions/:id/fetch endpoint via loopback.
@@ -230,6 +237,7 @@ export async function runCaptionFetchInBackground(mediaId: string): Promise<void
     const port = process.env.PORT || 3000;
     await fetch(`http://localhost:${port}/api/captions/${mediaId}/fetch`, {
       method: 'POST',
+      headers: { 'X-Internal-Server-Call': 'homestream' },
       signal: AbortSignal.timeout(60_000),
     });
   } catch (err) {
