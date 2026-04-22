@@ -44,7 +44,8 @@ export function requireAuth(req: Request, res: Response): boolean {
   }
 
   const cfg = readConfig();
-  const adminPassword = cfg.adminPassword || process.env.ADMIN_PASSWORD || '';
+  // Only use the password from config file (set by wizard). Never fall back to env.
+  const adminPassword = cfg.adminPassword || '';
 
   // Open mode — no password set, all requests allowed
   if (!adminPassword) return true;
