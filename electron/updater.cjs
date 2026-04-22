@@ -108,6 +108,15 @@ function setupAutoUpdater({ controlWindowGetter, pushLog }) {
   });
 
   autoUpdater.on('update-available', (info) => {
+    // Guard: never treat the currently-running version as an "update"
+    // This prevents an install loop where the app keeps re-installing itself.
+    const currentVersion = app.getVersion();
+    if (info.version === currentVersion) {
+      log(`Update check returned same version (v${info.version}) — skipping`, 'info');
+      sendStatus('not-available');
+      setTimeout(() => sendStatus('idle'), 5_000);
+      return;
+    }
     availableVersion = info.version;
     log(`Update available: v${info.version}`, 'success');
     sendStatus('available');
@@ -166,6 +175,13 @@ function setupAutoUpdater({ controlWindowGetter, pushLog }) {
 
   ipcMain.on('install-update', () => {
     if (currentState !== 'ready') return;
+    // Final safety check — never install same or older version
+    const currentVersion = app.getVersion();
+    if (availableVersion && availableVersion <= currentVersion) {
+      log(`Refusing to install v${availableVersion} — not newer than current v${currentVersion}`, 'warn');
+      sendStatus('idle');
+      return;
+    }
     log('Restarting to install update…', 'warn');
     // setImmediate gives the IPC reply time to flush before the process exits
     setImmediate(() => autoUpdater.quitAndInstall(false, true));
