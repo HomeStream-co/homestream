@@ -289,7 +289,7 @@ describe('toPublic() — strips pinHash from API response', () => {
     await setPin(p.id, '1234');
     const stored = readProfiles().find(x => x.id === p.id)!;
     const pub = toPublic(stored);
-    expect((pub as Record<string, unknown>).pinHash).toBeUndefined();
+    expect((pub as unknown as Record<string, unknown>).pinHash).toBeUndefined();
   });
 
   it('includes hasPin: true when PIN is set', async () => {

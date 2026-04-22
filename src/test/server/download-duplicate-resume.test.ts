@@ -59,7 +59,6 @@ vi.mock('../../server/dataDir.js', () => ({
 
 const {
   upsertJob,
-  deleteJob,
   findJobByInfoHash,
   markJobInterrupted,
   getInterruptedJobs,

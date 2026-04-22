@@ -13,7 +13,7 @@
  * getSessionCount) with controlled time via vi.useFakeTimers().
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── In-memory fs mock ─────────────────────────────────────────────────────────
 // We need a mutable in-memory store that the module can read/write.

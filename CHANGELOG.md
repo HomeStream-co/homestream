@@ -7,6 +7,50 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.2.5] — 2026-04-22
+
+### Fixed
+
+#### Episode Scheduler
+- Season advancement bug: `epStart` now only offsets the first season; S2+ correctly start at E1
+- `infoHash` always uses `best.infoHash` (was sometimes using stale local variable)
+- Catch-up subscriptions now have `.finally(() => scheduleOne(updated))` to guarantee rescheduling even on error
+- Double-fire race condition fixed: `scheduleAllSubscriptions` skips `scheduleOne` for subs already being catch-up checked
+- All scheduler timers now call `.unref()` so they don't block graceful shutdown
+- `cancelAllSubscriptions()` exported for clean shutdown integration
+- `savePath` uses `dataPath('downloads')` instead of hardcoded path
+
+#### Security & API Hardening
+- `hlsTranscoder.ts`: all imports moved to top-level (no dynamic require inside functions)
+- `transcodeWorker.ts`: uses `createRequire` from `module` for CommonJS interop
+- `torrentManager.ts`: stores absolute file paths; post-transcode library update fixed
+- `startupCleanup.ts`: transcode revert now uses absolute paths (was breaking on relative paths)
+- `backup/GET.ts`: uses `readLibrary()` / `readConfig()` / `readProfiles()` instead of direct fs reads; redacts `pinHash`
+- `tracks/GET.ts`: replaced hardcoded `/private` path with `readLibrary()` lookup
+- `captions/upload/POST.ts`: uses `writeLibrary(lib => ...)` updater pattern (safe concurrent writes)
+- `chat/POST.ts` + `enrich/[id]/POST.ts`: standardised to `gemini-2.0-flash` model
+- `stream/[filename]/GET.ts`: added `Vary: Range` header for correct CDN/proxy caching
+
+#### TypeScript
+- `downloads.tsx`: `act()` helper widened to accept `() => void | Promise<void>` (was rejecting sync callbacks)
+- `torrent-download.test.ts`: fixed spread of `unknown[]` into typed mock function
+- `profiles-store.test.ts`: fixed double-cast via `unknown` intermediate
+- `session-store.test.ts`: removed unused `afterEach` import
+- `download-duplicate-resume.test.ts`: removed unused `deleteJob` import
+
+### Added
+
+#### Test Suite (597 tests, 32 files — was 321/21)
+- `downloads-get.test.ts` (37 tests): full coverage of `GET /api/stremio/downloads` — qBit offline path, online happy path with metadata merging, all 12 `normaliseQbitState` branches
+- `downloads-controls.test.ts` (36 tests): full coverage of pause, resume, and priority endpoints — validation, offline guard, success, error handling
+- `download-duplicate-resume.test.ts`: duplicate detection, `markJobInterrupted`, `getInterruptedJobs`, retry handler (WebTorrent + qBit paths)
+- `stream.test.ts` (21 tests): range requests, 304 Not Modified, MIME types, path traversal protection, library-first resolution
+- `torrent-download.test.ts`: validation, qBit vs WebTorrent routing, security scan, VPN integration, preloaded streams
+- `torrent-delete.test.ts` (9 tests): all delete scenarios
+- `torrent-manager.test.ts` (25 tests): `pickBestStream`, `parseResolution`, 1080p-over-4K preference logic
+
+---
+
 ## [1.0.0] — 2026-04-20
 
 First public release. 120 commits from initial scaffold to production-ready

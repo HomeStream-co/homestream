@@ -332,7 +332,7 @@ function QbitRow({ torrent, onDelete, onPause, onResume, onMoveUp, onMoveDown, i
   const canPause = isActive;
   const canResume = isPaused;
 
-  const act = async (key: typeof actionLoading, fn: () => Promise<void>) => {
+  const act = async (key: typeof actionLoading, fn: () => void | Promise<void>) => {
     setActionLoading(key);
     await fn();
     setActionLoading(null);

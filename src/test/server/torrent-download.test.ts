@@ -55,7 +55,7 @@ const mockRunPreDownloadScan = vi.fn(async () => ({
 }));
 
 vi.mock('../../server/security/threatScanner.js', () => ({
-  runPreDownloadScan: (...args: unknown[]) => mockRunPreDownloadScan(...args),
+  runPreDownloadScan: (...args: Parameters<typeof mockRunPreDownloadScan>) => mockRunPreDownloadScan(...args),
 }));
 
 const mockConnectForDownload  = vi.fn().mockResolvedValue({ ok: true });
