@@ -40,6 +40,14 @@ vi.mock('../../server/rateLimiter', () => ({
   getFailureDelay: vi.fn(() => 0),
 }));
 
+// Mock authMiddleware so ADMIN_PASSWORD env var doesn't block tests
+vi.mock('../../server/authMiddleware', () => ({
+  requireAuth: () => true,
+}));
+vi.mock('../../server/authMiddleware.js', () => ({
+  requireAuth: () => true,
+}));
+
 // Import handlers AFTER mocking
 const { default: listHandler }      = await import('../../server/api/profiles/GET');
 const { default: createHandler }    = await import('../../server/api/profiles/POST');

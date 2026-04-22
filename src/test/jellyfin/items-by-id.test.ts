@@ -11,6 +11,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { mockReq, mockRes, MOVIE_ITEM, SERIES_ITEM, SAMPLE_LIBRARY } from './helpers';
 
+// ── Mock jellyfinAuth (always pass — ADMIN_PASSWORD env var must not block) ───
+vi.mock('../../server/jellyfinAuth', () => ({ requireJellyfinAuth: () => true }));
+vi.mock('../../server/jellyfinAuth.js', () => ({ requireJellyfinAuth: () => true }));
+
 // ── Mock libraryStore ─────────────────────────────────────────────────────────
 
 let mockLibrary = [...SAMPLE_LIBRARY];
