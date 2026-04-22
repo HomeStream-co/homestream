@@ -44,7 +44,11 @@ export function requireAuth(req: Request, res: Response): boolean {
   }
 
   const cfg = readConfig();
+<<<<<<< HEAD
   // Only use the password from config file (set by wizard). Never fall back to env.
+=======
+  // Password comes from config file only (set by wizard). Never fall back to env.
+>>>>>>> 20260422042700-9h9yrecco0
   const adminPassword = cfg.adminPassword || '';
 
   // Open mode — no password set, all requests allowed

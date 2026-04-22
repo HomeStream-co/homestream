@@ -57,8 +57,13 @@ const DEFAULTS: AppConfig = {
   qbitPassword: process.env.QBIT_PASSWORD || 'homestream',
   jellyfinUrl: process.env.JELLYFIN_URL || 'http://localhost:8096',
   jellyfinApiKey: process.env.JELLYFIN_API_KEY || '',
+<<<<<<< HEAD
   // NEVER read adminPassword from env — the setup wizard sets it on first run.
   // An env var here bypasses the wizard entirely and locks users out.
+=======
+  // adminPassword is ALWAYS set by the setup wizard via homestream-config.json.
+  // Never read it from env — that bypasses the wizard and locks users out.
+>>>>>>> 20260422042700-9h9yrecco0
   adminPassword: '',
   omdbApiKey: process.env.OMDB_API_KEY || '',
   googleAiApiKey: process.env.GOOGLE_AI_API_KEY || '',
