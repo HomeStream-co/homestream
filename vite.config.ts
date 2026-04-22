@@ -77,7 +77,7 @@ function serverBundlePlugin(): Plugin {
 const allowedHosts = ["all"];
 const corsOrigins = ["*"];
 
-export default defineConfig(({ mode }) => ({
+export default defineConfig(({ mode: _mode }) => ({
 	envPrefix: ["VITE_", "SITE_"],
 
 	plugins: [
