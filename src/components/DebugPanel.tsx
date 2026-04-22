@@ -835,9 +835,9 @@ function CopyDiagnosticButton({ health, sysInfo }: { health: HealthReport | null
 
     if (health) {
       lines.push('── Health Checks ───────────────────────────────────');
-      lines.push(`Overall: ${health.overall.toUpperCase()}`);
+      lines.push(`Overall: ${(health.overall ?? 'unknown').toUpperCase()}`);
       for (const c of health.checks) {
-        lines.push(`  [${c.status.toUpperCase().padEnd(5)}] ${c.name}: ${c.message}`);
+        lines.push(`  [${(c.status ?? 'unknown').toUpperCase().padEnd(5)}] ${c.name}: ${c.message}`);
         if (c.detail) lines.push(`           ${c.detail}`);
       }
       lines.push('');
@@ -967,7 +967,7 @@ export default function DebugPanel({ open, onClose }: DebugPanelProps) {
               <div className="flex items-center gap-2">
                 <Wrench className="w-4 h-4 text-primary" />
                 <span className="text-sm font-semibold text-foreground">Debug &amp; Diagnostics</span>
-                {health && (
+                {health && health.overall && (
                   <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${
                     health.overall === 'ok'    ? 'bg-green-500/20 text-green-400' :
                     health.overall === 'warn'  ? 'bg-yellow-500/20 text-yellow-400' :

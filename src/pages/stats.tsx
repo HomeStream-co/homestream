@@ -205,9 +205,19 @@ export default function StatsPage() {
     if (!silent) setRefreshing(true);
     try {
       const res = await fetch('/api/stats');
+      if (res.status === 401) throw new Error('HTTP 401 — please log in first');
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json = await res.json() as StatsData;
-      setData(json);
+      // Guard: ensure array fields are actually arrays before rendering
+      const safe: StatsData = {
+        ...json,
+        codecs: Array.isArray(json.codecs) ? json.codecs : [],
+        resolutions: Array.isArray(json.resolutions) ? json.resolutions : [],
+        genres: Array.isArray(json.genres) ? json.genres : [],
+        topWatched: Array.isArray(json.topWatched) ? json.topWatched : [],
+        recentlyAdded: Array.isArray(json.recentlyAdded) ? json.recentlyAdded : [],
+      };
+      setData(safe);
       setLastRefresh(new Date());
       setError(null);
     } catch (err) {
@@ -233,10 +243,16 @@ export default function StatsPage() {
   }
 
   if (error || !data) {
+    const is401 = error?.includes('401');
     return (
       <div className="max-w-xl mx-auto px-4 py-20 text-center">
         <BarChart3 className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
         <h2 className="text-lg font-semibold text-foreground mb-2">Could not load stats</h2>
+        {is401 && (
+          <p className="text-sm text-muted-foreground mb-4">
+            You need to be logged in to view stats. Please sign in and try again.
+          </p>
+        )}
         <p className="text-sm text-muted-foreground mb-6">{error ?? 'Unknown error'}</p>
         <button
           onClick={() => fetchStats()}

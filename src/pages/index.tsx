@@ -69,7 +69,9 @@ function RemoteQRWidget() {
   useEffect(() => {
     fetch('/api/remote/qr?format=svg')
       .then(r => r.json())
-      .then(data => setQr(data))
+      .then((data: { url?: string; qr?: string }) => {
+        if (data?.url && data?.qr) setQr({ url: data.url, qr: data.qr });
+      })
       .catch(() => {});
   }, []);
 
@@ -99,7 +101,7 @@ function RemoteQRWidget() {
             {/* QR code */}
             <div
               className="w-36 h-36 [&_svg]:w-full [&_svg]:h-full rounded-xl overflow-hidden bg-white p-1"
-              dangerouslySetInnerHTML={{ __html: qr.qr.replace(/fill="none"/g, 'fill="#ffffff"') }}
+              dangerouslySetInnerHTML={{ __html: (qr.qr ?? '').replace(/fill="none"/g, 'fill="#ffffff"') }}
             />
             <p className="text-[10px] text-muted-foreground text-center leading-relaxed">
               Scan with your phone camera to open the remote instantly

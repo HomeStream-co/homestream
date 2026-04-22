@@ -320,6 +320,8 @@ export default function SettingsPanel({ onOpenSecurity, onOpenDebug }: SettingsP
   const [apiKeysSaving, setApiKeysSaving] = useState(false);
   const [apiKeysSaved, setApiKeysSaved] = useState(false);
   const [apiKeysLoaded, setApiKeysLoaded] = useState(false);
+  // Tracks which keys are already saved on the server (from wizard)
+  const [apiKeysSavedState, setApiKeysSavedState] = useState({ omdb: false, googleAi: false, tmdb: false });
 
   // Storage stats state
   const [storageStats, setStorageStats] = useState<{
@@ -349,10 +351,17 @@ export default function SettingsPanel({ onOpenSecurity, onOpenDebug }: SettingsP
       .then(r => r.json())
       .then((data: { config?: { omdbApiKey?: string; googleAiApiKey?: string; tmdbApiKey?: string } }) => {
         if (data.config) {
+          // Server returns masked keys (e.g. "ab12••••••••") — treat as "key is set"
+          // Show empty string so user can type a new key, but display a saved indicator
           setApiKeys({
-            omdbApiKey: data.config.omdbApiKey ?? '',
-            googleAiApiKey: data.config.googleAiApiKey ?? '',
-            tmdbApiKey: data.config.tmdbApiKey ?? '',
+            omdbApiKey: '',
+            googleAiApiKey: '',
+            tmdbApiKey: '',
+          });
+          setApiKeysSavedState({
+            omdb: !!data.config.omdbApiKey,
+            googleAi: !!data.config.googleAiApiKey,
+            tmdb: !!data.config.tmdbApiKey,
           });
           setApiKeysLoaded(true);
         }
@@ -456,9 +465,13 @@ export default function SettingsPanel({ onOpenSecurity, onOpenDebug }: SettingsP
   };
 
   const testTmdb = async () => {
-    const res = await fetch('https://api.themoviedb.org/3/configuration', {
-      headers: { Authorization: `Bearer ${apiKeys.tmdbApiKey}` },
-    });
+    const key = apiKeys.tmdbApiKey.trim();
+    const isToken = key.startsWith('eyJ');
+    const url = isToken
+      ? 'https://api.themoviedb.org/3/configuration'
+      : `https://api.themoviedb.org/3/configuration?api_key=${encodeURIComponent(key)}`;
+    const headers: Record<string, string> = isToken ? { Authorization: `Bearer ${key}` } : {};
+    const res = await fetch(url, { headers });
     if (res.ok) return { ok: true, message: 'Connected to TMDB' };
     if (res.status === 401) return { ok: false, message: 'Invalid API key (401)' };
     return { ok: false, message: `HTTP ${res.status}` };
@@ -1044,29 +1057,44 @@ export default function SettingsPanel({ onOpenSecurity, onOpenDebug }: SettingsP
                 <div className="border-t border-border/50">
                   <SectionHeader icon={KeyRound} label="API Keys" />
                   <div className="px-4 pb-4 divide-y divide-border/30">
+                    {apiKeysSavedState.omdb && !apiKeys.omdbApiKey && (
+                      <div className="flex items-center gap-1.5 py-1.5 text-[11px] text-green-400">
+                        <CheckCircle2 className="w-3 h-3" /> OMDB key saved — enter a new value to replace it
+                      </div>
+                    )}
                     <ApiKeyField
                       label="OMDB"
                       description="Movie metadata (posters, ratings, plot). Get free key at omdbapi.com"
                       value={apiKeys.omdbApiKey}
                       onChange={v => setApiKeys(k => ({ ...k, omdbApiKey: v }))}
                       onTest={testOmdb}
-                      placeholder="e.g. a1b2c3d4"
+                      placeholder={apiKeysSavedState.omdb ? '(key saved — enter new to replace)' : 'e.g. a1b2c3d4'}
                     />
+                    {apiKeysSavedState.tmdb && !apiKeys.tmdbApiKey && (
+                      <div className="flex items-center gap-1.5 py-1.5 text-[11px] text-green-400">
+                        <CheckCircle2 className="w-3 h-3" /> TMDB key saved — enter a new value to replace it
+                      </div>
+                    )}
                     <ApiKeyField
                       label="TMDB"
                       description="Discover page, trending movies & TV. Get key at themoviedb.org"
                       value={apiKeys.tmdbApiKey}
                       onChange={v => setApiKeys(k => ({ ...k, tmdbApiKey: v }))}
                       onTest={testTmdb}
-                      placeholder="Bearer token or v4 key"
+                      placeholder={apiKeysSavedState.tmdb ? '(key saved — enter new to replace)' : 'v3 API key or Bearer token'}
                     />
+                    {apiKeysSavedState.googleAi && !apiKeys.googleAiApiKey && (
+                      <div className="flex items-center gap-1.5 py-1.5 text-[11px] text-green-400">
+                        <CheckCircle2 className="w-3 h-3" /> Google AI key saved — enter a new value to replace it
+                      </div>
+                    )}
                     <ApiKeyField
                       label="Google Gemini"
                       description="AI enrichment & chat assistant. Get key at aistudio.google.com"
                       value={apiKeys.googleAiApiKey}
                       onChange={v => setApiKeys(k => ({ ...k, googleAiApiKey: v }))}
                       onTest={testGemini}
-                      placeholder="AIza…"
+                      placeholder={apiKeysSavedState.googleAi ? '(key saved — enter new to replace)' : 'AIza…'}
                     />
                     <div className="pt-3">
                       <button

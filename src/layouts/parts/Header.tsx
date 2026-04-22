@@ -275,7 +275,7 @@ export default function Header({ onChatOpen: _onChatOpen }: HeaderProps) {
             <Suspense fallback={null}>
               <DebugPanel open={debugOpen} onClose={() => setDebugOpen(false)} />
             </Suspense>
-            <SecurityPanel open={securityOpen} onClose={() => setSecurityOpen(false)} />
+            <SecurityPanel open={securityOpen} onClose={() => setSecurityOpen(false)} onBack={() => { setSecurityOpen(false); }} />
 
             {/* ── Stremio ── */}
             <StremioPanel />

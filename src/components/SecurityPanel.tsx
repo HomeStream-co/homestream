@@ -15,7 +15,7 @@ import {
   Trash2, RotateCcw, RefreshCw, X, ChevronDown,
   ChevronRight, AlertTriangle, CheckCircle2, Lock,
   FileX, Archive, Cpu, Hash, Eye, EyeOff, Loader2,
-  Info,
+  Info, ChevronLeft,
 } from 'lucide-react';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -235,9 +235,10 @@ function QuarantineRow({
 interface SecurityPanelProps {
   open: boolean;
   onClose: () => void;
+  onBack?: () => void;
 }
 
-export default function SecurityPanel({ open, onClose }: SecurityPanelProps) {
+export default function SecurityPanel({ open, onClose, onBack }: SecurityPanelProps) {
   const [quarantine, setQuarantine] = useState<QuarantineEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [vtKey, setVtKey] = useState('');
@@ -330,6 +331,15 @@ export default function SecurityPanel({ open, onClose }: SecurityPanelProps) {
             {/* Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-border flex-shrink-0">
               <div className="flex items-center gap-3">
+                {onBack && (
+                  <button
+                    onClick={onBack}
+                    className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                    title="Back to Settings"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                )}
                 <div className="w-9 h-9 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center">
                   <ShieldCheck className="w-5 h-5 text-primary" />
                 </div>

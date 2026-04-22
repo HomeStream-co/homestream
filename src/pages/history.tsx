@@ -65,10 +65,11 @@ export default function HistoryPage() {
     setLoading(true);
     try {
       const res = await fetch(`/api/history?profile=${encodeURIComponent(profileId)}`);
-      const data = await res.json() as HistoryItem[];
-      setItems(data);
+      const data = await res.json() as HistoryItem[] | { error?: string };
+      setItems(Array.isArray(data) ? data : []);
     } catch {
       toast.error('Failed to load watch history');
+      setItems([]);
     } finally {
       setLoading(false);
     }
