@@ -113,7 +113,10 @@ export function writeConfig(updates: Partial<AppConfig>): AppConfig {
 }
 
 export function isSetupComplete(): boolean {
-  // Check env var first (Docker Compose sets this)
-  if (process.env.SETUP_COMPLETE === 'true') return true;
+  // Only trust SETUP_COMPLETE env var in non-Electron environments (Docker/cloud).
+  // In the packaged .exe the Electron main process strips this var before spawning
+  // the server, so it will never be set. Checking it here anyway would let a
+  // stale build-time env var bypass the wizard entirely.
+  if (!process.env.ELECTRON && process.env.SETUP_COMPLETE === 'true') return true;
   return readConfig().setupComplete;
 }
