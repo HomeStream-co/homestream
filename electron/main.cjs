@@ -234,13 +234,39 @@ async function startServer() {
     stdio: 'pipe',
   });
 
+  // ── Desktop crash log ─────────────────────────────────────────────────────
+  // Write all server stdout/stderr to Desktop\homestream-debug.txt so the user
+  // can read the actual crash message without hunting through AppData or Event Viewer.
+  const desktopLog = path.join(app.getPath('desktop'), 'homestream-debug.txt');
+  function appendDesktopLog(line) {
+    try {
+      fs.appendFileSync(desktopLog, `[${new Date().toISOString()}] ${line}\n`);
+    } catch { /* ignore write errors */ }
+  }
+  // Write a header so each run is clearly separated
+  try {
+    fs.appendFileSync(desktopLog,
+      `\n${'='.repeat(60)}\nHomeStream started at ${new Date().toISOString()}\n` +
+      `resourcesPath: ${process.resourcesPath}\n` +
+      `userData: ${app.getPath('userData')}\n` +
+      `${'='.repeat(60)}\n`
+    );
+  } catch { /* ignore */ }
+
   serverProcess.stdout?.on('data', d => {
-    d.toString().split('\n').filter(Boolean).forEach(line => pushLog(line, 'info'));
+    d.toString().split('\n').filter(Boolean).forEach(line => {
+      pushLog(line, 'info');
+      appendDesktopLog(`[stdout] ${line}`);
+    });
   });
   serverProcess.stderr?.on('data', d => {
-    d.toString().split('\n').filter(Boolean).forEach(line => pushLog(line, 'error'));
+    d.toString().split('\n').filter(Boolean).forEach(line => {
+      pushLog(line, 'error');
+      appendDesktopLog(`[stderr] ${line}`);
+    });
   });
   serverProcess.on('exit', code => {
+    appendDesktopLog(`[exit] Server exited with code ${code}`);
     pushLog(`Server exited with code ${code}`, code === 0 ? 'info' : 'error');
     serverProcess = null;
     serverRunning = false;
