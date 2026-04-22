@@ -118,7 +118,11 @@ export default defineConfig(({ mode }) => ({
 
 	ssr: {
 		noExternal: [],
-		external: ["html-to-image", "#airo/secrets"],
+		// Do NOT put "#airo/secrets" here — ssr.external tells Vite to skip
+		// the alias and resolve it as a real Node module, which fails because
+		// it's not an installed package. The alias in resolve.alias handles
+		// dev resolution. The build rollupOptions.external handles production.
+		external: ["html-to-image"],
 	},
 
 	server: {
