@@ -17,7 +17,6 @@
 import path from 'path';
 import fs from 'fs';
 import { randomUUID } from 'crypto';
-import WebTorrent from 'webtorrent';
 import { writeLibrary } from './libraryStore.js';
 import { createJob } from './transcodeStore.js';
 import { transcodeFile } from './transcodeWorker.js';
@@ -175,7 +174,18 @@ export async function startTorrentDownload(params: {
   job.progress = 0;
 
   try {
-    const client = new WebTorrent();
+    // Lazy-load WebTorrent so the module can be imported in production
+    // even when webtorrent is not bundled (it's externalized in the build).
+    // This avoids a top-level ERR_MODULE_NOT_FOUND crash on startup.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let WebTorrentCtor: new (...args: any[]) => any;
+    try {
+      const wt = await import('webtorrent');
+      WebTorrentCtor = (wt.default ?? wt) as typeof WebTorrentCtor;
+    } catch {
+      throw new Error('WebTorrent is not available in this environment. Use qBittorrent for downloads.');
+    }
+    const client = new WebTorrentCtor();
 
     await new Promise<void>((resolve, reject) => {
       const torrent = client.add(magnet, { path: UPLOADS_DIR });
@@ -200,8 +210,8 @@ export async function startTorrentDownload(params: {
         // Find the largest video file in the torrent
         const videoExts = ['.mp4', '.mkv', '.avi', '.mov', '.wmv', '.m4v', '.ts', '.webm'];
         const videoFile = torrent.files
-          .filter((f: WebTorrent.TorrentFile) => videoExts.includes(path.extname(f.name).toLowerCase()))
-          .sort((a: WebTorrent.TorrentFile, b: WebTorrent.TorrentFile) => b.length - a.length)[0];
+          .filter((f: { name: string; length: number; path: string }) => videoExts.includes(path.extname(f.name).toLowerCase()))
+          .sort((a: { name: string; length: number; path: string }, b: { name: string; length: number; path: string }) => b.length - a.length)[0];
 
         if (!videoFile) {
           client.destroy();
