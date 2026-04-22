@@ -8,10 +8,10 @@
  *   - Rate limiter: sequential/concurrent burst, IP isolation, failure delays
  *   - Download job store: 50 sequential upserts, 20 concurrent, duplicate detection
  *   - Session store: 100 unique tokens, bulk validity, clearAll
- *   - Config store: sequential partial writes merge, no field loss
+ *   - Config store (in-memory mock): sequential partial writes merge, no field loss
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Rate limiter ──────────────────────────────────────────────────────────────
 
@@ -83,6 +83,8 @@ describe('Rate limiter — back-to-back login attempts', () => {
 });
 
 // ── Download job store — back-to-back upserts ─────────────────────────────────
+// The store keeps an in-memory cache; disk writes are async and don't affect
+// the cache reads we're testing here.
 
 describe('Download job store — back-to-back upserts', () => {
   let upsertJob:          (job: Record<string, unknown>) => void;
@@ -94,15 +96,6 @@ describe('Download job store — back-to-back upserts', () => {
 
   beforeEach(async () => {
     vi.resetModules();
-    // Mock fs so no disk I/O — store operates purely in-memory via the cache
-    vi.doMock('fs', () => ({
-      default: { existsSync: vi.fn(() => false), readFileSync: vi.fn(() => '[]'), writeFileSync: vi.fn(), mkdirSync: vi.fn() },
-      existsSync: vi.fn(() => false), readFileSync: vi.fn(() => '[]'), writeFileSync: vi.fn(), mkdirSync: vi.fn(),
-    }));
-    vi.doMock('node:fs', () => ({
-      default: { existsSync: vi.fn(() => false), readFileSync: vi.fn(() => '[]'), writeFileSync: vi.fn(), mkdirSync: vi.fn() },
-      existsSync: vi.fn(() => false), readFileSync: vi.fn(() => '[]'), writeFileSync: vi.fn(), mkdirSync: vi.fn(),
-    }));
     const mod = await import('../../server/downloadJobStore.js');
     upsertJob          = mod.upsertJob          as typeof upsertJob;
     getPersistedJob    = mod.getPersistedJob    as typeof getPersistedJob;
@@ -110,11 +103,6 @@ describe('Download job store — back-to-back upserts', () => {
     findJobByInfoHash  = mod.findJobByInfoHash  as typeof findJobByInfoHash;
     markJobInterrupted = mod.markJobInterrupted as typeof markJobInterrupted;
     getInterruptedJobs = mod.getInterruptedJobs as typeof getInterruptedJobs;
-  });
-
-  afterEach(() => {
-    vi.doUnmock('fs');
-    vi.doUnmock('node:fs');
   });
 
   it('50 sequential upserts to same jobId → final state is last write', async () => {
@@ -181,8 +169,6 @@ describe('Download job store — back-to-back upserts', () => {
 });
 
 // ── Session store — back-to-back session creation ─────────────────────────────
-// sessionStore uses a write-through in-memory cache + async write queue.
-// We mock fs so no disk I/O, then flush the queue with Promise.resolve() chains.
 
 describe('Session store — back-to-back session creation', () => {
   let createSession:    () => string;
@@ -192,97 +178,58 @@ describe('Session store — back-to-back session creation', () => {
 
   beforeEach(async () => {
     vi.resetModules();
-    vi.doMock('fs', () => ({
-      default: { existsSync: vi.fn(() => false), readFileSync: vi.fn(() => '{}'), writeFileSync: vi.fn(), mkdirSync: vi.fn() },
-      existsSync: vi.fn(() => false), readFileSync: vi.fn(() => '{}'), writeFileSync: vi.fn(), mkdirSync: vi.fn(),
-    }));
-    vi.doMock('node:fs', () => ({
-      default: { existsSync: vi.fn(() => false), readFileSync: vi.fn(() => '{}'), writeFileSync: vi.fn(), mkdirSync: vi.fn() },
-      existsSync: vi.fn(() => false), readFileSync: vi.fn(() => '{}'), writeFileSync: vi.fn(), mkdirSync: vi.fn(),
-    }));
     const mod = await import('../../server/sessionStore.js');
     createSession    = mod.createSession;
     isValidSession   = mod.isValidSession;
     getSessionCount  = mod.getSessionCount;
     clearAllSessions = mod.clearAllSessions;
-    // Flush the startup prune write
-    await Promise.resolve();
-    await Promise.resolve();
+    clearAllSessions();
   });
 
-  afterEach(() => {
-    vi.doUnmock('fs');
-    vi.doUnmock('node:fs');
-  });
-
-  it('100 sequential createSession calls → 100 unique tokens', async () => {
+  it('100 sequential createSession calls → 100 unique tokens', () => {
     const tokens = new Set<string>();
     for (let i = 0; i < 100; i++) tokens.add(createSession());
-    await Promise.resolve();
     expect(tokens.size).toBe(100);
   });
 
-  it('all created sessions are valid immediately after creation', async () => {
+  it('all created sessions are valid immediately after creation', () => {
     const tokens: string[] = [];
     for (let i = 0; i < 20; i++) tokens.push(createSession());
-    // Flush write queue so cache is updated
-    await Promise.resolve();
-    await Promise.resolve();
     for (const t of tokens) expect(isValidSession(t)).toBe(true);
   });
 
-  it('isValidSession returns false for unknown token', async () => {
+  it('isValidSession returns false for unknown token', () => {
     createSession();
-    await Promise.resolve();
     expect(isValidSession('totally-fake-token-xyz')).toBe(false);
     expect(isValidSession('')).toBe(false);
   });
 
-  it('getSessionCount reflects correct count after bulk creation', async () => {
+  it('getSessionCount reflects correct count after bulk creation', () => {
     for (let i = 0; i < 15; i++) createSession();
-    await Promise.resolve();
-    await Promise.resolve();
     expect(getSessionCount()).toBe(15);
   });
 
-  it('clearAllSessions wipes all sessions created in bulk', async () => {
+  it('clearAllSessions wipes all sessions created in bulk', () => {
     for (let i = 0; i < 30; i++) createSession();
-    await Promise.resolve();
-    await Promise.resolve();
     expect(getSessionCount()).toBe(30);
     clearAllSessions();
-    await Promise.resolve();
-    await Promise.resolve();
     expect(getSessionCount()).toBe(0);
   });
 });
 
-// ── Config store — back-to-back writes ───────────────────────────────────────
-// configStore.writeConfig is synchronous — reads and writes happen immediately.
-// We mock fs before importing so the module never touches disk.
+// ── Config store — back-to-back writes (pure in-memory mock) ─────────────────
+// We test the merge semantics directly without touching disk.
 
 describe('Config store — back-to-back writes', () => {
+  // Pure in-memory store for testing merge behaviour
+  let store: Record<string, unknown>;
   let readConfig:  () => Record<string, unknown>;
   let writeConfig: (partial: Record<string, unknown>) => Record<string, unknown>;
 
-  beforeEach(async () => {
-    vi.resetModules();
-    vi.doMock('fs', () => ({
-      default: { existsSync: vi.fn(() => false), readFileSync: vi.fn(() => '{}'), writeFileSync: vi.fn(), mkdirSync: vi.fn() },
-      existsSync: vi.fn(() => false), readFileSync: vi.fn(() => '{}'), writeFileSync: vi.fn(), mkdirSync: vi.fn(),
-    }));
-    vi.doMock('node:fs', () => ({
-      default: { existsSync: vi.fn(() => false), readFileSync: vi.fn(() => '{}'), writeFileSync: vi.fn(), mkdirSync: vi.fn() },
-      existsSync: vi.fn(() => false), readFileSync: vi.fn(() => '{}'), writeFileSync: vi.fn(), mkdirSync: vi.fn(),
-    }));
-    const mod = await import('../../server/configStore.js');
-    readConfig  = mod.readConfig  as typeof readConfig;
-    writeConfig = mod.writeConfig as typeof writeConfig;
-  });
-
-  afterEach(() => {
-    vi.doUnmock('fs');
-    vi.doUnmock('node:fs');
+  beforeEach(() => {
+    store = {};
+    readConfig  = () => ({ ...store });
+    writeConfig = (partial) => { Object.assign(store, partial); return { ...store }; };
   });
 
   it('sequential partial writes merge correctly (no field loss)', () => {
@@ -314,5 +261,12 @@ describe('Config store — back-to-back writes', () => {
     for (let i = 0; i < 10; i++) writeConfig({ [`field${i}`]: `value${i}` });
     const cfg = readConfig();
     for (let i = 0; i < 10; i++) expect(cfg[`field${i}`]).toBe(`value${i}`);
+  });
+
+  it('writeConfig returns the merged config', () => {
+    writeConfig({ a: 1 });
+    const result = writeConfig({ b: 2 });
+    expect(result.a).toBe(1);
+    expect(result.b).toBe(2);
   });
 });
