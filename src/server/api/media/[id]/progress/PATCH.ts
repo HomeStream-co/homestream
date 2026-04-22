@@ -115,6 +115,29 @@ async function flushWrite(key: string): Promise<Record<string, unknown> | null> 
   return updated;
 }
 
+// ── Flush all pending writes on shutdown ──────────────────────────────────────
+// SIGTERM on Windows kills immediately — we hook the graceful /api/shutdown
+// POST endpoint instead, but also register SIGINT for dev server Ctrl+C.
+// This ensures the last seek position is never lost on a clean exit.
+async function flushAllPending(): Promise<void> {
+  const keys = [...pendingWrites.keys()];
+  if (keys.length === 0) return;
+  console.log(`[progress] Flushing ${keys.length} pending write(s) before shutdown…`);
+  for (const key of keys) {
+    const timer = pendingWrites.get(key);
+    if (timer) clearTimeout(timer);
+    try { await flushWrite(key); } catch (err) {
+      console.error(`[progress] Flush failed for ${key}:`, err);
+    }
+  }
+}
+
+process.once('SIGINT',  () => flushAllPending().finally(() => process.exit(0)));
+process.once('SIGTERM', () => flushAllPending().finally(() => process.exit(0)));
+
+// Also export so /api/shutdown POST can call it directly before process.exit
+export { flushAllPending as flushProgressWrites };
+
 export default async function handler(req: Request, res: Response) {
   if (!requireAuth(req, res)) return;
   try {

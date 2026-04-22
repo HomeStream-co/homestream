@@ -15,12 +15,15 @@
  */
 import type { Request, Response } from 'express';
 import fs from 'fs';
-import path from 'path';
 import { writeLibraryDirect } from '../../libraryStore.js';
 import { requireAuth } from '../../authMiddleware.js';
+import { dataPath } from '../../dataDir.js';
 
-const CONFIG_PATH   = fs.existsSync('/private') ? '/private/homestream-config.json'   : path.resolve('./homestream-config.json');
-const PROFILES_PATH = fs.existsSync('/private') ? '/private/homestream-profiles.json' : path.resolve('./homestream-profiles.json');
+// Use dataPath() so paths are correct in all environments:
+//   Cloud/Linux: /private/homestream-*.json
+//   Windows .exe: %APPDATA%\HomeStream\homestream-*.json
+const CONFIG_PATH   = dataPath('homestream-config.json');
+const PROFILES_PATH = dataPath('homestream-profiles.json');
 
 // Fields that are NEVER restored from backup (must be re-entered by user)
 const REDACTED_CONFIG_FIELDS = new Set([

@@ -282,11 +282,22 @@ function stopServer() {
   serverRunning = false;
   sendStatus();
 
-  // Try graceful HTTP shutdown first (server listens for this)
-  const gracefulReq = http.get(`http://localhost:${port}/api/shutdown`, () => {
-    // Server acknowledged — give it 3 seconds to clean up then kill
-    setTimeout(() => { try { proc.kill(); } catch { /* already dead */ } }, 3000);
-  });
+  // Try graceful HTTP shutdown first (server listens for this).
+  // Use POST — GET is CSRF-able via <img src> or <script src> from any LAN page.
+  const postBody = '{}';
+  const gracefulReq = http.request(
+    {
+      hostname: '127.0.0.1',
+      port,
+      path: '/api/shutdown',
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(postBody) },
+    },
+    () => {
+      // Server acknowledged — give it 3 seconds to clean up then kill
+      setTimeout(() => { try { proc.kill(); } catch { /* already dead */ } }, 3000);
+    },
+  );
   gracefulReq.setTimeout(1000, () => {
     gracefulReq.destroy();
     // No response — kill immediately
@@ -296,6 +307,8 @@ function stopServer() {
     // Server not responding — kill immediately
     try { proc.kill(); } catch { /* already dead */ }
   });
+  gracefulReq.write(postBody);
+  gracefulReq.end();
 }
 
 function waitForServer(port, timeout = SERVER_READY_TIMEOUT) {

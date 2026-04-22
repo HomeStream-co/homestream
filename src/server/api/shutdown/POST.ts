@@ -25,6 +25,16 @@ export default async function handler(req: Request, res: Response) {
   // Acknowledge immediately so Electron doesn't time out
   res.json({ ok: true, message: 'Shutting down gracefully' });
 
+  // Flush any pending debounced progress writes so the last seek position
+  // is never lost when the server shuts down mid-playback.
+  try {
+    const { flushProgressWrites } = await import('../../api/media/[id]/progress/PATCH.js');
+    await flushProgressWrites();
+    console.log('[shutdown] Flushed pending progress writes');
+  } catch (err) {
+    console.warn('[shutdown] Progress flush failed (non-fatal):', err);
+  }
+
   // Clean up HLS temp segments
   try {
     const { stopAllHlsJobs, HLS_BASE_DIR } = await import('../../hlsTranscoder.js');
