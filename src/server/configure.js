@@ -34,8 +34,8 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 //
 // We detect the Electron case via the ELECTRON env var injected by main.js.
 function resolveClientDir() {
-  if (process.env.ELECTRON === '1' && process.resourcesPath) {
-    return join(process.resourcesPath, 'client');
+  if (process.env.ELECTRON === '1' && process.env.ELECTRON_RESOURCES_PATH) {
+    return join(process.env.ELECTRON_RESOURCES_PATH, 'client');
   }
   // Dev/cloud: client files are in the same dist/ directory as app.js
   return __dirname;

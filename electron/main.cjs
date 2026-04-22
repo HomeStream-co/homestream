@@ -210,6 +210,10 @@ async function startServer() {
       PORT: String(activePort),
       NODE_ENV: 'production',
       ELECTRON: '1',
+      // Pass resourcesPath so the server bundle can locate client files.
+      // process.resourcesPath is Electron-only and does NOT exist in the
+      // child Node.js process — we must inject it explicitly.
+      ELECTRON_RESOURCES_PATH: process.resourcesPath,
       // Tell all server stores where to write data files.
       // app.getPath('userData') resolves to the OS user-data folder:
       //   Windows: %APPDATA%\HomeStream
