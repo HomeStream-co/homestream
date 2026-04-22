@@ -282,37 +282,42 @@ async function startServer() {
     // row, we quit the entire Electron app so the user doesn't have to kill it
     // via Task Manager or restart their PC.
     const MAX_WATCHDOG_RESTARTS = 3;
-    if (code !== 0 && !app.isQuitting) {
+
+    // Hard-stop: if we are already quitting, do nothing at all.
+    // This prevents queued setTimeout callbacks from spawning new processes
+    // after app.quit() has been called.
+    if (app.isQuitting) return;
+
+    if (code !== 0) {
       // Detect fast crash
       const uptime = Date.now() - lastServerStartTime;
       if (uptime < FAST_CRASH_WINDOW_MS) {
         fastCrashCount++;
         pushLog(`Watchdog: fast crash #${fastCrashCount}/${MAX_FAST_CRASHES} (server lived ${uptime}ms)`, 'error');
-        if (fastCrashCount >= MAX_FAST_CRASHES) {
-          pushLog(`Watchdog: ${MAX_FAST_CRASHES} fast crashes in a row — quitting HomeStream to protect your PC.`, 'error');
-          app.isQuitting = true;
+        appendDesktopLog(`Watchdog: fast crash #${fastCrashCount}/${MAX_FAST_CRASHES} (uptime ${uptime}ms)`);
 
-          // Read crash log to show in the dialog so user doesn't have to navigate to AppData
+        if (fastCrashCount >= MAX_FAST_CRASHES) {
+          // Set quitting FIRST before anything else so no further restarts fire
+          app.isQuitting = true;
+          pushLog(`Watchdog: ${MAX_FAST_CRASHES} fast crashes — quitting.`, 'error');
+
+          // Show the desktop log path in the dialog since crash-log.json may not exist
           let crashDetail = '';
           try {
-            const logPath = path.join(app.getPath('userData'), 'crash-log.json');
-            if (fs.existsSync(logPath)) {
-              const entries = JSON.parse(fs.readFileSync(logPath, 'utf-8'));
-              const top = entries.slice(0, 3);
-              crashDetail = top.map(e =>
-                `[${e.type}] ${e.message}\n${(e.stack || '').split('\n').slice(0,3).join('\n')}`
-              ).join('\n\n---\n\n');
+            const desktopLogPath = path.join(app.getPath('desktop'), 'homestream-debug.txt');
+            if (fs.existsSync(desktopLogPath)) {
+              const lines = fs.readFileSync(desktopLogPath, 'utf-8').split('\n').slice(-30).join('\n');
+              crashDetail = `\nLast log lines:\n${lines}`;
             }
           } catch { /* ignore */ }
 
           dialog.showErrorBox(
-            'HomeStream — Server crash loop detected',
-            `The HomeStream server crashed ${MAX_FAST_CRASHES} times in a row.\n\n` +
-            `HomeStream will now close so you don't have to use Task Manager.\n\n` +
-            (crashDetail
-              ? `CRASH DETAILS:\n${crashDetail}\n\n`
-              : '') +
-            `Full log: %APPDATA%\\HomeStream\\crash-log.json`
+            'HomeStream — Crash loop stopped',
+            `The server crashed ${MAX_FAST_CRASHES} times instantly.\n\n` +
+            `HomeStream has stopped to protect your PC.\n\n` +
+            `Open this file on your Desktop for the full error:\n` +
+            `  homestream-debug.txt` +
+            crashDetail
           );
           app.quit();
           return;
@@ -323,20 +328,23 @@ async function startServer() {
       }
 
       if (watchdogRestarts >= MAX_WATCHDOG_RESTARTS) {
-        pushLog(`Watchdog: giving up after ${MAX_WATCHDOG_RESTARTS} restarts — server appears broken. Use the Start button to retry manually.`, 'error');
+        app.isQuitting = true;
+        pushLog(`Watchdog: giving up after ${MAX_WATCHDOG_RESTARTS} restarts.`, 'error');
         dialog.showErrorBox(
           'HomeStream — Too many restarts',
-          `The HomeStream server has crashed and restarted ${MAX_WATCHDOG_RESTARTS} times.\n\n` +
-          `Auto-restart has been disabled. Use the "Start Server" button in the control panel to try again manually, ` +
-          `or quit HomeStream and check the crash log at:\n  %APPDATA%\\HomeStream\\crash-log.json`
+          `The HomeStream server crashed ${MAX_WATCHDOG_RESTARTS} times.\n\n` +
+          `Open this file on your Desktop for the full error:\n` +
+          `  homestream-debug.txt`
         );
+        app.quit();
         return;
       }
       watchdogRestarts++;
       const delay = Math.min(2000 * Math.pow(2, watchdogRestarts - 1), 30000);
       pushLog(`Watchdog: restarting server in ${delay / 1000}s (attempt ${watchdogRestarts}/${MAX_WATCHDOG_RESTARTS})…`, 'warn');
       setTimeout(() => {
-        if (!app.isQuitting && !serverProcess) {
+        if (app.isQuitting) return; // double-check before spawning
+        if (!serverProcess) {
           pushLog('Watchdog: restarting server now…', 'warn');
           startServer().catch(err => pushLog(`Watchdog restart failed: ${err.message}`, 'error'));
         }
