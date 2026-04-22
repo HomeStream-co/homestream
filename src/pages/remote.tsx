@@ -1153,45 +1153,54 @@ export default function RemotePage() {
                 initial={{ opacity: 0, y: 16 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0 }}
-                className="flex flex-col gap-5"
+                className="flex flex-col gap-4"
               >
-                {/* Poster + now playing */}
-                <div
-                  className="relative rounded-2xl overflow-hidden aspect-[2/3] max-h-52 w-full bg-card border border-border"
-                  {...swipeHandlers}
-                >
+                {/* ── Now Playing card (horizontal, compact) ── */}
+                <div className="flex items-center gap-3 bg-card border border-border rounded-2xl p-3">
                   {state.poster ? (
                     <img
                       src={state.poster}
                       alt={state.title}
-                      className="w-full h-full object-cover"
+                      className="w-12 h-16 object-cover rounded-xl flex-shrink-0"
                     />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <Film className="w-12 h-12 text-muted-foreground" />
+                    <div className="w-12 h-16 bg-muted rounded-xl flex items-center justify-center flex-shrink-0">
+                      <Film className="w-5 h-5 text-muted-foreground" />
                     </div>
                   )}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
-                  <div className="absolute bottom-0 left-0 right-0 p-3">
-                    <p className="text-[10px] text-white/60 uppercase tracking-wider">Now Playing</p>
-                    <p className="text-white font-semibold text-sm leading-tight line-clamp-2">{state.title}</p>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-0.5">Now Playing</p>
+                    <p className="text-sm font-semibold text-foreground leading-tight line-clamp-2">{state.title}</p>
+                    <p className="text-xs text-muted-foreground mt-1">{formatTime(displayTime)} / {formatTime(state.duration)}</p>
                   </div>
-
-                  {/* Seek / volume flash overlays */}
-                  <AnimatePresence>
-                    {seekFlash && <SeekFlash key={seekFlash.key} dir={seekFlash.dir} secs={seekFlash.secs} />}
-                  </AnimatePresence>
-                  <AnimatePresence>
-                    {volFlash && <VolumeFlash key={volFlash.key} dir={volFlash.dir} pct={volFlash.pct} />}
-                  </AnimatePresence>
-
-                  {/* Swipe hint */}
-                  <div className="absolute top-2 right-2">
-                    <span className="text-[9px] text-white/30 bg-black/30 rounded px-1.5 py-0.5">swipe to seek</span>
+                  {/* Fullscreen + Cast inline */}
+                  <div className="flex flex-col gap-2 flex-shrink-0">
+                    <button
+                      onClick={() => sendHaptic({ type: 'fullscreen' })}
+                      className="w-9 h-9 rounded-xl bg-muted flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+                      title="Fullscreen"
+                    >
+                      <Maximize2 className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => {
+                        haptic(30);
+                        if (state.cast?.active) setShowCastPanel(v => !v);
+                        else send({ type: 'cast' });
+                      }}
+                      className={`w-9 h-9 rounded-xl flex items-center justify-center transition-colors ${
+                        state.cast?.active
+                          ? 'bg-primary/20 text-primary'
+                          : 'bg-muted text-muted-foreground hover:text-foreground'
+                      }`}
+                      title={state.cast?.active ? 'Casting' : 'Cast'}
+                    >
+                      <Cast className="w-4 h-4" />
+                    </button>
                   </div>
                 </div>
 
-                {/* Seek bar */}
+                {/* ── Seek bar ── */}
                 <SeekBar
                   state={state}
                   displayTime={displayTime}
@@ -1201,94 +1210,134 @@ export default function RemotePage() {
                   send={send}
                 />
 
-                {/* Main controls */}
-                <div className="flex items-center justify-center gap-6">
-                  <ControlBtn
+                {/* ── Big three: skip back | play/pause | skip forward ── */}
+                <div
+                  className="flex items-center justify-between px-2"
+                  {...swipeHandlers}
+                >
+                  {/* Skip back 10s */}
+                  <motion.button
+                    whileTap={{ scale: 0.88 }}
                     onClick={() => sendHaptic({ type: 'skip_back', seconds: 10 })}
-                    label="−10s"
-                    size="md"
+                    className="flex flex-col items-center gap-1.5 w-20 h-20 rounded-2xl bg-card border border-border justify-center active:bg-muted transition-colors"
                   >
-                    <SkipBack className="w-5 h-5" />
-                  </ControlBtn>
+                    <SkipBack className="w-6 h-6 text-foreground" />
+                    <span className="text-[10px] text-muted-foreground font-medium">−10s</span>
+                  </motion.button>
 
-                  <button
+                  {/* Play / Pause — large center button */}
+                  <motion.button
+                    whileTap={{ scale: 0.92 }}
                     onClick={() => sendHaptic({ type: state.paused ? 'play' : 'pause' }, [30, 20, 30])}
-                    className="w-20 h-20 rounded-full bg-primary hover:bg-primary/90 active:scale-95 flex items-center justify-center shadow-lg shadow-primary/30 transition-all"
+                    className="w-24 h-24 rounded-full bg-primary flex items-center justify-center shadow-xl shadow-primary/40 transition-all"
                   >
                     {state.paused
-                      ? <Play className="w-8 h-8 text-primary-foreground fill-primary-foreground ml-1" />
-                      : <Pause className="w-8 h-8 text-primary-foreground fill-primary-foreground" />
+                      ? <Play className="w-10 h-10 text-primary-foreground fill-primary-foreground ml-1" />
+                      : <Pause className="w-10 h-10 text-primary-foreground fill-primary-foreground" />
                     }
-                  </button>
+                  </motion.button>
 
-                  <ControlBtn
+                  {/* Skip forward 10s */}
+                  <motion.button
+                    whileTap={{ scale: 0.88 }}
                     onClick={() => sendHaptic({ type: 'skip_forward', seconds: 10 })}
-                    label="+10s"
-                    size="md"
+                    className="flex flex-col items-center gap-1.5 w-20 h-20 rounded-2xl bg-card border border-border justify-center active:bg-muted transition-colors"
                   >
-                    <SkipForward className="w-5 h-5" />
-                  </ControlBtn>
+                    <SkipForward className="w-6 h-6 text-foreground" />
+                    <span className="text-[10px] text-muted-foreground font-medium">+10s</span>
+                  </motion.button>
                 </div>
 
-                {/* Secondary controls */}
-                <div className="flex items-center justify-center flex-wrap gap-2">
-                  <PillBtn onClick={() => sendHaptic({ type: 'skip_intro' })}>
-                    <FastForward className="w-3.5 h-3.5" />
-                    Skip Intro
-                  </PillBtn>
+                {/* ── Volume slider ── */}
+                <VolumeControl state={state} send={send} />
 
-                  {state.hasNextEpisode && (
-                    <PillBtn onClick={() => sendHaptic({ type: 'next_episode' })}>
-                      Next Ep
-                      <ChevronRight className="w-3.5 h-3.5" />
-                    </PillBtn>
-                  )}
-
-                  {/* Subtitle toggle */}
-                  {hasSubtitles && (
-                    <PillBtn
-                      onClick={cycleSubtitle}
-                      active={subtitleActive}
-                      title={subtitleActive
-                        ? `Subtitles: ${state.subtitleTracks?.find(t => t.index === state.activeSubtitle)?.label ?? 'On'}`
-                        : 'Subtitles off'}
-                    >
-                      <Subtitles className="w-3.5 h-3.5" />
-                      {subtitleActive
-                        ? (state.subtitleTracks?.find(t => t.index === state.activeSubtitle)?.label ?? 'CC')
-                        : 'CC'}
-                    </PillBtn>
-                  )}
-
-                  {/* Speed picker */}
-                  <SpeedPicker
-                    speed={state.speed}
-                    show={showSpeedPicker}
-                    setShow={setShowSpeedPicker}
-                    onSelect={s => sendHaptic({ type: 'speed', rate: s })}
-                  />
-
-                  {/* Fullscreen */}
-                  <PillBtn onClick={() => sendHaptic({ type: 'fullscreen' })}>
-                    <Maximize2 className="w-3.5 h-3.5" />
-                  </PillBtn>
-
-                  {/* Cast */}
-                  <PillBtn
-                    onClick={() => {
-                      haptic(30);
-                      if (state.cast?.active) {
-                        setShowCastPanel(v => !v);
-                      } else {
-                        send({ type: 'cast' });
-                      }
-                    }}
-                    active={state.cast?.active || showCastPanel}
-                    title={state.cast?.active ? 'Manage cast session' : 'Cast to Chromecast'}
+                {/* ── Secondary action row ── */}
+                <div className="grid grid-cols-4 gap-2">
+                  {/* Skip Intro */}
+                  <motion.button
+                    whileTap={{ scale: 0.92 }}
+                    onClick={() => sendHaptic({ type: 'skip_intro' })}
+                    className="flex flex-col items-center gap-1.5 bg-card border border-border rounded-2xl py-3 px-1 transition-colors active:bg-muted"
                   >
-                    <Cast className="w-3.5 h-3.5" />
-                    {state.cast?.active ? 'Casting' : 'Cast'}
-                  </PillBtn>
+                    <FastForward className="w-5 h-5 text-foreground" />
+                    <span className="text-[10px] text-muted-foreground font-medium leading-tight text-center">Skip Intro</span>
+                  </motion.button>
+
+                  {/* Next Episode (always shown, dimmed if unavailable) */}
+                  <motion.button
+                    whileTap={{ scale: 0.92 }}
+                    onClick={() => state.hasNextEpisode && sendHaptic({ type: 'next_episode' })}
+                    className={`flex flex-col items-center gap-1.5 border rounded-2xl py-3 px-1 transition-colors ${
+                      state.hasNextEpisode
+                        ? 'bg-card border-border active:bg-muted'
+                        : 'bg-card/40 border-border/40 opacity-40 cursor-not-allowed'
+                    }`}
+                  >
+                    <ChevronRight className="w-5 h-5 text-foreground" />
+                    <span className="text-[10px] text-muted-foreground font-medium leading-tight text-center">Next Ep</span>
+                  </motion.button>
+
+                  {/* Subtitles */}
+                  <motion.button
+                    whileTap={{ scale: 0.92 }}
+                    onClick={hasSubtitles ? cycleSubtitle : undefined}
+                    className={`flex flex-col items-center gap-1.5 border rounded-2xl py-3 px-1 transition-colors ${
+                      subtitleActive
+                        ? 'bg-primary/15 border-primary/40'
+                        : hasSubtitles
+                          ? 'bg-card border-border active:bg-muted'
+                          : 'bg-card/40 border-border/40 opacity-40 cursor-not-allowed'
+                    }`}
+                  >
+                    <Subtitles className={`w-5 h-5 ${subtitleActive ? 'text-primary' : 'text-foreground'}`} />
+                    <span className={`text-[10px] font-medium leading-tight text-center ${subtitleActive ? 'text-primary' : 'text-muted-foreground'}`}>
+                      {subtitleActive
+                        ? (state.subtitleTracks?.find(t => t.index === state.activeSubtitle)?.label ?? 'CC On')
+                        : 'CC'}
+                    </span>
+                  </motion.button>
+
+                  {/* Speed */}
+                  <div className="relative">
+                    <motion.button
+                      whileTap={{ scale: 0.92 }}
+                      onClick={() => { haptic(20); setShowSpeedPicker(v => !v); }}
+                      className={`w-full flex flex-col items-center gap-1.5 border rounded-2xl py-3 px-1 transition-colors ${
+                        state.speed !== 1
+                          ? 'bg-primary/15 border-primary/40'
+                          : 'bg-card border-border active:bg-muted'
+                      }`}
+                    >
+                      <Zap className={`w-5 h-5 ${state.speed !== 1 ? 'text-primary' : 'text-foreground'}`} />
+                      <span className={`text-[10px] font-medium ${state.speed !== 1 ? 'text-primary' : 'text-muted-foreground'}`}>
+                        {state.speed}×
+                      </span>
+                    </motion.button>
+                    <AnimatePresence>
+                      {showSpeedPicker && (
+                        <motion.div
+                          initial={{ opacity: 0, y: 6, scale: 0.95 }}
+                          animate={{ opacity: 1, y: 0, scale: 1 }}
+                          exit={{ opacity: 0, y: 6, scale: 0.95 }}
+                          className="absolute bottom-full right-0 mb-2 bg-card border border-border rounded-2xl shadow-xl overflow-hidden z-20 w-28"
+                        >
+                          {SPEEDS.map(s => (
+                            <button
+                              key={s}
+                              onClick={() => { sendHaptic({ type: 'speed', rate: s }); setShowSpeedPicker(false); }}
+                              className={`w-full px-4 py-2.5 text-sm text-left transition-colors ${
+                                state.speed === s
+                                  ? 'bg-primary/20 text-primary font-semibold'
+                                  : 'text-foreground hover:bg-muted'
+                              }`}
+                            >
+                              {s}×
+                            </button>
+                          ))}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
                 </div>
 
                 {/* Cast session panel */}
@@ -1302,8 +1351,10 @@ export default function RemotePage() {
                   )}
                 </AnimatePresence>
 
-                {/* Volume */}
-                <VolumeControl state={state} send={send} />
+                {/* Swipe hint */}
+                <p className="text-center text-[10px] text-muted-foreground/50">
+                  ← swipe controls area to seek · ↕ swipe for volume
+                </p>
               </motion.div>
             )}
           </AnimatePresence>
