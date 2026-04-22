@@ -26,11 +26,11 @@ const mockWriteLibrary = vi.fn(async (updater: (lib: Record<string, unknown>[]) 
   mockLibrary = updater([...mockLibrary]);
 });
 
-vi.mock('../../../../server/libraryStore.js', () => ({
+vi.mock('../../server/libraryStore.js', () => ({
   writeLibrary: (...args: Parameters<typeof mockWriteLibrary>) => mockWriteLibrary(...args),
 }));
 
-vi.mock('../../../../server/authMiddleware.js', () => ({
+vi.mock('../../server/authMiddleware.js', () => ({
   requireAuth: () => true,
 }));
 
@@ -47,8 +47,6 @@ function makeReqRes(params: Record<string, string>, body: unknown) {
 }
 
 const { default: handler } = await import('../../server/api/media/[id]/progress/PATCH.js');
-
-// ── Tests ─────────────────────────────────────────────────────────────────────
 
 describe('PATCH /api/media/:id/progress — validation', () => {
   it('returns 400 when progress is missing', async () => {
