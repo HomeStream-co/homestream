@@ -13,7 +13,7 @@
  * Supported platforms: Windows (.exe), macOS (.dmg), Linux (.AppImage)
  */
 
-const { app, BrowserWindow, Tray, Menu, shell, nativeImage, ipcMain, globalShortcut } = require('electron');
+const { app, BrowserWindow, Tray, Menu, shell, nativeImage, ipcMain, globalShortcut, dialog } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
 const http = require('http');
@@ -105,6 +105,10 @@ let serverProcess = null;
 let serverRunning = false;
 let logBuffer = [];
 let watchdogRestarts = 0; // tracks consecutive crash-restarts for exponential backoff
+let fastCrashCount = 0;   // crashes that happened within FAST_CRASH_WINDOW_MS of starting
+let lastServerStartTime = 0; // epoch ms when the server process was last spawned
+const FAST_CRASH_WINDOW_MS = 5000;  // exit within 5s of start = "fast crash"
+const MAX_FAST_CRASHES    = 5;      // 5 fast crashes → quit the whole app
 // Resolved at startup — may differ from PREFERRED_PORT if 3000 is taken
 let activePort = PREFERRED_PORT;
 
@@ -183,6 +187,7 @@ async function startServer() {
 
   const serverPath = path.join(process.resourcesPath, 'server', 'server.bundle.mjs');
   pushLog(`Starting server on port ${activePort}: ${serverPath}`);
+  lastServerStartTime = Date.now();
 
   serverProcess = spawn(process.execPath, [serverPath], {
     env: {
@@ -226,10 +231,45 @@ async function startServer() {
     // If the server exits with a non-zero code AND the app isn't quitting,
     // restart it automatically with exponential backoff (2s → 4s → 8s → max 30s).
     // Cap at 10 restarts to avoid infinite loops on a fundamentally broken server.
+    //
+    // Fast-crash guard: if the server exits within FAST_CRASH_WINDOW_MS of
+    // starting, that's a "fast crash". After MAX_FAST_CRASHES fast crashes in a
+    // row, we quit the entire Electron app so the user doesn't have to kill it
+    // via Task Manager or restart their PC.
     const MAX_WATCHDOG_RESTARTS = 10;
     if (code !== 0 && !app.isQuitting) {
+      // Detect fast crash
+      const uptime = Date.now() - lastServerStartTime;
+      if (uptime < FAST_CRASH_WINDOW_MS) {
+        fastCrashCount++;
+        pushLog(`Watchdog: fast crash #${fastCrashCount}/${MAX_FAST_CRASHES} (server lived ${uptime}ms)`, 'error');
+        if (fastCrashCount >= MAX_FAST_CRASHES) {
+          pushLog(`Watchdog: ${MAX_FAST_CRASHES} fast crashes in a row — quitting HomeStream to protect your PC.`, 'error');
+          app.isQuitting = true;
+          dialog.showErrorBox(
+            'HomeStream — Server crash loop detected',
+            `The HomeStream server crashed ${MAX_FAST_CRASHES} times in a row within seconds of starting.\n\n` +
+            `HomeStream will now close automatically so you don't have to use Task Manager.\n\n` +
+            `To diagnose the problem, check the crash log in:\n` +
+            `  %APPDATA%\\HomeStream\\crash-log.json\n\n` +
+            `Common causes: missing ffmpeg, port already in use, or a corrupt config file.`
+          );
+          app.quit();
+          return;
+        }
+      } else {
+        // Survived past the fast-crash window — reset fast-crash counter
+        fastCrashCount = 0;
+      }
+
       if (watchdogRestarts >= MAX_WATCHDOG_RESTARTS) {
         pushLog(`Watchdog: giving up after ${MAX_WATCHDOG_RESTARTS} restarts — server appears broken. Use the Start button to retry manually.`, 'error');
+        dialog.showErrorBox(
+          'HomeStream — Too many restarts',
+          `The HomeStream server has crashed and restarted ${MAX_WATCHDOG_RESTARTS} times.\n\n` +
+          `Auto-restart has been disabled. Use the "Start Server" button in the control panel to try again manually, ` +
+          `or quit HomeStream and check the crash log at:\n  %APPDATA%\\HomeStream\\crash-log.json`
+        );
         return;
       }
       watchdogRestarts++;
@@ -242,14 +282,16 @@ async function startServer() {
         }
       }, delay);
     } else if (code === 0) {
-      // Clean exit — reset restart counter
+      // Clean exit — reset all counters
       watchdogRestarts = 0;
+      fastCrashCount = 0;
     }
   });
 
   waitForServer(activePort).then(() => {
     serverRunning = true;
     watchdogRestarts = 0; // reset on successful start
+    fastCrashCount = 0;   // reset fast-crash counter on successful start
     pushLog(`Server ready at http://localhost:${activePort}`, 'success');
     pushLog(`LAN address: http://${getLanIp()}:${activePort}`, 'success');
     sendStatus();
