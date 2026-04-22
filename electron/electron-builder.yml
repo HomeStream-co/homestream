@@ -62,17 +62,11 @@ extraResources:
   # Server bundle — loaded by main.js as a child process
   - from: dist/server.bundle.mjs
     to: server/server.bundle.mjs
-  # Client bundle — Vite outputs to dist/ (index.html + assets/).
-  # We copy the whole dist/ folder to resources/client/ so configure.js can
-  # serve it with express.static when running as a packaged Electron app.
-  # Exclude the server bundle and sourcemaps to keep the installer lean.
-  - from: dist
+  # Client bundle — Vite outputs to dist/client/ (index.html + assets/).
+  # We copy dist/client/ to resources/client/ so configure.js can serve it
+  # with express.static when running as a packaged Electron app.
+  - from: dist/client
     to: client
-    filter:
-      - "**/*"
-      - "!server.bundle.mjs"
-      - "!server.bundle.mjs.map"
-      - "!app.js"
   # FFmpeg binary — copied into resources/ffmpeg/ so users don't need to install it.
   # ffmpeg-static provides the platform-appropriate binary (ffmpeg.exe on Windows,
   # ffmpeg on macOS/Linux). We use a glob so the build doesn't fail when the
