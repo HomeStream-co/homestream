@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express';
 import fs from 'fs';
 import path from 'path';
+import { createRequire } from 'module';
 import { readLibrary } from '../../../../libraryStore.js';
 import { requireAuth } from '../../../../authMiddleware.js';
 
@@ -21,8 +22,17 @@ import { requireAuth } from '../../../../authMiddleware.js';
  *   { success: true, langs: { en: 'downloaded'|'stub'|'exists', es: 'downloaded'|'stub'|'exists' } }
  */
 
+// Read version from package.json so the User-Agent always matches the release
+function getVersion(): string {
+  try {
+    const req = createRequire(import.meta.url);
+    const pkg = req('../../../../../package.json') as { version?: string };
+    return pkg.version ?? '1.0';
+  } catch { return '1.0'; }
+}
+
 const OS_API = 'https://rest.opensubtitles.org/search';
-const USER_AGENT = 'HomeStream v1.0';
+const USER_AGENT = `HomeStream v${getVersion()}`;
 
 interface SubResult {
   SubDownloadLink?: string;

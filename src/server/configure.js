@@ -183,8 +183,11 @@ export const serverBefore = (server) => {
   // HomeStream is a local-network app — CSP is permissive for LAN IPs and
   // localhost, but still blocks obvious XSS vectors.
   server.use((req, res, next) => {
-    // Only apply to HTML responses (not API or media streams)
-    if (!req.path.startsWith('/api') && !req.path.startsWith('/api/stream')) {
+    // Only apply security headers to HTML page responses.
+    // API routes and media streams handle their own headers.
+    const isApi = req.path.startsWith('/api');
+    const isMedia = req.path.startsWith('/api/stream/') || req.path.startsWith('/api/hls/') || req.path.startsWith('/api/transcode/');
+    if (!isApi && !isMedia) {
       res.set({
         'X-Content-Type-Options': 'nosniff',
         'X-Frame-Options': 'SAMEORIGIN',

@@ -20,20 +20,32 @@ import { dataPath } from './dataDir.js';
 const SESSIONS_PATH = dataPath('homestream-sessions.json');
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
-// ── Write queue (same pattern as libraryStore) ────────────────────────────────
+// ── In-memory write-through cache ─────────────────────────────────────────────
+// isValidSession is called on EVERY authenticated request (hot path).
+// Reading homestream-sessions.json from disk on every request is wasteful.
+// We keep a write-through cache: reads come from memory, writes go to both.
+// Cache is populated lazily on first read and stays in sync via enqueueWrite.
 
 let writeQueue: Promise<void> = Promise.resolve();
+let cache: Record<string, number> | null = null;
 
 function readRaw(): Record<string, number> {
-  if (!fs.existsSync(SESSIONS_PATH)) return {};
+  if (cache !== null) return cache;
+  if (!fs.existsSync(SESSIONS_PATH)) {
+    cache = {};
+    return cache;
+  }
   try {
-    return JSON.parse(fs.readFileSync(SESSIONS_PATH, 'utf-8')) as Record<string, number>;
+    cache = JSON.parse(fs.readFileSync(SESSIONS_PATH, 'utf-8')) as Record<string, number>;
+    return cache;
   } catch {
-    return {};
+    cache = {};
+    return cache;
   }
 }
 
 function writeRaw(data: Record<string, number>): void {
+  cache = data; // update cache synchronously before disk write
   fs.writeFileSync(SESSIONS_PATH, JSON.stringify(data), 'utf-8');
 }
 

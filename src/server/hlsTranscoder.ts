@@ -34,7 +34,34 @@ function resolveFfmpeg(): string {
   } catch { /* not installed */ }
   return 'ffmpeg';
 }
+
+// Resolve ffprobe binary: same logic as ffmpeg but for ffprobe.
+// ffmpeg-static bundles both binaries in the same directory.
+function resolveFfprobe(): string {
+  // Electron sets FFMPEG_PATH to the bundled ffmpeg binary.
+  // ffprobe lives in the same directory with the same naming convention.
+  if (process.env.FFMPEG_PATH) {
+    const dir = path.dirname(process.env.FFMPEG_PATH);
+    const ext = process.platform === 'win32' ? '.exe' : '';
+    const candidate = path.join(dir, `ffprobe${ext}`);
+    if (fs.existsSync(candidate)) return candidate;
+  }
+  try {
+    const req = createRequire(import.meta.url);
+    // ffmpeg-static exports the ffmpeg path; ffprobe is in the same dir
+    const ffmpegPath = req('ffmpeg-static') as string | null;
+    if (ffmpegPath) {
+      const dir = path.dirname(ffmpegPath);
+      const ext = process.platform === 'win32' ? '.exe' : '';
+      const candidate = path.join(dir, `ffprobe${ext}`);
+      if (fs.existsSync(candidate)) return candidate;
+    }
+  } catch { /* not installed */ }
+  return 'ffprobe';
+}
+
 const FFMPEG = resolveFfmpeg();
+const FFPROBE = resolveFfprobe();
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
@@ -94,12 +121,12 @@ export interface CodecInfo {
   needsTranscode: boolean;
 }
 
-/** Codecs natively supported by all modern browsers */
+/** Codecs natively supported by all modern browsers — do NOT include hevc here */
 const BROWSER_SAFE_CODECS = new Set(['h264', 'avc1', 'vp8', 'vp9', 'av1', 'theora']);
 
 export async function probeCodec(filePath: string): Promise<CodecInfo> {
   return new Promise(resolve => {
-    const probe = spawn('ffprobe', [
+    const probe = spawn(FFPROBE, [
       '-v', 'quiet',
       '-print_format', 'json',
       '-show_streams',
@@ -113,8 +140,9 @@ export async function probeCodec(filePath: string): Promise<CodecInfo> {
       try {
         const json = JSON.parse(out) as { streams?: Array<{ codec_name?: string }> };
         const codec = json.streams?.[0]?.codec_name ?? 'unknown';
-        // HEVC/H.265 and others need transcoding — browsers can't decode them
-        const needsTranscode = !BROWSER_SAFE_CODECS.has(codec) || codec === 'hevc';
+        // hevc/H.265 and any unrecognised codec need transcoding.
+        // BROWSER_SAFE_CODECS intentionally excludes hevc — no contradiction.
+        const needsTranscode = !BROWSER_SAFE_CODECS.has(codec);
         resolve({ codec, needsTranscode });
       } catch {
         resolve({ codec: 'unknown', needsTranscode: false });
@@ -207,10 +235,15 @@ export async function startHlsJob(mediaId: string, sourceFilePath: string): Prom
   ff.on('close', (code) => {
     clearInterval(watchInterval);
     if (!job.ready) {
-      // FFmpeg failed before producing any output — resolve waiters anyway
+      // FFmpeg failed before producing any output — resolve waiters so they
+      // don't hang, but mark the job as FAILED so startHlsJob removes it from
+      // the map. The next call will start a fresh job rather than reusing a
+      // broken one.
       job.ready = true;
       for (const resolve of job.waiters) resolve();
       job.waiters = [];
+      // Remove from map so the next play attempt starts a fresh transcode
+      jobs.delete(mediaId);
     }
     if (code !== 0 && code !== null) {
       console.warn(`[hls] FFmpeg exited with code ${code} for ${mediaId}`);
