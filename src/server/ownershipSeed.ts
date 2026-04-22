@@ -27,7 +27,6 @@
  *  - Safe to commit to a public repository
  */
 
-import bcrypt from 'bcryptjs';
 import { readConfig, writeConfig } from './configStore.js';
 
 // Module-level guard — only seed once per process lifetime.
@@ -56,13 +55,14 @@ export async function runOwnershipSeed(): Promise<void> {
   let didSeed = false;
 
   // ── 1. Admin password ──────────────────────────────────────────────────────
-  const secretPassword = resolveSecret('ADMIN_PASSWORD');
-  if (secretPassword && !cfg.adminPassword) {
-    const hashed = await bcrypt.hash(secretPassword, 12);
-    updates.adminPassword = hashed;
-    didSeed = true;
-    console.log('[ownership] Admin password seeded from ADMIN_PASSWORD secret (bcrypt hash stored)');
-  }
+  // DISABLED: We never seed adminPassword from the ADMIN_PASSWORD env/secret.
+  // The setup wizard is the only legitimate way to set the admin password.
+  // Seeding from env bypasses the wizard and causes crash-loops in Electron
+  // (the secret has a value in the platform but Electron has no wizard-set password,
+  // so the app boots locked with no way to log in or complete setup).
+  //
+  // const secretPassword = resolveSecret('ADMIN_PASSWORD');
+  // if (secretPassword && !cfg.adminPassword) { ... }
 
   // ── 2. TMDB API key ────────────────────────────────────────────────────────
   const secretTmdb = resolveSecret('TMDB_API_KEY');

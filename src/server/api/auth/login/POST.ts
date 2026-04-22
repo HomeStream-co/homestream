@@ -111,7 +111,7 @@ export default async function handler(req: Request, res: Response) {
   if (!password) return res.status(400).json({ error: 'Password required' });
 
   const cfg = readConfig();
-  const storedPassword = cfg.adminPassword || process.env.ADMIN_PASSWORD || '';
+  const storedPassword = cfg.adminPassword || '';
 
   // If no admin password is set, allow any login (open mode)
   if (storedPassword) {

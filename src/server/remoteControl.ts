@@ -78,7 +78,7 @@ const latestState = new Map<string, PlayerState>();
  */
 function isAuthorised(req: IncomingMessage): boolean {
   const cfg = readConfig();
-  const adminPassword = cfg.adminPassword || process.env.ADMIN_PASSWORD || '';
+  const adminPassword = cfg.adminPassword || '';
 
   // Open mode — no password set
   if (!adminPassword) return true;

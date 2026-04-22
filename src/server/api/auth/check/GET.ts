@@ -9,7 +9,7 @@ import { isValidSession } from '../login/POST.js';
 
 export default async function handler(req: Request, res: Response) {
   const cfg = readConfig();
-  const adminPassword = cfg.adminPassword || process.env.ADMIN_PASSWORD || '';
+  const adminPassword = cfg.adminPassword || '';
   const requiresPassword = !!adminPassword;
 
   const token = req.cookies?.hs_session as string | undefined;

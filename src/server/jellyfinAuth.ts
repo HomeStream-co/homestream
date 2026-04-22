@@ -22,7 +22,7 @@ import { jellyfinTokens } from './api/jellyfin/Users/AuthenticateByName/POST.js'
 
 export function requireJellyfinAuth(req: Request, res: Response): boolean {
   const cfg = readConfig();
-  const adminPassword = cfg.adminPassword || process.env.ADMIN_PASSWORD || '';
+  const adminPassword = cfg.adminPassword || '';
 
   // Open mode — no password set, all requests allowed
   if (!adminPassword) return true;
