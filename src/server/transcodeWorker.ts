@@ -32,6 +32,7 @@
  */
 
 import { spawn } from 'child_process';
+import { createRequire } from 'module';
 import fs from 'fs';
 import path from 'path';
 import { updateJob, broadcast, getJob } from './transcodeStore.js';
@@ -44,7 +45,6 @@ const UPLOADS_DIR = path.resolve('./uploads');
 function resolveFfmpeg(): string {
   if (process.env.FFMPEG_PATH) return process.env.FFMPEG_PATH;
   try {
-    const { createRequire } = require('module') as typeof import('module');
     const req = createRequire(import.meta.url);
     const p = req('ffmpeg-static') as string | null;
     if (p) return p;
@@ -61,7 +61,6 @@ function resolveFfprobe(): string {
     if (fs.existsSync(candidate)) return candidate;
   }
   try {
-    const { createRequire } = require('module') as typeof import('module');
     const req = createRequire(import.meta.url);
     const ffmpegPath = req('ffmpeg-static') as string | null;
     if (ffmpegPath) {

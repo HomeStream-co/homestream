@@ -10,29 +10,17 @@
  * Requires auth (handled by authMiddleware on all /api routes).
  */
 import type { Request, Response } from 'express';
-import fs from 'fs';
-import path from 'path';
 import { requireAuth } from '../../authMiddleware.js';
-
-const LIBRARY_PATH  = fs.existsSync('/private') ? '/private/media-library.json'       : path.resolve('./media-library.json');
-const CONFIG_PATH   = fs.existsSync('/private') ? '/private/homestream-config.json'   : path.resolve('./homestream-config.json');
-const PROFILES_PATH = fs.existsSync('/private') ? '/private/homestream-profiles.json' : path.resolve('./homestream-profiles.json');
-
-function safeReadJson<T>(filePath: string, fallback: T): T {
-  try {
-    const raw = fs.readFileSync(filePath, 'utf8');
-    return JSON.parse(raw) as T;
-  } catch {
-    return fallback;
-  }
-}
+import { readLibrary } from '../../libraryStore.js';
+import { readConfig } from '../../configStore.js';
+import { readProfiles } from '../../profilesStore.js';
 
 export default function handler(req: Request, res: Response) {
   try {
     if (!requireAuth(req, res)) return;
-    const library  = safeReadJson<unknown[]>(LIBRARY_PATH, []);
-    const config   = safeReadJson<Record<string, unknown>>(CONFIG_PATH, {});
-    const profiles = safeReadJson<unknown[]>(PROFILES_PATH, []);
+    const library  = readLibrary<unknown>();
+    const config   = readConfig() as unknown as Record<string, unknown>;
+    const profiles = readProfiles() as unknown as Record<string, unknown>[];
 
     // Redact sensitive fields from config
     const safeConfig = { ...config };
@@ -41,9 +29,10 @@ export default function handler(req: Request, res: Response) {
     }
 
     // Redact PIN hashes from profiles
-    const safeProfiles = (profiles as Record<string, unknown>[]).map(p => {
+    const safeProfiles = profiles.map(p => {
       const copy = { ...p };
       if (copy.pin) copy.pin = '[REDACTED]';
+      if (copy.pinHash) copy.pinHash = '[REDACTED]';
       return copy;
     });
 

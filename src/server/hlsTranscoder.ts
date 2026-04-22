@@ -19,6 +19,9 @@
 
 import { spawn, type ChildProcess } from 'child_process';
 import { createRequire } from 'module';
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
 
 // Resolve FFmpeg binary: prefer FFMPEG_PATH env var (set by Electron when
 // bundling ffmpeg-static), then try ffmpeg-static directly, then fall back
@@ -62,9 +65,6 @@ function resolveFfprobe(): string {
 
 const FFMPEG = resolveFfmpeg();
 const FFPROBE = resolveFfprobe();
-import fs from 'fs';
-import path from 'path';
-import os from 'os';
 
 // ── Config ────────────────────────────────────────────────────────────────────
 

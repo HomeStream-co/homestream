@@ -20,7 +20,7 @@ import type { Request, Response } from 'express';
 import fs from 'fs';
 import path from 'path';
 import multer from 'multer';
-import { readLibrary, writeLibraryDirect } from '../../../../libraryStore.js';
+import { readLibrary, writeLibrary } from '../../../../libraryStore.js';
 import { requireAuth } from '../../../../authMiddleware.js';
 
 // ── Multer — memory storage so we can inspect before writing ─────────────────
@@ -75,8 +75,8 @@ export default function handler(req: Request, res: Response) {
 
     // Verify the media item exists
     const library = readLibrary();
-    const itemIndex = library.findIndex((m) => (m as { id: string }).id === id);
-    if (itemIndex === -1) {
+    const itemExists = library.some((m) => (m as { id: string }).id === id);
+    if (!itemExists) {
       res.status(404).json({ success: false, error: 'Media item not found' });
       return;
     }
@@ -102,11 +102,16 @@ export default function handler(req: Request, res: Response) {
       fs.writeFileSync(vttPath, vttContent, 'utf8');
       console.log(`[captions] User uploaded ${lang} subtitles for item ${id} (${req.file.originalname})`);
 
-      // Persist caption status to the library item
-      const item = library[itemIndex] as Record<string, unknown>;
-      const existing = (item.captions as Record<string, string> | undefined) ?? {};
-      item.captions = { ...existing, [lang]: 'downloaded' };
-      await writeLibraryDirect(library);
+      // Persist caption status to the library item using the write queue
+      await writeLibrary(lib => {
+        const idx = lib.findIndex((m) => (m as { id: string }).id === id);
+        if (idx !== -1) {
+          const it = lib[idx] as Record<string, unknown>;
+          const existing = (it.captions as Record<string, string> | undefined) ?? {};
+          lib[idx] = { ...it, captions: { ...existing, [lang]: 'downloaded' } };
+        }
+        return lib;
+      });
 
       res.json({
         success: true,

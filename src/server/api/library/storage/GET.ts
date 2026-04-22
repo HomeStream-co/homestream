@@ -14,8 +14,10 @@ import { readConfig } from '../../../configStore.js';
 import { requireAuth } from '../../../authMiddleware.js';
 
 function getDiskStats(dir: string): { free: number; total: number } | null {
+  // Sanitise dir to prevent shell injection
+  const safePath = dir.replace(/[`$\\|;&<>(){}!]/g, '');
   try {
-    const out = execSync(`df -k "${dir}" 2>/dev/null | tail -1`, { timeout: 3000 }).toString().trim();
+    const out = execSync(`df -k "${safePath}" 2>/dev/null | tail -1`, { timeout: 3000 }).toString().trim();
     const parts = out.split(/\s+/);
     if (parts.length >= 4) {
       const total = parseInt(parts[1]) * 1024;

@@ -79,7 +79,6 @@ async function importFile(filePath: string): Promise<void> {
   }
 
   const { title: extractedTitle, year: extractedYear } = extractTitle(filename);
-  const ext = path.extname(filename).toLowerCase();
 
   // Fetch OMDB metadata
   const omdb = await fetchOMDB(extractedTitle, extractedYear);

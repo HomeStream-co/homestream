@@ -1,18 +1,9 @@
-/**
- * GET /api/media/:id/tracks
- *
- * Returns all audio and subtitle tracks for a media file.
- * Uses the probe cache so repeated calls are instant (no repeated ffprobe).
- *
- * File resolution order (mirrors stream endpoint):
- *  1. item.filePath (absolute path — handles downloads folder, custom dirs)
- *  2. uploads/<filename> (legacy upload path)
- */
 import type { Request, Response } from 'express';
 import path from 'path';
 import fs from 'fs';
 import { probeFile } from '../../../../probeCache.js';
 import { requireAuth } from '../../../../authMiddleware.js';
+import { readLibrary } from '../../../../libraryStore.js';
 
 const UPLOADS_DIR = path.resolve('./uploads');
 
@@ -21,13 +12,8 @@ export default async function handler(req: Request, res: Response) {
     if (!requireAuth(req, res)) return;
     const { id } = req.params;
 
-    const libPath = fs.existsSync('/private') ? '/private/media-library.json' : path.resolve('./media-library.json');
-    if (!fs.existsSync(libPath)) {
-      return res.json({ audio: [], subtitles: [] });
-    }
-
     type LibEntry = { id: string; filename?: string; filePath?: string; filepath?: string };
-    const library = JSON.parse(fs.readFileSync(libPath, 'utf8')) as LibEntry[];
+    const library = readLibrary<LibEntry>();
 
     const item = library.find(m => m.id === id);
     if (!item) return res.status(404).json({ error: 'Media not found' });

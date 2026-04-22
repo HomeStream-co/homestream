@@ -29,6 +29,7 @@ import {
   SCHEDULE_MS,
   type ShowSubscription,
 } from './subscriptionStore.js';
+import { dataPath } from './dataDir.js';
 
 // ── Timer registry ────────────────────────────────────────────────────────────
 
@@ -130,7 +131,9 @@ async function checkSubscription(sub: ShowSubscription): Promise<void> {
 
   try {
     for (let s = startSeason; s <= sub.totalSeasons; s++) {
-      const epStart = s === startSeason ? startEpisode : 1;
+      // Only offset the starting episode for the very first season we check.
+      // All subsequent seasons always start at episode 1.
+      const epStart = (s === startSeason) ? startEpisode : 1;
 
       for (let ep = epStart; ep <= MAX_EPS; ep++) {
         const streams = await fetchStreamsForEpisode(sub.imdbId, s, ep);
@@ -163,7 +166,7 @@ async function checkSubscription(sub: ShowSubscription): Promise<void> {
           }
         }
 
-        const savePath = cfg.mediaDir ? `${cfg.mediaDir}/downloads` : '/downloads';
+        const savePath = cfg.mediaDir ? `${cfg.mediaDir}/downloads` : dataPath('downloads');
         const jobId = `sched-${best.infoHash}-${Date.now()}`;
 
         if (qbitActuallyReachable) {
@@ -173,9 +176,13 @@ async function checkSubscription(sub: ShowSubscription): Promise<void> {
               category: 'homestream',
               tags: 'series',
             });
+            // Use the returned hash as the job ID when qBit provides one;
+            // always use best.infoHash for the infoHash field (the qBit return
+            // value is the torrent hash which equals infoHash, but fall back
+            // to best.infoHash if addMagnet returns empty/null).
             upsertJob({
               jobId: hash || jobId,
-              infoHash: hash || best.infoHash,
+              infoHash: best.infoHash,
               title: epTitle,
               quality: best.quality,
               type: 'series',
@@ -254,6 +261,8 @@ function scheduleOne(sub: ShowSubscription): void {
     if (updated?.enabled) scheduleOne(updated);
   }, nextMs);
 
+  // .unref() so this timer never prevents a clean process exit
+  timer.unref();
   _timers.set(sub.imdbId, timer);
 
   const nextDate = new Date(Date.now() + nextMs);
@@ -268,16 +277,27 @@ export function scheduleAllSubscriptions(): void {
   if (subs.length === 0) return;
   console.log(`[scheduler] Scheduling ${subs.length} subscription(s)`);
 
-  // Immediately check any that were due while the server was offline
+  // Immediately check any that were due while the server was offline,
+  // then reschedule them for their next interval once the check completes.
   const due = getDueSubscriptions();
+  const dueIds = new Set(due.map(s => s.imdbId));
+
   for (const sub of due) {
-    checkSubscription(sub).catch(err =>
-      console.error(`[scheduler] Catch-up check failed for "${sub.title}":`, err)
-    );
+    checkSubscription(sub)
+      .catch(err =>
+        console.error(`[scheduler] Catch-up check failed for "${sub.title}":`, err)
+      )
+      .finally(() => {
+        // Reschedule after catch-up so the sub isn't orphaned.
+        const updated = getSubscription(sub.imdbId);
+        if (updated?.enabled) scheduleOne(updated);
+      });
   }
 
+  // Schedule all non-due subs normally. Due subs are handled above and will
+  // be rescheduled via .finally() — skip them here to avoid a double-fire.
   for (const sub of subs) {
-    scheduleOne(sub);
+    if (!dueIds.has(sub.imdbId)) scheduleOne(sub);
   }
 }
 
@@ -308,8 +328,8 @@ export async function checkNow(imdbId: string): Promise<{ message: string }> {
   }
 }
 
-// Graceful shutdown
-process.on('exit', () => {
+// Exported so server shutdown can cancel all timers explicitly if needed.
+export function cancelAllSubscriptions(): void {
   _timers.forEach(t => clearTimeout(t));
   _timers.clear();
-});
+}

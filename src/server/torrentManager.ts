@@ -249,7 +249,8 @@ export async function startTorrentDownload(params: {
           id: mediaId,
           filename: outputFilename,
           originalFilename: videoFile.name,
-          filepath: `/uploads/${outputFilename}`,
+          filepath: destPath,
+          filePath: destPath,
           title: omdb?.Title || title,
           year: omdb?.Year || year || 'Unknown',
           genre: genres,
@@ -286,14 +287,16 @@ export async function startTorrentDownload(params: {
 
         // Kick off transcode
         try {
-          const result = await transcodeFile(mediaId, inputFilename, outputFilename);
+          const result = await transcodeFile(mediaId, destPath, path.join(UPLOADS_DIR, outputFilename));
+          const finalPath = path.join(UPLOADS_DIR, result.outputFilename);
           await writeLibrary(lib => {
             const idx = lib.findIndex(m => (m as { id: string }).id === mediaId);
             if (idx !== -1) {
               const item = lib[idx] as Record<string, unknown>;
               item.transcoding = false;
               item.filename = result.outputFilename;
-              item.filepath = `/uploads/${result.outputFilename}`;
+              item.filepath = finalPath;
+              item.filePath = finalPath;
               item.fileSize = result.finalSize;
               item.originalSize = result.originalSize;
               item.savedBytes = result.savedBytes;

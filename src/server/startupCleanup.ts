@@ -294,11 +294,19 @@ export function runStartupCleanup(): void {
     // ── Resolve stuck transcode flag ─────────────────────────────────────────
     if (!item.transcoding) return result;
 
-    // The transcoded output is always <original-stem>_tc.mp4
+    // The transcoded output is always <original-stem>_tc.mp4.
+    // For items imported via folderWatcher, the file lives in the downloads dir
+    // (stored as an absolute path in filePath). For uploaded items it's in uploads/.
+    const storedDir = (() => {
+      const fp = (item.filePath ?? item.filepath) as string | undefined;
+      if (fp && path.isAbsolute(fp)) return path.dirname(fp);
+      return UPLOADS_DIR;
+    })();
+
     const tcFilename = item.filename.endsWith('_tc.mp4')
       ? item.filename
       : item.filename.replace(/\.[^.]+$/, '') + '_tc.mp4';
-    const tcPath = path.join(UPLOADS_DIR, tcFilename);
+    const tcPath = path.join(storedDir, tcFilename);
     const tcExists = fs.existsSync(tcPath);
 
     changed = true;
@@ -317,14 +325,21 @@ export function runStartupCleanup(): void {
     //   b) Transcode was interrupted before FFmpeg finished.
     const originalFilename = item.originalFilename;
     if (originalFilename) {
-      const origPath = path.join(UPLOADS_DIR, path.basename(originalFilename));
-      if (fs.existsSync(origPath)) {
+      // Check in the same directory as the stored filePath first (downloads dir),
+      // then fall back to uploads/ for legacy items.
+      const origCandidates = [
+        path.join(storedDir, path.basename(originalFilename as string)),
+        path.join(UPLOADS_DIR, path.basename(originalFilename as string)),
+      ];
+      const origPath = origCandidates.find(p => fs.existsSync(p));
+      if (origPath) {
         console.log(`[startup]   ↩ "${item.title}" — _tc.mp4 missing but original found, reverting filename`);
         return {
           ...result,
           transcoding: false,
-          filename: path.basename(originalFilename),
-          filepath: `/uploads/${path.basename(originalFilename)}`,
+          filename: path.basename(originalFilename as string),
+          filepath: origPath,
+          filePath: origPath,
           transcodeError: undefined,
           transcodeWarning: 'Transcode was reverted or interrupted — playing original file. May not seek perfectly.',
         };
