@@ -86,7 +86,11 @@ export default defineConfig(({ mode }) => ({
 			mode: "isolated",
 			configure: "src/server/configure.js",
 			dirs: [{ dir: "./src/server/api", route: "" }],
-			forceRestart: mode === "development",
+			// forceRestart causes an infinite restart loop in the cloud environment:
+			// ownershipSeed writes to homestream-config.json → Vite picks up the
+			// SSR module change → restarts → writes again → repeat.
+			// The plugin auto-detects new API route files without needing forceRestart.
+			forceRestart: false,
 		}),
 		serverBundlePlugin(),
 	],
@@ -132,7 +136,17 @@ export default defineConfig(({ mode }) => ({
 			overlay: false,
 		},
 		watch: {
-			ignored: ["**/dist/**", "**/.api/**"],
+			// Ignore build output, API cache, data files, and /private storage.
+			// Without these, writes to homestream-*.json trigger SSR module reloads
+			// which restart the server in an infinite loop.
+			ignored: [
+				"**/dist/**",
+				"**/.api/**",
+				"**/homestream-data/**",
+				"**/homestream-*.json",
+				"/private/**",
+				"**/node_modules/**",
+			],
 		},
 	},
 

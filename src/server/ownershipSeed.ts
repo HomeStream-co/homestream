@@ -30,6 +30,13 @@
 import bcrypt from 'bcryptjs';
 import { readConfig, writeConfig } from './configStore.js';
 
+// Module-level guard — only seed once per process lifetime.
+// vite-plugin-api-routes calls viteServerBefore on every hot-reload;
+// without this guard, ownershipSeed would run (and potentially write
+// homestream-config.json) on every restart, which triggers another
+// Vite SSR module reload → infinite restart loop.
+let _seeded = false;
+
 // Resolve a secret value from process.env.
 // The platform injects all secrets as environment variables at runtime,
 // so process.env is the correct and only source needed here.
@@ -41,6 +48,9 @@ function resolveSecret(name: string): string | undefined {
 }
 
 export async function runOwnershipSeed(): Promise<void> {
+  if (_seeded) return;
+  _seeded = true;
+
   const cfg = readConfig();
   const updates: Record<string, string | boolean> = {};
   let didSeed = false;
