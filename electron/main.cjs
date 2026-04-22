@@ -107,8 +107,8 @@ let logBuffer = [];
 let watchdogRestarts = 0; // tracks consecutive crash-restarts for exponential backoff
 let fastCrashCount = 0;   // crashes that happened within FAST_CRASH_WINDOW_MS of starting
 let lastServerStartTime = 0; // epoch ms when the server process was last spawned
-const FAST_CRASH_WINDOW_MS = 5000;  // exit within 5s of start = "fast crash"
-const MAX_FAST_CRASHES    = 5;      // 5 fast crashes → quit the whole app
+const FAST_CRASH_WINDOW_MS = 15000; // exit within 15s of start = "fast crash"
+const MAX_FAST_CRASHES    = 3;      // 3 fast crashes → quit the whole app
 // Resolved at startup — may differ from PREFERRED_PORT if 3000 is taken
 let activePort = PREFERRED_PORT;
 
@@ -251,7 +251,7 @@ async function startServer() {
     // starting, that's a "fast crash". After MAX_FAST_CRASHES fast crashes in a
     // row, we quit the entire Electron app so the user doesn't have to kill it
     // via Task Manager or restart their PC.
-    const MAX_WATCHDOG_RESTARTS = 10;
+    const MAX_WATCHDOG_RESTARTS = 3;
     if (code !== 0 && !app.isQuitting) {
       // Detect fast crash
       const uptime = Date.now() - lastServerStartTime;
@@ -261,13 +261,28 @@ async function startServer() {
         if (fastCrashCount >= MAX_FAST_CRASHES) {
           pushLog(`Watchdog: ${MAX_FAST_CRASHES} fast crashes in a row — quitting HomeStream to protect your PC.`, 'error');
           app.isQuitting = true;
+
+          // Read crash log to show in the dialog so user doesn't have to navigate to AppData
+          let crashDetail = '';
+          try {
+            const logPath = path.join(app.getPath('userData'), 'crash-log.json');
+            if (fs.existsSync(logPath)) {
+              const entries = JSON.parse(fs.readFileSync(logPath, 'utf-8'));
+              const top = entries.slice(0, 3);
+              crashDetail = top.map(e =>
+                `[${e.type}] ${e.message}\n${(e.stack || '').split('\n').slice(0,3).join('\n')}`
+              ).join('\n\n---\n\n');
+            }
+          } catch { /* ignore */ }
+
           dialog.showErrorBox(
             'HomeStream — Server crash loop detected',
-            `The HomeStream server crashed ${MAX_FAST_CRASHES} times in a row within seconds of starting.\n\n` +
-            `HomeStream will now close automatically so you don't have to use Task Manager.\n\n` +
-            `To diagnose the problem, check the crash log in:\n` +
-            `  %APPDATA%\\HomeStream\\crash-log.json\n\n` +
-            `Common causes: missing ffmpeg, port already in use, or a corrupt config file.`
+            `The HomeStream server crashed ${MAX_FAST_CRASHES} times in a row.\n\n` +
+            `HomeStream will now close so you don't have to use Task Manager.\n\n` +
+            (crashDetail
+              ? `CRASH DETAILS:\n${crashDetail}\n\n`
+              : '') +
+            `Full log: %APPDATA%\\HomeStream\\crash-log.json`
           );
           app.quit();
           return;
