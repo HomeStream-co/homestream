@@ -189,9 +189,24 @@ async function startServer() {
   pushLog(`Starting server on port ${activePort}: ${serverPath}`);
   lastServerStartTime = Date.now();
 
+  // Build a clean env for the server child process.
+  // Strip any secrets that were baked into the build environment (ADMIN_PASSWORD,
+  // DEVELOPER_LOCK, API keys, etc.) — these must come from the user's own
+  // homestream-config.json written during the setup wizard, NOT from build-time
+  // env vars. Leaking them here causes isSetupComplete() to return true before
+  // the wizard has run, skipping setup entirely and crashing on missing mediaDir.
+  const BUILD_TIME_SECRETS = [
+    'ADMIN_PASSWORD', 'DEVELOPER_LOCK', 'GH_TOKEN',
+    'GOOGLE_AI_API_KEY', 'TMDB_API_KEY', 'OMDB_API_KEY',
+    'VIRUSTOTAL_API_KEY', 'QBIT_PASSWORD', 'JELLYFIN_API_KEY',
+    'SETUP_COMPLETE', '_PLACEHOLDER',
+  ];
+  const cleanEnv = { ...process.env };
+  for (const key of BUILD_TIME_SECRETS) delete cleanEnv[key];
+
   serverProcess = spawn(process.execPath, [serverPath], {
     env: {
-      ...process.env,
+      ...cleanEnv,
       PORT: String(activePort),
       NODE_ENV: 'production',
       ELECTRON: '1',
