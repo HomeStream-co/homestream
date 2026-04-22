@@ -18,8 +18,15 @@ interface TestBody {
 
 async function testTmdb(apiKey: string): Promise<{ ok: boolean; message: string }> {
   try {
-    const res = await fetch('https://api.themoviedb.org/3/configuration', {
-      headers: { Authorization: `Bearer ${apiKey}` },
+    // v3 API keys go as a query param; v4 tokens go as Bearer header.
+    // Support both: if it looks like a JWT (starts with eyJ) use Bearer, otherwise use api_key param.
+    const isToken = apiKey.startsWith('eyJ');
+    const url = isToken
+      ? 'https://api.themoviedb.org/3/configuration'
+      : `https://api.themoviedb.org/3/configuration?api_key=${encodeURIComponent(apiKey)}`;
+    const headers: Record<string, string> = isToken ? { Authorization: `Bearer ${apiKey}` } : {};
+    const res = await fetch(url, {
+      headers,
       signal: AbortSignal.timeout(8_000),
     });
     if (res.ok) return { ok: true, message: 'Key is valid — TMDB connected!' };

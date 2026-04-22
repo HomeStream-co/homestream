@@ -94,9 +94,15 @@ async function checkTMDB(): Promise<SubsystemCheck> {
     const cfg = readConfig();
     if (!cfg.tmdbApiKey) return { name: 'TMDB', status: 'warn', message: 'No API key — Discover page disabled' };
 
+    const tmdbUrl = cfg.tmdbApiKey.startsWith('eyJ')
+      ? 'https://api.themoviedb.org/3/configuration'
+      : `https://api.themoviedb.org/3/configuration?api_key=${encodeURIComponent(cfg.tmdbApiKey)}`;
+    const tmdbHeaders: Record<string, string> = cfg.tmdbApiKey.startsWith('eyJ')
+      ? { Authorization: `Bearer ${cfg.tmdbApiKey}` }
+      : {};
     const res = await checkWithTimeout(
-      () => fetch('https://api.themoviedb.org/3/configuration', {
-        headers: { Authorization: `Bearer ${cfg.tmdbApiKey}` },
+      () => fetch(tmdbUrl, {
+        headers: tmdbHeaders,
         signal: AbortSignal.timeout(5000),
       }).then(r => r.status),
       6000,

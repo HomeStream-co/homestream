@@ -215,8 +215,9 @@ describe('POST /api/setup/test-keys', () => {
   it('trims whitespace from value before testing', async () => {
     fetchMock.mockResolvedValue({ ok: true, json: async () => ({}) });
     await handler(makeReq({ key: 'tmdb', value: '  mykey  ' }), makeRes() as unknown as Response);
-    const opts = fetchMock.mock.calls[0][1] as { headers: { Authorization: string } };
-    expect(opts.headers.Authorization).toContain('mykey');
-    expect(opts.headers.Authorization).not.toContain('  ');
+    // v3 keys go as api_key query param, not Bearer header
+    const url = fetchMock.mock.calls[0][0] as string;
+    expect(url).toContain('mykey');
+    expect(url).not.toContain('  ');
   });
 });
