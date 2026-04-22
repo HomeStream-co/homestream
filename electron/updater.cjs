@@ -64,7 +64,24 @@ function log(msg, level = 'info') {
 
 let pushLogFn = null;
 
-// ── Auto-updater setup ────────────────────────────────────────────────────────
+// Simple semver comparison — returns true if `a` is strictly greater than `b`
+function semverGt(a, b) {
+  try {
+    const pa = String(a).replace(/^v/, '').split('.').map(Number);
+    const pb = String(b).replace(/^v/, '').split('.').map(Number);
+    for (let i = 0; i < 3; i++) {
+      const na = pa[i] ?? 0;
+      const nb = pb[i] ?? 0;
+      if (na > nb) return true;
+      if (na < nb) return false;
+    }
+    return false; // equal
+  } catch {
+    return false;
+  }
+}
+
+
 
 function setupAutoUpdater({ controlWindowGetter, pushLog }) {
   getControlWindow = controlWindowGetter;
@@ -108,11 +125,11 @@ function setupAutoUpdater({ controlWindowGetter, pushLog }) {
   });
 
   autoUpdater.on('update-available', (info) => {
-    // Guard: never treat the currently-running version as an "update"
+    // Guard: only treat it as an update if the remote version is strictly newer.
     // This prevents an install loop where the app keeps re-installing itself.
     const currentVersion = app.getVersion();
-    if (info.version === currentVersion) {
-      log(`Update check returned same version (v${info.version}) — skipping`, 'info');
+    if (!semverGt(info.version, currentVersion)) {
+      log(`Update check returned v${info.version} which is not newer than current v${currentVersion} — skipping`, 'info');
       sendStatus('not-available');
       setTimeout(() => sendStatus('idle'), 5_000);
       return;
@@ -175,15 +192,14 @@ function setupAutoUpdater({ controlWindowGetter, pushLog }) {
 
   ipcMain.on('install-update', () => {
     if (currentState !== 'ready') return;
-    // Final safety check — never install same or older version
+    // Final safety check — only install if strictly newer
     const currentVersion = app.getVersion();
-    if (availableVersion && availableVersion <= currentVersion) {
+    if (!availableVersion || !semverGt(availableVersion, currentVersion)) {
       log(`Refusing to install v${availableVersion} — not newer than current v${currentVersion}`, 'warn');
       sendStatus('idle');
       return;
     }
     log('Restarting to install update…', 'warn');
-    // setImmediate gives the IPC reply time to flush before the process exits
     setImmediate(() => autoUpdater.quitAndInstall(false, true));
   });
 

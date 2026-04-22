@@ -225,12 +225,16 @@ async function startServer() {
     // ── Watchdog: auto-restart on unexpected crash ─────────────────────────
     // If the server exits with a non-zero code AND the app isn't quitting,
     // restart it automatically with exponential backoff (2s → 4s → 8s → max 30s).
-    // This keeps HomeStream running on your home server even after a transient
-    // crash (OOM, ffmpeg error, etc.) without needing manual intervention.
+    // Cap at 10 restarts to avoid infinite loops on a fundamentally broken server.
+    const MAX_WATCHDOG_RESTARTS = 10;
     if (code !== 0 && !app.isQuitting) {
+      if (watchdogRestarts >= MAX_WATCHDOG_RESTARTS) {
+        pushLog(`Watchdog: giving up after ${MAX_WATCHDOG_RESTARTS} restarts — server appears broken. Use the Start button to retry manually.`, 'error');
+        return;
+      }
       watchdogRestarts++;
       const delay = Math.min(2000 * Math.pow(2, watchdogRestarts - 1), 30000);
-      pushLog(`Watchdog: restarting server in ${delay / 1000}s (attempt ${watchdogRestarts})…`, 'warn');
+      pushLog(`Watchdog: restarting server in ${delay / 1000}s (attempt ${watchdogRestarts}/${MAX_WATCHDOG_RESTARTS})…`, 'warn');
       setTimeout(() => {
         if (!app.isQuitting && !serverProcess) {
           pushLog('Watchdog: restarting server now…', 'warn');
@@ -245,18 +249,20 @@ async function startServer() {
 
   waitForServer(activePort).then(() => {
     serverRunning = true;
+    watchdogRestarts = 0; // reset on successful start
     pushLog(`Server ready at http://localhost:${activePort}`, 'success');
     pushLog(`LAN address: http://${getLanIp()}:${activePort}`, 'success');
     sendStatus();
 
-    // On first run (no config file yet) automatically open the setup wizard
-    // so the user doesn't have to figure out what to do next.
-    // Use the same userData path that the server stores data in.
-    const configPath = path.join(app.getPath('userData'), 'homestream-config.json');
-    const isFirstRun = !fs.existsSync(configPath);
-    const startPage = isFirstRun ? '/setup' : '/';
-    shell.openExternal(`http://localhost:${activePort}${startPage}`);
-    if (isFirstRun) pushLog('First run detected — opening setup wizard in browser', 'info');
+    // Only open the browser on the FIRST successful server start, not on
+    // watchdog restarts. This prevents spam-opening browser windows on crash loops.
+    if (watchdogRestarts === 0) {
+      const configPath = path.join(app.getPath('userData'), 'homestream-config.json');
+      const isFirstRun = !fs.existsSync(configPath);
+      const startPage = isFirstRun ? '/setup' : '/';
+      shell.openExternal(`http://localhost:${activePort}${startPage}`);
+      if (isFirstRun) pushLog('First run detected — opening setup wizard in browser', 'info');
+    }
   }).catch(err => {
     pushLog(`Server failed to start: ${err.message}`, 'error');
     serverRunning = false;
