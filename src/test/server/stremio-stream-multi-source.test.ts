@@ -30,8 +30,8 @@ let mockConfig = {
   prowlarrApiKey: '',
 };
 
-// Per-test fetch handler
-type FetchHandler = (url: string, init?: RequestInit) => Promise<Response>;
+// Per-test fetch handler — uses globalThis.Response (Web Fetch API) not express.Response
+type FetchHandler = (url: string, init?: RequestInit) => Promise<globalThis.Response>;
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
@@ -118,7 +118,7 @@ afterEach(() => {
   global.fetch = originalFetch;
 });
 
-function mockFetch(handler: ((url: string) => Promise<Response>) | ((url: string, init?: RequestInit) => Promise<Response>)) {
+function mockFetch(handler: ((url: string) => Promise<globalThis.Response>) | ((url: string, init?: RequestInit) => Promise<globalThis.Response>)) {
   global.fetch = vi.fn(handler as FetchHandler) as unknown as typeof fetch;
 }
 
