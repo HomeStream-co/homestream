@@ -23,7 +23,7 @@ import {
   Wifi, WifiOff, Film, FastForward, ChevronRight, Zap,
   RotateCcw, QrCode, X, ExternalLink, Subtitles,
   Maximize2, Cast, ChevronUp, ChevronDown, Tv2, Square,
-  Search, Sparkles, Download,
+  Search, Sparkles, Download, Copy, Check,
 } from 'lucide-react';
 
 // ── Sub-tab components (extracted for maintainability) ─────────────────────────
@@ -431,9 +431,16 @@ export default function RemotePage() {
 
           {/* Header bar */}
           <div className="flex items-center justify-between mb-5">
-            <div className="flex items-center gap-2">
-              <Film className="w-5 h-5 text-primary" />
-              <span className="font-heading text-foreground font-bold tracking-wide">Remote</span>
+            <div className="flex flex-col">
+              <div className="flex items-center gap-2">
+                <Film className="w-5 h-5 text-primary" />
+                <span className="font-heading text-foreground font-bold tracking-wide">Remote</span>
+              </div>
+              {qrData?.url && (
+                <span className="text-[10px] text-muted-foreground font-mono mt-0.5 pl-7 truncate max-w-[180px]">
+                  {qrData.url.replace(/^https?:\/\//, '')}
+                </span>
+              )}
             </div>
             <div className="flex items-center gap-2">
               {qrData && (
@@ -459,6 +466,7 @@ export default function RemotePage() {
             {activeTab === 'remote' && status !== 'connected' && (
               <IdleState
                 status={status}
+                serverUrl={qrData?.url}
                 onRetry={() => {
                   if (reconnectRef.current) clearTimeout(reconnectRef.current);
                   connect();
@@ -827,13 +835,29 @@ function StatusBadge({ status, screenCount }: { status: ConnStatus; screenCount:
   );
 }
 
-function IdleState({ status, onRetry }: { status: ConnStatus; onRetry: () => void }) {
+function IdleState({
+  status, onRetry, serverUrl,
+}: {
+  status: ConnStatus;
+  onRetry: () => void;
+  serverUrl?: string;
+}) {
+  const [copied, setCopied] = useState(false);
+
+  const copyUrl = () => {
+    if (!serverUrl) return;
+    navigator.clipboard.writeText(serverUrl).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0 }}
-      className="w-full text-center py-12"
+      className="w-full text-center py-10"
     >
       <div className="w-16 h-16 rounded-2xl bg-card border border-border flex items-center justify-center mx-auto mb-4">
         <Film className="w-7 h-7 text-muted-foreground" />
@@ -848,6 +872,24 @@ function IdleState({ status, onRetry }: { status: ConnStatus; onRetry: () => voi
           ? 'Open HomeStream on your TV or desktop and start playing something.'
           : 'Make sure HomeStream is running on your home network.'}
       </p>
+
+      {/* Server address pill */}
+      {serverUrl && (
+        <button
+          onClick={copyUrl}
+          className="mt-4 mx-auto flex items-center gap-2 bg-card border border-border rounded-xl px-3 py-2 text-left hover:border-primary/40 transition-colors group"
+          title="Tap to copy server address"
+        >
+          <Wifi className="w-3.5 h-3.5 text-primary shrink-0" />
+          <code className="text-[11px] text-muted-foreground group-hover:text-foreground transition-colors font-mono">
+            {serverUrl}
+          </code>
+          {copied
+            ? <Check className="w-3.5 h-3.5 text-green-400 shrink-0" />
+            : <Copy className="w-3.5 h-3.5 text-muted-foreground/50 shrink-0" />}
+        </button>
+      )}
+
       {status === 'disconnected' && (
         <button
           onClick={onRetry}
