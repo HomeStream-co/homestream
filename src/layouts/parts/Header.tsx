@@ -121,6 +121,7 @@ export default function Header({ onChatOpen: _onChatOpen }: HeaderProps) {
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [debugOpen, setDebugOpen] = useState(false);
   const [securityOpen, setSecurityOpen] = useState(false);
+  const [settingsForceOpen, setSettingsForceOpen] = useState(false);
   // PIN lock state — which profile is pending PIN verification
   const [pinPendingProfile, setPinPendingProfile] = useState<Profile | null>(null);
   const navigate = useNavigate();
@@ -270,12 +271,18 @@ export default function Header({ onChatOpen: _onChatOpen }: HeaderProps) {
             <SettingsPanel
               onOpenSecurity={() => setSecurityOpen(true)}
               onOpenDebug={() => setDebugOpen(true)}
+              forceOpen={settingsForceOpen}
+              onClose={() => setSettingsForceOpen(false)}
             />
 
             <Suspense fallback={null}>
               <DebugPanel open={debugOpen} onClose={() => setDebugOpen(false)} />
             </Suspense>
-            <SecurityPanel open={securityOpen} onClose={() => setSecurityOpen(false)} onBack={() => { setSecurityOpen(false); }} />
+            <SecurityPanel
+              open={securityOpen}
+              onClose={() => setSecurityOpen(false)}
+              onBack={() => { setSecurityOpen(false); setSettingsForceOpen(true); }}
+            />
 
             {/* ── Stremio ── */}
             <StremioPanel />

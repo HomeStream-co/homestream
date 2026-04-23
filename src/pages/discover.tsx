@@ -748,7 +748,7 @@ export default function DiscoverPage() {
   const [directLoading, setDirectLoading] = useState(false);
   const [directError, setDirectError] = useState('');
 
-  const { upcoming, trending, trendingShows, recommended, loading, stale, error, refresh, lastRefreshed } = useTMDBContext();
+  const { upcoming, trending, trendingShows, topRatedShows, popularShows, recommended, loading, stale, error, refresh, lastRefreshed } = useTMDBContext();
 
   const libraryTitles = useMemo(
     () => new Set(library.map(m => m.title.toLowerCase())),
@@ -769,8 +769,10 @@ export default function DiscoverPage() {
   const filteredTrending = filterMovies(trending);
   const filteredRecommended = filterMovies(recommended);
 
-  // TV shows from dedicated TMDB /trending/tv/week endpoint
+  // TV shows from dedicated TMDB endpoints
   const filteredShows = useMemo(() => filterMovies(trendingShows), [trendingShows, filterMovies]);
+  const filteredTopRatedShows = useMemo(() => filterMovies(topRatedShows), [topRatedShows, filterMovies]);
+  const filteredPopularShows = useMemo(() => filterMovies(popularShows), [popularShows, filterMovies]);
 
   const handleTMDBDownload = useCallback((movie: TMDBMovie) => {
     setDownloadTarget({ title: movie.title, posterUrl: movie.posterUrl, release_date: movie.release_date, type: 'movie' });
@@ -922,19 +924,32 @@ export default function DiscoverPage() {
           {/* ── TV Shows tab ── */}
           {activeTab === 'shows' && (
             <div>
-              {filteredShows.length > 0 ? (
-                <Section key={`shows-${searchQuery}`} title="Trending TV Shows" icon={Tv2} movies={filteredShows} libraryTitles={libraryTitles} watchlist={watchlist} onAddToWatchlist={addToWatchlist} onRemoveFromWatchlist={removeFromWatchlist} onDownload={handleTMDBDownload} />
-              ) : loading ? (
+              {loading && trendingShows.length === 0 ? (
                 <div className="text-center py-16">
                   <Loader2 className="w-8 h-8 text-primary animate-spin mx-auto mb-4" />
                   <p className="text-muted-foreground text-sm">Loading TV shows…</p>
                 </div>
-              ) : (
+              ) : trendingShows.length === 0 && topRatedShows.length === 0 && popularShows.length === 0 ? (
                 <div className="text-center py-16">
                   <Tv2 className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
                   <p className="text-muted-foreground text-sm mb-2">No TV shows found.</p>
                   <p className="text-muted-foreground text-xs">Use the <button onClick={() => setActiveTab('search')} className="text-primary hover:underline">Search & Download</button> tab to find any TV show by name.</p>
                 </div>
+              ) : (
+                <>
+                  {filteredShows.length > 0 && (
+                    <Section key={`shows-trending-${searchQuery}`} title="Trending This Week" icon={TrendingUp} movies={filteredShows} libraryTitles={libraryTitles} watchlist={watchlist} onAddToWatchlist={addToWatchlist} onRemoveFromWatchlist={removeFromWatchlist} onDownload={handleTMDBDownload} />
+                  )}
+                  {filteredPopularShows.length > 0 && (
+                    <Section key={`shows-popular-${searchQuery}`} title="Popular Right Now" icon={Sparkles} movies={filteredPopularShows} libraryTitles={libraryTitles} watchlist={watchlist} onAddToWatchlist={addToWatchlist} onRemoveFromWatchlist={removeFromWatchlist} onDownload={handleTMDBDownload} />
+                  )}
+                  {filteredTopRatedShows.length > 0 && (
+                    <Section key={`shows-toprated-${searchQuery}`} title="All-Time Top Rated" icon={Star} movies={filteredTopRatedShows} libraryTitles={libraryTitles} watchlist={watchlist} onAddToWatchlist={addToWatchlist} onRemoveFromWatchlist={removeFromWatchlist} onDownload={handleTMDBDownload} />
+                  )}
+                  {filteredShows.length === 0 && filteredPopularShows.length === 0 && filteredTopRatedShows.length === 0 && searchQuery && (
+                    <div className="text-center py-16 text-muted-foreground text-sm">No TV shows match "{searchQuery}"</div>
+                  )}
+                </>
               )}
             </div>
           )}

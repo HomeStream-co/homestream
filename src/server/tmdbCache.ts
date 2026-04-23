@@ -85,6 +85,8 @@ function localiseUrls(entry: TMDBCacheEntry): TMDBCacheEntry {
     upcoming:      fix(entry.upcoming),
     trending:      fix(entry.trending),
     trendingShows: fix(entry.trendingShows),
+    topRatedShows: fix(entry.topRatedShows ?? []),
+    popularShows:  fix(entry.popularShows  ?? []),
   };
 }
 
@@ -111,6 +113,8 @@ export interface TMDBCacheEntry {
   upcoming: TMDBMovie[];
   trending: TMDBMovie[];
   trendingShows: TMDBMovie[];
+  topRatedShows: TMDBMovie[];
+  popularShows: TMDBMovie[];
   stale?: boolean;
 }
 
@@ -217,7 +221,7 @@ async function fetchFresh(): Promise<TMDBCacheEntry> {
   const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
   const lastDay = new Date(now.getFullYear(), now.getMonth() + 2, 0).toISOString().slice(0, 10);
 
-  const [upcomingRaw, trendingRaw, trendingShowsRaw] = await Promise.all([
+  const [upcomingRaw, trendingRaw, trendingShowsRaw, topRatedShowsRaw, popularShowsRaw] = await Promise.all([
     tmdbGet('/discover/movie', {
       sort_by: 'popularity.desc',
       'primary_release_date.gte': firstDay,
@@ -226,6 +230,8 @@ async function fetchFresh(): Promise<TMDBCacheEntry> {
     }),
     tmdbGet('/trending/movie/week'),
     tmdbGet('/trending/tv/week'),
+    tmdbGet('/tv/top_rated'),
+    tmdbGet('/tv/popular'),
   ]);
 
   const upcoming = attachGenres(
@@ -243,8 +249,18 @@ async function fetchFresh(): Promise<TMDBCacheEntry> {
       .slice(0, 30)
       .map(normaliseMovie)
   );
+  const topRatedShows = attachGenres(
+    ((topRatedShowsRaw as { results: Record<string, unknown>[] }).results ?? [])
+      .slice(0, 30)
+      .map(normaliseMovie)
+  );
+  const popularShows = attachGenres(
+    ((popularShowsRaw as { results: Record<string, unknown>[] }).results ?? [])
+      .slice(0, 30)
+      .map(normaliseMovie)
+  );
 
-  return { fetchedAt: Date.now(), upcoming, trending, trendingShows };
+  return { fetchedAt: Date.now(), upcoming, trending, trendingShows, topRatedShows, popularShows };
 }
 
 // ── Recommendations based on library genres/actors ────────────────────────────
@@ -377,7 +393,7 @@ export async function getTMDBData(forceRefresh = false): Promise<TMDBCacheEntry 
     return fresh;
   } catch (err) {
     console.warn('[tmdbCache] Cold fetch failed:', err);
-    return { fetchedAt: 0, upcoming: [], trending: [], trendingShows: [], stale: true };
+    return { fetchedAt: 0, upcoming: [], trending: [], trendingShows: [], topRatedShows: [], popularShows: [], stale: true };
   }
 }
 

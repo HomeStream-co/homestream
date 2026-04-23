@@ -20,6 +20,8 @@ export interface TMDBState {
   upcoming: TMDBMovie[];
   trending: TMDBMovie[];
   trendingShows: TMDBMovie[];
+  topRatedShows: TMDBMovie[];
+  popularShows: TMDBMovie[];
   recommended: TMDBMovie[];
   fetchedAt: number;
   stale: boolean;
@@ -76,6 +78,8 @@ export function TMDBProvider({ children, libraryGenres = [] }: TMDBProviderProps
     upcoming: cached?.upcoming ?? [],
     trending: cached?.trending ?? [],
     trendingShows: cached?.trendingShows ?? [],
+    topRatedShows: cached?.topRatedShows ?? [],
+    popularShows:  cached?.popularShows  ?? [],
     recommended: cached?.recommended ?? [],
     fetchedAt: cached?.fetchedAt ?? 0,
     stale: cached?.stale ?? false,
@@ -103,6 +107,8 @@ export function TMDBProvider({ children, libraryGenres = [] }: TMDBProviderProps
         upcoming: data.upcoming ?? [],
         trending: data.trending ?? [],
         trendingShows: data.trendingShows ?? [],
+        topRatedShows: data.topRatedShows ?? [],
+        popularShows:  data.popularShows  ?? [],
         recommended: data.recommended ?? [],
         fetchedAt: data.fetchedAt,
         stale: data.stale ?? false,

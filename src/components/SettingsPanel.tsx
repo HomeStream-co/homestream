@@ -275,17 +275,26 @@ function ApiKeyField({
 interface SettingsPanelProps {
   onOpenSecurity?: () => void;
   onOpenDebug?: () => void;
+  /** When true, the panel opens programmatically (e.g. back-from-Security) */
+  forceOpen?: boolean;
+  /** Called when the panel closes itself (so parent can clear forceOpen) */
+  onClose?: () => void;
 }
 
-export default function SettingsPanel({ onOpenSecurity, onOpenDebug }: SettingsPanelProps) {
+export default function SettingsPanel({ onOpenSecurity, onOpenDebug, forceOpen, onClose }: SettingsPanelProps) {
   const { settings, activeTheme, setTheme, updateSetting } = useTheme();
-  const { profiles, setPin, clearPin } = useProfile();
+  const { profiles, setPin, clearPin, activeProfile } = useProfile();
   const adultProfile = profiles.find(p => p.id === 'adult');
   const adultPinEnabled = adultProfile?.hasPin ?? false;
   const { requiresPassword, logout, logoutAll } = useAuth();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
+
+  // Allow parent to open the panel programmatically (e.g. back from Security Center)
+  useEffect(() => {
+    if (forceOpen) setOpen(true);
+  }, [forceOpen]);
 
   // PIN management state
   const [pinMode, setPinMode] = useState<'idle' | 'set' | 'change' | 'confirm'>('idle');
@@ -511,11 +520,12 @@ export default function SettingsPanel({ onOpenSecurity, onOpenDebug }: SettingsP
     const handler = (e: MouseEvent) => {
       if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
         setOpen(false);
+        onClose?.();
       }
     };
     window.addEventListener('mousedown', handler);
     return () => window.removeEventListener('mousedown', handler);
-  }, [open]);
+  }, [open, onClose]);
 
   function set<K extends keyof AppSettings>(key: K, value: AppSettings[K]) {
     updateSetting(key, value);
@@ -919,6 +929,8 @@ export default function SettingsPanel({ onOpenSecurity, onOpenDebug }: SettingsP
                 </div>
 
                 {/* ── 6. Parental Controls ── */}
+                {/* Only show to adult (non-restricted) profiles */}
+                {!activeProfile?.restricted && (
                 <div className="border-t border-border/50">
                   <SectionHeader icon={ShieldCheck} label="Parental Controls" />
                   <div className="px-4 pb-4 space-y-4">
@@ -1052,6 +1064,7 @@ export default function SettingsPanel({ onOpenSecurity, onOpenDebug }: SettingsP
                     </div>
                   </div>
                 </div>
+                )} {/* end !activeProfile?.restricted */}
 
                 {/* ── 7. API Keys ── */}
                 <div className="border-t border-border/50">

@@ -532,7 +532,7 @@ export default function ProfilesPage() {
   const canAddMore = profiles.length < 6;
 
   return (
-    <div className="min-h-screen bg-background flex flex-col items-center justify-center px-4 py-12">
+    <div className="min-h-screen bg-background flex flex-col items-center justify-start pt-16 px-4 pb-12">
       <title>HomeStream — Who's Watching?</title>
 
       {/* Logo */}

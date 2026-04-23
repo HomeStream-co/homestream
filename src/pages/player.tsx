@@ -257,10 +257,17 @@ export default function PlayerPage() {
 
   // ── Skip Intro ────────────────────────────────────────────────────────────
   const skipIntro = useCallback(() => { if (ps.videoRef.current) ps.videoRef.current.currentTime = SKIP_INTRO_END; }, [ps.videoRef]);
+  const autoSkipFiredRef = useRef(false);
+  // Reset auto-skip guard when the item changes
+  useEffect(() => { autoSkipFiredRef.current = false; }, [id]);
   useEffect(() => {
     const inIntro = ps.currentTime > 30 && ps.currentTime < SKIP_INTRO_END && ps.playing;
     ps.setShowSkipIntro(inIntro);
-    if (inIntro && appSettings.autoSkipIntro) skipIntro();
+    // Auto-skip fires exactly once per item — never repeatedly
+    if (inIntro && appSettings.autoSkipIntro && !autoSkipFiredRef.current) {
+      autoSkipFiredRef.current = true;
+      skipIntro();
+    }
   }, [ps.currentTime, ps.playing, appSettings.autoSkipIntro, skipIntro, ps]);
 
   // ── Auto-hide controls ────────────────────────────────────────────────────

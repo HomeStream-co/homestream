@@ -9,7 +9,7 @@
  *   2. Domain    — Let's Encrypt via Caddy automatic HTTPS (requires port 80/443 open)
  *   3. Cloudflare Tunnel — zero open ports, works behind CGNAT
  */
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import {
