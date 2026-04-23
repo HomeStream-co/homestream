@@ -96,6 +96,14 @@ export default async function handler(req: Request, res: Response) {
   }
 
   const action = iface ? `bound to "${iface}"` : 'cleared (no VPN enforcement)';
+
+  // Restart the kill-switch monitor so it picks up the new interface immediately
+  // without requiring a server restart.
+  import('../../../vpnKillSwitch.js').then(({ stopVpnKillSwitch, startVpnKillSwitch }) => {
+    stopVpnKillSwitch();
+    if (iface) startVpnKillSwitch();
+  }).catch(() => {/* non-fatal */});
+
   res.json({
     ok: true,
     message: `VPN interface ${action}${qbitUpdated ? ' — qBittorrent updated' : ' — qBittorrent not reachable, update it manually'}`,

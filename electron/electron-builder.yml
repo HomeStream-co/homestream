@@ -28,10 +28,11 @@ extraMetadata:
 # ── Auto-updater (electron-updater via GitHub Releases) ───────────────────────
 # Set GH_TOKEN env var when publishing: npm run electron:publish
 # Users get notified of new releases automatically; they choose when to install.
+# Owner/repo are injected from GitHub Actions secrets at build time.
 publish:
   provider: github
-  owner: trevorrossworn-code
-  repo: homestream
+  owner: ${HOMESTREAM_GH_OWNER}
+  repo: ${HOMESTREAM_GH_REPO}
   releaseType: release
 
 # Directories
@@ -115,9 +116,10 @@ nsis:
   createStartMenuShortcut: true
   shortcutName: HomeStream
   runAfterFinish: true
-  # Branding images (optional — remove these lines if the files don't exist)
-  # installerHeaderBitmap: electron/assets/nsis-header.bmp   (150×57 BMP)
-  # installerSidebar: electron/assets/nsis-sidebar.bmp       (164×314 BMP)
+  # Delta updates — only downloads the diff between versions, not the full installer.
+  # This means users get updates in seconds (a few MB) instead of minutes (full ~150MB installer).
+  # electron-builder generates a .nsis.7z delta package alongside the full installer.
+  differentialPackage: true
 
 # ── macOS ─────────────────────────────────────────────────────────────────────
 mac:

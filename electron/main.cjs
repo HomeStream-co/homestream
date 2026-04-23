@@ -2,7 +2,8 @@
  * HomeStream Electron Main Process
  *
  * Wraps the HomeStream Express server + React frontend in a native desktop app.
- * No auto-updater — users download new versions manually.
+ * Auto-updater: checks GitHub Releases every 4 hours; user confirms before install.
+ * Delta updates: only downloads the diff (a few MB) — no full reinstall needed.
  *
  * Architecture:
  *  - Shows a control panel window: server status, LAN IP, log viewer, start/stop
@@ -952,6 +953,7 @@ const CONTROL_PANEL_HTML = `<!DOCTYPE html>
   <button class="btn-primary" id="btn-open" disabled onclick="openBrowser()">Open HomeStream</button>
   <button class="btn-secondary" id="btn-setup" disabled onclick="openSetup()">Setup Wizard</button>
   <button class="btn-secondary" id="btn-stop" disabled onclick="toggleServer()">Stop Server</button>
+  <button class="btn-secondary" id="btn-check-update" onclick="checkForUpdate()" title="Check GitHub Releases for a newer version">Check for Updates</button>
   <button class="btn-secondary" id="btn-crashlog" onclick="toggleCrashLog()" title="View crash log to diagnose startup errors">Crash Log</button>
 </div>
 
@@ -1146,9 +1148,9 @@ const CONTROL_PANEL_HTML = `<!DOCTYPE html>
         panel.classList.add('visible', 'state-available');
         icon.textContent = '⬆️';
         title.textContent = \`Update available — v\${data.version}\`;
-        sub.textContent = 'A new version of HomeStream is ready to download.';
+        sub.textContent = 'A delta update is ready. Download is small — no reinstall needed.';
         actions.innerHTML =
-          '<button class="btn-update btn-update-primary" onclick="window.electronAPI?.downloadUpdate()">Download</button>' +
+          '<button class="btn-update btn-update-primary" onclick="window.electronAPI?.downloadUpdate()">Download Update</button>' +
           '<button class="btn-update btn-update-dismiss" onclick="dismissUpdate()">Later</button>';
         break;
 

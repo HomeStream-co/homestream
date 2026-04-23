@@ -1,13 +1,21 @@
 name: Release
 
-# Triggered by pushing a version tag: git tag v1.2.0 && git push origin v1.2.0
+# Triggered by pushing a version tag: git tag v1.3.6 && git push origin v1.3.6
+#
+# Prerequisites (set in repo Settings → Secrets and variables → Actions):
+#   GH_TOKEN  — GitHub Personal Access Token with repo + write:packages scope
+#               (used by electron-builder to create the GitHub Release)
+#
+# Optional (auto-detected from github.repository if not set):
+#   GH_OWNER  — GitHub username/org (e.g. trevorrossworn-code)
+#   GH_REPO   — Repository name (e.g. homestream)
 #
 # Re-tag cycle (if you need to rebuild the same version):
 #   git pull origin main
-#   git tag -d v1.1.0
-#   git push origin --delete v1.1.0
-#   git tag v1.1.0
-#   git push origin v1.1.0
+#   git tag -d v1.3.6
+#   git push origin --delete v1.3.6
+#   git tag v1.3.6
+#   git push origin v1.3.6
 
 on:
   push:
@@ -16,7 +24,9 @@ on:
 
 jobs:
   release-windows:
+    name: Build & Publish Windows Installer
     runs-on: windows-latest
+    timeout-minutes: 30
 
     steps:
       - uses: actions/checkout@v4
@@ -29,29 +39,33 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build app
+      - name: Build app (Vite + server bundle)
         run: npm run build
         env:
           CI: true
 
-      - name: Package installer
+      - name: Package & publish installer
+        # electron-builder reads publish config from electron/electron-builder.yml.
+        # --publish always → creates/updates the GitHub Release and uploads assets.
         run: npx electron-builder --win -c electron/electron-builder.yml --publish always
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
-          HOMESTREAM_GH_OWNER: ${{ secrets.GH_OWNER }}
-          HOMESTREAM_GH_REPO: ${{ secrets.GH_REPO }}
-          # Code signing — uncomment when WIN_CSC_LINK secret is added (v1.2)
+          # Owner/repo — fall back to the current repo context if secrets aren't set
+          HOMESTREAM_GH_OWNER: ${{ secrets.GH_OWNER || github.repository_owner }}
+          HOMESTREAM_GH_REPO: ${{ secrets.GH_REPO || github.event.repository.name }}
+          # Code signing — uncomment when WIN_CSC_LINK secret is added
           # WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
           # WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
 
-      # Upload the installer as a GitHub Actions artifact as a safety net.
-      # If the GitHub Release publish step fails for any reason, the .exe is
-      # still downloadable from the Actions run for 30 days.
+      # Safety net: upload the installer as an Actions artifact even if the
+      # GitHub Release publish step fails (e.g. token scope issue).
       - name: Upload installer artifact
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: HomeStream-Windows-Installer
-          path: dist-electron/*.exe
+          name: HomeStream-Windows-Installer-${{ github.ref_name }}
+          path: |
+            dist-electron/*.exe
+            dist-electron/*.yml
           retention-days: 30
           if-no-files-found: warn

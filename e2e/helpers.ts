@@ -17,22 +17,49 @@ import { type Page, expect } from '@playwright/test';
 export const TEST_PASSWORD = process.env.E2E_PASSWORD ?? 'homestream';
 
 /**
- * Wait for the React app shell to be mounted and hydrated.
- * Waits for auth check to complete so the app renders actual content
- * (not the blank null state while authenticated === null).
+ * Wait for the React app shell to be mounted and auth check to resolve.
+ *
+ * The AuthGate renders `null` while `authenticated === null` (checking).
+ * We must wait for it to resolve before asserting anything — otherwise all
+ * tests fail because the DOM is blank.
+ *
+ * Strategy: wait for ANY of the known post-auth-check selectors to appear:
+ *   - [data-testid="login-gate"]  → password required, not yet logged in
+ *   - [data-testid="app-ready"]   → app is ready (authenticated)
+ *   - nav                         → header nav (authenticated)
+ *   - main                        → main content area (authenticated)
+ *   - h1                          → any page heading (authenticated)
+ *   - input[type="password"]      → login gate without testid
+ *   - [data-setup-wizard]         → setup wizard is showing
+ *
+ * Falls back gracefully — if none appear within 12s, we continue anyway
+ * so individual tests can make their own assertions.
  */
 export async function waitForApp(page: Page) {
-  await page.waitForSelector('#root', { state: 'attached' });
-  // Wait for auth check to resolve — the app renders null while checking.
-  // We wait for ANY visible content: login gate, setup page, or main nav.
-  await page.waitForFunction(() => {
-    const root = document.getElementById('root');
-    if (!root) return false;
-    // App has rendered something meaningful (not blank)
-    return root.children.length > 0 && (root.textContent?.trim().length ?? 0) > 0;
-  }, { timeout: 10_000 }).catch(() => {});
-  // Small extra tick for React state to settle
-  await page.waitForTimeout(200);
+  // Step 1: wait for #root to be in the DOM
+  await page.waitForSelector('#root', { state: 'attached', timeout: 15_000 }).catch(() => {});
+
+  // Step 2: wait for auth check to resolve — any meaningful content
+  const POST_AUTH_SELECTORS = [
+    '[data-testid="login-gate"]',
+    '[data-testid="app-ready"]',
+    'nav',
+    'main',
+    'h1',
+    'input[type="password"]',
+    '[data-setup-wizard]',
+    'header',
+  ].join(', ');
+
+  await page.waitForSelector(POST_AUTH_SELECTORS, {
+    state: 'visible',
+    timeout: 12_000,
+  }).catch(() => {
+    // Timed out — app may be in an unexpected state; let the test assert
+  });
+
+  // Step 3: tiny tick for React state to fully settle after selector appears
+  await page.waitForTimeout(150);
 }
 
 /**

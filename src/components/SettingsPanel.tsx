@@ -353,6 +353,14 @@ export default function SettingsPanel({ onOpenSecurity, onOpenDebug, forceOpen, 
   // Health badge for debug button
   const [healthStatus, setHealthStatus] = useState<'ok' | 'warn' | 'error' | null>(null);
 
+  // VPN bind state (Settings panel quick-bind)
+  const [vpnInterfaces, setVpnInterfaces] = useState<{ name: string; address: string; likelyVpn: boolean; internal: boolean; family: string }[]>([]);
+  const [vpnCurrentInterface, setVpnCurrentInterface] = useState<string | null>(null);
+  const [vpnSelectedInterface, setVpnSelectedInterface] = useState<string>('');
+  const [vpnBindState, setVpnBindState] = useState<'idle' | 'saving' | 'ok' | 'error'>('idle');
+  const [vpnBindMsg, setVpnBindMsg] = useState('');
+  const [vpnLoaded, setVpnLoaded] = useState(false);
+
   // Load current keys when panel opens
   useEffect(() => {
     if (!open || apiKeysLoaded) return;
@@ -409,6 +417,50 @@ export default function SettingsPanel({ onOpenSecurity, onOpenDebug, forceOpen, 
       })
       .catch(() => {});
   }, [open, healthStatus]);
+
+  // Load VPN interfaces + current binding when panel opens
+  useEffect(() => {
+    if (!open || vpnLoaded) return;
+    setVpnLoaded(true);
+    // Load current binding from setup config
+    fetch('/api/setup')
+      .then(r => r.json())
+      .then((data: { vpnInterface?: string | null }) => {
+        const current = data.vpnInterface ?? null;
+        setVpnCurrentInterface(current);
+        setVpnSelectedInterface(current ?? '');
+      })
+      .catch(() => {});
+    // Load available adapters
+    fetch('/api/vpn/interfaces')
+      .then(r => r.json())
+      .then((data: { interfaces: { name: string; address: string; likelyVpn: boolean; internal: boolean; family: string }[] }) => {
+        setVpnInterfaces((data.interfaces ?? []).filter(i => !i.internal && i.family === 'IPv4'));
+      })
+      .catch(() => {});
+  }, [open, vpnLoaded]);
+
+  const handleVpnBind = async () => {
+    setVpnBindState('saving');
+    setVpnBindMsg('');
+    try {
+      const res = await fetch('/api/vpn/bind', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ interface: vpnSelectedInterface || null }),
+      });
+      const data = await res.json() as { ok: boolean; message: string };
+      setVpnBindState(data.ok ? 'ok' : 'error');
+      setVpnBindMsg(data.message);
+      if (data.ok) {
+        setVpnCurrentInterface(vpnSelectedInterface || null);
+        toast.success(vpnSelectedInterface ? 'VPN kill-switch enabled' : 'VPN binding cleared');
+      }
+    } catch {
+      setVpnBindState('error');
+      setVpnBindMsg('Could not reach server');
+    }
+  };
 
   const handleScanLibrary = async () => {
     setScanning(true);
@@ -1154,6 +1206,70 @@ export default function SettingsPanel({ onOpenSecurity, onOpenDebug, forceOpen, 
                       </div>
                     </a>
                     <BackupRestoreButton />
+                  </div>
+                </div>
+
+                {/* ── 8.5. VPN Kill-Switch ── */}
+                <div className="border-t border-border/50">
+                  <SectionHeader icon={WifiOff} label="VPN Kill-Switch" />
+                  <div className="px-4 pb-4 flex flex-col gap-3">
+                    <p className="text-[11px] text-muted-foreground leading-relaxed">
+                      Lock downloads to your VPN adapter. If the VPN disconnects, all downloads pause automatically so your real IP is never exposed.
+                    </p>
+
+                    {/* Current binding status */}
+                    {vpnCurrentInterface ? (
+                      <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-green-500/10 border border-green-500/20">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-green-400 shrink-0" />
+                        <p className="text-[11px] text-green-300">
+                          Kill-switch active — bound to <span className="font-mono font-semibold">{vpnCurrentInterface}</span>
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/40 border border-border">
+                        <WifiOff className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                        <p className="text-[11px] text-muted-foreground">No VPN binding — downloads use any available interface</p>
+                      </div>
+                    )}
+
+                    {/* Adapter selector */}
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[10px] font-medium text-muted-foreground">VPN Adapter</label>
+                      <select
+                        value={vpnSelectedInterface}
+                        onChange={e => { setVpnSelectedInterface(e.target.value); setVpnBindState('idle'); setVpnBindMsg(''); }}
+                        className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary"
+                      >
+                        <option value="">— Disable kill-switch —</option>
+                        {vpnInterfaces.map(i => (
+                          <option key={`${i.name}-${i.address}`} value={i.name}>
+                            {i.likelyVpn ? '🔒 ' : ''}{i.name} ({i.address})
+                          </option>
+                        ))}
+                      </select>
+                      {vpnInterfaces.length === 0 && (
+                        <p className="text-[10px] text-muted-foreground">No adapters detected — connect your VPN first, then reopen Settings.</p>
+                      )}
+                    </div>
+
+                    <button
+                      onClick={handleVpnBind}
+                      disabled={vpnBindState === 'saving' || vpnSelectedInterface === (vpnCurrentInterface ?? '')}
+                      className="flex items-center justify-center gap-1.5 py-2 rounded-lg bg-muted hover:bg-muted/80 text-foreground text-xs font-medium transition-colors disabled:opacity-40"
+                    >
+                      {vpnBindState === 'saving'
+                        ? <><Loader2 className="w-3.5 h-3.5 animate-spin" />Saving…</>
+                        : vpnBindState === 'ok'
+                          ? <><CheckCircle2 className="w-3.5 h-3.5 text-green-400" />Saved</>
+                          : <><WifiOff className="w-3.5 h-3.5" />{vpnSelectedInterface ? 'Apply VPN Binding' : 'Clear VPN Binding'}</>
+                      }
+                    </button>
+
+                    {vpnBindMsg && (
+                      <p className={`text-[11px] ${vpnBindState === 'error' ? 'text-destructive' : 'text-green-400'}`}>
+                        {vpnBindMsg}
+                      </p>
+                    )}
                   </div>
                 </div>
 

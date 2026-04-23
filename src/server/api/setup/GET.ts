@@ -77,6 +77,9 @@ export default async function handler(req: Request, res: Response) {
     hasAdminPassword: !!config.adminPassword,
     hasOmdbKey: !!config.omdbApiKey,
     hasGoogleAiKey: !!config.googleAiApiKey,
+    // VPN binding — returned so the Settings panel can show the current bound interface
+    vpnInterface: config.vpnInterface ?? null,
+    vpnKillSwitch: config.vpnKillSwitch ?? false,
     // FFmpeg availability — shown in setup wizard and settings
     ffmpeg,
     // Nested config object for the Settings panel API Keys section
