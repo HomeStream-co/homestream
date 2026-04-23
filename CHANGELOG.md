@@ -7,6 +7,37 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.3.7] — 2026-04-23
+
+### Fixed
+
+#### VPN Kill-Switch — Settings Panel
+- `POST /api/vpn/bind`: kill-switch monitor now restarts immediately after rebind so the new interface is enforced without a server restart
+- `GET /api/setup`: confirmed `vpnInterface` and `vpnKillSwitch` are returned so the Settings panel loads the current binding on open
+
+#### CI / Release Workflow
+- `e2e.yml`: `Run E2E tests` step now passes `SETUP_COMPLETE=true`, `E2E_PASSWORD`, and `NODE_ENV=test` env vars — previously these were only set at the job level and not forwarded to the step
+- `release.yml`: `GH_OWNER`/`GH_REPO` now fall back to `github.repository_owner` / `github.event.repository.name` if secrets aren't set — release no longer fails when only `GH_TOKEN` is configured
+- `electron-builder.yml`: publish config `owner` was hardcoded; now uses `${HOMESTREAM_GH_OWNER}` env var consistent with `extraMetadata`
+
+#### Electron Control Panel
+- "Check for Updates" button added to action bar (always visible, not just when update is available)
+- Update panel messaging: "No reinstall needed" / "Restart & Update" (was "Restart & Install")
+- `differentialPackage: true` in NSIS config — delta updates download only the diff (~a few MB), not the full installer
+
+### Added
+
+#### E2E Test Coverage (80 total, up from 77)
+- `e2e/profiles.spec.ts` — 6 tests: page loads, heading visible, no 404, no crash
+- `e2e/discover.spec.ts` — 7 tests: page loads, 4 tabs present, each tab clickable without crash
+- `e2e/setup-wizard.spec.ts` — 5 tests: page loads, wizard content visible, navigation buttons present
+
+### Tests
+- 867 unit tests passing (48 files) — unchanged
+- 80 Playwright E2E tests across 9 spec files (CI-ready)
+
+---
+
 ## [1.3.6] — 2026-04-23
 
 ### Fixed
