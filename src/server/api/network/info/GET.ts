@@ -7,10 +7,8 @@
  */
 import type { Request, Response } from 'express';
 import os from 'os';
-import { requireAuth } from '../../../authMiddleware.js';
 
 export default function handler(_req: Request, res: Response) {
-  if (!requireAuth(_req, res)) return;
   const hostname = os.hostname();
   const interfaces = os.networkInterfaces();
 

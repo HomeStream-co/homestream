@@ -54,34 +54,39 @@ const SORT_OPTIONS = [
 // Scan with your phone → opens the remote instantly.
 
 function RemoteQRWidget() {
-  const [qr, setQr] = useState<{ url: string; qr: string } | null>(null);
+  const [data, setData] = useState<{ url: string; qr: string; lanIP?: string; port?: string } | null>(null);
   const [qrError, setQrError] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [copiedIP, setCopiedIP] = useState(false);
+
+  const remoteUrl = data?.url ?? `http://${window.location.hostname}:3000/remote`;
+  const lanIP     = data?.lanIP ?? window.location.hostname;
+  const port      = data?.port  ?? '3000';
 
   function copyUrl() {
-    if (!qr) return;
-    navigator.clipboard.writeText(qr.url).then(() => {
+    navigator.clipboard.writeText(remoteUrl).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     });
   }
 
+  function copyIP() {
+    navigator.clipboard.writeText(lanIP).then(() => {
+      setCopiedIP(true);
+      setTimeout(() => setCopiedIP(false), 2000);
+    });
+  }
+
   useEffect(() => {
     fetch('/api/remote/qr?format=svg')
-      .then(r => {
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        return r.json();
-      })
-      .then((data: { url?: string; qr?: string }) => {
-        if (data?.url && data?.qr) setQr({ url: data.url, qr: data.qr });
+      .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
+      .then((d: { url?: string; qr?: string; lanIP?: string; port?: string }) => {
+        if (d?.url && d?.qr) setData({ url: d.url, qr: d.qr, lanIP: d.lanIP, port: d.port });
         else setQrError(true);
       })
       .catch(() => setQrError(true));
   }, []);
-
-  // Show the button even if QR failed — clicking will show the URL fallback
-  const remoteUrl = qr?.url ?? `${window.location.protocol}//${window.location.hostname}:${window.location.port || 3000}/remote`;
 
   return (
     <div className="fixed bottom-6 right-6 z-40 flex flex-col items-end gap-2">
@@ -92,47 +97,58 @@ function RemoteQRWidget() {
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.85, y: 10 }}
             transition={{ duration: 0.2 }}
-            className="bg-card border border-border rounded-2xl p-4 shadow-2xl flex flex-col items-center gap-3 w-56"
+            className="bg-card border border-border rounded-2xl p-4 shadow-2xl flex flex-col items-center gap-3 w-64"
           >
+            {/* Header */}
             <div className="flex items-center gap-2 w-full">
               <Smartphone className="w-4 h-4 text-primary flex-shrink-0" />
               <p className="text-xs font-semibold text-foreground">Phone Remote</p>
-              <button
-                onClick={() => setExpanded(false)}
-                className="ml-auto text-muted-foreground hover:text-foreground transition-colors"
-              >
+              <button onClick={() => setExpanded(false)} className="ml-auto text-muted-foreground hover:text-foreground transition-colors">
                 <X className="w-3.5 h-3.5" />
               </button>
             </div>
+
             {/* QR code or fallback */}
-            {qr && !qrError ? (
+            {data && !qrError ? (
               <div
-                className="w-36 h-36 [&_svg]:w-full [&_svg]:h-full rounded-xl overflow-hidden bg-white p-1"
-                dangerouslySetInnerHTML={{ __html: (qr.qr ?? '').replace(/fill="none"/g, 'fill="#ffffff"') }}
+                className="w-40 h-40 [&_svg]:w-full [&_svg]:h-full rounded-xl overflow-hidden bg-white p-2 flex-shrink-0"
+                dangerouslySetInnerHTML={{ __html: data.qr }}
               />
             ) : (
-              <div className="w-36 h-36 rounded-xl bg-muted flex flex-col items-center justify-center gap-2 text-center px-3">
-                <Smartphone className="w-6 h-6 text-muted-foreground" />
-                <p className="text-[10px] text-muted-foreground leading-tight">Open the URL below on your phone</p>
+              <div className="w-40 h-40 rounded-xl bg-muted flex flex-col items-center justify-center gap-2 text-center px-3">
+                <QrCode className="w-8 h-8 text-muted-foreground/40" />
+                <p className="text-[10px] text-muted-foreground leading-tight">Type the address below on your phone</p>
               </div>
             )}
-            <p className="text-[10px] text-muted-foreground text-center leading-relaxed">
-              {qr && !qrError ? 'Scan with your phone camera to open the remote instantly' : 'Type this address on your phone'}
-            </p>
 
-            {/* URL — tap to copy */}
+            {data && !qrError && (
+              <p className="text-[10px] text-muted-foreground text-center leading-relaxed -mt-1">
+                Scan with your phone camera
+              </p>
+            )}
+
+            {/* LAN IP — big and easy to read for TV/phone typing */}
+            <div className="w-full rounded-xl border border-border bg-muted/50 px-3 py-2.5">
+              <p className="text-[10px] text-muted-foreground mb-1 uppercase tracking-wider font-medium">Server address</p>
+              <div className="flex items-center gap-2">
+                <code className="flex-1 text-sm font-mono font-bold text-foreground tracking-wide">{lanIP}</code>
+                <button onClick={copyIP} title="Copy IP" className="text-muted-foreground hover:text-foreground transition-colors flex-shrink-0">
+                  {copiedIP ? <Check className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
+                </button>
+              </div>
+              <p className="text-[10px] text-muted-foreground mt-0.5">Port: {port}</p>
+            </div>
+
+            {/* Full URL — copy */}
             <button
               onClick={copyUrl}
-              title="Tap to copy"
+              title="Copy full URL"
               className="w-full flex items-center gap-1.5 bg-muted hover:bg-muted/80 rounded-lg px-2.5 py-2 transition-colors group"
             >
-              <code className="flex-1 text-[10px] text-muted-foreground truncate text-left font-mono">
-                {remoteUrl}
-              </code>
+              <code className="flex-1 text-[10px] text-muted-foreground truncate text-left font-mono">{remoteUrl}</code>
               {copied
                 ? <Check className="w-3 h-3 text-green-400 flex-shrink-0" />
-                : <Copy className="w-3 h-3 text-muted-foreground flex-shrink-0 group-hover:text-foreground transition-colors" />
-              }
+                : <Copy className="w-3 h-3 text-muted-foreground flex-shrink-0 group-hover:text-foreground transition-colors" />}
             </button>
 
             <a
