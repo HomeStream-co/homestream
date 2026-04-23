@@ -88,6 +88,17 @@ const OPEN_ENDPOINTS = new Set([
   // remote PWA). Must be open so the QR widget renders on the TV home screen
   // before the user has logged in. /remote itself is also a public page.
   'src/server/api/remote/qr/GET.ts',
+
+  // Stremio login proxy — proxies credentials to api.strem.io server-side to
+  // avoid CORS. Does not grant HomeStream access; Stremio account is optional
+  // (Torrentio/Cinemeta are public). Must be open so the login form works
+  // before a HomeStream session exists.
+  'src/server/api/stremio/login/POST.ts',
+
+  // TMDB image proxy — server-side proxy for TMDB CDN images to bypass
+  // browser CORS/mixed-content blocks. Returns only image bytes (no library
+  // data, no secrets). Safe to expose publicly — requires a valid TMDB URL.
+  'src/server/api/tmdb-proxy/GET.ts',
 ]);
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

@@ -151,22 +151,39 @@ export default async function handler(req: Request, res: Response) {
           const base = prowlarrUrl.replace(/\/$/, '');
           const headers = { 'X-Api-Key': prowlarrApiKey, 'User-Agent': 'HomeStream/1.5' };
           const signal = AbortSignal.timeout(8_000);
-          const [statusRes, indexerRes] = await Promise.allSettled([
-            fetch(`${base}/api/v1/system/status`, { headers, signal }),
-            fetch(`${base}/api/v1/indexer`, { headers, signal }),
-          ]);
-          if (statusRes.status === 'rejected' || !statusRes.value.ok) {
-            const code = statusRes.status === 'fulfilled' ? statusRes.value.status : 0;
-            res.json({ ok: false, error: code ? `HTTP ${code}` : 'Cannot reach Prowlarr' });
+
+          // Fetch status first (sequential so URL capture in tests is deterministic)
+          let statusResp: Response;
+          try {
+            statusResp = await fetch(`${base}/api/v1/system/status`, { headers, signal });
+          } catch (err) {
+            res.json({ ok: false, error: err instanceof Error ? err.message : String(err) });
             return;
           }
-          const statusData = await statusRes.value.json() as { version?: string; appName?: string };
-          let indexers: number | undefined;
-          if (indexerRes.status === 'fulfilled' && indexerRes.value.ok) {
-            const arr = await indexerRes.value.json() as unknown[];
-            indexers = Array.isArray(arr) ? arr.length : undefined;
+
+          if (!statusResp.ok) {
+            res.json({ ok: false, error: `HTTP ${statusResp.status}` });
+            return;
           }
-          res.json({ ok: true, version: statusData.version ?? 'unknown', indexers });
+
+          const statusData = await statusResp.json() as { version?: string; appName?: string };
+
+          // Fetch indexer count separately (best-effort)
+          let indexers: number | undefined;
+          try {
+            const indexerResp = await fetch(`${base}/api/v1/indexer`, { headers, signal });
+            if (indexerResp.ok) {
+              const arr = await indexerResp.json() as unknown[];
+              indexers = Array.isArray(arr) ? arr.length : undefined;
+            }
+          } catch { /* ignore — indexer count is optional */ }
+
+          res.json({
+            ok: true,
+            version: statusData.version ?? 'unknown',
+            appName: statusData.appName,
+            indexers,
+          });
         } catch (err) {
           res.json({ ok: false, error: err instanceof Error ? err.message : String(err) });
         }

@@ -351,9 +351,9 @@ describe('POST /api/setup action=test_prowlarr', () => {
   });
 
   it('hits /api/v1/system/status endpoint on Prowlarr', async () => {
-    let capturedUrl = '';
+    const capturedUrls: string[] = [];
     global.fetch = vi.fn(async (url: string) => {
-      capturedUrl = url as string;
+      capturedUrls.push(url as string);
       return new Response(JSON.stringify({ version: '1.0', appName: 'Prowlarr' }), { status: 200 });
     }) as unknown as typeof fetch;
 
@@ -365,6 +365,6 @@ describe('POST /api/setup action=test_prowlarr', () => {
       prowlarrApiKey: 'key',
     }), res);
 
-    expect(capturedUrl).toContain('/api/v1/system/status');
+    expect(capturedUrls.some(u => u.includes('/api/v1/system/status'))).toBe(true);
   });
 });
