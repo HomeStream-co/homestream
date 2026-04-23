@@ -18,7 +18,7 @@ jobs:
   release-windows:
     name: Build & Publish Windows Installer
     runs-on: windows-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
 
     steps:
       - uses: actions/checkout@v4
@@ -28,63 +28,79 @@ jobs:
           node-version: '22'
           cache: 'npm'
 
+      # ── Install ────────────────────────────────────────────────────────────
       - name: Install dependencies
         run: npm ci
+        env:
+          # Suppress optional native rebuild failures (bufferutil, utf-8-validate)
+          npm_config_optional: true
 
-      # Delete any existing release for this tag so electron-builder can
-      # create it fresh. This handles the re-tag cycle cleanly — without this,
-      # electron-builder silently fails to upload assets when the release
-      # already exists (even as a draft).
-      - name: Delete existing release (if any)
+      # ── Delete existing release so electron-builder can create it fresh ───
+      - name: Delete existing GitHub Release (if any)
+        shell: bash
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
-        shell: bash
         run: |
           TAG="${{ github.ref_name }}"
-          RELEASE_ID=$(curl -s -H "Authorization: token $GH_TOKEN" \
-            "https://api.github.com/repos/${{ github.repository }}/releases/tags/$TAG" \
+          echo "Checking for existing release for tag: $TAG"
+          RESPONSE=$(curl -s -H "Authorization: token $GH_TOKEN" \
+            "https://api.github.com/repos/${{ github.repository }}/releases/tags/$TAG")
+          echo "API response: $RESPONSE" | head -5
+          RELEASE_ID=$(echo "$RESPONSE" \
             | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('id',''))" 2>/dev/null || true)
-          if [ -n "$RELEASE_ID" ] && [ "$RELEASE_ID" != "None" ]; then
+          if [ -n "$RELEASE_ID" ] && [ "$RELEASE_ID" != "None" ] && [ "$RELEASE_ID" != "" ]; then
             echo "Deleting existing release id=$RELEASE_ID for tag $TAG"
             curl -s -X DELETE -H "Authorization: token $GH_TOKEN" \
               "https://api.github.com/repos/${{ github.repository }}/releases/$RELEASE_ID"
+            echo "Deleted."
           else
             echo "No existing release found for $TAG — proceeding"
           fi
 
+      # ── Build ──────────────────────────────────────────────────────────────
       - name: Build app (Vite + server bundle)
         run: npm run build
         env:
           CI: true
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
 
+      # ── Verify artifacts ───────────────────────────────────────────────────
       - name: Verify build artifacts
         shell: bash
         run: |
-          echo "=== dist/ contents ==="
-          ls -lh dist/ || echo "dist/ missing!"
+          echo "=== dist/ top-level ==="
+          ls -lh dist/ || { echo "ERROR: dist/ missing"; exit 1; }
+          echo ""
           echo "=== dist/client/ ==="
-          ls dist/client/ | head -10 || echo "dist/client/ missing!"
+          ls dist/client/ | head -15 || { echo "ERROR: dist/client/ missing"; exit 1; }
+          echo ""
           echo "=== server bundle ==="
-          ls -lh dist/server.bundle.cjs || echo "server.bundle.cjs MISSING — build failed"
-          if [ ! -f dist/server.bundle.cjs ]; then
-            echo "ERROR: server bundle not produced — aborting release"
+          if [ -f dist/server.bundle.cjs ]; then
+            ls -lh dist/server.bundle.cjs
+            echo "✓ server.bundle.cjs present"
+          else
+            echo "ERROR: dist/server.bundle.cjs MISSING — build failed"
             exit 1
           fi
+          echo ""
+          echo "=== sourcemap (optional) ==="
+          ls -lh dist/server.bundle.cjs.map 2>/dev/null && echo "✓ sourcemap present" || echo "(no sourcemap — OK)"
 
-      - name: Package & publish installer
-        # Runs on windows-latest — NSIS produces a proper .exe installer.
-        # --publish always → creates the GitHub Release and uploads assets.
+      # ── Package & publish ──────────────────────────────────────────────────
+      - name: Package & publish Windows installer
+        # --publish always → creates the GitHub Release and uploads the .exe
         run: npx electron-builder --win --config electron/electron-builder.yml --config.win.target=nsis --publish always
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          DEBUG: electron-builder
           # Code signing — uncomment when WIN_CSC_LINK secret is added:
           # WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
           # WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
 
-      # Safety net: upload the installer as an Actions artifact even if the
-      # GitHub Release publish step fails.
-      - name: Upload installer artifact
+      # ── Safety-net artifact upload ─────────────────────────────────────────
+      # Uploads the .exe to Actions artifacts even if the GitHub Release
+      # publish step fails — so you can always download it manually.
+      - name: Upload installer artifact (safety net)
         if: always()
         uses: actions/upload-artifact@v4
         with:
