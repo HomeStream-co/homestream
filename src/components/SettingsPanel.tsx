@@ -22,6 +22,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Settings } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTheme } from '@/context/ThemeContext';
+import { useProfile } from '@/context/ProfileContext';
 
 import { ConfirmDialog, type ConfirmDialogState } from './settings/shared';
 import SettingsAppearance       from './settings/SettingsAppearance';
@@ -53,6 +54,7 @@ export default function SettingsPanel({
   onOpenSecurity, onOpenDebug, forceOpen, onClose,
 }: SettingsPanelProps) {
   const { activeTheme } = useTheme();
+  const { activeProfile } = useProfile();
   const [open, setOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
 
@@ -435,6 +437,7 @@ export default function SettingsPanel({
                   onSetAllocTv={setAllocTv}
                   onSaveAllocation={saveAllocation}
                 />
+                {!activeProfile?.restricted && (
                 <SettingsParentalControls
                   onClose={handleClose}
                   onOpenConfirm={openConfirm}
@@ -447,6 +450,7 @@ export default function SettingsPanel({
                   onSetPinConfirm={setPinConfirm}
                   onSetPinError={setPinError}
                 />
+                )}
                 <SettingsApiKeys
                   apiKeys={apiKeys}
                   apiKeysSavedState={apiKeysSavedState}

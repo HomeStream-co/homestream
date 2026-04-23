@@ -123,6 +123,33 @@ export default function StepOptional({
     }
   };
 
+  const testProwlarr = async () => {
+    setProwlarrTest('testing');
+    setProwlarrTestMsg('');
+    try {
+      const res = await fetch('/api/setup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'test_prowlarr',
+          prowlarrUrl: form.prowlarrUrl,
+          prowlarrApiKey: form.prowlarrApiKey,
+        }),
+      });
+      const data = await res.json() as { ok: boolean; version?: string; appName?: string; error?: string };
+      if (data.ok) {
+        setProwlarrTest('ok');
+        setProwlarrTestMsg(`${data.appName ?? 'Prowlarr'} v${data.version ?? '?'} — connected`);
+      } else {
+        setProwlarrTest('error');
+        setProwlarrTestMsg(data.error ?? 'Connection failed');
+      }
+    } catch {
+      setProwlarrTest('error');
+      setProwlarrTestMsg('Cannot reach Prowlarr — is it running?');
+    }
+  };
+
   const saveAndContinue = async () => {
     setStatus(s => ({ ...s, qbit: s.qbit === 'ok' ? 'ok' : 'idle' }));
     // Save whatever was entered (even if not tested — user can skip)
@@ -136,6 +163,8 @@ export default function StepOptional({
         qbitPassword: form.qbitPassword,
         jellyfinUrl: form.jellyfinUrl,
         jellyfinApiKey: form.jellyfinApiKey,
+        prowlarrUrl: form.prowlarrUrl,
+        prowlarrApiKey: form.prowlarrApiKey,
       }),
     }).catch(() => {/* non-fatal */});
     onNext();
