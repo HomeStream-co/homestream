@@ -818,9 +818,20 @@ export default function DownloadsPage() {
   useEffect(() => {
     fetchData();
     fetchStorage();
-    const interval = setInterval(fetchData, 2000);
-    const storageInterval = setInterval(fetchStorage, 15000);
-    return () => { clearInterval(interval); clearInterval(storageInterval); };
+    const interval = setInterval(() => {
+      if (!document.hidden) fetchData();
+    }, 2000);
+    const storageInterval = setInterval(() => {
+      if (!document.hidden) fetchStorage();
+    }, 15000);
+    // Also resume immediately when the tab becomes visible again
+    const onVisible = () => { if (!document.hidden) { fetchData(); fetchStorage(); } };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      clearInterval(interval);
+      clearInterval(storageInterval);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
   }, [fetchData, fetchStorage]);
 
   const handleDelete = useCallback(async (hash: string, deleteFiles: boolean) => {

@@ -11,10 +11,10 @@
  */
 
 import Bonjour from 'bonjour-service';
-import { createRequire } from 'module';
 
-const _require = createRequire(import.meta.url);
-const pkg = _require('../../package.json') as { version: string };
+// Version baked in at build time — no runtime package.json read needed.
+declare const __APP_VERSION__: string;
+const APP_VERSION = (typeof __APP_VERSION__ !== 'undefined') ? __APP_VERSION__ : '0.0.0';
 
 let bonjour: InstanceType<typeof Bonjour> | null = null;
 
@@ -29,7 +29,7 @@ export function startMDNS(port: number = 3000): void {
       port,
       txt: {
         path: '/',
-        version: pkg.version,
+        version: APP_VERSION,
         description: 'HomeStream Media Server',
       },
     });

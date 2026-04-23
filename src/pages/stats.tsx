@@ -230,8 +230,15 @@ export default function StatsPage() {
 
   useEffect(() => {
     fetchStats();
-    pollRef.current = setInterval(() => fetchStats(true), 10_000);
-    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+    pollRef.current = setInterval(() => {
+      if (!document.hidden) fetchStats(true);
+    }, 10_000);
+    const onVisible = () => { if (!document.hidden) fetchStats(true); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
   }, [fetchStats]);
 
   if (loading) {

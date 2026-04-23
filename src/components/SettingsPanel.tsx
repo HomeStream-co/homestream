@@ -13,7 +13,7 @@
  *  9. Tools       — Security Center, HTTPS Setup, Setup Wizard, Debug Panel (always visible)
  * 10. Session     — sign out
  */
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import {
@@ -37,7 +37,7 @@ function fmtBytes(bytes: number): string {
 }
 
 // ── Small reusable toggle ─────────────────────────────────────────────────────
-function Toggle({
+const Toggle = memo(function Toggle({
   checked, onChange, label, description, icon: Icon,
 }: {
   checked: boolean;
@@ -65,17 +65,17 @@ function Toggle({
       </button>
     </label>
   );
-}
+});
 
 // ── Section header ────────────────────────────────────────────────────────────
-function SectionHeader({ icon: Icon, label }: { icon: React.ElementType; label: string }) {
+const SectionHeader = memo(function SectionHeader({ icon: Icon, label }: { icon: React.ElementType; label: string }) {
   return (
     <div className="flex items-center gap-2 px-4 pt-3 pb-1">
       <Icon className="w-3.5 h-3.5 text-primary" />
       <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-semibold">{label}</p>
     </div>
   );
-}
+});
 
 // ── Confirm Dialog ────────────────────────────────────────────────────────────
 function ConfirmDialog({
@@ -440,7 +440,7 @@ export default function SettingsPanel({ onOpenSecurity, onOpenDebug, forceOpen, 
       .catch(() => {});
   }, [open, vpnLoaded]);
 
-  const handleVpnBind = async () => {
+  const handleVpnBind = useCallback(async () => {
     setVpnBindState('saving');
     setVpnBindMsg('');
     try {
@@ -460,9 +460,9 @@ export default function SettingsPanel({ onOpenSecurity, onOpenDebug, forceOpen, 
       setVpnBindState('error');
       setVpnBindMsg('Could not reach server');
     }
-  };
+  }, [vpnSelectedInterface]);
 
-  const handleScanLibrary = async () => {
+  const handleScanLibrary = useCallback(async () => {
     setScanning(true);
     setScanResult(null);
     try {
@@ -480,9 +480,9 @@ export default function SettingsPanel({ onOpenSecurity, onOpenDebug, forceOpen, 
     } finally {
       setScanning(false);
     }
-  };
+  }, []);
 
-  const saveAllocation = async () => {
+  const saveAllocation = useCallback(async () => {
     setAllocSaving(true);
     setAllocSaved(false);
     try {
@@ -500,9 +500,9 @@ export default function SettingsPanel({ onOpenSecurity, onOpenDebug, forceOpen, 
     } finally {
       setAllocSaving(false);
     }
-  };
+  }, [allocMovies, allocTv]);
 
-  const saveApiKeys = async () => {
+  const saveApiKeys = useCallback(async () => {
     setApiKeysSaving(true);
     setApiKeysSaved(false);
     try {
@@ -516,7 +516,7 @@ export default function SettingsPanel({ onOpenSecurity, onOpenDebug, forceOpen, 
     } catch { /* ignore */ } finally {
       setApiKeysSaving(false);
     }
-  };
+  }, [apiKeys]);
 
   const testOmdb = async () => {
     const res = await fetch(`https://www.omdbapi.com/?t=Inception&apikey=${apiKeys.omdbApiKey}`);

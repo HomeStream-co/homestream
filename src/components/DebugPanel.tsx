@@ -417,13 +417,16 @@ function QuickFixesTab() {
 function SystemTab() {
   const [info, setInfo] = useState<SystemInfo | null>(null);
   const [loading, setLoading] = useState(false);
-  const [uptimeTick, setUptimeTick] = useState(0);
+  // Timestamp of when system info was fetched — used to compute live uptime
+  // without a setInterval (avoids a constant 1-second re-render cycle).
+  const fetchedAtRef = useRef<number>(0);
 
   const fetchInfo = useCallback(async () => {
     setLoading(true);
     try {
       const res = await fetch('/api/debug/system-info');
       const data = await res.json() as SystemInfo;
+      fetchedAtRef.current = Date.now();
       setInfo(data);
     } catch { /* ignore */ } finally {
       setLoading(false);
@@ -432,14 +435,10 @@ function SystemTab() {
 
   useEffect(() => { void fetchInfo(); }, [fetchInfo]);
 
-  // Tick uptime every second
-  useEffect(() => {
-    if (!info) return;
-    const t = setInterval(() => setUptimeTick(n => n + 1), 1000);
-    return () => clearInterval(t);
-  }, [info]);
-
-  const liveUptime = info ? info.uptime + uptimeTick : 0;
+  // Compute live uptime at render time — no interval needed.
+  const liveUptime = info
+    ? info.uptime + Math.floor((Date.now() - fetchedAtRef.current) / 1000)
+    : 0;
 
   const Row = ({ label, value, mono = false, color }: { label: string; value: string; mono?: boolean; color?: string }) => (
     <div className="flex items-center justify-between py-1.5 border-b border-border/30 last:border-0">

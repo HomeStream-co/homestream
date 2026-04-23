@@ -3,6 +3,10 @@ import react from "@vitejs/plugin-react";
 import path from "path";
 import * as esbuild from "esbuild";
 import apiRoutes from "vite-plugin-api-routes";
+import { readFileSync } from "fs";
+
+// Read version once at config load time — used in both Vite define and esbuild define.
+const pkg = JSON.parse(readFileSync(path.resolve(__dirname, "package.json"), "utf-8")) as { version: string };
 
 function serverBundlePlugin(): Plugin {
 	let built = false;
@@ -63,6 +67,17 @@ function serverBundlePlugin(): Plugin {
 				packages: "bundle",
 				sourcemap: true,
 				plugins: [externalizePlugin],
+				// Fix: server source files use import.meta.url for __dirname emulation
+				// and createRequire(import.meta.url). In CJS output, import.meta is
+				// undefined — this define replaces every occurrence at bundle time with
+				// a CJS-compatible equivalent so require('module').createRequire(...)
+				// and fileURLToPath(...) both receive a valid file URL string.
+				define: {
+					"import.meta.url": "require('url').pathToFileURL(__filename).href",
+					// Bake version so health/GET.ts and mdnsService.ts don't need
+					// createRequire just to read package.json.
+					__APP_VERSION__: JSON.stringify(pkg.version),
+				},
 			});
 
 			console.log("Server bundle created at dist/server.bundle.cjs");
@@ -75,6 +90,12 @@ const corsOrigins = ["*"];
 
 export default defineConfig(({ mode: _mode }) => ({
 	envPrefix: ["VITE_", "SITE_"],
+
+	define: {
+		// Bake version into both client and server bundles — avoids runtime
+		// package.json reads which require createRequire(import.meta.url).
+		__APP_VERSION__: JSON.stringify(pkg.version),
+	},
 
 	plugins: [
 		react(),

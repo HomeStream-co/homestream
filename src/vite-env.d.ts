@@ -14,3 +14,7 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv
 }
+
+// Injected at build time by Vite define + esbuild define.
+// Available in both client and server bundles.
+declare const __APP_VERSION__: string;

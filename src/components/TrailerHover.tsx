@@ -29,26 +29,45 @@ import { useMedia } from '@/context/MediaContext';
 
 // ── Trailer key cache ─────────────────────────────────────────────────────────
 const trailerCache = new Map<string, string | null>();
+// In-flight deduplication — prevents duplicate fetches for the same item
+// when multiple cards are hovered in quick succession (e.g. fast scrolling).
+const inFlight = new Map<string, Promise<string | null>>();
+// Max concurrent trailer fetches — prevents hammering TMDB on carousel scroll.
+let activeFetches = 0;
+const MAX_CONCURRENT_FETCHES = 2;
 
 async function fetchTrailerKey(item: MediaItem): Promise<string | null> {
   const cacheKey = `${item.id}`;
   if (trailerCache.has(cacheKey)) return trailerCache.get(cacheKey)!;
+  // Return existing in-flight promise if one is already running for this item
+  if (inFlight.has(cacheKey)) return inFlight.get(cacheKey)!;
+  // Throttle: if too many fetches are running, skip rather than queue
+  if (activeFetches >= MAX_CONCURRENT_FETCHES) return null;
 
-  try {
-    const params = new URLSearchParams({
-      title: item.title,
-      type: item.type === 'series' ? 'series' : 'movie',
-      ...(item.year ? { year: String(item.year) } : {}),
-    });
-    const res = await fetch(`/api/tmdb/trailer?${params}`);
-    const data = await res.json() as { trailerKey?: string | null };
-    const key = data.trailerKey ?? null;
-    trailerCache.set(cacheKey, key);
-    return key;
-  } catch {
-    trailerCache.set(cacheKey, null);
-    return null;
-  }
+  const promise = (async () => {
+    activeFetches++;
+    try {
+      const params = new URLSearchParams({
+        title: item.title,
+        type: item.type === 'series' ? 'series' : 'movie',
+        ...(item.year ? { year: String(item.year) } : {}),
+      });
+      const res = await fetch(`/api/tmdb/trailer?${params}`);
+      const data = await res.json() as { trailerKey?: string | null };
+      const key = data.trailerKey ?? null;
+      trailerCache.set(cacheKey, key);
+      return key;
+    } catch {
+      trailerCache.set(cacheKey, null);
+      return null;
+    } finally {
+      activeFetches--;
+      inFlight.delete(cacheKey);
+    }
+  })();
+
+  inFlight.set(cacheKey, promise);
+  return promise;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
