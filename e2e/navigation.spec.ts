@@ -15,15 +15,20 @@ import { test, expect } from '@playwright/test';
 import { login, waitForApp } from './helpers';
 
 const MAIN_ROUTES = [
-  { path: '/',            name: 'Home' },
-  { path: '/discover',   name: 'Discover' },
-  { path: '/downloads',  name: 'Downloads' },
-  { path: '/library',    name: 'Library' },
-  { path: '/profiles',   name: 'Profiles' },
-  { path: '/watchlist',  name: 'Watchlist' },
-  { path: '/history',    name: 'History' },
-  { path: '/stats',      name: 'Stats' },
-  { path: '/https-setup', name: 'HTTPS Setup' },
+  { path: '/',             name: 'Home' },
+  { path: '/browse',       name: 'Browse (alias)' },
+  { path: '/discover',     name: 'Discover' },
+  { path: '/downloads',    name: 'Downloads' },
+  { path: '/library',      name: 'Library' },
+  { path: '/movies',       name: 'Movies' },
+  { path: '/shows',        name: 'Shows' },
+  { path: '/profiles',     name: 'Profiles' },
+  { path: '/watchlist',    name: 'Watchlist' },
+  { path: '/history',      name: 'History' },
+  { path: '/stats',        name: 'Stats' },
+  { path: '/https-setup',  name: 'HTTPS Setup' },
+  { path: '/samsung-tv',   name: 'Samsung TV Setup' },
+  { path: '/remote',       name: 'Phone Remote PWA' },
 ];
 
 test.describe('Route smoke tests — all pages load without crashing', () => {

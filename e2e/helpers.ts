@@ -13,8 +13,16 @@
 
 import { type Page, expect } from '@playwright/test';
 
-/** Default test credentials — matches ADMIN_PASSWORD env var in dev */
-export const TEST_PASSWORD = process.env.E2E_PASSWORD ?? 'homestream';
+/**
+ * Default test credentials — matches ADMIN_PASSWORD env var in dev.
+ *
+ * IMPORTANT: use `|| 'homestream'` not `?? 'homestream'`.
+ * In CI, e2e.yml sets E2E_PASSWORD to '' (empty string) when the secret
+ * is not configured. `??` only catches null/undefined — it would leave
+ * TEST_PASSWORD as '' and break any test that tries to submit a password.
+ * `||` catches the empty-string case and falls back to 'homestream'.
+ */
+export const TEST_PASSWORD = process.env.E2E_PASSWORD || 'homestream';
 
 /**
  * Wait for the React app shell to be mounted and auth check to resolve.
