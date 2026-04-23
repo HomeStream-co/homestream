@@ -251,6 +251,11 @@ function cleanupOrphanedUploads(library: MediaRecord[]): void {
 
 
 
+export function runHlsPeriodicCleanup(): void {
+  console.log('[hls-cleanup] Running periodic HLS segment cleanup…');
+  cleanupHlsOrphans();
+}
+
 export function runStartupCleanup(): void {
   // ── HLS orphan cleanup ───────────────────────────────────────────────────────
   // Runs first so disk space is reclaimed before anything else.

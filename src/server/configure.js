@@ -294,4 +294,14 @@ export const serverListening = (server) => {
   }).catch(err => {
     console.warn('[downloads-ws] Failed to attach download broadcaster (non-fatal):', err.message);
   });
+
+  // Periodic HLS /tmp segment cleanup — every 6 hours.
+  // Catches segments from jobs whose 30-min idle timer never fired because
+  // the server ran continuously without a restart (e.g. always-on home server).
+  const SIX_HOURS_MS = 6 * 60 * 60 * 1000;
+  setInterval(() => {
+    import('./startupCleanup.js').then(({ runHlsPeriodicCleanup }) => {
+      runHlsPeriodicCleanup();
+    }).catch(() => { /* non-fatal */ });
+  }, SIX_HOURS_MS);
 };
