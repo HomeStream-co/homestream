@@ -55,6 +55,7 @@ const SORT_OPTIONS = [
 
 function RemoteQRWidget() {
   const [qr, setQr] = useState<{ url: string; qr: string } | null>(null);
+  const [qrError, setQrError] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
 
@@ -68,14 +69,19 @@ function RemoteQRWidget() {
 
   useEffect(() => {
     fetch('/api/remote/qr?format=svg')
-      .then(r => r.json())
+      .then(r => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
       .then((data: { url?: string; qr?: string }) => {
         if (data?.url && data?.qr) setQr({ url: data.url, qr: data.qr });
+        else setQrError(true);
       })
-      .catch(() => {});
+      .catch(() => setQrError(true));
   }, []);
 
-  if (!qr) return null;
+  // Show the button even if QR failed — clicking will show the URL fallback
+  const remoteUrl = qr?.url ?? `${window.location.protocol}//${window.location.hostname}:${window.location.port || 3000}/remote`;
 
   return (
     <div className="fixed bottom-6 right-6 z-40 flex flex-col items-end gap-2">
@@ -98,13 +104,20 @@ function RemoteQRWidget() {
                 <X className="w-3.5 h-3.5" />
               </button>
             </div>
-            {/* QR code */}
-            <div
-              className="w-36 h-36 [&_svg]:w-full [&_svg]:h-full rounded-xl overflow-hidden bg-white p-1"
-              dangerouslySetInnerHTML={{ __html: (qr.qr ?? '').replace(/fill="none"/g, 'fill="#ffffff"') }}
-            />
+            {/* QR code or fallback */}
+            {qr && !qrError ? (
+              <div
+                className="w-36 h-36 [&_svg]:w-full [&_svg]:h-full rounded-xl overflow-hidden bg-white p-1"
+                dangerouslySetInnerHTML={{ __html: (qr.qr ?? '').replace(/fill="none"/g, 'fill="#ffffff"') }}
+              />
+            ) : (
+              <div className="w-36 h-36 rounded-xl bg-muted flex flex-col items-center justify-center gap-2 text-center px-3">
+                <Smartphone className="w-6 h-6 text-muted-foreground" />
+                <p className="text-[10px] text-muted-foreground leading-tight">Open the URL below on your phone</p>
+              </div>
+            )}
             <p className="text-[10px] text-muted-foreground text-center leading-relaxed">
-              Scan with your phone camera to open the remote instantly
+              {qr && !qrError ? 'Scan with your phone camera to open the remote instantly' : 'Type this address on your phone'}
             </p>
 
             {/* URL — tap to copy */}
@@ -114,7 +127,7 @@ function RemoteQRWidget() {
               className="w-full flex items-center gap-1.5 bg-muted hover:bg-muted/80 rounded-lg px-2.5 py-2 transition-colors group"
             >
               <code className="flex-1 text-[10px] text-muted-foreground truncate text-left font-mono">
-                {qr.url}
+                {remoteUrl}
               </code>
               {copied
                 ? <Check className="w-3 h-3 text-green-400 flex-shrink-0" />
@@ -123,7 +136,7 @@ function RemoteQRWidget() {
             </button>
 
             <a
-              href={qr.url}
+              href={remoteUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="w-full text-center text-[10px] bg-primary/10 text-primary rounded-lg py-1.5 font-medium hover:bg-primary/20 transition-colors"
@@ -134,7 +147,7 @@ function RemoteQRWidget() {
         )}
       </AnimatePresence>
 
-      {/* Toggle button */}
+      {/* Toggle button — always visible */}
       <motion.button
         onClick={() => setExpanded(v => !v)}
         whileTap={{ scale: 0.92 }}

@@ -100,3 +100,18 @@
 html {
   scroll-behavior: smooth;
 }
+
+/* Ensure the app fills the full viewport — fixes "centered in middle" in iframe/TV */
+html, body {
+  width: 100%;
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
+}
+
+#app {
+  width: 100%;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
