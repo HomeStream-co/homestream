@@ -29,7 +29,12 @@
     "electron:publish": "npm run build && electron-builder --config electron/electron-builder.yml --publish always",
     "release": "bash scripts/release.sh",
     "release:minor": "bash scripts/release.sh minor",
-    "release:major": "bash scripts/release.sh major"
+    "release:major": "bash scripts/release.sh major",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:headed": "playwright test --headed",
+    "test:e2e:report": "playwright show-report playwright-report",
+    "test:e2e:debug": "playwright test --debug"
   },
   "dependencies": {
     "@dr.pogodin/react-helmet": "^3.0.5",
