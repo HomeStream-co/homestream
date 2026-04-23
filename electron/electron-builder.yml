@@ -76,6 +76,29 @@ extraResources:
     filter:
       - "ffmpeg"
       - "ffmpeg.exe"
+  # node_modules — required because the server bundle uses packages: "external"
+  # (to avoid esbuild mangling createRequire on Windows). All npm packages are
+  # excluded from the bundle and resolved at runtime via NODE_PATH set in main.cjs.
+  # We exclude electron itself (not needed at runtime) and heavy dev-only packages.
+  - from: node_modules
+    to: node_modules
+    filter:
+      - "!electron/**"
+      - "!electron-builder/**"
+      - "!esbuild/**"
+      - "!vite/**"
+      - "!vitest/**"
+      - "!@vitejs/**"
+      - "!@playwright/**"
+      - "!@testing-library/**"
+      - "!typescript/**"
+      - "!eslint/**"
+      - "!prettier/**"
+      - "!postcss/**"
+      - "!tailwindcss/**"
+      - "!autoprefixer/**"
+      - "!jsdom/**"
+      - "!tsx/**"
 
 # ── Windows ───────────────────────────────────────────────────────────────────
 win:

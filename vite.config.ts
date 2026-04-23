@@ -37,17 +37,6 @@ function serverBundlePlugin(): Plugin {
 				},
 			};
 
-			// Write the require-shim to a temp file so esbuild can `inject` it.
-			// Using inject (not banner) means esbuild sees our createRequire import
-			// BEFORE it processes bundled CJS modules, so it de-duplicates correctly
-			// instead of generating conflicting createRequireN helper variables.
-			const shimPath = path.resolve(__dirname, "dist", "_require-shim.mjs");
-			const fs1 = await import("fs");
-			fs1.writeFileSync(
-				shimPath,
-				`import { createRequire } from "module";\nglobalThis.require = globalThis.require ?? createRequire(import.meta.url);\n`
-			);
-
 			await esbuild.build({
 				entryPoints: [path.resolve(__dirname, "dist", "app.js")],
 				bundle: true,
@@ -55,18 +44,22 @@ function serverBundlePlugin(): Plugin {
 				target: "node22",
 				format: "esm",
 				outfile,
-				// Bundle everything so node_modules are inlined — no runtime
-				// dependency on a node_modules folder next to the binary.
-				packages: "bundle",
+				// packages: "external" — keeps all node_modules out of the bundle so
+				// esbuild never inlines CJS packages that use createRequire internally.
+				// This prevents the createRequireN mangling crash on Windows.
+				// node_modules are shipped alongside the binary via extraResources in
+				// electron-builder.yml and located at runtime via NODE_PATH (set in
+				// electron/main.cjs before forking the server process).
+				packages: "external",
 				sourcemap: true,
-				// inject provides the shim before bundling so esbuild de-duplicates
-				// createRequire imports rather than generating createRequireN helpers.
-				inject: [shimPath],
 				plugins: [externalizePlugin],
+				// Minimal banner: just a require() shim for any app-level code that
+				// calls require() directly. No createRequire aliasing — keep it simple
+				// so there is zero chance of conflicting with Node internals.
+				banner: {
+					js: `import { createRequire as __createRequire } from "module";\nconst require = __createRequire(import.meta.url);`,
+				},
 			});
-
-			// Clean up temp shim
-			try { fs1.unlinkSync(shimPath); } catch { /* ignore */ }
 
 			console.log("Server bundle created at dist/server.bundle.mjs");
 		},
