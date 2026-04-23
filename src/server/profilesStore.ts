@@ -71,7 +71,9 @@ export function readProfiles(): StoredProfile[] {
 }
 
 function writeProfiles(profiles: StoredProfile[]): void {
-  fs.writeFileSync(PROFILES_PATH, JSON.stringify(profiles, null, 2));
+  const tmp = PROFILES_PATH + '.tmp';
+  fs.writeFileSync(tmp, JSON.stringify(profiles, null, 2));
+  fs.renameSync(tmp, PROFILES_PATH);
 }
 
 // ── CRUD ──────────────────────────────────────────────────────────────────────

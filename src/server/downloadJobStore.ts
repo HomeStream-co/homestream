@@ -60,7 +60,9 @@ function enqueueWrite(updater: (current: PersistedJob[]) => PersistedJob[]): voi
   writeQueue = writeQueue.then(() => {
     const current = readRaw();
     const next = updater(current);
-    fs.writeFileSync(JOBS_PATH, JSON.stringify(next, null, 2));
+    const tmp = JOBS_PATH + '.tmp';
+    fs.writeFileSync(tmp, JSON.stringify(next, null, 2));
+    fs.renameSync(tmp, JOBS_PATH);
   }).catch(err => {
     console.error('[downloadJobStore] Write failed:', err);
   });

@@ -75,7 +75,9 @@ function enqueueWrite(updater: (current: ShowSubscription[]) => ShowSubscription
     .then(() => {
       const current = readRaw();
       const next = updater(current);
-      fs.writeFileSync(SUBS_PATH, JSON.stringify(next, null, 2));
+      const tmp = SUBS_PATH + '.tmp';
+      fs.writeFileSync(tmp, JSON.stringify(next, null, 2));
+      fs.renameSync(tmp, SUBS_PATH);
     })
     .catch(err => {
       console.error('[subscriptionStore] Write failed:', err);

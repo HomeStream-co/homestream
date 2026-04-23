@@ -26,8 +26,13 @@ vi.mock('fs', () => ({
     existsSync: () => mockFileExists,
     readFileSync: () => mockFileContent,
     writeFileSync: vi.fn((_path: string, data: string) => {
+      // Captures tmp writes; renameSync commits them
       mockFileContent = data;
       mockFileExists = true;
+    }),
+    renameSync: vi.fn((_src: string, _dest: string) => {
+      // Atomic rename: tmp → dest. In the mock, writeFileSync already
+      // captured the data, so renameSync is a no-op.
     }),
     // dataDir.ts calls mkdirSync to create the data directory on first access
     mkdirSync: vi.fn(),

@@ -87,7 +87,10 @@ function writeLog(entries: CrashEntry[]): void {
     // Ensure directory exists
     const dir = path.dirname(logPath);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(logPath, JSON.stringify(entries, null, 2));
+    // Atomic write: tmp → rename prevents partial-write corruption on crash
+    const tmp = logPath + '.tmp';
+    fs.writeFileSync(tmp, JSON.stringify(entries, null, 2));
+    fs.renameSync(tmp, logPath);
   } catch (writeErr) {
     // Last resort — stderr only, never throw from the crash logger itself
     process.stderr.write(`[crashLogger] Failed to write log: ${writeErr}\n`);

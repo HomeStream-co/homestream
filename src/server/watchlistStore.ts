@@ -53,7 +53,9 @@ let writeQueue: Promise<void> = Promise.resolve();
 
 function writeStore(store: WatchlistStore): Promise<void> {
   writeQueue = writeQueue.then(() => {
-    fs.writeFileSync(WATCHLIST_PATH, JSON.stringify(store, null, 2));
+    const tmp = WATCHLIST_PATH + '.tmp';
+    fs.writeFileSync(tmp, JSON.stringify(store, null, 2));
+    fs.renameSync(tmp, WATCHLIST_PATH);
   }).catch(err => {
     console.error('[watchlistStore] Write failed:', err);
   });

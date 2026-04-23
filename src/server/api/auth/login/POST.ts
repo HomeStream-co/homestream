@@ -117,16 +117,21 @@ export default async function handler(req: Request, res: Response) {
   if (storedPassword) {
     let valid = false;
 
-    if (isBcryptHash(storedPassword)) {
-      valid = await bcrypt.compare(password, storedPassword);
-    } else {
-      // Legacy plaintext — compare directly, then upgrade to bcrypt
-      valid = password === storedPassword;
-      if (valid) {
-        const hashed = await bcrypt.hash(password, 12);
-        writeConfig({ adminPassword: hashed });
-        console.log('[auth] Admin password upgraded to bcrypt hash');
+    try {
+      if (isBcryptHash(storedPassword)) {
+        valid = await bcrypt.compare(password, storedPassword);
+      } else {
+        // Legacy plaintext — compare directly, then upgrade to bcrypt
+        valid = password === storedPassword;
+        if (valid) {
+          const hashed = await bcrypt.hash(password, 12);
+          writeConfig({ adminPassword: hashed });
+          console.log('[auth] Admin password upgraded to bcrypt hash');
+        }
       }
+    } catch (err) {
+      console.error('[auth] bcrypt error during login:', err);
+      return res.status(500).json({ error: 'Authentication error. Please try again.' });
     }
 
     if (!valid) {

@@ -155,7 +155,9 @@ function writeQuarantineLog(entries: QuarantineEntry[]) {
   try {
     const p = getQuarantineLogPath();
     fs.mkdirSync(path.dirname(p), { recursive: true });
-    fs.writeFileSync(p, JSON.stringify(entries, null, 2), 'utf-8');
+    const tmp = p + '.tmp';
+    fs.writeFileSync(tmp, JSON.stringify(entries, null, 2), 'utf-8');
+    fs.renameSync(tmp, p);
   } catch (err) {
     console.error('[security] Failed to write quarantine log:', err);
   }

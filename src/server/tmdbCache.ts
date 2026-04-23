@@ -154,7 +154,10 @@ function readCache(key: string): TMDBCacheEntry | null {
 
 function writeCache(key: string, data: TMDBCacheEntry): void {
   try {
-    fs.writeFileSync(cacheFile(key), JSON.stringify(data, null, 2));
+    const dest = cacheFile(key);
+    const tmp = dest + '.tmp';
+    fs.writeFileSync(tmp, JSON.stringify(data, null, 2));
+    fs.renameSync(tmp, dest);
   } catch (err) {
     console.error('[tmdbCache] Failed to write cache:', err);
   }

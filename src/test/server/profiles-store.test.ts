@@ -36,10 +36,12 @@ vi.mock('fs', () => ({
     existsSync:    () => diskData !== null,
     readFileSync:  () => { if (diskData === null) throw new Error('ENOENT'); return diskData; },
     writeFileSync: (_p: string, data: string) => { diskData = data; },
+    renameSync:    (_src: string, _dest: string) => { /* no-op: writeFileSync already captured data */ },
   },
   existsSync:    () => diskData !== null,
   readFileSync:  () => { if (diskData === null) throw new Error('ENOENT'); return diskData; },
   writeFileSync: (_p: string, data: string) => { diskData = data; },
+  renameSync:    (_src: string, _dest: string) => { /* no-op */ },
 }));
 
 vi.mock('../../server/dataDir.js', () => ({
