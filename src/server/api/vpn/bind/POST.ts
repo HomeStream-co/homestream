@@ -13,7 +13,7 @@
  */
 import type { Request, Response } from 'express';
 import os from 'os';
-import { readConfig, writeConfig } from '../../../configStore.js';
+import { readConfig, writeConfig, isSetupComplete } from '../../../configStore.js';
 import { requireAuth } from '../../../authMiddleware.js';
 
 interface BindBody {
@@ -62,7 +62,11 @@ async function pushToQbit(
 }
 
 export default async function handler(req: Request, res: Response) {
-  if (!requireAuth(req, res)) return;  const { interface: iface } = req.body as BindBody;
+  // Allow unauthenticated access during the setup wizard (setup not yet complete).
+  // Once setup is done, a valid session cookie is required.
+  if (isSetupComplete() && !requireAuth(req, res)) return;
+
+  const { interface: iface } = req.body as BindBody;
 
   // Validate the interface exists if one was provided
   if (iface !== null && iface !== undefined) {
