@@ -684,27 +684,57 @@ export default function LibraryPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background pt-20 pb-16">
+    <div className="min-h-screen bg-background pb-16">
       <title>My Library — HomeStream</title>
+
+      {/* ── Cinematic page header ── */}
+      <div className="relative pt-24 pb-10 px-4 sm:px-6 lg:px-8 overflow-hidden">
+        {/* Subtle radial glow behind the heading */}
+        <div className="absolute inset-0 pointer-events-none">
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-primary/8 rounded-full blur-3xl" />
+        </div>
+        <div className="relative max-w-screen-2xl mx-auto">
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.45, ease: 'easeOut' as const }}
+          >
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-1 h-8 rounded-full bg-primary shadow-[0_0_12px_hsl(var(--primary)/0.6)]" />
+              <h1 className="text-4xl sm:text-5xl font-heading font-bold text-foreground tracking-tight">My Library</h1>
+            </div>
+            <p className="text-muted-foreground text-sm ml-4 pl-3 border-l border-border">
+              Drop any video format — HomeStream auto-transcodes to browser-ready MP4 with zero-latency seeking.
+            </p>
+          </motion.div>
+        </div>
+      </div>
+
       <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8">
 
-        <h1 className="text-4xl font-heading text-foreground mb-1">My Library</h1>
-        <p className="text-muted-foreground mb-8">
-          Drop any video format — HomeStream auto-transcodes to browser-ready MP4 with zero-latency seeking.
-        </p>
-
         {/* ── Upload Zone ── */}
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.1, ease: 'easeOut' as const }}
+        >
         <div
           onDragOver={e => { e.preventDefault(); setDragging(true); }}
           onDragLeave={() => setDragging(false)}
           onDrop={handleDrop}
           onClick={() => fileInputRef.current?.click()}
-          className={`relative border-2 border-dashed rounded-2xl p-12 text-center cursor-pointer transition-all mb-8 ${
+          className={`relative border-2 border-dashed rounded-2xl p-10 text-center cursor-pointer transition-all duration-300 mb-8 group ${
             dragging
-              ? 'border-primary bg-primary/10'
-              : 'border-border hover:border-primary/50 hover:bg-card/50'
+              ? 'border-primary bg-primary/8 shadow-[0_0_40px_hsl(var(--primary)/0.15)]'
+              : 'border-border hover:border-primary/50 hover:bg-card/60 hover:shadow-[0_0_30px_hsl(var(--primary)/0.08)]'
           }`}
         >
+          {/* Animated corner accents */}
+          <div className={`absolute top-3 left-3 w-4 h-4 border-t-2 border-l-2 rounded-tl-lg transition-colors duration-300 ${dragging ? 'border-primary' : 'border-border group-hover:border-primary/50'}`} />
+          <div className={`absolute top-3 right-3 w-4 h-4 border-t-2 border-r-2 rounded-tr-lg transition-colors duration-300 ${dragging ? 'border-primary' : 'border-border group-hover:border-primary/50'}`} />
+          <div className={`absolute bottom-3 left-3 w-4 h-4 border-b-2 border-l-2 rounded-bl-lg transition-colors duration-300 ${dragging ? 'border-primary' : 'border-border group-hover:border-primary/50'}`} />
+          <div className={`absolute bottom-3 right-3 w-4 h-4 border-b-2 border-r-2 rounded-br-lg transition-colors duration-300 ${dragging ? 'border-primary' : 'border-border group-hover:border-primary/50'}`} />
+
           <input
             ref={fileInputRef}
             type="file"
@@ -713,15 +743,27 @@ export default function LibraryPage() {
             className="hidden"
             onChange={e => handleFiles(e.target.files)}
           />
-          <Film className={`w-12 h-12 mx-auto mb-4 ${dragging ? 'text-primary' : 'text-muted-foreground'}`} />
-          <p className="text-lg font-medium text-foreground mb-1">Drop your video files here</p>
-          <p className="text-sm text-muted-foreground mb-3">or click to browse</p>
-          <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground">
-            <span>MP4 · MKV · AVI · MOV · WMV · M4V · TS · WebM · FLV · 3GP</span>
-            <span className="text-border">|</span>
-            <span className="flex items-center gap-1"><Zap className="w-3 h-3 text-primary" /> Auto-transcoded to H.264 faststart</span>
+          <motion.div
+            animate={dragging ? { scale: 1.1 } : { scale: 1 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+          >
+            <div className={`w-16 h-16 rounded-2xl mx-auto mb-4 flex items-center justify-center transition-colors duration-300 ${dragging ? 'bg-primary/20' : 'bg-muted group-hover:bg-primary/10'}`}>
+              <Film className={`w-8 h-8 transition-colors duration-300 ${dragging ? 'text-primary' : 'text-muted-foreground group-hover:text-primary'}`} />
+            </div>
+          </motion.div>
+          <p className="text-base font-semibold text-foreground mb-1">
+            {dragging ? 'Release to upload' : 'Drop your video files here'}
+          </p>
+          <p className="text-sm text-muted-foreground mb-4">or click to browse</p>
+          <div className="flex items-center justify-center gap-3 flex-wrap text-xs text-muted-foreground">
+            <span className="bg-muted/60 px-2.5 py-1 rounded-full">MP4 · MKV · AVI · MOV · WMV</span>
+            <span className="bg-muted/60 px-2.5 py-1 rounded-full">M4V · TS · WebM · FLV · 3GP</span>
+            <span className="flex items-center gap-1 bg-primary/10 text-primary px-2.5 py-1 rounded-full font-medium">
+              <Zap className="w-3 h-3" /> Auto-transcoded to H.264 faststart
+            </span>
           </div>
         </div>
+        </motion.div>
 
         {/* ── Upload / Transcode Progress Cards ── */}
         <AnimatePresence>
