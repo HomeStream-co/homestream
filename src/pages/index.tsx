@@ -20,7 +20,7 @@
 
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Play, Plus, Check, Star, Upload, Clock, Search, X, SlidersHorizontal, Bookmark, Smartphone, QrCode, Copy } from 'lucide-react';
+import { Play, Plus, Check, Star, Upload, Clock, Search, X, SlidersHorizontal, Bookmark, Smartphone, QrCode, Copy, Tv2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useMedia } from '@/context/MediaContext';
 import { useProfile } from '@/context/ProfileContext';
@@ -628,6 +628,22 @@ export default function HomePage() {
             transition={{ duration: 0.2 }}
             className="pt-8 pb-20"
           >
+            {/* ── Watch on TV banner ── */}
+            <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 mb-6">
+              <a
+                href="/samsung-tv"
+                className="flex items-center gap-4 bg-card border border-border hover:border-primary/40 rounded-2xl px-5 py-4 transition-all group hover:shadow-lg hover:shadow-primary/10"
+              >
+                <div className="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center flex-shrink-0 group-hover:bg-primary/25 transition-colors">
+                  <Tv2 className="w-5 h-5 text-primary" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-foreground">Watch on your Samsung TV</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Step-by-step guide to open HomeStream in your TV browser — no app needed</p>
+                </div>
+                <span className="text-xs text-primary font-medium group-hover:underline flex-shrink-0">Get started →</span>
+              </a>
+            </div>
             {continueWatchingItems.length > 0 && (
               <MediaCarousel
                 title="Continue Watching"

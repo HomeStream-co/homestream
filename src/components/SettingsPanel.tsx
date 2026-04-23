@@ -36,6 +36,7 @@ import SettingsBackup           from './settings/SettingsBackup';
 import SettingsVpn, { type VpnInterface } from './settings/SettingsVpn';
 import SettingsTools            from './settings/SettingsTools';
 import SettingsSession          from './settings/SettingsSession';
+import SettingsProwlarr         from './settings/SettingsProwlarr';
 
 // ── Props ─────────────────────────────────────────────────────────────────────
 
@@ -439,6 +440,7 @@ export default function SettingsPanel({
                   tmdbStale={tmdbStale}
                   onRefresh={handleTmdbRefresh}
                 />
+                <SettingsProwlarr onSaved={() => toast.success('Prowlarr settings saved')} />
                 <SettingsStorage
                   storageStats={storageStats}
                   storageLoading={storageLoading}

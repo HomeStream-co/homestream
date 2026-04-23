@@ -148,13 +148,25 @@ export default async function handler(req: Request, res: Response) {
           return;
         }
         try {
-          const r = await fetch(`${prowlarrUrl}/api/v1/system/status`, {
-            headers: { 'X-Api-Key': prowlarrApiKey, 'User-Agent': 'HomeStream/1.5' },
-            signal: AbortSignal.timeout(8_000),
-          });
-          if (!r.ok) { res.json({ ok: false, error: `HTTP ${r.status}` }); return; }
-          const data = await r.json() as { version?: string; appName?: string };
-          res.json({ ok: true, version: data.version ?? 'unknown', appName: data.appName ?? 'Prowlarr' });
+          const base = prowlarrUrl.replace(/\/$/, '');
+          const headers = { 'X-Api-Key': prowlarrApiKey, 'User-Agent': 'HomeStream/1.5' };
+          const signal = AbortSignal.timeout(8_000);
+          const [statusRes, indexerRes] = await Promise.allSettled([
+            fetch(`${base}/api/v1/system/status`, { headers, signal }),
+            fetch(`${base}/api/v1/indexer`, { headers, signal }),
+          ]);
+          if (statusRes.status === 'rejected' || !statusRes.value.ok) {
+            const code = statusRes.status === 'fulfilled' ? statusRes.value.status : 0;
+            res.json({ ok: false, error: code ? `HTTP ${code}` : 'Cannot reach Prowlarr' });
+            return;
+          }
+          const statusData = await statusRes.value.json() as { version?: string; appName?: string };
+          let indexers: number | undefined;
+          if (indexerRes.status === 'fulfilled' && indexerRes.value.ok) {
+            const arr = await indexerRes.value.json() as unknown[];
+            indexers = Array.isArray(arr) ? arr.length : undefined;
+          }
+          res.json({ ok: true, version: statusData.version ?? 'unknown', indexers });
         } catch (err) {
           res.json({ ok: false, error: err instanceof Error ? err.message : String(err) });
         }
