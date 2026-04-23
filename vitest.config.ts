@@ -47,6 +47,7 @@ export default defineConfig({
         // React component tests — jsdom environment
         test: {
           name: 'browser',
+          globals: true,
           environment: 'jsdom',
           setupFiles: ['./src/test/setup.ts'],
           include: ['src/test/**/*.test.{ts,tsx}'],
