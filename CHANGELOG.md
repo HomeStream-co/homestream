@@ -7,11 +7,26 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
-## [1.3.7] — 2026-04-23
+## [1.3.7] — 2026-04-23 (release)
 
 ### Fixed
 
-#### Docker — Data Persistence Bug (Critical)
+#### Data Integrity — Atomic Writes (Critical)
+- `libraryStore.ts`: `writeLibrary()` now uses a tmp-file + `renameSync` atomic write pattern. A crash or power loss mid-write previously could leave `media-library.json` half-written and permanently corrupted (all media metadata lost). Now the rename is atomic at the OS level — the file is either fully written or untouched.
+- `sessionStore.ts`: same atomic write applied to `homestream-sessions.json`. A corrupted sessions file previously forced all users to log in again after a crash.
+- `configStore.ts`: same atomic write applied to `homestream-config.json`. Also fixed a silent-failure bug where a disk-write error was swallowed and the caller received `next` as if the write succeeded — now logs the error and returns `current` so callers can detect the failure.
+- `startupCleanup.ts`: `writeLibrarySafe()` fallback path upgraded from bare `writeFileSync` to the same atomic tmp+rename pattern.
+
+#### Reliability — Transcode Worker
+- `transcodeWorker.ts`: `fs.statSync(resolvedInput)` on line 289 was called unconditionally after `probeFile()` — if the file disappeared between upload and transcode start (race condition, manual deletion), it threw an uncaught `ENOENT` that crashed the transcode job without a clean error. Now wrapped in a safe try/catch that falls back to `0`.
+
+#### Reliability — Episode Scheduler
+- `episodeScheduler.ts`: `checkSubscription()` had no wall-clock timeout. A show with 10 seasons × 50 episodes × a hung Torrentio connection could block the scheduler indefinitely. Added a 5-minute `setTimeout` guard (`.unref()`'d so it never prevents clean process exit) that throws and unblocks the scheduler if a single check runs too long.
+
+#### Reliability — Gzip Middleware
+- `configure.js`: gzip `res.json` patch now checks `res.headersSent` before setting `Content-Encoding` headers. Previously, if Express had already started sending a response (e.g. an upstream middleware called `res.end()` before the gzip callback fired), setting headers would throw `Cannot set headers after they are sent`.
+
+
 - `Dockerfile`: volume was declared at `/app/data` but `dataDir.ts` writes to `process.cwd()/homestream-data` when `HOMESTREAM_DATA` is unset — data was silently lost on container restart
 - Fixed by: setting `ENV HOMESTREAM_DATA=/app/homestream-data` in Dockerfile and declaring `VOLUME ["/app/homestream-data", "/app/uploads"]`
 - `docker-compose.yml`: updated volume mount from `homestream_data:/app/data` → `homestream_data:/app/homestream-data` to match; added `HOMESTREAM_DATA` env var
