@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, lazy, Suspense, useCallback } from 'react';
+import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import {
   Search, Upload, Menu, X, Film, Bookmark, ChevronDown, Lock,
@@ -14,6 +14,7 @@ import SecurityPanel from '@/components/SecurityPanel';
 import PinLock from '@/components/PinLock';
 import NotificationBell from '@/components/NotificationBell';
 import { notify } from '@/lib/notificationStore';
+import { useDownloadSocket } from '@/hooks/useDownloadSocket';
 
 const DebugPanel = lazy(() => import('@/components/DebugPanel'));
 
@@ -28,68 +29,48 @@ interface DownloadEntry {
   status: string;
 }
 
+/** Wraps useDownloadSocket — fires toast/bell notifications on status transitions */
 function useActiveDownloadCount(): number {
-  const [count, setCount] = useState(0);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const { jobs, qbitTorrents } = useDownloadSocket();
   const prevStatuses = useRef<Map<string, string>>(new Map());
   const { refreshLibrary } = useMedia();
 
+  const allEntries: DownloadEntry[] = [...(jobs ?? []), ...(qbitTorrents ?? [])];
+
+  // Fire notifications on status transitions
   useEffect(() => {
-    const poll = async () => {
-      try {
-        const res = await fetch('/api/stremio/downloads');
-        if (!res.ok) return;
-        const data = await res.json() as {
-          jobs?: DownloadEntry[];
-          qbitTorrents?: DownloadEntry[];
-        };
+    for (const entry of allEntries) {
+      const prev = prevStatuses.current.get(entry.hash);
+      const isNowDone = entry.status === 'done' || entry.status === 'seeding';
+      const isNowError = entry.status === 'error';
+      const wasActive = prev === 'downloading' || prev === 'queued';
 
-        const allEntries: DownloadEntry[] = [
-          ...(data.jobs ?? []),
-          ...(data.qbitTorrents ?? []),
-        ];
+      if (wasActive && isNowDone) {
+        const label = entry.title || entry.name || 'Download';
+        notify({ type: 'download_complete', title: label, message: 'Download complete — ready to watch', ttl: 0 });
+        toast.success(`"${label}" is ready to watch`, {
+          description: 'Added to your library',
+          duration: 5000,
+          action: { label: 'Go to Library', onClick: () => window.location.assign('/library') },
+        });
+        refreshLibrary?.();
+      }
 
-        for (const entry of allEntries) {
-          const prev = prevStatuses.current.get(entry.hash);
-          const isNowDone = entry.status === 'done' || entry.status === 'seeding';
-          const isNowError = entry.status === 'error';
-          const wasActive = prev === 'downloading' || prev === 'queued';
+      if (wasActive && isNowError) {
+        const label = entry.title || entry.name || 'Download';
+        notify({ type: 'download_error', title: label, message: 'Download failed — check the Downloads page', ttl: 0 });
+      }
+    }
 
-          if (wasActive && isNowDone) {
-            const label = entry.title || entry.name || 'Download';
-            notify({ type: 'download_complete', title: label, message: 'Download complete — ready to watch', ttl: 0 });
-            toast.success(`"${label}" is ready to watch`, {
-              description: 'Added to your library',
-              duration: 5000,
-              action: { label: 'Go to Library', onClick: () => window.location.assign('/library') },
-            });
-            refreshLibrary?.();
-          }
-
-          if (wasActive && isNowError) {
-            const label = entry.title || entry.name || 'Download';
-            notify({ type: 'download_error', title: label, message: 'Download failed — check the Downloads page', ttl: 0 });
-          }
-        }
-
-        const next = new Map<string, string>();
-        for (const e of allEntries) next.set(e.hash, e.status);
-        prevStatuses.current = next;
-
-        const active =
-          (data.jobs ?? []).filter(j => j.status === 'downloading' || j.status === 'queued' || j.status === 'transcoding').length +
-          (data.qbitTorrents ?? []).filter(t => t.status === 'downloading' || t.status === 'queued').length;
-        setCount(active);
-      } catch { /* ignore */ }
-    };
-
-    poll();
-    timerRef.current = setInterval(poll, 5_000);
-    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+    const next = new Map<string, string>();
+    for (const e of allEntries) next.set(e.hash, e.status);
+    prevStatuses.current = next;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [jobs, qbitTorrents]);
 
-  return count;
+  return allEntries.filter(
+    e => e.status === 'downloading' || e.status === 'queued' || e.status === 'transcoding'
+  ).length;
 }
 
 export default function Header({ onChatOpen: _onChatOpen }: HeaderProps) {
