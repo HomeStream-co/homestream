@@ -4,9 +4,10 @@ import {
   X, Search, ChevronRight, Loader2,
   Tv2, Film, AlertCircle, ExternalLink, Star,
   LogIn, LogOut, CheckCircle2, Download, HardDrive,
-  Wifi, Clock, ChevronDown, ChevronUp, RefreshCw,
+  Wifi, Clock, ChevronDown, ChevronUp, RefreshCw, CalendarClock,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import ScheduleModal from './ScheduleModal.js';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -143,6 +144,11 @@ export default function StremioPanel() {
   const [bulkSeason, setBulkSeason] = useState<number | 'all'>(1);
   const [totalEpisodes, setTotalEpisodes] = useState(10);
   const [showBulkOptions, setShowBulkOptions] = useState(false);
+
+  // Schedule modal
+  const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
+  const [scheduleStream, setScheduleStream] = useState<StreamResult | null>(null);
+  const [schedulingId, setSchedulingId] = useState<string | null>(null);
 
   // Downloads tab
   const [jobs, setJobs] = useState<TorrentJob[]>([]);
@@ -350,8 +356,51 @@ export default function StremioPanel() {
 
   const currentView = !account ? 'login' : view;
 
+  // ── Schedule a download for a future time ──
+  const handleScheduleConfirm = async (isoTimestamp: string) => {
+    if (!selected || !scheduleStream) return;
+    setSchedulingId(scheduleStream.infoHash);
+    try {
+      const res = await fetch('/api/stremio/schedule', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          imdbId: selected.id,
+          type: selected.type,
+          title: selected.name,
+          poster: selected.poster,
+          year: selected.year?.toString(),
+          streams: [scheduleStream],
+          scheduledFor: isoTimestamp,
+          ...(selected.type === 'series' ? { season, episode } : {}),
+        }),
+      });
+      const data = await res.json() as { ok?: boolean; error?: string };
+      if (data.ok) {
+        toast.success(`"${selected.name}" scheduled — will download automatically`);
+        setScheduleModalOpen(false);
+        setScheduleStream(null);
+      } else {
+        toast.error(data.error ?? 'Failed to schedule download');
+      }
+    } catch {
+      toast.error('Failed to schedule download');
+    } finally {
+      setSchedulingId(null);
+    }
+  };
+
   return (
     <>
+      {/* ── Schedule Modal ── */}
+      <ScheduleModal
+        open={scheduleModalOpen}
+        onClose={() => { setScheduleModalOpen(false); setScheduleStream(null); }}
+        onSchedule={handleScheduleConfirm}
+        title={selected?.name ?? ''}
+        loading={!!schedulingId}
+      />
+
       {/* ── Header Button ── */}
       <button
         onClick={() => setOpen(true)}
@@ -728,6 +777,14 @@ export default function StremioPanel() {
                                     : <Download className="w-3.5 h-3.5" />
                                   }
                                   Download
+                                </button>
+                                <button
+                                  disabled={!!downloadingId || !!schedulingId}
+                                  onClick={() => { setScheduleStream(stream); setScheduleModalOpen(true); }}
+                                  className="flex items-center gap-1.5 px-3 py-1.5 bg-muted hover:bg-muted/70 border border-border text-muted-foreground hover:text-foreground text-xs rounded-lg font-medium transition-colors disabled:opacity-60 flex-shrink-0"
+                                  title="Schedule for later"
+                                >
+                                  <CalendarClock className="w-3.5 h-3.5" />
                                 </button>
                               </motion.div>
                             ))}

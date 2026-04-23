@@ -145,6 +145,13 @@ export const serverBefore = (server) => {
     console.warn('[scheduler] Failed to start (non-fatal):', err.message);
   });
 
+  // Start scheduled download queue engine (user-defined future downloads)
+  import('./scheduledDownloads.js').then(({ startScheduler }) => {
+    startScheduler();
+  }).catch(err => {
+    console.warn('[scheduled-downloads] Failed to start (non-fatal):', err.message);
+  });
+
   // Start VPN kill-switch monitor (pauses torrents if VPN drops)
   import('./vpnKillSwitch.js').then(({ startVpnKillSwitch }) => {
     startVpnKillSwitch();
