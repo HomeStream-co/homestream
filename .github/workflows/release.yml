@@ -58,6 +58,20 @@ jobs:
           CI: true
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
 
+      - name: Verify build artifacts
+        shell: bash
+        run: |
+          echo "=== dist/ contents ==="
+          ls -lh dist/ || echo "dist/ missing!"
+          echo "=== dist/client/ ==="
+          ls dist/client/ | head -10 || echo "dist/client/ missing!"
+          echo "=== server bundle ==="
+          ls -lh dist/server.bundle.cjs || echo "server.bundle.cjs MISSING — build failed"
+          if [ ! -f dist/server.bundle.cjs ]; then
+            echo "ERROR: server bundle not produced — aborting release"
+            exit 1
+          fi
+
       - name: Package & publish installer
         # Runs on windows-latest — NSIS produces a proper .exe installer.
         # --publish always → creates the GitHub Release and uploads assets.

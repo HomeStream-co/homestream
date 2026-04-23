@@ -75,9 +75,10 @@ extraResources:
   # Server bundle — CJS format, all node_modules inlined. No external node_modules needed.
   - from: dist/server.bundle.cjs
     to: server/server.bundle.cjs
-  # Sourcemap for crash diagnostics
+  # Sourcemap for crash diagnostics (optional — skipped if build didn't produce it)
   - from: dist/server.bundle.cjs.map
     to: server/server.bundle.cjs.map
+    filter: "**/*"
   # Client bundle — Vite outputs to dist/client/ (index.html + assets/).
   - from: dist/client
     to: client
