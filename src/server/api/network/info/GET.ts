@@ -4,6 +4,12 @@
  * Returns the server's LAN IP addresses and hostname so the HTTPS setup
  * page can pre-fill Caddyfile configs without the user having to look
  * up their own IP.
+ *
+ * Intentionally open (no auth) — needed by the setup wizard before a
+ * password is configured. Returns only local network metadata (no secrets).
+ *
+ * no-try/catch: intentional — os.networkInterfaces() and os.hostname() are
+ * synchronous Node built-ins that never throw.
  */
 import type { Request, Response } from 'express';
 import os from 'os';

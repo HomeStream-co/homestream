@@ -4,6 +4,12 @@
  * Jellyfin-compatible server info endpoint.
  * TV apps call this first to verify they're talking to a Jellyfin-compatible server
  * and to get the server name and version.
+ *
+ * Intentionally open (no auth) — Jellyfin spec requires this endpoint to be
+ * unauthenticated so TV apps can discover the server before login.
+ *
+ * no-try/catch: intentional — os.networkInterfaces() and os.hostname() are
+ * synchronous Node built-ins that never throw.
  */
 import type { Request, Response } from 'express';
 import os from 'os';

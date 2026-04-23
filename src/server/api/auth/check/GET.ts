@@ -2,6 +2,9 @@
  * GET /api/auth/check
  * Returns { authenticated: boolean, requiresPassword: boolean }
  * Used by the frontend to decide whether to show the login gate.
+ *
+ * no-try/catch: intentional — readConfig() is internally guarded and never
+ * throws; isValidSession() is a pure Map lookup. Nothing here can throw.
  */
 import type { Request, Response } from 'express';
 import { readConfig } from '../../../configStore.js';

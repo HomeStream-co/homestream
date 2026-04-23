@@ -16,7 +16,6 @@
 
 const { app, BrowserWindow, Tray, Menu, shell, nativeImage, ipcMain, globalShortcut, dialog, utilityProcess } = require('electron');
 const path = require('path');
-const { spawn } = require('child_process');
 const http = require('http');
 const os = require('os');
 const fs = require('fs');

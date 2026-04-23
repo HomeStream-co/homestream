@@ -6,6 +6,12 @@
  * for the user's OS (Windows vs macOS vs Linux).
  *
  * When running outside Electron (cloud/dev), returns sensible defaults.
+ *
+ * Intentionally open (no auth) — needed by the setup wizard before a
+ * password is configured. Returns only OS platform and a suggested path.
+ *
+ * no-try/catch: intentional — reads env vars and calls os.homedir() +
+ * path.join(), both of which are synchronous and never throw.
  */
 import type { Request, Response } from 'express';
 import os from 'os';

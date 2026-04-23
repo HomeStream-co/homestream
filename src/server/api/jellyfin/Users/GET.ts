@@ -2,6 +2,12 @@
  * GET /api/jellyfin/Users
  *
  * Returns the list of users. TV apps call this after login to get the user ID.
+ *
+ * Intentionally open (no auth) — Jellyfin spec; TV apps call this before
+ * establishing a session. Returns only static user metadata (no secrets).
+ *
+ * no-try/catch: intentional — returns a hardcoded static object. Nothing
+ * here can throw.
  */
 import type { Request, Response } from 'express';
 

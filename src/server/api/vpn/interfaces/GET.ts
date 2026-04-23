@@ -5,6 +5,13 @@
  * On Windows, Norton VPN creates a virtual adapter (usually named
  * "Norton Secure VPN" or "NordVPN" etc.) — the client picks the right one.
  *
+ * Intentionally open (no auth) — needed by the setup wizard (step 4: VPN
+ * binding) before a password is configured. Returns only adapter names and
+ * IP addresses — no secrets.
+ *
+ * no-try/catch: intentional — os.networkInterfaces() is a synchronous Node
+ * built-in that never throws.
+ *
  * Response: { interfaces: Array<{ name, address, family, internal }> }
  */
 import type { Request, Response } from 'express';

@@ -35,28 +35,33 @@ import { requireAuth } from '../../../authMiddleware.js';
 export default function handler(req: Request, res: Response) {
   if (!requireAuth(req, res)) return;
 
-  const mem = process.memoryUsage();
-  const cpus = os.cpus();
+  try {
+    const mem = process.memoryUsage();
+    const cpus = os.cpus();
 
-  res.json({
-    node:     process.version,
-    platform: os.platform(),
-    arch:     os.arch(),
-    uptime:   Math.floor(process.uptime()),
-    memory: {
-      heapUsedMb:  +(mem.heapUsed  / 1_048_576).toFixed(1),
-      heapTotalMb: +(mem.heapTotal / 1_048_576).toFixed(1),
-      rssMb:       +(mem.rss       / 1_048_576).toFixed(1),
-      externalMb:  +(mem.external  / 1_048_576).toFixed(1),
-      freeMb:      +(os.freemem()  / 1_048_576).toFixed(0),
-      totalMb:     +(os.totalmem() / 1_048_576).toFixed(0),
-    },
-    cpu: {
-      model:   cpus[0]?.model ?? 'Unknown',
-      cores:   cpus.length,
-      loadAvg: os.loadavg(),   // [0,0,0] on Windows — fine to show
-    },
-    env: process.env.NODE_ENV ?? 'development',
-    pid: process.pid,
-  });
+    res.json({
+      node:     process.version,
+      platform: os.platform(),
+      arch:     os.arch(),
+      uptime:   Math.floor(process.uptime()),
+      memory: {
+        heapUsedMb:  +(mem.heapUsed  / 1_048_576).toFixed(1),
+        heapTotalMb: +(mem.heapTotal / 1_048_576).toFixed(1),
+        rssMb:       +(mem.rss       / 1_048_576).toFixed(1),
+        externalMb:  +(mem.external  / 1_048_576).toFixed(1),
+        freeMb:      +(os.freemem()  / 1_048_576).toFixed(0),
+        totalMb:     +(os.totalmem() / 1_048_576).toFixed(0),
+      },
+      cpu: {
+        model:   cpus[0]?.model ?? 'Unknown',
+        cores:   cpus.length,
+        loadAvg: os.loadavg(),   // [0,0,0] on Windows — fine to show
+      },
+      env: process.env.NODE_ENV ?? 'development',
+      pid: process.pid,
+    });
+  } catch (err) {
+    console.error('[debug/system-info] Error reading system info:', err);
+    res.status(500).json({ error: 'Failed to read system info' });
+  }
 }

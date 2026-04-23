@@ -43,6 +43,7 @@ export default function handler(req: Request, res: Response) {
   upload.single('video')(req, res, async (err) => {
     if (err) return res.status(400).json({ error: err.message });
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+    try {
 
     const inputFilename  = req.file.filename;
     const outputFilename = inputFilename.replace(/\.[^.]+$/, '') + '_tc.mp4';
@@ -126,5 +127,11 @@ export default function handler(req: Request, res: Response) {
           return lib;
         });
       });
+    } catch (uploadErr) {
+      console.error('[upload] Unexpected error in upload handler:', uploadErr);
+      if (!res.headersSent) {
+        res.status(500).json({ error: 'Upload failed unexpectedly' });
+      }
+    }
   });
 }

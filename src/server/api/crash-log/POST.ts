@@ -14,11 +14,17 @@ interface CrashPayload {
 }
 
 export default function handler(req: Request, res: Response) {
-  const body = req.body as CrashPayload;
-  const type = (body.type as 'reactError') ?? 'manual';
-  const err = Object.assign(new Error(body.message ?? 'Unknown frontend error'), {
-    stack: body.stack,
-  });
-  logCrash(type as 'manual', err, body.context);
-  res.json({ ok: true });
+  try {
+    const body = req.body as CrashPayload;
+    const type = (body.type as 'reactError') ?? 'manual';
+    const err = Object.assign(new Error(body.message ?? 'Unknown frontend error'), {
+      stack: body.stack,
+    });
+    logCrash(type as 'manual', err, body.context);
+    res.json({ ok: true });
+  } catch {
+    // Never let a crash-logger failure surface as a 500 — the client doesn't
+    // need to know the log write failed; just acknowledge receipt.
+    res.json({ ok: true });
+  }
 }
