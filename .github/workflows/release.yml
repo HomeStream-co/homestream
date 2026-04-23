@@ -1,22 +1,13 @@
 name: Release
 
-# Triggered by pushing a version tag: git tag v1.3.7 && git push origin v1.3.7
+# Triggered by pushing a version tag: git tag v1.5.2 && git push origin v1.5.2
 #
 # Prerequisites (set in repo Settings → Secrets and variables → Actions):
 #   GH_TOKEN  — GitHub Personal Access Token with repo + write:packages scope
-#               (used by electron-builder to create the GitHub Release)
 #
-# GH_OWNER and GH_REPO are auto-derived from the repository context.
-# You do NOT need to set them as secrets — they are read directly from
-# github.repository_owner and github.event.repository.name below.
-# (The old pattern `${{ secrets.X || github.Y }}` is invalid YAML/Actions syntax
-#  and silently resolves to empty string when the secret is not set.)
-#
-# Re-tag cycle (if you need to rebuild the same version):
-#   git tag -d v1.3.7
-#   git push origin --delete v1.3.7
-#   git tag v1.3.7
-#   git push origin v1.3.7
+# Re-tag cycle (rebuild same version):
+#   git tag -d v1.5.2 && git push origin --delete v1.5.2
+#   git tag v1.5.2 && git push origin v1.5.2
 
 on:
   push:
@@ -40,6 +31,27 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Delete any existing release for this tag so electron-builder can
+      # create it fresh. This handles the re-tag cycle cleanly — without this,
+      # electron-builder silently fails to upload assets when the release
+      # already exists (even as a draft).
+      - name: Delete existing release (if any)
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        shell: bash
+        run: |
+          TAG="${{ github.ref_name }}"
+          RELEASE_ID=$(curl -s -H "Authorization: token $GH_TOKEN" \
+            "https://api.github.com/repos/${{ github.repository }}/releases/tags/$TAG" \
+            | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('id',''))" 2>/dev/null || true)
+          if [ -n "$RELEASE_ID" ] && [ "$RELEASE_ID" != "None" ]; then
+            echo "Deleting existing release id=$RELEASE_ID for tag $TAG"
+            curl -s -X DELETE -H "Authorization: token $GH_TOKEN" \
+              "https://api.github.com/repos/${{ github.repository }}/releases/$RELEASE_ID"
+          else
+            echo "No existing release found for $TAG — proceeding"
+          fi
+
       - name: Build app (Vite + server bundle)
         run: npm run build
         env:
@@ -47,22 +59,17 @@ jobs:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
 
       - name: Package & publish installer
-        # Runs on windows-latest — NSIS is available, so we override the default
-        # zip target (used for local Linux builds) with nsis to produce a proper
-        # .exe installer for end-users.
-        # --publish always → creates/updates the GitHub Release and uploads assets.
-        # GH_TOKEN must be set in repo Settings → Secrets → Actions.
+        # Runs on windows-latest — NSIS produces a proper .exe installer.
+        # --publish always → creates the GitHub Release and uploads assets.
         run: npx electron-builder --win --config electron/electron-builder.yml --config.win.target=nsis --publish always
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
-          # signAndEditExecutable defaults to true on Windows — rcedit works fine
-          # on windows-latest so the app icon will be patched into the .exe.
           # Code signing — uncomment when WIN_CSC_LINK secret is added:
           # WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
           # WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
 
       # Safety net: upload the installer as an Actions artifact even if the
-      # GitHub Release publish step fails (e.g. token scope issue).
+      # GitHub Release publish step fails.
       - name: Upload installer artifact
         if: always()
         uses: actions/upload-artifact@v4
