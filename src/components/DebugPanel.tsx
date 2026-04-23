@@ -11,7 +11,7 @@
  * Always visible (not DEV-only). Designed to get any user unstuck.
  */
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   X, RefreshCw, CheckCircle2, AlertTriangle, XCircle,

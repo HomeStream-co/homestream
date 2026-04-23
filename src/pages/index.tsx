@@ -32,7 +32,6 @@ import { toActorsString } from '@/lib/utils';
 import OfflineBanner from '@/components/OfflineBanner';
 import LazySection from '@/components/LazySection';
 import HomePageSkeleton from '@/components/HomePageSkeleton';
-import { Skeleton } from '@/components/ui/skeleton';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -302,7 +301,7 @@ export default function HomePage() {
   };
 
   return (
-    <div className="bg-background">
+    <div className="bg-background min-h-screen">
       <title>HomeStream — Your Personal Cinema</title>
       <meta name="description" content="Stream your personal media library. Movies, TV shows, and more." />
 
@@ -311,221 +310,268 @@ export default function HomePage() {
 
       {/* ── Hero ── */}
       {showHeroSkeleton ? (
-        <div className="relative h-[72vh] bg-card">
-          <Skeleton className="w-full h-full" />
+        <div className="relative h-[80vh] overflow-hidden">
+          <div className="absolute inset-0 shimmer" />
+          <div className="absolute inset-0 bg-gradient-to-t from-background to-transparent" />
         </div>
       ) : showTMDBBanner ? (
         <HeroBanner movies={upcoming} loading={tmdbLoading && upcoming.length === 0} />
       ) : showLibraryHero ? (
-        <div className="relative h-[70vh] overflow-hidden">
+        /* ── Library hero (no TMDB) ── */
+        <div className="relative h-[78vh] overflow-hidden">
           {featured!.poster && (
             <img
               src={featured!.poster}
               alt={featured!.title}
               className="absolute inset-0 w-full h-full object-cover scale-110"
-              style={{ filter: 'blur(2px) brightness(0.4)' }}
+              style={{ filter: 'blur(3px) brightness(0.38) saturate(1.15)' }}
               onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
             />
           )}
-          <div className="absolute inset-0 bg-gradient-to-br from-primary/20 via-background/60 to-background" />
-          <div className="absolute inset-0 bg-gradient-to-r from-background via-background/60 to-transparent" />
-          <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-br from-primary/15 via-background/50 to-background" />
+          <div className="absolute inset-0 bg-gradient-to-r from-background via-background/65 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-t from-background via-background/20 to-transparent" />
+          <div className="absolute top-0 left-0 right-0 h-28 bg-gradient-to-b from-black/50 to-transparent" />
 
-          <div className="relative h-full flex items-end pb-16 px-4 sm:px-6 lg:px-8 max-w-screen-2xl mx-auto">
+          <div className="relative h-full flex items-end pb-20 px-6 sm:px-10 lg:px-16 max-w-screen-2xl mx-auto">
             <motion.div
-              initial={{ opacity: 0, y: 30 }}
+              initial={{ opacity: 0, y: 32 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6 }}
-              className="max-w-xl"
+              transition={{ duration: 0.6, ease: 'easeOut' as const }}
+              className="max-w-2xl"
             >
-              {featured!.imdbRating !== 'N/A' && (
-                <div className="flex items-center gap-1 mb-3">
-                  <Star className="w-4 h-4 text-accent fill-accent" />
-                  <span className="text-accent font-semibold text-sm">{featured!.imdbRating}/10</span>
-                  <span className="text-muted-foreground text-sm ml-1">IMDb</span>
-                </div>
-              )}
-              <h1 className="text-5xl sm:text-6xl font-heading text-foreground tracking-wide mb-3">
+              <div className="flex items-center gap-2.5 mb-4">
+                {featured!.imdbRating !== 'N/A' && (
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-yellow-500/15 border border-yellow-500/30 text-yellow-400 text-[11px] font-bold">
+                    <Star className="w-3 h-3 fill-yellow-400" />
+                    {featured!.imdbRating}
+                  </span>
+                )}
+                {featured!.year && (
+                  <span className="text-xs text-muted-foreground font-medium">{featured!.year}</span>
+                )}
+                {featured!.rated && featured!.rated !== 'N/A' && (
+                  <span className="px-2 py-0.5 rounded border border-muted-foreground/40 text-[10px] text-muted-foreground font-semibold uppercase">
+                    {featured!.rated}
+                  </span>
+                )}
+              </div>
+
+              <h1 className="text-5xl sm:text-6xl lg:text-7xl font-heading text-foreground tracking-wide mb-3 leading-none drop-shadow-2xl">
                 {featured!.title}
               </h1>
-              <div className="flex items-center gap-3 mb-4 text-sm text-muted-foreground">
-                <span>{featured!.year}</span>
-                {featured!.rated && featured!.rated !== 'N/A' && (
-                  <span className="border border-muted-foreground px-1.5 py-0.5 rounded text-xs">{featured!.rated}</span>
-                )}
-                {featured!.runtime && featured!.runtime !== 'Unknown' && <span>{featured!.runtime}</span>}
-                <span>{featured!.genre.slice(0, 2).join(' · ')}</span>
-              </div>
-              <p className="text-sm text-foreground/80 mb-6 line-clamp-3 leading-relaxed">{featured!.plot}</p>
-              <div className="flex items-center gap-3">
-                <button
+
+              {featured!.genre.length > 0 && (
+                <div className="flex items-center gap-2 mb-4 flex-wrap">
+                  {featured!.genre.slice(0, 4).map(g => (
+                    <span key={g} className="px-2.5 py-1 rounded-full glass text-xs text-foreground/80 font-medium">
+                      {g}
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              <p className="text-sm text-foreground/70 mb-6 line-clamp-3 leading-relaxed max-w-lg">{featured!.plot}</p>
+
+              <div className="flex items-center gap-3 flex-wrap">
+                <motion.button
                   onClick={() => navigate(`/player/${featured!.id}`)}
-                  className="flex items-center gap-2 bg-white hover:bg-white/90 text-black px-6 py-2.5 rounded font-semibold text-sm transition-colors"
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.97 }}
+                  className="flex items-center gap-2 bg-white hover:bg-white/90 text-black px-7 py-3 rounded-xl font-bold text-sm transition-all shadow-lg"
                 >
                   <Play className="w-4 h-4 fill-black" />
                   Play Now
-                </button>
-                <button
+                </motion.button>
+                <motion.button
                   onClick={() => inWatchlist ? removeFromWatchlist(featured!.id) : addToWatchlist(featured!.id)}
-                  className="flex items-center gap-2 bg-white/20 hover:bg-white/30 text-white px-5 py-2.5 rounded font-medium text-sm transition-colors border border-white/30"
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.97 }}
+                  className="flex items-center gap-2 glass hover:bg-white/15 text-foreground px-6 py-3 rounded-xl font-semibold text-sm transition-all"
                 >
-                  {inWatchlist ? <Check className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
-                  {inWatchlist ? 'In My List' : 'My List'}
-                </button>
+                  {inWatchlist ? <Check className="w-4 h-4 text-primary" /> : <Plus className="w-4 h-4" />}
+                  {inWatchlist ? 'In My List' : 'Add to List'}
+                </motion.button>
               </div>
             </motion.div>
           </div>
         </div>
       ) : showEmptyState ? (
-        <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
-          <div className="w-20 h-20 rounded-full bg-card flex items-center justify-center mb-6">
-            <Upload className="w-8 h-8 text-primary" />
-          </div>
-          <h1 className="text-3xl font-heading text-foreground mb-3">Your library is empty</h1>
-          <p className="text-muted-foreground mb-6 max-w-sm">
-            Add your first video file, or browse trending movies and shows to download.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-3">
-            <button
-              onClick={() => navigate('/library')}
-              className="flex items-center gap-2 bg-primary hover:bg-primary/80 text-white px-6 py-3 rounded font-medium transition-colors"
-            >
-              <Upload className="w-4 h-4" />
-              Upload a Video File
-            </button>
-            <button
-              onClick={() => navigate('/discover')}
-              className="flex items-center gap-2 bg-card hover:bg-muted border border-border text-foreground px-6 py-3 rounded font-medium transition-colors"
-            >
-              Browse &amp; Download
-            </button>
-          </div>
+        /* ── Empty state ── */
+        <div className="flex flex-col items-center justify-center min-h-[70vh] text-center px-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.5 }}
+            className="flex flex-col items-center gap-6"
+          >
+            <div className="relative">
+              <div className="w-24 h-24 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center">
+                <Upload className="w-10 h-10 text-primary" />
+              </div>
+              <div className="absolute inset-0 bg-primary/10 blur-2xl rounded-full" />
+            </div>
+            <div>
+              <h1 className="text-4xl font-heading text-foreground mb-3 tracking-wide">Your Cinema Awaits</h1>
+              <p className="text-muted-foreground mb-2 max-w-sm leading-relaxed">
+                Add your first video file to get started, or browse trending movies and shows to download.
+              </p>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <motion.button
+                onClick={() => navigate('/library')}
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.97 }}
+                className="flex items-center gap-2 bg-primary hover:bg-primary/85 text-primary-foreground px-7 py-3 rounded-xl font-semibold text-sm transition-all shadow-lg shadow-primary/25"
+              >
+                <Upload className="w-4 h-4" />
+                Upload a Video File
+              </motion.button>
+              <motion.button
+                onClick={() => navigate('/discover')}
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.97 }}
+                className="flex items-center gap-2 glass hover:bg-white/10 text-foreground px-7 py-3 rounded-xl font-semibold text-sm transition-all"
+              >
+                Browse &amp; Download
+              </motion.button>
+            </div>
+          </motion.div>
         </div>
       ) : null}
 
-      {/* ── Search bar ── */}
-      <div className="sticky top-16 z-30 bg-background/90 backdrop-blur-sm border-b border-border/40 px-4 sm:px-6 lg:px-8 py-3">
-        <div className="max-w-screen-2xl mx-auto flex items-center gap-3">
-          <div className="relative flex-1 max-w-xl">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
-            <input
-              ref={searchRef}
-              type="text"
-              value={query}
-              onChange={e => setQuery(e.target.value)}
-              placeholder="Search movies, shows, actors, genres..."
-              className="w-full bg-card border border-border rounded-lg pl-10 pr-10 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary transition-colors"
-            />
-            {query && (
+      {/* ── Sticky search + filter bar ── */}
+      <div className="sticky top-16 z-30 border-b border-border/30" style={{ background: 'hsl(var(--background) / 0.92)', backdropFilter: 'blur(20px)' }}>
+        <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+          <div className="flex items-center gap-2.5">
+            {/* Search input */}
+            <div className="relative flex-1 max-w-2xl">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+              <input
+                ref={searchRef}
+                type="text"
+                value={query}
+                onChange={e => setQuery(e.target.value)}
+                placeholder="Search movies, shows, actors, genres..."
+                className="w-full glass rounded-xl pl-10 pr-10 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary/50 transition-all"
+              />
+              {query && (
+                <button
+                  onClick={clearSearch}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+
+            {/* Filter toggle */}
+            <button
+              onClick={() => setShowFilters(v => !v)}
+              className={`flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl border text-sm font-medium transition-all ${
+                showFilters || genre !== 'All' || typeFilter !== 'all'
+                  ? 'bg-primary/15 border-primary/35 text-primary'
+                  : 'glass text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <SlidersHorizontal className="w-4 h-4" />
+              <span className="hidden sm:inline">Filters</span>
+              {(genre !== 'All' || typeFilter !== 'all') && (
+                <span className="w-1.5 h-1.5 rounded-full bg-primary" />
+              )}
+            </button>
+
+            {/* My List shortcut */}
+            {myList.length > 0 && !isSearching && (
               <button
-                onClick={clearSearch}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                onClick={() => navigate('/watchlist')}
+                className="hidden sm:flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl glass text-muted-foreground hover:text-foreground text-sm transition-all"
+                title="My Watchlist"
               >
-                <X className="w-4 h-4" />
+                <Bookmark className="w-4 h-4" />
+                <span className="hidden md:inline">My List</span>
+                <span className="text-[10px] bg-primary text-primary-foreground rounded-full px-1.5 py-0.5 leading-none font-bold">{myList.length}</span>
+              </button>
+            )}
+
+            {isSearching && (
+              <button onClick={clearSearch} className="text-xs text-muted-foreground hover:text-primary transition-colors whitespace-nowrap font-medium">
+                Clear
               </button>
             )}
           </div>
 
-          {/* Filter toggle */}
-          <button
-            onClick={() => setShowFilters(v => !v)}
-            className={`flex items-center gap-1.5 px-3 py-2.5 rounded-lg border text-sm font-medium transition-colors ${
-              showFilters || genre !== 'All' || typeFilter !== 'all'
-                ? 'bg-primary/10 border-primary/30 text-primary'
-                : 'bg-card border-border text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            <SlidersHorizontal className="w-4 h-4" />
-            <span className="hidden sm:inline">Filters</span>
-          </button>
-
-          {/* My List shortcut */}
-          {myList.length > 0 && !isSearching && (
-            <button
-              onClick={() => navigate('/watchlist')}
-              className="flex items-center gap-1.5 px-3 py-2.5 rounded-lg border border-border bg-card text-muted-foreground hover:text-foreground text-sm transition-colors"
-              title="My Watchlist"
-            >
-              <Bookmark className="w-4 h-4" />
-              <span className="hidden sm:inline">My List</span>
-              <span className="text-xs bg-primary text-white rounded-full px-1.5 py-0.5 leading-none">{myList.length}</span>
-            </button>
-          )}
-
-          {/* Clear all */}
-          {isSearching && (
-            <button onClick={clearSearch} className="text-xs text-muted-foreground hover:text-foreground transition-colors whitespace-nowrap">
-              Clear all
-            </button>
-          )}
-        </div>
-
-        {/* Expanded filters */}
-        <AnimatePresence>
-          {showFilters && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: 'auto', opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              className="overflow-hidden"
-            >
-              <div className="max-w-screen-2xl mx-auto pt-3 flex flex-wrap items-center gap-3">
-                {/* Type */}
-                <div className="flex gap-1">
-                  {(['all', 'movie', 'series'] as const).map(t => (
-                    <button
-                      key={t}
-                      onClick={() => setTypeFilter(t)}
-                      className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
-                        typeFilter === t ? 'bg-primary text-white' : 'bg-card text-muted-foreground hover:text-foreground'
-                      }`}
-                    >
-                      {t === 'all' ? 'All Types' : t === 'movie' ? 'Movies' : 'TV Shows'}
-                    </button>
-                  ))}
-                </div>
-
-                <div className="w-px h-4 bg-border" />
-
-                {/* Genre chips */}
-                <div className="flex flex-wrap gap-1">
-                  {GENRES.map(g => (
-                    <button
-                      key={g}
-                      onClick={() => setGenre(g)}
-                      className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
-                        genre === g ? 'bg-primary text-white' : 'bg-card text-muted-foreground hover:text-foreground'
-                      }`}
-                    >
-                      {g}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Sort */}
-                <div className="ml-auto">
-                  <select
-                    value={sortBy}
-                    onChange={e => setSortBy(e.target.value)}
-                    className="bg-card border border-border rounded px-3 py-1.5 text-xs text-foreground focus:outline-none focus:border-primary"
-                  >
-                    {SORT_OPTIONS.map(o => (
-                      <option key={o.value} value={o.value}>{o.label}</option>
+          {/* Expanded filters */}
+          <AnimatePresence>
+            {showFilters && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.22 }}
+                className="overflow-hidden"
+              >
+                <div className="pt-3 pb-1 flex flex-wrap items-center gap-2">
+                  {/* Type pills */}
+                  <div className="flex gap-1">
+                    {(['all', 'movie', 'series'] as const).map(t => (
+                      <button
+                        key={t}
+                        onClick={() => setTypeFilter(t)}
+                        className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all ${
+                          typeFilter === t
+                            ? 'bg-primary text-primary-foreground shadow-sm shadow-primary/30'
+                            : 'glass text-muted-foreground hover:text-foreground'
+                        }`}
+                      >
+                        {t === 'all' ? 'All' : t === 'movie' ? 'Movies' : 'TV Shows'}
+                      </button>
                     ))}
-                  </select>
+                  </div>
+
+                  <div className="w-px h-4 bg-border/60" />
+
+                  {/* Genre pills */}
+                  <div className="flex flex-wrap gap-1">
+                    {GENRES.map(g => (
+                      <button
+                        key={g}
+                        onClick={() => setGenre(g)}
+                        className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                          genre === g
+                            ? 'bg-primary text-primary-foreground shadow-sm shadow-primary/30'
+                            : 'glass text-muted-foreground hover:text-foreground'
+                        }`}
+                      >
+                        {g}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Sort */}
+                  <div className="ml-auto">
+                    <select
+                      value={sortBy}
+                      onChange={e => setSortBy(e.target.value)}
+                      className="glass rounded-lg px-3 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary/50"
+                    >
+                      {SORT_OPTIONS.map(o => (
+                        <option key={o.value} value={o.value}>{o.label}</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
       </div>
 
       {/* ── Kids mode banner ── */}
       {activeProfile?.restricted && (
-        <div className="mx-4 sm:mx-6 lg:mx-8 mt-4 flex items-center gap-2.5 bg-yellow-500/10 border border-yellow-500/25 rounded-xl px-4 py-2.5 w-fit">
-          <span className="text-lg">🧒</span>
-          <p className="text-xs text-yellow-400 font-medium">Kids mode — showing G &amp; PG rated content only</p>
+        <div className="mx-4 sm:mx-6 lg:mx-8 mt-4 flex items-center gap-2.5 bg-yellow-500/10 border border-yellow-500/20 rounded-xl px-4 py-2.5 w-fit">
+          <span className="text-base">🧒</span>
+          <p className="text-xs text-yellow-400 font-semibold">Kids mode — G &amp; PG content only</p>
         </div>
       )}
 
@@ -534,27 +580,40 @@ export default function HomePage() {
         {isSearching ? (
           <motion.div
             key="search"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.15 }}
-            className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-16"
+            transition={{ duration: 0.2 }}
+            className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-20"
           >
-            <p className="text-sm text-muted-foreground mb-4">
-              {searchResults.length} title{searchResults.length !== 1 ? 's' : ''}
-              {query && <> matching <span className="text-foreground font-medium">"{query}"</span></>}
-            </p>
+            <div className="flex items-center justify-between mb-5">
+              <p className="text-sm text-muted-foreground">
+                <span className="text-foreground font-semibold tabular-nums">{searchResults.length}</span>{' '}
+                title{searchResults.length !== 1 ? 's' : ''}
+                {query && <> for <span className="text-foreground font-medium">"{query}"</span></>}
+              </p>
+            </div>
 
             {searchResults.length === 0 ? (
-              <div className="text-center py-20">
-                <p className="text-muted-foreground text-lg">No titles found.</p>
-                <p className="text-muted-foreground text-sm mt-1">Try adjusting your search or filters.</p>
-                <button onClick={clearSearch} className="mt-4 text-primary text-sm hover:underline">Clear search</button>
+              <div className="text-center py-24">
+                <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-4">
+                  <Search className="w-7 h-7 text-muted-foreground/40" />
+                </div>
+                <p className="text-foreground font-semibold mb-1">No titles found</p>
+                <p className="text-muted-foreground text-sm">Try different keywords or clear your filters.</p>
+                <button onClick={clearSearch} className="mt-4 text-primary text-sm font-medium hover:underline">Clear search</button>
               </div>
             ) : (
               <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-7 xl:grid-cols-9 gap-4">
-                {searchResults.map(item => (
-                  <MediaCard key={item.id} item={item} size="md" />
+                {searchResults.map((item, i) => (
+                  <motion.div
+                    key={item.id}
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: Math.min(i * 0.03, 0.4), duration: 0.25 }}
+                  >
+                    <MediaCard item={item} size="md" />
+                  </motion.div>
                 ))}
               </div>
             )}
@@ -566,15 +625,16 @@ export default function HomePage() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.15 }}
-            className="pt-6"
+            transition={{ duration: 0.2 }}
+            className="pt-8 pb-20"
           >
             {continueWatchingItems.length > 0 && (
               <MediaCarousel
                 title="Continue Watching"
                 items={continueWatchingItems}
                 showProgress
-                titleIcon={<Clock className="w-4 h-4 text-primary" />}
+                titleIcon={<Clock className="w-3.5 h-3.5" />}
+                accentClass="bg-blue-500"
               />
             )}
 
@@ -582,28 +642,34 @@ export default function HomePage() {
               <MediaCarousel
                 title="My List"
                 items={myList}
-                titleIcon={<Bookmark className="w-4 h-4 text-primary" />}
+                titleIcon={<Bookmark className="w-3.5 h-3.5" />}
+                accentClass="bg-yellow-500"
               />
             )}
 
-            <MediaCarousel title="Recently Added" items={recentlyAdded} />
+            <MediaCarousel title="Recently Added" items={recentlyAdded} accentClass="bg-primary" />
 
-            <LazySection skeletonHeight={220}>
-              <MediaCarousel title="Movies" items={movies} />
+            <LazySection skeletonHeight={240}>
+              <MediaCarousel title="Movies" items={movies} accentClass="bg-primary" />
             </LazySection>
-            <LazySection skeletonHeight={220}>
-              <MediaCarousel title="TV Shows & Series" items={series} />
+            <LazySection skeletonHeight={240}>
+              <MediaCarousel title="TV Shows & Series" items={series} accentClass="bg-purple-500" />
             </LazySection>
             {topRated.length > 0 && (
-              <LazySection skeletonHeight={220}>
-                <MediaCarousel title="Top Rated" items={topRated} />
+              <LazySection skeletonHeight={240}>
+                <MediaCarousel
+                  title="Top Rated"
+                  items={topRated}
+                  titleIcon={<Star className="w-3.5 h-3.5" />}
+                  accentClass="bg-yellow-500"
+                />
               </LazySection>
             )}
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* ── Phone Remote QR — always visible on TV home screen ── */}
+      {/* ── Phone Remote QR ── */}
       <RemoteQRWidget />
     </div>
   );
