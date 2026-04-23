@@ -126,7 +126,7 @@ export default function ShowPage() {
 
   useEffect(() => {
     if (!showImdbId) return;
-    fetch('/api/subscriptions')
+    fetch('/api/subscriptions', { credentials: 'include' })
       .then(r => r.json())
       .then((data: { subscriptions: Array<{ imdbId: string; schedule: string; enabled: boolean }> }) => {
         const existing = data.subscriptions?.find(s => s.imdbId === showImdbId);

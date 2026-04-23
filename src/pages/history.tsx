@@ -64,7 +64,7 @@ export default function HistoryPage() {
   const fetchHistory = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/history?profile=${encodeURIComponent(profileId)}`);
+      const res = await fetch(`/api/history?profile=${encodeURIComponent(profileId)}`, { credentials: 'include' });
       const data = await res.json() as HistoryItem[] | { error?: string };
       setItems(Array.isArray(data) ? data : []);
     } catch {
@@ -83,6 +83,7 @@ export default function HistoryPage() {
     try {
       await fetch('/api/history', {
         method: 'DELETE',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id, profileId }),
       });
@@ -99,6 +100,7 @@ export default function HistoryPage() {
     try {
       await fetch('/api/history', {
         method: 'DELETE',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ profileId }),
       });

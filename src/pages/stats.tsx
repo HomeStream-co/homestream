@@ -204,7 +204,7 @@ export default function StatsPage() {
   const fetchStats = useCallback(async (silent = false) => {
     if (!silent) setRefreshing(true);
     try {
-      const res = await fetch('/api/stats');
+      const res = await fetch('/api/stats', { credentials: 'include' });
       if (res.status === 401) throw new Error('HTTP 401 — please log in first');
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json = await res.json() as StatsData;
