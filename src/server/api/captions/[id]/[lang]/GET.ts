@@ -42,8 +42,10 @@ export default async function handler(req: Request, res: Response) {
       res.send('WEBVTT\n\n');
     }
   } catch (err) {
-    // Fallback — never leave the browser hanging on a broken <track>
-    res.send('WEBVTT\n\n');
+    // Fallback — only send if headers haven't been flushed yet
+    if (!res.headersSent) {
+      res.send('WEBVTT\n\n');
+    }
     console.error(`[captions] Error serving ${captionPath}:`, String(err));
   }
 }
