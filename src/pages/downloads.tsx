@@ -24,7 +24,7 @@ import {
   RefreshCw, X, ChevronDown, ChevronUp, Activity,
   Settings2, Save, BarChart3, Layers,
   Bell, BellOff, Calendar, RotateCcw, TrendingUp,
-  ChevronsUp, ChevronsDown,
+  ChevronsUp, ChevronsDown, Link2, Send,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import VPNPanel from '@/components/VPNPanel';
@@ -696,6 +696,125 @@ function GlobalSpeedBar({ tf }: { tf: TransferInfo }) {
   );
 }
 
+// ─── Manual Magnet Input ──────────────────────────────────────────────────────
+
+function MagnetInput({ onAdded }: { onAdded: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [magnet, setMagnet] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  const isValid = magnet.trim().startsWith('magnet:');
+
+  const handleSubmit = async () => {
+    if (!isValid || submitting) return;
+    setSubmitting(true);
+    try {
+      const res = await fetch('/api/stremio/magnet', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ magnet: magnet.trim() }),
+      });
+      const json = await res.json() as { ok: boolean; hash?: string; error?: string };
+      if (!res.ok || !json.ok) {
+        toast.error(json.error ?? 'Failed to add magnet');
+      } else {
+        toast.success('Magnet added to qBittorrent');
+        setMagnet('');
+        setOpen(false);
+        onAdded();
+      }
+    } catch (err) {
+      toast.error(`Network error: ${String(err)}`);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const text = e.clipboardData.getData('text');
+    if (text.trim().startsWith('magnet:')) {
+      // Auto-submit on paste of a valid magnet
+      setTimeout(() => {
+        setMagnet(text.trim());
+      }, 0);
+    }
+  };
+
+  useEffect(() => {
+    if (open && inputRef.current) inputRef.current.focus();
+  }, [open]);
+
+  return (
+    <div className="mb-6">
+      {!open ? (
+        <button
+          onClick={() => setOpen(true)}
+          className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl border border-dashed border-border bg-card/40 hover:bg-card hover:border-primary/40 transition-all text-muted-foreground hover:text-foreground group"
+        >
+          <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0 group-hover:bg-primary/20 transition-colors">
+            <Link2 className="w-4 h-4 text-primary" />
+          </div>
+          <div className="text-left">
+            <p className="text-sm font-medium text-foreground">Paste a magnet link</p>
+            <p className="text-xs text-muted-foreground">Add any torrent directly to qBittorrent</p>
+          </div>
+          <Send className="w-4 h-4 ml-auto opacity-0 group-hover:opacity-100 transition-opacity" />
+        </button>
+      ) : (
+        <motion.div
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="rounded-2xl border border-primary/30 bg-card p-4 space-y-3"
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Link2 className="w-4 h-4 text-primary" />
+              <span className="text-sm font-semibold text-foreground">Paste Magnet Link</span>
+            </div>
+            <button
+              onClick={() => { setOpen(false); setMagnet(''); }}
+              className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          <textarea
+            ref={inputRef}
+            value={magnet}
+            onChange={e => setMagnet(e.target.value)}
+            onPaste={handlePaste}
+            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSubmit(); } }}
+            placeholder="magnet:?xt=urn:btih:..."
+            rows={3}
+            className="w-full bg-background border border-border rounded-xl px-3 py-2.5 text-sm font-mono text-foreground placeholder:text-muted-foreground resize-none focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/60 transition-all"
+          />
+
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-xs text-muted-foreground">
+              {isValid
+                ? <span className="text-green-400 flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> Valid magnet link</span>
+                : magnet.length > 0
+                  ? <span className="text-yellow-400 flex items-center gap-1"><AlertCircle className="w-3 h-3" /> Must start with magnet:</span>
+                  : 'Paste a magnet link above — press Enter or click Add'}
+            </p>
+            <button
+              onClick={handleSubmit}
+              disabled={!isValid || submitting}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {submitting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+              {submitting ? 'Adding…' : 'Add to Queue'}
+            </button>
+          </div>
+        </motion.div>
+      )}
+    </div>
+  );
+}
+
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function DownloadsPage() {
@@ -1006,6 +1125,9 @@ export default function DownloadsPage() {
           <div className="mb-6">
             <VPNPanel />
           </div>
+
+          {/* ── Manual Magnet Paste ── */}
+          <MagnetInput onAdded={fetchData} />
 
           {/* ── Disk Usage Bar ── */}
           {storage && storage.diskTotalBytes && (
