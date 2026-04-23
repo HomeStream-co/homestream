@@ -167,7 +167,7 @@ Go to **Settings → Debug Panel → Quick Fixes → Purge Orphaned Upload Files
 Go to **Settings → Debug Panel → Quick Fixes → Clear TMDB Cache**.
 
 **Check if everything is working**
-Open your browser and go to `http://localhost:5173/api/health`
+Open your browser and go to `http://localhost:3000/api/health` (Electron/Docker) or `http://localhost:5173/api/health` (dev mode)
 
 ---
 
