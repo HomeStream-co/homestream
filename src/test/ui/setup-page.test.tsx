@@ -23,7 +23,7 @@
 
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 
 // ── Mock react-router-dom navigate ────────────────────────────────────────────
 // We need to capture navigate() calls without actually routing.

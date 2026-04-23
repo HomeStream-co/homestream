@@ -31,7 +31,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, waitFor, act } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import React, { type ReactElement } from 'react';
+import { type ReactElement } from 'react';
 
 // ── Inline the guard logic under test ────────────────────────────────────────
 // We test the COMBINED guard logic as it appears in RootLayout, but without

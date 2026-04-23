@@ -5,6 +5,7 @@ import path from 'path';
 const sharedAlias = {
   '@/': path.resolve(__dirname, './src/'),
   '@/components': path.resolve(__dirname, './src/components'),
+  '@/context': path.resolve(__dirname, './src/context'),
   '@/lib': path.resolve(__dirname, './src/lib'),
   '@/api': path.resolve(__dirname, './src/server/api'),
   '@/db': path.resolve(__dirname, './src/server/db'),
@@ -45,6 +46,7 @@ export default defineConfig({
     projects: [
       {
         // React component tests — jsdom environment
+        plugins: [react()],
         test: {
           name: 'browser',
           globals: true,

@@ -24,15 +24,16 @@
  */
 
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 // ── Mock AuthContext ──────────────────────────────────────────────────────────
 // LoginGate calls useAuth().login(password) and reads nothing else.
+// Use the full relative path so Vite's alias resolver finds it in jsdom env.
 
 const mockLogin = vi.fn();
 
-vi.mock('@/context/AuthContext', () => ({
+vi.mock('../../context/AuthContext', () => ({
   useAuth: () => ({ login: mockLogin }),
 }));
 
@@ -182,7 +183,6 @@ describe('LoginGate', () => {
 
     // The toggle button has tabIndex=-1 and no accessible name — find by its
     // position as the sibling button inside the password wrapper
-    const toggleBtn = screen.getByRole('button', { hidden: true, name: '' });
     // Fallback: find by the fact it's the only non-submit button
     const allButtons = screen.getAllByRole('button');
     // allButtons[0] = toggle (tabIndex=-1), allButtons[1] = submit
