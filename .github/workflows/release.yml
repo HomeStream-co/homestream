@@ -1,21 +1,22 @@
 name: Release
 
-# Triggered by pushing a version tag: git tag v1.3.6 && git push origin v1.3.6
+# Triggered by pushing a version tag: git tag v1.3.7 && git push origin v1.3.7
 #
 # Prerequisites (set in repo Settings → Secrets and variables → Actions):
 #   GH_TOKEN  — GitHub Personal Access Token with repo + write:packages scope
 #               (used by electron-builder to create the GitHub Release)
 #
-# Optional (auto-detected from github.repository if not set):
-#   GH_OWNER  — GitHub username/org (e.g. trevorrossworn-code)
-#   GH_REPO   — Repository name (e.g. homestream)
+# GH_OWNER and GH_REPO are auto-derived from the repository context.
+# You do NOT need to set them as secrets — they are read directly from
+# github.repository_owner and github.event.repository.name below.
+# (The old pattern `${{ secrets.X || github.Y }}` is invalid YAML/Actions syntax
+#  and silently resolves to empty string when the secret is not set.)
 #
 # Re-tag cycle (if you need to rebuild the same version):
-#   git pull origin main
-#   git tag -d v1.3.6
-#   git push origin --delete v1.3.6
-#   git tag v1.3.6
-#   git push origin v1.3.6
+#   git tag -d v1.3.7
+#   git push origin --delete v1.3.7
+#   git tag v1.3.7
+#   git push origin v1.3.7
 
 on:
   push:
@@ -47,12 +48,13 @@ jobs:
       - name: Package & publish installer
         # electron-builder reads publish config from electron/electron-builder.yml.
         # --publish always → creates/updates the GitHub Release and uploads assets.
+        # HOMESTREAM_GH_OWNER/REPO come directly from the github context — no secrets needed.
+        # GH_TOKEN must be set in repo Settings → Secrets → Actions.
         run: npx electron-builder --win -c electron/electron-builder.yml --publish always
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
-          # Owner/repo — fall back to the current repo context if secrets aren't set
-          HOMESTREAM_GH_OWNER: ${{ secrets.GH_OWNER || github.repository_owner }}
-          HOMESTREAM_GH_REPO: ${{ secrets.GH_REPO || github.event.repository.name }}
+          HOMESTREAM_GH_OWNER: ${{ github.repository_owner }}
+          HOMESTREAM_GH_REPO: ${{ github.event.repository.name }}
           # Code signing — uncomment when WIN_CSC_LINK secret is added
           # WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
           # WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
