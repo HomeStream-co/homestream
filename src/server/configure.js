@@ -287,4 +287,11 @@ export const serverListening = (server) => {
   }).catch(err => {
     console.warn('[remote] Failed to attach remote control (non-fatal):', err.message);
   });
+
+  // Attach WebSocket download broadcaster (replaces 5s client-side polling)
+  import('./downloadBroadcaster.js').then(({ attachDownloadBroadcaster }) => {
+    attachDownloadBroadcaster(server);
+  }).catch(err => {
+    console.warn('[downloads-ws] Failed to attach download broadcaster (non-fatal):', err.message);
+  });
 };
