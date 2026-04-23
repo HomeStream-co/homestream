@@ -2,11 +2,14 @@
  * ImageWithFallback — renders an <img> and swaps to a styled placeholder
  * if the image fails to load (404, CORS, no API key, etc.).
  *
+ * For TMDB CDN URLs that fail (e.g. mixed-content or CORS), automatically
+ * retries via the local /api/tmdb-proxy endpoint which fetches server-side.
+ *
  * Usage:
  *   <ImageWithFallback src={url} alt="Title" className="w-full h-full object-cover" />
  */
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { Film, Tv } from 'lucide-react';
 
 interface Props extends React.ImgHTMLAttributes<HTMLImageElement> {
@@ -18,6 +21,8 @@ interface Props extends React.ImgHTMLAttributes<HTMLImageElement> {
   fallbackClassName?: string;
 }
 
+const TMDB_CDN = 'image.tmdb.org';
+
 export default function ImageWithFallback({
   src,
   alt,
@@ -27,7 +32,22 @@ export default function ImageWithFallback({
   ...rest
 }: Props) {
   const [error, setError] = useState(false);
+  const [proxied, setProxied] = useState(false);
   const Icon = fallbackIcon === 'tv' ? Tv : Film;
+
+  // Build the proxy URL for TMDB CDN images
+  const proxyUrl = src && src.includes(TMDB_CDN)
+    ? `/api/tmdb-proxy?url=${encodeURIComponent(src)}`
+    : null;
+
+  const handleError = useCallback(() => {
+    // If we haven't tried the proxy yet and this is a TMDB CDN URL, try it
+    if (!proxied && proxyUrl) {
+      setProxied(true);
+    } else {
+      setError(true);
+    }
+  }, [proxied, proxyUrl]);
 
   if (!src || error) {
     return (
@@ -41,12 +61,14 @@ export default function ImageWithFallback({
     );
   }
 
+  const activeSrc = proxied && proxyUrl ? proxyUrl : src;
+
   return (
     <img
-      src={src}
+      src={activeSrc}
       alt={alt}
       className={className}
-      onError={() => setError(true)}
+      onError={handleError}
       {...rest}
     />
   );

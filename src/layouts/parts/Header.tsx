@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import {
   Search, Upload, Menu, X, Film, Bookmark, ChevronDown, Lock,
-  Home, Compass, Download, Library, History, Settings2, Wifi, BarChart3,
+  Home, Compass, Download, Library, History, Settings2, Wifi, BarChart3, Tv2,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'sonner';
@@ -145,6 +145,7 @@ export default function Header({ onChatOpen: _onChatOpen }: HeaderProps) {
     { to: '/library',   label: 'My Library' },
     { to: '/history',   label: 'History' },
     { to: '/stats',     label: 'Stats' },
+    { to: '/samsung-tv', label: 'Watch on TV', icon: Tv2 },
   ];
 
   const isActive = (to: string) =>
@@ -179,14 +180,19 @@ export default function Header({ onChatOpen: _onChatOpen }: HeaderProps) {
                 <Link
                   key={link.to}
                   to={link.to}
-                  className={`relative px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 ${
-                    isActive(link.to)
-                      ? 'text-foreground bg-white/8'
-                      : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
+                  className={`relative px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-1.5 ${
+                    link.to === '/samsung-tv'
+                      ? isActive(link.to)
+                        ? 'text-primary bg-primary/15 border border-primary/30'
+                        : 'text-primary/80 hover:text-primary hover:bg-primary/10 border border-primary/20'
+                      : isActive(link.to)
+                        ? 'text-foreground bg-white/8'
+                        : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
                   }`}
                 >
+                  {link.icon && <link.icon className="w-3.5 h-3.5" />}
                   {link.label}
-                  {isActive(link.to) && (
+                  {isActive(link.to) && link.to !== '/samsung-tv' && (
                     <motion.div
                       layoutId="nav-indicator"
                       className="absolute bottom-0 left-1/2 -translate-x-1/2 w-4 h-0.5 bg-primary rounded-full"
