@@ -48,13 +48,11 @@ jobs:
       - name: Package & publish installer
         # electron-builder reads publish config from electron/electron-builder.yml.
         # --publish always → creates/updates the GitHub Release and uploads assets.
-        # HOMESTREAM_GH_OWNER/REPO come directly from the github context — no secrets needed.
+        # owner/repo are hardcoded in electron-builder.yml (yml does not support env var expansion).
         # GH_TOKEN must be set in repo Settings → Secrets → Actions.
         run: npx electron-builder --win -c electron/electron-builder.yml --publish always
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
-          HOMESTREAM_GH_OWNER: ${{ github.repository_owner }}
-          HOMESTREAM_GH_REPO: ${{ github.event.repository.name }}
           # Code signing — uncomment when WIN_CSC_LINK secret is added
           # WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
           # WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}

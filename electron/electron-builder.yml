@@ -16,23 +16,22 @@ productName: HomeStream
 copyright: Copyright © 2026 HomeStream
 
 # Bake the GitHub owner/repo into the packaged app so the auto-updater knows
-# where to check for new releases. Set GH_OWNER and GH_REPO as GitHub Actions
-# secrets — they are injected via HOMESTREAM_GH_OWNER / HOMESTREAM_GH_REPO
-# env vars in the release workflow and written into package.json inside the asar.
-# updater.js reads process.env.HOMESTREAM_GH_OWNER at runtime (Electron passes
-# all extraMetadata fields as env vars automatically via electron-builder).
+# where to check for new releases.
+# updater.cjs reads pkg.build.ghOwner / pkg.build.ghRepo at runtime.
+# NOTE: electron-builder only expands its own built-in macros (${version},
+# ${productName}, etc.) — it does NOT expand arbitrary env vars in yml values.
+# Hardcode the repo coordinates here; they never change.
 extraMetadata:
-  ghOwner: ${HOMESTREAM_GH_OWNER}
-  ghRepo: ${HOMESTREAM_GH_REPO}
+  ghOwner: trevorrossworn-code
+  ghRepo: homestream
 
 # ── Auto-updater (electron-updater via GitHub Releases) ───────────────────────
-# Set GH_TOKEN env var when publishing: npm run electron:publish
-# Users get notified of new releases automatically; they choose when to install.
-# Owner/repo are injected from GitHub Actions secrets at build time.
+# GH_TOKEN must be set in repo Settings → Secrets → Actions.
+# owner/repo are hardcoded — electron-builder yml does not support ${ENV_VAR} expansion.
 publish:
   provider: github
-  owner: ${HOMESTREAM_GH_OWNER}
-  repo: ${HOMESTREAM_GH_REPO}
+  owner: trevorrossworn-code
+  repo: homestream
   releaseType: release
 
 # Directories
