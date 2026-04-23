@@ -7,6 +7,13 @@
  * Returns null immediately if no job exists for this mediaId.
  * Automatically closes the SSE connection when the job reaches a
  * terminal state (done / error / skipped).
+ *
+ * Race-condition fix (v1.4.3):
+ *   Previously the hook did a fetch() to sniff the Content-Type, then opened
+ *   a second EventSource to the same endpoint. This caused two simultaneous
+ *   connections — the fetch consumed the SSE stream body, and the EventSource
+ *   got an empty response. Now we open EventSource directly and detect the
+ *   terminal/no-job case from the first message frame.
  */
 import { useEffect, useState } from 'react';
 
@@ -23,6 +30,10 @@ export interface TranscodeProgress {
 
 const TERMINAL: TranscodeStatus[] = ['done', 'error', 'skipped'];
 
+// How long to wait for the first SSE message before assuming no active job.
+// The server sends a frame immediately if a job exists; 3s is generous.
+const NO_JOB_TIMEOUT_MS = 3_000;
+
 export function useTranscodeProgress(mediaId: string | undefined): TranscodeProgress | null {
   const [job, setJob] = useState<TranscodeProgress | null>(null);
 
@@ -31,45 +42,48 @@ export function useTranscodeProgress(mediaId: string | undefined): TranscodeProg
 
     let es: EventSource | null = null;
     let cancelled = false;
+    let noJobTimer: ReturnType<typeof setTimeout> | null = null;
 
-    // First do a quick HEAD-style fetch to see if a job exists at all.
-    // The SSE endpoint returns JSON immediately for terminal states, so
-    // we can use a regular fetch to check without opening a long-lived connection.
-    fetch(`/api/transcode/${mediaId}`, { credentials: 'include' })
-      .then(r => {
-        if (!r.ok || cancelled) return;
-        const ct = r.headers.get('content-type') ?? '';
+    // Open SSE connection directly — no pre-flight fetch.
+    // The server sends the first frame immediately for active jobs, or closes
+    // the connection with a terminal-state JSON frame for finished/absent jobs.
+    es = new EventSource(`/api/transcode/${mediaId}`);
 
-        // Terminal state returned as plain JSON — parse and set once, no SSE needed
-        if (ct.includes('application/json')) {
-          return r.json().then((data: TranscodeProgress) => {
-            if (!cancelled) setJob(data);
-          });
-        }
+    // If no message arrives within NO_JOB_TIMEOUT_MS, assume no active job
+    // and close the connection to avoid a dangling SSE stream.
+    noJobTimer = setTimeout(() => {
+      if (!cancelled) {
+        es?.close();
+        es = null;
+      }
+    }, NO_JOB_TIMEOUT_MS);
 
-        // Active job — open SSE stream
-        es = new EventSource(`/api/transcode/${mediaId}`);
+    es.onmessage = (e) => {
+      // Clear the no-job timeout — we got a real frame
+      if (noJobTimer) { clearTimeout(noJobTimer); noJobTimer = null; }
 
-        es.onmessage = (e) => {
-          try {
-            const data = JSON.parse(e.data) as TranscodeProgress;
-            if (!cancelled) setJob(data);
-            // Close once terminal
-            if (TERMINAL.includes(data.status)) {
-              es?.close();
-            }
-          } catch { /* ignore malformed frames */ }
-        };
-
-        es.onerror = () => {
+      try {
+        const data = JSON.parse(e.data) as TranscodeProgress;
+        if (!cancelled) setJob(data);
+        // Close once terminal
+        if (TERMINAL.includes(data.status)) {
           es?.close();
-        };
-      })
-      .catch(() => { /* no job — stay null */ });
+          es = null;
+        }
+      } catch { /* ignore malformed frames */ }
+    };
+
+    es.onerror = () => {
+      if (noJobTimer) { clearTimeout(noJobTimer); noJobTimer = null; }
+      es?.close();
+      es = null;
+    };
 
     return () => {
       cancelled = true;
+      if (noJobTimer) clearTimeout(noJobTimer);
       es?.close();
+      es = null;
     };
   }, [mediaId]);
 

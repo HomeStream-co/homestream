@@ -23,31 +23,40 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 
-// Resolve FFmpeg binary: prefer FFMPEG_PATH env var (set by Electron when
-// bundling ffmpeg-static), then try ffmpeg-static directly, then fall back
-// to a system 'ffmpeg' on PATH.
+// ── Binary resolution (lazy, cached) ─────────────────────────────────────────
+//
+// IMPORTANT: resolveFfmpeg / resolveFfprobe are called LAZILY on first use,
+// NOT at module load time. Running createRequire + fs.existsSync synchronously
+// at module load caused the "slow Start Server" symptom — the module import
+// blocked the entire server startup while Node resolved the ffmpeg-static path.
+// Caching the result after the first call keeps subsequent calls O(1).
+
+let _ffmpeg: string | null = null;
+let _ffprobe: string | null = null;
+
 function resolveFfmpeg(): string {
-  if (process.env.FFMPEG_PATH) return process.env.FFMPEG_PATH;
+  if (_ffmpeg) return _ffmpeg;
+  if (process.env.FFMPEG_PATH) { _ffmpeg = process.env.FFMPEG_PATH; return _ffmpeg; }
   try {
     // Use createRequire so this ESM file can load the CJS ffmpeg-static package
     // without triggering the no-require-imports lint rule.
     const req = createRequire(import.meta.url);
     const p = req('ffmpeg-static') as string | null;
-    if (p) return p;
+    if (p) { _ffmpeg = p; return _ffmpeg; }
   } catch { /* not installed */ }
-  return 'ffmpeg';
+  _ffmpeg = 'ffmpeg';
+  return _ffmpeg;
 }
 
-// Resolve ffprobe binary: same logic as ffmpeg but for ffprobe.
-// ffmpeg-static bundles both binaries in the same directory.
 function resolveFfprobe(): string {
+  if (_ffprobe) return _ffprobe;
   // Electron sets FFMPEG_PATH to the bundled ffmpeg binary.
   // ffprobe lives in the same directory with the same naming convention.
   if (process.env.FFMPEG_PATH) {
     const dir = path.dirname(process.env.FFMPEG_PATH);
     const ext = process.platform === 'win32' ? '.exe' : '';
     const candidate = path.join(dir, `ffprobe${ext}`);
-    if (fs.existsSync(candidate)) return candidate;
+    if (fs.existsSync(candidate)) { _ffprobe = candidate; return _ffprobe; }
   }
   try {
     const req = createRequire(import.meta.url);
@@ -57,14 +66,16 @@ function resolveFfprobe(): string {
       const dir = path.dirname(ffmpegPath);
       const ext = process.platform === 'win32' ? '.exe' : '';
       const candidate = path.join(dir, `ffprobe${ext}`);
-      if (fs.existsSync(candidate)) return candidate;
+      if (fs.existsSync(candidate)) { _ffprobe = candidate; return _ffprobe; }
     }
   } catch { /* not installed */ }
-  return 'ffprobe';
+  _ffprobe = 'ffprobe';
+  return _ffprobe;
 }
 
-const FFMPEG = resolveFfmpeg();
-const FFPROBE = resolveFfprobe();
+// Accessors — resolved lazily on first probe/transcode call, not at import time
+const FFMPEG  = () => resolveFfmpeg();
+const FFPROBE = () => resolveFfprobe();
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
@@ -125,8 +136,16 @@ export interface CodecInfo {
 const BROWSER_SAFE_CODECS = new Set(['h264', 'avc1', 'vp8', 'vp9', 'av1', 'theora']);
 
 export async function probeCodec(filePath: string): Promise<CodecInfo> {
+  // 15-second timeout — ffprobe can hang indefinitely on corrupt or network-
+  // mounted files. Without this guard the player page never finishes loading.
   return new Promise(resolve => {
-    const probe = spawn(FFPROBE, [
+    const timer = setTimeout(() => {
+      probe.kill('SIGTERM');
+      console.warn(`[hls] ffprobe timed out for ${path.basename(filePath)} — assuming safe codec`);
+      resolve({ codec: 'unknown', needsTranscode: false });
+    }, 15_000);
+
+    const probe = spawn(FFPROBE(), [
       '-v', 'quiet',
       '-print_format', 'json',
       '-show_streams',
@@ -137,6 +156,7 @@ export async function probeCodec(filePath: string): Promise<CodecInfo> {
     let out = '';
     probe.stdout.on('data', (d: Buffer) => { out += d.toString(); });
     probe.on('close', () => {
+      clearTimeout(timer);
       try {
         const json = JSON.parse(out) as { streams?: Array<{ codec_name?: string }> };
         const codec = json.streams?.[0]?.codec_name ?? 'unknown';
@@ -148,7 +168,7 @@ export async function probeCodec(filePath: string): Promise<CodecInfo> {
         resolve({ codec: 'unknown', needsTranscode: false });
       }
     });
-    probe.on('error', () => resolve({ codec: 'unknown', needsTranscode: false }));
+    probe.on('error', () => { clearTimeout(timer); resolve({ codec: 'unknown', needsTranscode: false }); });
   });
 }
 
@@ -211,7 +231,7 @@ export async function startHlsJob(mediaId: string, sourceFilePath: string): Prom
 
   console.log(`[hls] Starting transcode for ${mediaId}: ${path.basename(sourceFilePath)}`);
 
-  const ff = spawn(FFMPEG, args, { stdio: ['ignore', 'ignore', 'pipe'] });
+  const ff = spawn(FFMPEG(), args, { stdio: ['ignore', 'ignore', 'pipe'] });
   job.process = ff;
 
   // Watch for the playlist file to appear — that means the first segment is ready

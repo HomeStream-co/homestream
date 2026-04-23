@@ -609,3 +609,151 @@ describe('POST /api/setup — unknown action', () => {
     expect((res.body as { error: string }).error).toContain('Unknown action');
   });
 });
+
+// ── POST /api/setup — crash-path / resilience tests ──────────────────────────
+
+describe('POST /api/setup — crash-path resilience', () => {
+  let handler: (req: Request, res: Response) => Promise<void>;
+
+  beforeEach(async () => {
+    vi.resetModules();
+    mockAuthed = true;
+    mockIsSetupComplete.mockReset().mockReturnValue(false);
+    mockWriteConfig.mockReset().mockReturnValue({ ...BASE_CONFIG, setupComplete: true });
+    mockReadConfig.mockReset().mockReturnValue(BASE_CONFIG);
+    mockBcryptHash.mockReset().mockResolvedValue('$2b$12$newhash');
+    mockStartWatcher.mockReset();
+    mockStopWatcher.mockReset();
+    const mod = await import('../../server/api/setup/POST.js');
+    handler = mod.default;
+  });
+
+  it('returns 500 when writeConfig throws during save', async () => {
+    mockWriteConfig.mockImplementation(() => { throw new Error('disk full'); });
+    const req = makeReq({ body: { action: 'save', mediaDir: '/media' } });
+    const res = makeRes();
+    await handler(req, res as unknown as Response);
+    expect(res.statusCode).toBe(500);
+    expect((res.body as { error: string }).error).toBe('Setup action failed');
+  });
+
+  it('returns 500 when writeConfig throws during complete', async () => {
+    mockWriteConfig.mockImplementation(() => { throw new Error('permission denied'); });
+    const req = makeReq({ body: { action: 'complete' } });
+    const res = makeRes();
+    await handler(req, res as unknown as Response);
+    expect(res.statusCode).toBe(500);
+  });
+
+  it('returns 500 when bcrypt.hash throws during save', async () => {
+    mockBcryptHash.mockRejectedValue(new Error('bcrypt internal error'));
+    const req = makeReq({ body: { action: 'save', adminPassword: 'newpass' } });
+    const res = makeRes();
+    await handler(req, res as unknown as Response);
+    expect(res.statusCode).toBe(500);
+  });
+
+  it('scan_existing returns 400 when no mediaDir in config or body', async () => {
+    mockReadConfig.mockReturnValue({ ...BASE_CONFIG, mediaDir: '' });
+    const req = makeReq({ body: { action: 'scan_existing' } });
+    const res = makeRes();
+    await handler(req, res as unknown as Response);
+    expect(res.statusCode).toBe(400);
+    expect((res.body as { error: string }).error).toContain('No media directory');
+  });
+
+  it('scan_existing returns 500 when scanExistingMedia throws', async () => {
+    mockReadConfig.mockReturnValue(BASE_CONFIG);
+    mockScanExisting.mockImplementation(() => { throw new Error('EACCES: permission denied'); });
+    const req = makeReq({ body: { action: 'scan_existing', mediaDir: '/media' } });
+    const res = makeRes();
+    await handler(req, res as unknown as Response);
+    expect(res.statusCode).toBe(500);
+  });
+
+  it('import_existing returns immediately with ok:true when no files scanned', async () => {
+    // lastScanFiles is empty (no prior scan_existing call in this session)
+    const req = makeReq({ body: { action: 'import_existing' } });
+    const res = makeRes();
+    await handler(req, res as unknown as Response);
+    // Should return 200 with imported:0, not crash
+    expect(res.statusCode).toBe(200);
+    expect((res.body as { imported: number }).imported).toBe(0);
+  });
+
+  it('complete starts folder watcher when watchFolderEnabled is true', async () => {
+    mockWriteConfig.mockReturnValue({
+      ...BASE_CONFIG,
+      setupComplete: true,
+      watchFolderEnabled: true,
+      downloadsDir: '/media/downloads',
+    });
+    const req = makeReq({ body: { action: 'complete' } });
+    const res = makeRes();
+    await handler(req, res as unknown as Response);
+    expect(mockStopWatcher).toHaveBeenCalled();
+    expect(mockStartWatcher).toHaveBeenCalledWith('/media/downloads');
+    expect(res.statusCode).toBe(200);
+  });
+
+  it('complete does NOT start folder watcher when watchFolderEnabled is false', async () => {
+    mockWriteConfig.mockReturnValue({
+      ...BASE_CONFIG,
+      setupComplete: true,
+      watchFolderEnabled: false,
+    });
+    const req = makeReq({ body: { action: 'complete' } });
+    const res = makeRes();
+    await handler(req, res as unknown as Response);
+    expect(mockStartWatcher).not.toHaveBeenCalled();
+  });
+
+  it('save with empty body does not crash (no fields to update)', async () => {
+    mockWriteConfig.mockReturnValue(BASE_CONFIG);
+    const req = makeReq({ body: { action: 'save' } });
+    const res = makeRes();
+    await handler(req, res as unknown as Response);
+    expect(res.statusCode).toBe(200);
+    expect((res.body as { ok: boolean }).ok).toBe(true);
+  });
+
+  it('save boolean coercion: watchFolderEnabled "true" → true', async () => {
+    mockWriteConfig.mockReturnValue(BASE_CONFIG);
+    const req = makeReq({ body: { action: 'save', watchFolderEnabled: 'true' } });
+    const res = makeRes();
+    await handler(req, res as unknown as Response);
+    expect(mockWriteConfig).toHaveBeenCalledWith(
+      expect.objectContaining({ watchFolderEnabled: true })
+    );
+  });
+
+  it('save boolean coercion: watchFolderEnabled "false" → false', async () => {
+    mockWriteConfig.mockReturnValue(BASE_CONFIG);
+    const req = makeReq({ body: { action: 'save', watchFolderEnabled: 'false' } });
+    const res = makeRes();
+    await handler(req, res as unknown as Response);
+    expect(mockWriteConfig).toHaveBeenCalledWith(
+      expect.objectContaining({ watchFolderEnabled: false })
+    );
+  });
+
+  it('save boolean coercion: autoTranscode "true" → true', async () => {
+    mockWriteConfig.mockReturnValue(BASE_CONFIG);
+    const req = makeReq({ body: { action: 'save', autoTranscode: 'true' } });
+    const res = makeRes();
+    await handler(req, res as unknown as Response);
+    expect(mockWriteConfig).toHaveBeenCalledWith(
+      expect.objectContaining({ autoTranscode: true })
+    );
+  });
+
+  it('save normalises Windows backslash paths to OS separator', async () => {
+    mockWriteConfig.mockReturnValue(BASE_CONFIG);
+    const req = makeReq({ body: { action: 'save', mediaDir: 'C:\\Users\\Public\\Videos' } });
+    const res = makeRes();
+    await handler(req, res as unknown as Response);
+    // On Linux (CI), path.sep is '/' — backslashes become forward slashes
+    const call = mockWriteConfig.mock.calls[0][0] as Record<string, string>;
+    expect(call.mediaDir).not.toContain('\\');
+  });
+});
