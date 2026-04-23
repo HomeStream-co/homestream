@@ -233,7 +233,7 @@ export default function SetupPage() {
   const currentStep = STEPS[step];
 
   return (
-    <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4 py-8">
+    <div className="min-h-dvh bg-background flex flex-col items-center justify-start p-4 py-8 overflow-y-auto">
       <title>Setup — HomeStream</title>
 
       {/* Logo */}
@@ -274,7 +274,7 @@ export default function SetupPage() {
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -20 }}
             transition={{ duration: 0.2 }}
-            className="bg-card border border-border rounded-2xl p-8 shadow-2xl max-h-[80vh] overflow-y-auto"
+            className="bg-card border border-border rounded-2xl p-8 shadow-2xl"
           >
             {step === 0 && <StepSysReqs     {...stepProps} />}
             {step === 1 && <StepMediaFolder {...stepProps} />}

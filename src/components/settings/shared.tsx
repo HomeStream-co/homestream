@@ -1,13 +1,8 @@
 /**
  * settings/shared.tsx
  *
- * Primitives shared across all SettingsPanel section files:
- *   - fmtBytes        — human-readable byte sizes
- *   - Toggle          — labelled on/off switch
- *   - SectionHeader   — icon + uppercase label row
- *   - ConfirmDialog   — modal confirm/cancel overlay
- *   - ApiKeyField     — masked input with show/hide + test button
- *   - TestStatus      — type alias for ApiKeyField status
+ * Primitives shared across all SettingsPanel section files.
+ * Nothing here has its own state beyond local UI state.
  */
 
 import { memo, useState } from 'react';
@@ -39,10 +34,14 @@ export const Toggle = memo(function Toggle({
 }) {
   return (
     <label className="flex items-start gap-3 cursor-pointer group py-2">
-      {Icon && <Icon className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0 group-hover:text-foreground transition-colors" />}
+      {Icon && (
+        <Icon className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0 group-hover:text-foreground transition-colors" />
+      )}
       <div className="flex-1 min-w-0">
         <p className="text-sm text-foreground leading-tight">{label}</p>
-        {description && <p className="text-[11px] text-muted-foreground mt-0.5 leading-snug">{description}</p>}
+        {description && (
+          <p className="text-[11px] text-muted-foreground mt-0.5 leading-snug">{description}</p>
+        )}
       </div>
       <button
         role="switch"
@@ -52,7 +51,11 @@ export const Toggle = memo(function Toggle({
           checked ? 'bg-primary' : 'bg-muted'
         }`}
       >
-        <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform duration-200 ${checked ? 'translate-x-4' : 'translate-x-0'}`} />
+        <span
+          className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform duration-200 ${
+            checked ? 'translate-x-4' : 'translate-x-0'
+          }`}
+        />
       </button>
     </label>
   );
@@ -69,7 +72,9 @@ export const SectionHeader = memo(function SectionHeader({
   return (
     <div className="flex items-center gap-2 px-4 pt-3 pb-1">
       <Icon className="w-3.5 h-3.5 text-primary" />
-      <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-semibold">{label}</p>
+      <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-semibold">
+        {label}
+      </p>
     </div>
   );
 });
@@ -100,14 +105,25 @@ export function ConfirmDialog({
         className="relative z-10 w-full max-w-sm bg-card border border-border rounded-2xl shadow-2xl p-5 flex flex-col gap-4"
       >
         <div className="flex items-start gap-3">
-          <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${variant === 'destructive' ? 'bg-destructive/15' : 'bg-yellow-500/15'}`}>
-            <AlertTriangle className={`w-5 h-5 ${variant === 'destructive' ? 'text-destructive' : 'text-yellow-400'}`} />
+          <div
+            className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${
+              variant === 'destructive' ? 'bg-destructive/15' : 'bg-yellow-500/15'
+            }`}
+          >
+            <AlertTriangle
+              className={`w-5 h-5 ${
+                variant === 'destructive' ? 'text-destructive' : 'text-yellow-400'
+              }`}
+            />
           </div>
           <div>
             <p className="text-sm font-semibold text-foreground">{title}</p>
             <p className="text-[12px] text-muted-foreground mt-1 leading-relaxed">{message}</p>
           </div>
-          <button onClick={onCancel} className="ml-auto text-muted-foreground hover:text-foreground transition-colors flex-shrink-0">
+          <button
+            onClick={onCancel}
+            className="ml-auto text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
+          >
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -181,7 +197,11 @@ export function ApiKeyField({
             placeholder={placeholder ?? 'Enter API key…'}
             className="w-full pr-8 pl-3 py-1.5 text-xs bg-background border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary font-mono"
           />
-          <button type="button" onClick={() => setShow(s => !s)} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+          <button
+            type="button"
+            onClick={() => setShow(s => !s)}
+            className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+          >
             {show ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
           </button>
         </div>

@@ -3,7 +3,7 @@ import { useTheme, THEMES } from '@/context/ThemeContext';
 import { SectionHeader, Toggle } from './shared';
 
 export default function SettingsAppearance() {
-  const { settings, activeTheme, setTheme, updateSetting } = useTheme();
+  const { settings, setTheme, updateSetting } = useTheme();
 
   return (
     <>
@@ -25,7 +25,9 @@ export default function SettingsAppearance() {
                 <div className="flex-1" style={{ background: theme.swatch }} />
                 <div className="flex-1" style={{ background: theme.accentSwatch }} />
               </div>
-              <span className="text-[10px] text-center leading-tight text-foreground font-medium line-clamp-2">{theme.name}</span>
+              <span className="text-[10px] text-center leading-tight text-foreground font-medium line-clamp-2">
+                {theme.name}
+              </span>
               {settings.themeId === theme.id && (
                 <div className="absolute top-1 right-1 w-3.5 h-3.5 rounded-full bg-primary flex items-center justify-center">
                   <Check className="w-2 h-2 text-white" />
@@ -34,7 +36,6 @@ export default function SettingsAppearance() {
             </button>
           ))}
         </div>
-        {/* Theme name badge — mirrors the panel header badge */}
         <div className="mt-2 border-t border-border/50 pt-2">
           <Toggle
             checked={settings.syncPlayerColor}
@@ -44,8 +45,6 @@ export default function SettingsAppearance() {
             icon={Monitor}
           />
         </div>
-        {/* Suppress unused-var warning — activeTheme is used by parent header badge */}
-        <span className="sr-only">{activeTheme.name}</span>
       </div>
     </>
   );

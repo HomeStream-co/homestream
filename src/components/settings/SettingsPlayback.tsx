@@ -1,4 +1,6 @@
-import { Play, Zap, RotateCcw, SkipForward, Monitor, Volume2, Subtitles } from 'lucide-react';
+import {
+  Play, Zap, RotateCcw, SkipForward, Monitor, Volume2, Subtitles,
+} from 'lucide-react';
 import { useTheme, type AppSettings } from '@/context/ThemeContext';
 import { SectionHeader, Toggle } from './shared';
 
@@ -71,7 +73,9 @@ export default function SettingsPlayback() {
               onChange={e => set('defaultVolume', Number(e.target.value))}
               className="w-20 accent-primary cursor-pointer"
             />
-            <span className="text-xs text-foreground font-mono w-8 text-right">{settings.defaultVolume}%</span>
+            <span className="text-xs text-foreground font-mono w-8 text-right">
+              {settings.defaultVolume}%
+            </span>
           </div>
         </div>
 

@@ -645,7 +645,7 @@ export default function SettingsPanel({ onOpenSecurity, onOpenDebug, forceOpen, 
                 </span>
               </div>
 
-              <div className="max-h-[calc(100vh-120px)] overflow-y-auto">
+              <div className="overflow-y-auto" style={{ maxHeight: 'min(calc(100dvh - 96px), 640px)' }}>
 
                 {/* ── 1. Appearance ── */}
                 <SectionHeader icon={Palette} label="Appearance" />
