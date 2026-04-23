@@ -15,17 +15,15 @@ export default function handler(req: Request, res: Response) {
     return;
   }
 
-  if (action === 'delete') {
-    const result = deleteFromQuarantine(id);
-    res.json(result);
-    return;
+  try {
+    if (action === 'delete') {
+      return res.json(deleteFromQuarantine(id));
+    }
+    if (action === 'restore') {
+      return res.json(restoreFromQuarantine(id));
+    }
+    res.status(400).json({ error: `Unknown action: ${action}` });
+  } catch (err) {
+    res.status(500).json({ error: 'Quarantine operation failed', message: String(err) });
   }
-
-  if (action === 'restore') {
-    const result = restoreFromQuarantine(id);
-    res.json(result);
-    return;
-  }
-
-  res.status(400).json({ error: `Unknown action: ${action}` });
 }

@@ -28,14 +28,17 @@ import { getSessionCount } from '../../auth/login/POST.js';
 export default function handler(req: Request, res: Response) {
   if (!requireAuth(req, res)) return;
 
-  const cfg = readConfig();
-
-  res.json({
-    developerLocked: isDeveloperLocked(),
-    hasAdminPassword: !!cfg.adminPassword,
-    hasTmdbKey: !!cfg.tmdbApiKey,
-    hasGoogleAiKey: !!cfg.googleAiApiKey,
-    setupComplete: isSetupComplete(),
-    sessionCount: getSessionCount(),
-  });
+  try {
+    const cfg = readConfig();
+    res.json({
+      developerLocked: isDeveloperLocked(),
+      hasAdminPassword: !!cfg.adminPassword,
+      hasTmdbKey: !!cfg.tmdbApiKey,
+      hasGoogleAiKey: !!cfg.googleAiApiKey,
+      setupComplete: isSetupComplete(),
+      sessionCount: getSessionCount(),
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to read admin status', message: String(err) });
+  }
 }

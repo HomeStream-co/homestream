@@ -11,5 +11,9 @@ import { requireAuth } from '../../authMiddleware.js';
 export default function handler(req: Request, res: Response) {
   if (!requireAuth(req, res)) return;
   const profileId = (req.query.profile as string | undefined)?.trim() || 'adult';
-  res.json(readWatchlist(profileId));
+  try {
+    res.json(readWatchlist(profileId));
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to read watchlist', message: String(err) });
+  }
 }

@@ -34,10 +34,16 @@ export default async function handler(req: Request, res: Response) {
   res.setHeader('Cache-Control', 'public, max-age=3600');
   res.setHeader('Access-Control-Allow-Origin', '*');
 
-  if (fs.existsSync(captionPath)) {
-    res.sendFile(captionPath);
-  } else {
-    // Return a valid empty VTT so the browser doesn't log a parse error
+  try {
+    if (fs.existsSync(captionPath)) {
+      res.sendFile(captionPath);
+    } else {
+      // Return a valid empty VTT so the browser doesn't log a parse error
+      res.send('WEBVTT\n\n');
+    }
+  } catch (err) {
+    // Fallback — never leave the browser hanging on a broken <track>
     res.send('WEBVTT\n\n');
+    console.error(`[captions] Error serving ${captionPath}:`, String(err));
   }
 }

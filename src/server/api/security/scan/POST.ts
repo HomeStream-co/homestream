@@ -20,6 +20,10 @@ export default function handler(req: Request, res: Response) {
     return;
   }
 
-  const result = runPostDownloadScan({ filePath, infoHash, title });
-  res.json(result);
+  try {
+    const result = runPostDownloadScan({ filePath, infoHash, title });
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: 'Scan failed', message: String(err) });
+  }
 }
