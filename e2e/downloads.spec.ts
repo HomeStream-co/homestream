@@ -48,8 +48,8 @@ test.describe('Downloads Page', () => {
 
   test('global speed bar section is present', async ({ page }) => {
     // GlobalSpeedBar shows overall download speed
-    const speedBar = page.locator('[data-testid="global-speed-bar"], text=/speed|mb\/s|kb\/s/i').first();
-    const isVisible = await speedBar.isVisible({ timeout: 3000 }).catch(() => false);
+    const speedBar = page.locator('[data-testid="global-speed-bar"], text=/speed|mb[/]s|kb[/]s/i').first();
+    await speedBar.isVisible({ timeout: 3000 }).catch(() => false);
     // Speed bar may only show when downloads are active — just check page didn't crash
     expect(page.url()).toContain('/downloads');
   });
@@ -57,7 +57,7 @@ test.describe('Downloads Page', () => {
   test('page has a way to start a new download', async ({ page }) => {
     // There should be some way to initiate downloads — either a button or a link to Discover
     const discoverLink = page.locator('a[href*="discover"], button').filter({ hasText: /discover|find|search|add/i }).first();
-    const isVisible = await discoverLink.isVisible({ timeout: 3000 }).catch(() => false);
+    await discoverLink.isVisible({ timeout: 3000 }).catch(() => false);
     // Not strictly required — just checking the page is functional
     expect(page.url()).toContain('/downloads');
   });

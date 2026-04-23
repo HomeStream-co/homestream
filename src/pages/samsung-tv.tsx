@@ -15,8 +15,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import {
   Tv2, Wifi, Globe, Star, ChevronRight, ChevronLeft,
   Copy, Check, ArrowLeft, Info, Zap, MonitorSmartphone,
-  TriangleAlert, CheckCircle2, Keyboard, Home, Volume2,
-  Play, SkipForward, ChevronUp, ChevronDown, Circle,
+  TriangleAlert, CheckCircle2, Keyboard, Home,
+  Play, Circle,
   ExternalLink, Lock, Smartphone, RefreshCw,
 } from 'lucide-react';
 
@@ -73,15 +73,8 @@ function CodeBlock({ code, label }: { code: string; label?: string }) {
   );
 }
 
-function StepBadge({ n, active, done }: { n: number; active: boolean; done: boolean }) {
-  return (
-    <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 transition-colors ${
-      done ? 'bg-green-500 text-white' : active ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
-    }`}>
-      {done ? <Check className="w-3.5 h-3.5" /> : n}
-    </div>
-  );
-}
+
+// ── Section components ────────────────────────────────────────────────────────
 
 // Samsung remote key visual
 function RemoteKey({ label, icon: Icon, color = 'bg-card border-border text-foreground' }: {

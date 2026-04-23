@@ -12,7 +12,7 @@
  *   6. VPN interfaces — likelyVpn heuristic covers broad adapter names
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
