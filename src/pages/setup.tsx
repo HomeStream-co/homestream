@@ -83,6 +83,8 @@ export default function SetupPage() {
     vpnServerType: 'p2p',
     vpnAutoFastest: true,
     vpnKnownServers: '',
+    prowlarrUrl: 'http://localhost:9696',
+    prowlarrApiKey: '',
   });
 
   const set = (key: keyof FormData, value: unknown) =>

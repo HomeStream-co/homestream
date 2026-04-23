@@ -47,6 +47,9 @@ export interface FormData {
   vpnKnownServers: string;
   /** VPN interface binding — Windows adapter name (e.g. "Norton Secure VPN") */
   vpnInterface?: string;
+  // Prowlarr — self-hosted indexer aggregator
+  prowlarrUrl: string;
+  prowlarrApiKey: string;
 }
 
 export type KeyTestState = 'idle' | 'testing' | 'ok' | 'error';

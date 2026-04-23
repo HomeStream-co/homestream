@@ -1,46 +1,69 @@
 import type { Request, Response } from 'express';
 import { requireAuth } from '../../../authMiddleware.js';
+import { readConfig } from '../../../configStore.js';
 
 /**
  * POST /api/stremio/stream
- * Body: { imdbId: string, type: 'movie' | 'series', season?: number, episode?: number }
+ * Body: { imdbId, type, season?, episode?, title? }
  *
- * Resolves torrent/magnet streams for a given IMDB ID using public Stremio
- * addon endpoints (no auth required). Returns a list of stream options with
- * magnet links and quality labels so the UI can let the user pick one.
+ * Queries ALL configured sources in parallel and merges results:
+ *   1. Torrentio  — always queried (public, no config needed)
+ *   2. Prowlarr   — queried when prowlarrUrl + prowlarrApiKey are set in config
+ *   3. Nyaa.si    — queried for anime (always, public API, no auth)
  *
- * Uses the public Torrentio addon — the most popular Stremio stream source.
- * Torrentio aggregates public torrent trackers (RARBG, 1337x, YTS, etc.)
- * and returns magnet links. No account needed for basic use.
+ * Results are deduplicated by infoHash and sorted by seed count descending.
+ * Each result carries a `source` label so the UI can show where it came from.
  */
+
+// ── Types ─────────────────────────────────────────────────────────────────────
 
 interface TorrentioStream {
   name?: string;
   title?: string;
   infoHash?: string;
   fileIdx?: number;
-  behaviorHints?: { bingeGroup?: string };
   sources?: string[];
 }
+interface TorrentioResponse { streams?: TorrentioStream[] }
 
-interface TorrentioResponse {
-  streams?: TorrentioStream[];
+interface ProwlarrResult {
+  title: string;
+  downloadUrl?: string;
+  magnetUrl?: string;
+  infoHash?: string;
+  seeders?: number;
+  size?: number;
+  publishDate?: string;
+}
+interface ProwlarrResponse { results?: ProwlarrResult[] }
+
+interface NyaaItem {
+  id: number;
+  title: string;
+  magnet: string;
+  seeders: number;
+  leechers: number;
+  size: string;
+  hash: string;
 }
 
-interface StreamResult {
+export interface StreamResult {
   name: string;
   quality: string;
   size: string;
   seeds: string;
   magnet: string;
   infoHash: string;
+  source: 'torrentio' | 'prowlarr' | 'nyaa';
 }
 
-const TORRENTIO = 'https://torrentio.strem.fun';
-const TIMEOUT_MS = 15_000;
+const TORRENTIO   = 'https://torrentio.strem.fun';
+const NYAA_API    = 'https://nyaa.si/api';
+const TIMEOUT_MS  = 15_000;
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 function parseStreamTitle(raw: string): { quality: string; size: string; seeds: string } {
-  // Torrentio title format: "Quality\nSize 👤 Seeds\nSource"
   const lines = raw.split('\n').map(l => l.trim()).filter(Boolean);
   const quality = lines[0] ?? 'Unknown';
   const sizeLine = lines[1] ?? '';
@@ -61,13 +84,126 @@ function buildMagnet(infoHash: string, sources?: string[]): string {
   return `magnet:?xt=urn:btih:${infoHash}${trackers}`;
 }
 
+function formatBytes(bytes: number): string {
+  if (!bytes) return '';
+  if (bytes >= 1e9) return `${(bytes / 1e9).toFixed(1)} GB`;
+  if (bytes >= 1e6) return `${(bytes / 1e6).toFixed(0)} MB`;
+  return `${bytes} B`;
+}
+
+// ── Source fetchers ───────────────────────────────────────────────────────────
+
+async function fetchTorrentio(
+  imdbId: string, type: string, season?: number, episode?: number,
+): Promise<StreamResult[]> {
+  const streamId =
+    type === 'series' && season != null && episode != null
+      ? `${imdbId}:${season}:${episode}`
+      : imdbId;
+  const url = `${TORRENTIO}/stream/${type}/${streamId}.json`;
+  const controller = new AbortController();
+  const t = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  try {
+    const res = await fetch(url, { signal: controller.signal, headers: { 'User-Agent': 'HomeStream/1.5' } });
+    clearTimeout(t);
+    if (!res.ok) return [];
+    const data = await res.json() as TorrentioResponse;
+    return (data.streams ?? [])
+      .filter(s => s.infoHash)
+      .map(s => {
+        const { quality, size, seeds } = parseStreamTitle(s.title ?? s.name ?? '');
+        return {
+          name: s.name ?? 'Torrentio',
+          quality,
+          size,
+          seeds,
+          infoHash: s.infoHash!,
+          magnet: buildMagnet(s.infoHash!, s.sources),
+          source: 'torrentio' as const,
+        };
+      });
+  } catch {
+    clearTimeout(t);
+    return [];
+  }
+}
+
+async function fetchProwlarr(
+  query: string, prowlarrUrl: string, prowlarrApiKey: string,
+): Promise<StreamResult[]> {
+  if (!prowlarrUrl || !prowlarrApiKey) return [];
+  const url = `${prowlarrUrl.replace(/\/$/, '')}/api/v1/search?query=${encodeURIComponent(query)}&type=search&limit=30`;
+  const controller = new AbortController();
+  const t = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  try {
+    const res = await fetch(url, {
+      signal: controller.signal,
+      headers: { 'X-Api-Key': prowlarrApiKey, 'User-Agent': 'HomeStream/1.5' },
+    });
+    clearTimeout(t);
+    if (!res.ok) return [];
+    const data = await res.json() as ProwlarrResponse;
+    return (data.results ?? [])
+      .filter(r => r.magnetUrl || r.infoHash)
+      .map(r => {
+        const infoHash = r.infoHash ?? r.magnetUrl?.match(/btih:([a-fA-F0-9]{40})/i)?.[1] ?? '';
+        const magnet = r.magnetUrl ?? (infoHash ? `magnet:?xt=urn:btih:${infoHash}` : '');
+        if (!infoHash && !magnet) return null;
+        return {
+          name: r.title,
+          quality: r.title.match(/\b(2160p|4K|1080p|720p|480p)\b/i)?.[1] ?? 'Unknown',
+          size: formatBytes(r.size ?? 0),
+          seeds: String(r.seeders ?? 0),
+          infoHash: infoHash || magnet,
+          magnet,
+          source: 'prowlarr' as const,
+        };
+      })
+      .filter((r): r is StreamResult => r !== null);
+  } catch {
+    clearTimeout(t);
+    return [];
+  }
+}
+
+async function fetchNyaa(query: string): Promise<StreamResult[]> {
+  // Nyaa.si public RSS/JSON API — best for anime
+  const url = `${NYAA_API}?q=${encodeURIComponent(query)}&c=1_0&f=0&limit=20`;
+  const controller = new AbortController();
+  const t = setTimeout(() => controller.abort(), 10_000);
+  try {
+    const res = await fetch(url, { signal: controller.signal, headers: { 'User-Agent': 'HomeStream/1.5' } });
+    clearTimeout(t);
+    if (!res.ok) return [];
+    const data = await res.json() as { results?: NyaaItem[] } | NyaaItem[];
+    const items: NyaaItem[] = Array.isArray(data) ? data : (data.results ?? []);
+    return items
+      .filter(i => i.hash && i.magnet)
+      .map(i => ({
+        name: i.title,
+        quality: i.title.match(/\b(2160p|4K|1080p|720p|480p)\b/i)?.[1] ?? 'Unknown',
+        size: i.size ?? '',
+        seeds: String(i.seeders ?? 0),
+        infoHash: i.hash,
+        magnet: i.magnet,
+        source: 'nyaa' as const,
+      }));
+  } catch {
+    clearTimeout(t);
+    return [];
+  }
+}
+
+// ── Handler ───────────────────────────────────────────────────────────────────
+
 export default async function handler(req: Request, res: Response) {
   if (!requireAuth(req, res)) return;
-  const { imdbId, type, season, episode } = req.body as {
+  const { imdbId, type, season, episode, title } = req.body as {
     imdbId?: string;
     type?: string;
     season?: number;
     episode?: number;
+    title?: string;
   };
 
   if (!imdbId || !type) {
@@ -75,56 +211,49 @@ export default async function handler(req: Request, res: Response) {
     return;
   }
 
-  // Build Torrentio path
-  // Movie:  /stream/movie/tt1234567.json
-  // Series: /stream/series/tt1234567:1:1.json
-  const streamId =
-    type === 'series' && season != null && episode != null
-      ? `${imdbId}:${season}:${episode}`
-      : imdbId;
+  const config = readConfig();
 
-  const url = `${TORRENTIO}/stream/${type}/${streamId}.json`;
-
-  const controller = new AbortController();
-  const t = setTimeout(() => controller.abort(), TIMEOUT_MS);
-
-  try {
-    const fetchRes = await fetch(url, {
-      signal: controller.signal,
-      headers: { 'User-Agent': 'HomeStream/1.0' },
-    });
-    clearTimeout(t);
-
-    if (!fetchRes.ok) {
-      res.status(502).json({ error: 'Torrentio returned an error', status: fetchRes.status });
-      return;
-    }
-
-    const data = await fetchRes.json() as TorrentioResponse;
-    const streams = data.streams ?? [];
-
-    const results: StreamResult[] = streams
-      .filter(s => s.infoHash)
-      .slice(0, 20)
-      .map(s => {
-        const { quality, size, seeds } = parseStreamTitle(s.title ?? s.name ?? '');
-        return {
-          name: s.name ?? 'Stream',
-          quality,
-          size,
-          seeds,
-          infoHash: s.infoHash!,
-          magnet: buildMagnet(s.infoHash!, s.sources),
-        };
-      });
-
-    res.json({ streams: results });
-  } catch (err) {
-    clearTimeout(t);
-    const isTimeout = err instanceof Error && err.name === 'AbortError';
-    res.status(isTimeout ? 504 : 502).json({
-      error: isTimeout ? 'Stream lookup timed out' : 'Failed to fetch streams',
-      message: String(err),
-    });
+  // Build a human-readable search query for Prowlarr + Nyaa
+  // e.g. "Breaking Bad S02E04" or "Spirited Away"
+  let searchQuery = title ?? imdbId;
+  if (type === 'series' && season != null && episode != null) {
+    const s = String(season).padStart(2, '0');
+    const e = String(episode).padStart(2, '0');
+    searchQuery = `${title ?? imdbId} S${s}E${e}`;
   }
+
+  // Fire all sources in parallel — failures are isolated via allSettled
+  const [torrentioRes, prowlarrRes, nyaaRes] = await Promise.allSettled([
+    fetchTorrentio(imdbId, type, season, episode),
+    fetchProwlarr(searchQuery, config.prowlarrUrl, config.prowlarrApiKey),
+    fetchNyaa(searchQuery),
+  ]);
+
+  const torrentioStreams = torrentioRes.status === 'fulfilled' ? torrentioRes.value : [];
+  const prowlarrStreams  = prowlarrRes.status  === 'fulfilled' ? prowlarrRes.value  : [];
+  const nyaaStreams      = nyaaRes.status      === 'fulfilled' ? nyaaRes.value      : [];
+
+  // Merge + deduplicate by infoHash (case-insensitive)
+  const seen = new Set<string>();
+  const merged: StreamResult[] = [];
+  for (const stream of [...torrentioStreams, ...prowlarrStreams, ...nyaaStreams]) {
+    const key = stream.infoHash.toLowerCase();
+    if (!seen.has(key)) {
+      seen.add(key);
+      merged.push(stream);
+    }
+  }
+
+  // Sort by seed count descending
+  merged.sort((a, b) => (parseInt(b.seeds) || 0) - (parseInt(a.seeds) || 0));
+
+  res.json({
+    streams: merged.slice(0, 40),
+    sources: {
+      torrentio: torrentioStreams.length,
+      prowlarr: prowlarrStreams.length,
+      nyaa: nyaaStreams.length,
+      prowlarrConfigured: !!(config.prowlarrUrl && config.prowlarrApiKey),
+    },
+  });
 }

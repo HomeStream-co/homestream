@@ -45,6 +45,9 @@ export interface AppConfig {
   storageMoviesPct: number;   // e.g. 60 → 60% of disk reserved for movies
   storageTvPct: number;       // e.g. 30 → 30% of disk reserved for TV shows
   // storageOtherPct is implied: 100 - movies - tv
+  // Prowlarr — self-hosted indexer aggregator (queries 500+ trackers)
+  prowlarrUrl: string;        // e.g. http://localhost:9696
+  prowlarrApiKey: string;     // Settings → General → API Key in Prowlarr UI
 }
 
 const DEFAULTS: AppConfig = {
@@ -75,6 +78,8 @@ const DEFAULTS: AppConfig = {
   virusTotalApiKey: process.env.VIRUSTOTAL_API_KEY || '',
   storageMoviesPct: 60,
   storageTvPct: 30,
+  prowlarrUrl: process.env.PROWLARR_URL || 'http://localhost:9696',
+  prowlarrApiKey: process.env.PROWLARR_API_KEY || '',
 };
 
 // ── Read (always immediate) ───────────────────────────────────────────────────
