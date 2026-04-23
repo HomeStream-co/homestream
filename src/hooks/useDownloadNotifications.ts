@@ -11,13 +11,16 @@ import { notify } from '@/lib/notificationStore';
 
 interface TorrentInfo {
   hash: string;
+  jobId?: string;
   name: string;
-  status: string; // 'downloading' | 'done' | 'seeding' | 'error' | 'paused' | 'stalled'
+  title?: string;
+  status: string;
   progress: number;
 }
 
 interface DownloadsResponse {
-  torrents?: TorrentInfo[];
+  qbitTorrents?: TorrentInfo[];
+  jobs?: TorrentInfo[];
   qbitOnline?: boolean;
 }
 
@@ -36,39 +39,38 @@ export function useDownloadNotifications() {
     async function poll() {
       if (cancelled) return;
       try {
-        const res = await fetch('/api/downloads');
+        const res = await fetch('/api/stremio/downloads', { credentials: 'include' });
         if (!res.ok) return;
         const data: DownloadsResponse = await res.json();
-        const torrents = data.torrents ?? [];
+        const torrents = [...(data.qbitTorrents ?? []), ...(data.jobs ?? [])];
 
         for (const t of torrents) {
+          const id = t.hash ?? t.jobId ?? '';
+          const label = t.name ?? t.title ?? 'Unknown';
           const isDone  = t.status === 'done' || t.status === 'seeding';
           const isError = t.status === 'error';
 
-          // Track anything actively downloading
           if (t.status === 'downloading') {
-            inProgress.current.add(t.hash);
+            inProgress.current.add(id);
           }
 
-          // Fire "complete" only if it was previously in-progress (avoids
-          // notifying about items that were already done on page load)
-          if (isDone && !seenDone.current.has(t.hash)) {
-            seenDone.current.add(t.hash);
-            if (inProgress.current.has(t.hash)) {
+          if (isDone && !seenDone.current.has(id)) {
+            seenDone.current.add(id);
+            if (inProgress.current.has(id)) {
               notify({
                 type: 'download_complete',
-                title: t.name,
+                title: label,
                 message: 'Download complete — ready to watch',
-                ttl: 0, // persistent until dismissed
+                ttl: 0,
               });
             }
           }
 
-          if (isError && !seenError.current.has(t.hash)) {
-            seenError.current.add(t.hash);
+          if (isError && !seenError.current.has(id)) {
+            seenError.current.add(id);
             notify({
               type: 'download_error',
-              title: t.name,
+              title: label,
               message: 'Download failed — check the Downloads page for details',
               ttl: 0,
             });

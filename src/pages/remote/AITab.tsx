@@ -84,6 +84,7 @@ export default function AITab({ send }: AITabProps) {
     try {
       const res = await fetch('/api/chat', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: text, library: libraryPayload, history: historyRef.current }),
       });

@@ -49,6 +49,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ password }),
       });
@@ -64,12 +65,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const logout = useCallback(async () => {
-    await fetch('/api/auth/logout', { method: 'POST' });
+    await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
     setAuthenticated(false);
   }, []);
 
   const logoutAll = useCallback(async () => {
-    await fetch('/api/auth/logout-all', { method: 'POST' });
+    await fetch('/api/auth/logout-all', { method: 'POST', credentials: 'include' });
     setAuthenticated(false);
   }, []);
 

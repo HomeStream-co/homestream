@@ -177,7 +177,7 @@ export default function RemotePage() {
     let cancelled = false;
     async function poll() {
       try {
-        const r = await fetch('/api/stremio/downloads');
+        const r = await fetch('/api/stremio/downloads', { credentials: 'include' });
         if (!r.ok || cancelled) return;
         const data = await r.json() as { qbitTorrents?: { status: string }[]; jobs?: { status: string }[] };
         const all = [...(data.qbitTorrents ?? []), ...(data.jobs ?? [])];

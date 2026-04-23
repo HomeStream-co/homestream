@@ -339,6 +339,7 @@ function QuickFixesTab() {
     try {
       const res = await fetch('/api/debug/repair', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: id }),
       });
@@ -430,7 +431,7 @@ function SystemTab() {
   const fetchInfo = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/debug/system-info');
+      const res = await fetch('/api/debug/system-info', { credentials: 'include' });
       const data = await res.json() as SystemInfo;
       fetchedAtRef.current = Date.now();
       setInfo(data);
@@ -567,6 +568,7 @@ function NetworkTab() {
     try {
       const res = await fetch('/api/debug/repair', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'test_network' }),
       });
@@ -667,7 +669,7 @@ function CrashLogTab() {
   const fetchLog = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/crash-log');
+      const res = await fetch('/api/crash-log', { credentials: 'include' });
       const data = await res.json() as { entries: CrashEntry[] };
       setEntries(data.entries ?? []);
     } catch {
@@ -915,7 +917,7 @@ export default function DebugPanel({ open, onClose }: DebugPanelProps) {
   const fetchHealth = useCallback(async () => {
     setHealthLoading(true);
     try {
-      const res = await fetch('/api/health/full');
+      const res = await fetch('/api/health/full', { credentials: 'include' });
       const data = await res.json() as HealthReport;
       setHealth(data);
     } catch {
@@ -927,7 +929,7 @@ export default function DebugPanel({ open, onClose }: DebugPanelProps) {
 
   const fetchSysInfo = useCallback(async () => {
     try {
-      const res = await fetch('/api/debug/system-info');
+      const res = await fetch('/api/debug/system-info', { credentials: 'include' });
       const data = await res.json() as SystemInfo;
       setSysInfo(data);
     } catch { /* ignore */ }

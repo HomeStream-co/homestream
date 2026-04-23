@@ -147,7 +147,7 @@ export default function VPNPanel() {
 
   const fetchStatus = useCallback(async () => {
     try {
-      const res  = await fetch('/api/vpn');
+      const res  = await fetch('/api/vpn', { credentials: 'include' });
       const data = await res.json() as { status: VPNStatus; config: SafeVPNConfig | null; providers: ProviderMeta[] };
       setStatus(data.status);
       setConfig(data.config);
@@ -165,7 +165,7 @@ export default function VPNPanel() {
   const handleConnect = async () => {
     setActionLoading(true);
     try {
-      const res  = await fetch('/api/vpn', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'connect' }) });
+      const res  = await fetch('/api/vpn', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'connect' }) });
       const data = await res.json() as { ok: boolean; error?: string };
       if (!data.ok) setSaveMsg(`Failed: ${data.error}`);
       await fetchStatus();
@@ -175,7 +175,7 @@ export default function VPNPanel() {
   const handleDisconnect = async () => {
     setActionLoading(true);
     try {
-      await fetch('/api/vpn', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'disconnect' }) });
+      await fetch('/api/vpn', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'disconnect' }) });
       await fetchStatus();
     } finally { setActionLoading(false); }
   };
@@ -186,9 +186,8 @@ export default function VPNPanel() {
     try {
       const res  = await fetch('/api/vpn', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action:       'save',
           enabled:      true,
           protocol:     editProtocol,
           provider:     editProvider,
@@ -219,6 +218,7 @@ export default function VPNPanel() {
     try {
       const res  = await fetch('/api/vpn', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'test', protocol: editProtocol, configContent: editConfig, username: editUsername || undefined, password: editPassword || undefined }),
       });
@@ -235,7 +235,7 @@ export default function VPNPanel() {
     setProbeLoading(true);
     setProbeResult(null);
     try {
-      const res  = await fetch('/api/vpn/fastest-server');
+      const res  = await fetch('/api/vpn/fastest-server', { credentials: 'include' });
       const data = await res.json() as RankResult;
       setProbeResult(data);
     } catch {

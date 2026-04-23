@@ -74,7 +74,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   // ── Load profiles from server ──
   const refreshProfiles = useCallback(async () => {
     try {
-      const res = await fetch('/api/profiles');
+      const res = await fetch('/api/profiles', { credentials: 'include' });
       if (!res.ok) throw new Error('Failed to fetch profiles');
       const data = await res.json() as { profiles: Profile[] };
       setProfiles(data.profiles);
@@ -114,6 +114,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   const createProfile = useCallback(async (data: { name: string; avatar: string; color: string; restricted: boolean }): Promise<Profile> => {
     const res = await fetch('/api/profiles', {
       method: 'POST',
+      credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     });
@@ -129,6 +130,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   const updateProfile = useCallback(async (id: string, data: Partial<{ name: string; avatar: string; color: string; restricted: boolean }>): Promise<Profile> => {
     const res = await fetch(`/api/profiles/${id}`, {
       method: 'PATCH',
+      credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     });
@@ -142,7 +144,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   }, [refreshProfiles]);
 
   const deleteProfile = useCallback(async (id: string): Promise<void> => {
-    const res = await fetch(`/api/profiles/${id}`, { method: 'DELETE' });
+    const res = await fetch(`/api/profiles/${id}`, { method: 'DELETE', credentials: 'include' });
     if (!res.ok) {
       const err = await res.json().catch(() => ({})) as { error?: string };
       throw new Error(err.error ?? 'Failed to delete profile');
@@ -156,6 +158,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   const setPin = useCallback(async (id: string, pin: string): Promise<void> => {
     const res = await fetch(`/api/profiles/${id}/pin`, {
       method: 'POST',
+      credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'set', pin }),
     });
@@ -169,6 +172,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   const verifyPin = useCallback(async (id: string, pin: string): Promise<boolean> => {
     const res = await fetch(`/api/profiles/${id}/pin`, {
       method: 'POST',
+      credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'verify', pin }),
     });
@@ -180,6 +184,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   const clearPin = useCallback(async (id: string, currentPin: string): Promise<void> => {
     const res = await fetch(`/api/profiles/${id}/pin`, {
       method: 'POST',
+      credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'clear', pin: currentPin }),
     });

@@ -250,7 +250,7 @@ export default function SecurityPanel({ open, onClose, onBack }: SecurityPanelPr
   const fetchQuarantine = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/security/quarantine');
+      const res = await fetch('/api/security/quarantine', { credentials: 'include' });
       const data = await res.json() as { entries?: QuarantineEntry[] };
       setQuarantine(data.entries ?? []);
     } catch { /* ignore */ } finally {
@@ -262,7 +262,7 @@ export default function SecurityPanel({ open, onClose, onBack }: SecurityPanelPr
   useEffect(() => {
     if (!open) return;
     fetchQuarantine();
-    fetch('/api/setup')
+    fetch('/api/setup', { credentials: 'include' })
       .then(r => r.json())
       .then((d: { config?: { virusTotalApiKey?: string } }) => {
         if (d.config?.virusTotalApiKey) {
@@ -276,6 +276,7 @@ export default function SecurityPanel({ open, onClose, onBack }: SecurityPanelPr
   const handleDelete = async (id: string) => {
     await fetch('/api/security/quarantine', {
       method: 'POST',
+      credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'delete', id }),
     });
@@ -285,6 +286,7 @@ export default function SecurityPanel({ open, onClose, onBack }: SecurityPanelPr
   const handleRestore = async (id: string) => {
     await fetch('/api/security/quarantine', {
       method: 'POST',
+      credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'restore', id }),
     });
@@ -296,6 +298,7 @@ export default function SecurityPanel({ open, onClose, onBack }: SecurityPanelPr
     try {
       await fetch('/api/setup', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'save', virusTotalApiKey: vtKey }),
       });

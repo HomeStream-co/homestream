@@ -115,7 +115,7 @@ export default function SettingsPanel({
   const handleTmdbRefresh = useCallback(async () => {
     setTmdbRefreshing(true);
     try {
-      const res = await fetch('/api/tmdb?refresh=1');
+      const res = await fetch('/api/tmdb?refresh=1', { credentials: 'include' });
       if (res.ok) {
         const data = await res.json() as { fetchedAt?: number; stale?: boolean };
         const existing = (() => {
@@ -150,7 +150,7 @@ export default function SettingsPanel({
 
   useEffect(() => {
     if (!open || apiKeysLoaded) return;
-    fetch('/api/setup')
+    fetch('/api/setup', { credentials: 'include' })
       .then(r => r.json())
       .then((data: {
         config?: {
@@ -188,6 +188,7 @@ export default function SettingsPanel({
     try {
       await fetch('/api/setup', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'save', ...apiKeys }),
       });
@@ -258,7 +259,7 @@ export default function SettingsPanel({
     setScanning(true);
     setScanResult(null);
     try {
-      const res = await fetch('/api/library/scan', { method: 'POST' });
+      const res = await fetch('/api/library/scan', { method: 'POST', credentials: 'include' });
       const data = await res.json() as { added: number; skipped: number; errors?: string[] };
       setScanResult({ added: data.added, skipped: data.skipped });
       if (data.added > 0) {
@@ -280,6 +281,7 @@ export default function SettingsPanel({
     try {
       const res = await fetch('/api/library/storage', {
         method: 'PATCH',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ moviesPct: allocMovies, tvPct: allocTv }),
       });
@@ -300,7 +302,7 @@ export default function SettingsPanel({
 
   useEffect(() => {
     if (!open || healthStatus !== null) return;
-    fetch('/api/health/full')
+    fetch('/api/health/full', { credentials: 'include' })
       .then(r => r.json())
       .then((data: { overall?: 'ok' | 'warn' | 'error' }) => {
         setHealthStatus(data.overall ?? null);
@@ -320,7 +322,7 @@ export default function SettingsPanel({
   useEffect(() => {
     if (!open || vpnLoaded) return;
     setVpnLoaded(true);
-    fetch('/api/setup')
+    fetch('/api/setup', { credentials: 'include' })
       .then(r => r.json())
       .then((data: { vpnInterface?: string | null }) => {
         const current = data.vpnInterface ?? null;
@@ -328,7 +330,7 @@ export default function SettingsPanel({
         setVpnSelectedInterface(current ?? '');
       })
       .catch(() => {});
-    fetch('/api/vpn/interfaces')
+    fetch('/api/vpn/interfaces', { credentials: 'include' })
       .then(r => r.json())
       .then((data: { interfaces: VpnInterface[] }) => {
         setVpnInterfaces((data.interfaces ?? []).filter(i => !i.internal && i.family === 'IPv4'));

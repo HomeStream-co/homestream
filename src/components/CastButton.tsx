@@ -144,7 +144,7 @@ export default function CastButton({ streamUrl, title, className = '' }: CastBut
     setDevices([]);
     setSuccessId(null);
     try {
-      const res = await fetch('/api/cast/devices');
+      const res = await fetch('/api/cast/devices', { credentials: 'include' });
       const data = await res.json() as { devices?: DLNADevice[]; error?: string };
       if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
       setDevices(data.devices ?? []);
@@ -169,6 +169,7 @@ export default function CastButton({ streamUrl, title, className = '' }: CastBut
       const fullUrl = getLocalStreamUrl(streamUrl);
       const res = await fetch('/api/cast/send', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           deviceLocation: device.location,

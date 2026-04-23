@@ -19,6 +19,7 @@ function BackupRestoreButton() {
       if (backup.version !== 1) throw new Error('Unrecognised backup format (expected version 1)');
       const res = await fetch('/api/backup', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           backup,
