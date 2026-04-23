@@ -29,7 +29,7 @@ vi.useFakeTimers();
 // ── Shared mock state ─────────────────────────────────────────────────────────
 
 interface FakeEntry { name: string; isDirectory: () => boolean; isFile: () => boolean }
-let mockDirEntries: Record<string, FakeEntry[]> = {};
+const mockDirEntries: Record<string, FakeEntry[]> = {};
 let mockStats: Record<string, { size: number }> = {};
 let mockExisting: string[] = [];
 
