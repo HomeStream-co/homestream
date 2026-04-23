@@ -57,17 +57,19 @@ function gzipMiddleware(req, res, next) {
   const originalJson = res.json.bind(res);
   res.json = function (body) {
     const json = JSON.stringify(body);
-    const buf = Buffer.from(json, "utf-8");
+    const buf = Buffer.from(json, 'utf-8');
 
     if (buf.length < 1024) return originalJson(body);
 
     zlib.gzip(buf, (err, compressed) => {
       if (err) return originalJson(body);
+      // Only set gzip headers if response hasn't already started
+      if (res.headersSent) return;
       res.set({
-        "Content-Encoding": "gzip",
-        "Content-Type": "application/json; charset=utf-8",
-        "Content-Length": compressed.length,
-        Vary: "Accept-Encoding",
+        'Content-Encoding': 'gzip',
+        'Content-Type': 'application/json; charset=utf-8',
+        'Content-Length': compressed.length,
+        Vary: 'Accept-Encoding',
       });
       res.end(compressed);
     });

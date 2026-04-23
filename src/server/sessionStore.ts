@@ -46,7 +46,17 @@ function readRaw(): Record<string, number> {
 
 function writeRaw(data: Record<string, number>): void {
   cache = data; // update cache synchronously before disk write
-  fs.writeFileSync(SESSIONS_PATH, JSON.stringify(data), 'utf-8');
+  // Atomic write: write to a temp file then rename so a crash mid-write
+  // never leaves a half-written (corrupted) sessions file.
+  const tmp = SESSIONS_PATH + '.tmp';
+  try {
+    fs.writeFileSync(tmp, JSON.stringify(data), 'utf-8');
+    fs.renameSync(tmp, SESSIONS_PATH);
+  } catch (err) {
+    // Clean up temp file if rename failed
+    try { fs.unlinkSync(tmp); } catch { /* ignore */ }
+    throw err; // re-throw so enqueueWrite logs it
+  }
 }
 
 function enqueueWrite(updater: (current: Record<string, number>) => Record<string, number>): void {

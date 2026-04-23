@@ -108,10 +108,17 @@ export function writeConfig(updates: Partial<AppConfig>): AppConfig {
     next.libraryDir = next.libraryDir || path.join(updates.mediaDir, 'library');
   }
 
+  // Atomic write: write to a temp file then rename so a crash mid-write
+  // never leaves a half-written (corrupted) config file.
+  const tmp = CONFIG_PATH + '.tmp';
   try {
-    fs.writeFileSync(CONFIG_PATH, JSON.stringify(next, null, 2));
+    fs.writeFileSync(tmp, JSON.stringify(next, null, 2));
+    fs.renameSync(tmp, CONFIG_PATH);
   } catch (err) {
+    try { fs.unlinkSync(tmp); } catch { /* ignore */ }
     console.error('[configStore] Write failed:', err);
+    // Return current (not next) so callers know the write didn't persist
+    return current;
   }
 
   return next;

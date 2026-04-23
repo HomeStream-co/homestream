@@ -286,7 +286,9 @@ export async function transcodeFile(
 
   // ── 1. Probe the input file ──────────────────────────────────────────────
   const info = await probeFile(resolvedInput);
-  const originalSize = info.fileSizeBytes || fs.statSync(resolvedInput).size;
+  const originalSize = info.fileSizeBytes || (() => {
+    try { return fs.statSync(resolvedInput).size; } catch { return 0; }
+  })();
 
   // ── 2. Decide strategy ───────────────────────────────────────────────────
   const strategy = transcodeStrategy(info, path.basename(resolvedInput));

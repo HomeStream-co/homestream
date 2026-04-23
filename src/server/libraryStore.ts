@@ -42,7 +42,17 @@ export function writeLibrary<T = Record<string, unknown>>(
   writeQueue = writeQueue.then(() => {
     const current = readLibrary<T>();
     const next = updater(current);
-    fs.writeFileSync(LIBRARY_PATH, JSON.stringify(next, null, 2));
+    // Atomic write: write to a temp file then rename so a crash mid-write
+    // never leaves a half-written (corrupted) library file. This is the most
+    // critical data file in the app — corruption means all media metadata is lost.
+    const tmp = LIBRARY_PATH + '.tmp';
+    try {
+      fs.writeFileSync(tmp, JSON.stringify(next, null, 2));
+      fs.renameSync(tmp, LIBRARY_PATH);
+    } catch (err) {
+      try { fs.unlinkSync(tmp); } catch { /* ignore */ }
+      throw err;
+    }
   }).catch(err => {
     console.error('[libraryStore] Write failed:', err);
   });

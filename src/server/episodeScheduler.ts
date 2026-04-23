@@ -99,8 +99,24 @@ function pickBestStream(streams: StreamResult[]): StreamResult | null {
 
 // ── Core check logic ──────────────────────────────────────────────────────────
 
+// Maximum wall-clock time for a single subscription check.
+// 10 seasons × 50 episodes × 15s timeout = 7500s worst case without this guard.
+// In practice Torrentio responds in <1s for existing episodes and instantly
+// returns empty for non-existent ones, so 5 minutes is very generous.
+const CHECK_TIMEOUT_MS = 5 * 60 * 1000;
+
 async function checkSubscription(sub: ShowSubscription): Promise<void> {
   console.log(`[scheduler] Checking "${sub.title}" (${sub.imdbId})`);
+
+  // Wall-clock timeout guard — prevents a single stuck check from blocking
+  // the scheduler indefinitely (e.g. Torrentio unresponsive, AbortSignal not firing).
+  const timeoutHandle = setTimeout(() => {
+    throw new Error(`[scheduler] Check for "${sub.title}" timed out after ${CHECK_TIMEOUT_MS / 1000}s`);
+  }, CHECK_TIMEOUT_MS);
+  // .unref() so this timer never prevents a clean process exit
+  if (typeof timeoutHandle === 'object' && 'unref' in timeoutHandle) {
+    (timeoutHandle as ReturnType<typeof setTimeout>).unref?.();
+  }
 
   const startSeason = sub.lastFoundEpisode?.season ?? 1;
   const startEpisode = sub.lastFoundEpisode
@@ -218,6 +234,7 @@ async function checkSubscription(sub: ShowSubscription): Promise<void> {
       }
     }
   } finally {
+    clearTimeout(timeoutHandle);
     if (vpnConnected && vpnCfg) {
       try {
         await disconnectAfterDownload(vpnCfg);

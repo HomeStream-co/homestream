@@ -90,8 +90,15 @@ async function writeLibrarySafe(data: MediaRecord[]): Promise<void> {
     const { writeLibraryDirect } = await import('./libraryStore.js');
     await writeLibraryDirect(data as unknown as Record<string, unknown>[]);
   } catch {
-    // Fallback: direct write (startup is single-threaded at this point)
-    fs.writeFileSync(LIBRARY_PATH, JSON.stringify(data, null, 2));
+    // Fallback: atomic direct write (startup is single-threaded at this point)
+    const tmp = LIBRARY_PATH + '.tmp';
+    try {
+      fs.writeFileSync(tmp, JSON.stringify(data, null, 2));
+      fs.renameSync(tmp, LIBRARY_PATH);
+    } catch (err) {
+      try { fs.unlinkSync(tmp); } catch { /* ignore */ }
+      throw err;
+    }
   }
 }
 
