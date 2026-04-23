@@ -59,46 +59,21 @@ files:
 
 # Extra resources shipped alongside the app (available at process.resourcesPath at runtime)
 extraResources:
-  # Server bundle — loaded by main.js as a child process
-  - from: dist/server.bundle.mjs
-    to: server/server.bundle.mjs
+  # Server bundle — CJS format, all node_modules inlined. No external node_modules needed.
+  - from: dist/server.bundle.cjs
+    to: server/server.bundle.cjs
+  # Sourcemap for crash diagnostics
+  - from: dist/server.bundle.cjs.map
+    to: server/server.bundle.cjs.map
   # Client bundle — Vite outputs to dist/client/ (index.html + assets/).
-  # We copy dist/client/ to resources/client/ so configure.js can serve it
-  # with express.static when running as a packaged Electron app.
   - from: dist/client
     to: client
-  # FFmpeg binary — copied into resources/ffmpeg/ so users don't need to install it.
-  # ffmpeg-static provides the platform-appropriate binary (ffmpeg.exe on Windows,
-  # ffmpeg on macOS/Linux). We use a glob so the build doesn't fail when the
-  # platform binary doesn't match the current OS (e.g. building on Linux for Windows).
+  # FFmpeg binary
   - from: node_modules/ffmpeg-static
     to: ffmpeg
     filter:
       - "ffmpeg"
       - "ffmpeg.exe"
-  # node_modules — required because the server bundle uses packages: "external"
-  # (to avoid esbuild mangling createRequire on Windows). All npm packages are
-  # excluded from the bundle and resolved at runtime via NODE_PATH set in main.cjs.
-  # We exclude electron itself (not needed at runtime) and heavy dev-only packages.
-  - from: node_modules
-    to: node_modules
-    filter:
-      - "!electron/**"
-      - "!electron-builder/**"
-      - "!esbuild/**"
-      - "!vite/**"
-      - "!vitest/**"
-      - "!@vitejs/**"
-      - "!@playwright/**"
-      - "!@testing-library/**"
-      - "!typescript/**"
-      - "!eslint/**"
-      - "!prettier/**"
-      - "!postcss/**"
-      - "!tailwindcss/**"
-      - "!autoprefixer/**"
-      - "!jsdom/**"
-      - "!tsx/**"
 
 # ── Windows ───────────────────────────────────────────────────────────────────
 win:

@@ -7,7 +7,7 @@
  *
  * Architecture:
  *  - Shows a control panel window: server status, LAN IP, log viewer, start/stop
- *  - Spawns the HomeStream server (dist/server.bundle.mjs) as a child process
+ *  - Spawns the HomeStream server (dist/server.bundle.cjs) as a child process
  *  - System tray icon with quick-access menu
  *  - "Open HomeStream" button launches the browser UI at http://localhost:3000 (or next free port)
  *
@@ -185,7 +185,9 @@ async function startServer() {
 
   activePort = port;
 
-  const serverPath = path.join(process.resourcesPath, 'server', 'server.bundle.mjs');
+  // Server bundle is now CJS (.cjs) — all node_modules are inlined by esbuild.
+  // No NODE_PATH needed. No ESM loader involved. Works with spaces in path.
+  const serverPath = path.join(process.resourcesPath, 'server', 'server.bundle.cjs');
   pushLog(`Starting server on port ${activePort}: ${serverPath}`);
   lastServerStartTime = Date.now();
 
@@ -230,15 +232,6 @@ async function startServer() {
         const videos = app.getPath('videos');
         return path.join(videos, 'HomeStream');
       })(),
-      // NODE_PATH: tells Node where to find node_modules when the server bundle
-      // uses packages: "external" (i.e. packages are NOT inlined into the bundle).
-      // In a packaged Electron app, node_modules are shipped as an extraResource
-      // at resources/node_modules/. Without NODE_PATH, require('bcryptjs') etc.
-      // fail with ERR_MODULE_NOT_FOUND because there is no node_modules folder
-      // adjacent to resources/server/server.bundle.mjs.
-      NODE_PATH: app.isPackaged
-        ? path.join(process.resourcesPath, 'node_modules')
-        : path.join(__dirname, '..', 'node_modules'),
     },
     stdio: 'pipe',
   });

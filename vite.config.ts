@@ -20,20 +20,32 @@ function serverBundlePlugin(): Plugin {
 			}
 			built = true;
 			console.log("Bundling server code with esbuild...");
-			const outfile = path.resolve(__dirname, "dist", "server.bundle.mjs");
+			// Output as CJS (.cjs) — this is the definitive fix for the Windows
+			// launch crash chain:
+			//
+			// ESM + packages:"bundle"  → esbuild inlines CJS packages → generates
+			//   createRequireN() helpers → conflicts with banner → ReferenceError on launch
+			//
+			// ESM + packages:"external" → bare import 'express' etc. in output →
+			//   Node ESM loader can't find them (NODE_PATH is ignored by ESM) →
+			//   ERR_MODULE_NOT_FOUND on launch
+			//
+			// CJS + packages:"bundle"  → esbuild inlines everything with normal
+			//   require() calls → no ESM/CJS boundary → no createRequire needed →
+			//   no NODE_PATH needed → works on Windows with spaces in path → FIXED
+			const outfile = path.resolve(__dirname, "dist", "server.bundle.cjs");
 
-			// esbuild plugin to intercept unresolvable imports at bundle time
+			// Only externalize packages that are genuinely unbundleable:
+			// - webtorrent / webrtc-polyfill / node-datachannel: native addons or
+			//   packages with dynamic require() patterns esbuild can't trace
+			// - #airo/secrets: virtual module resolved by the platform at runtime
 			const externalizePlugin: esbuild.Plugin = {
 				name: "externalize-problem-imports",
 				setup(build) {
-					// Externalize anything starting with # (Node package imports like #airo/secrets)
-					build.onResolve({ filter: /^#/ }, (_args) => ({ path: _args.path, external: true }));
-					// Externalize webtorrent regardless of how it was aliased
-					build.onResolve({ filter: /webtorrent/ }, (_args) => ({ path: "webtorrent", external: true }));
-					// Externalize webrtc-polyfill
-					build.onResolve({ filter: /webrtc-polyfill/ }, (_args) => ({ path: "webrtc-polyfill", external: true }));
-					// Externalize node-datachannel
-					build.onResolve({ filter: /node-datachannel/ }, (_args) => ({ path: "node-datachannel", external: true }));
+					build.onResolve({ filter: /^#/ }, (args) => ({ path: args.path, external: true }));
+					build.onResolve({ filter: /webtorrent/ }, (args) => ({ path: args.path, external: true }));
+					build.onResolve({ filter: /webrtc-polyfill/ }, (args) => ({ path: args.path, external: true }));
+					build.onResolve({ filter: /node-datachannel/ }, (args) => ({ path: args.path, external: true }));
 				},
 			};
 
@@ -42,26 +54,18 @@ function serverBundlePlugin(): Plugin {
 				bundle: true,
 				platform: "node",
 				target: "node22",
-				format: "esm",
+				// CJS format: all imports become require() calls — no ESM loader
+				// involved, no NODE_PATH needed, no createRequire shim needed.
+				format: "cjs",
 				outfile,
-				// packages: "external" — keeps all node_modules out of the bundle so
-				// esbuild never inlines CJS packages that use createRequire internally.
-				// This prevents the createRequireN mangling crash on Windows.
-				// node_modules are shipped alongside the binary via extraResources in
-				// electron-builder.yml and located at runtime via NODE_PATH (set in
-				// electron/main.cjs before forking the server process).
-				packages: "external",
+				// Bundle all node_modules into the single .cjs file so the packaged
+				// Electron app has zero external runtime dependencies.
+				packages: "bundle",
 				sourcemap: true,
 				plugins: [externalizePlugin],
-				// Minimal banner: just a require() shim for any app-level code that
-				// calls require() directly. No createRequire aliasing — keep it simple
-				// so there is zero chance of conflicting with Node internals.
-				banner: {
-					js: `import { createRequire as __createRequire } from "module";\nconst require = __createRequire(import.meta.url);`,
-				},
 			});
 
-			console.log("Server bundle created at dist/server.bundle.mjs");
+			console.log("Server bundle created at dist/server.bundle.cjs");
 		},
 	};
 }
