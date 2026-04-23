@@ -531,6 +531,9 @@ export default function ProfilesPage() {
 
   const canAddMore = profiles.length < 6;
 
+  // Hide management controls when the active profile is kids/restricted
+  const activeIsRestricted = activeProfile?.restricted ?? false;
+
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-start pt-16 px-4 pb-12">
       <title>HomeStream — Who's Watching?</title>
@@ -601,7 +604,8 @@ export default function ProfilesPage() {
         </div>
       )}
 
-      {/* Manage / Done button */}
+      {/* Manage / Done button — hidden when a kids/restricted profile is active */}
+      {!activeIsRestricted && (
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -630,6 +634,7 @@ export default function ProfilesPage() {
           </p>
         )}
       </motion.div>
+      )}
 
       {/* PIN gate overlay */}
       <AnimatePresence>
