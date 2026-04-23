@@ -1116,6 +1116,13 @@ const CONTROL_PANEL_HTML = `<!DOCTYPE html>
 
   function checkForUpdate() {
     window.electronAPI?.checkForUpdate();
+    // Briefly disable the button and show feedback
+    const btn = document.getElementById('btn-check-update');
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = 'Checking…';
+      setTimeout(() => { btn.disabled = false; btn.textContent = 'Check for Updates'; }, 6_000);
+    }
     // Show a brief "checking" indicator on the version badge
     const badge = document.getElementById('version-badge');
     if (badge) { badge.textContent = 'Checking…'; setTimeout(() => { badge.textContent = badge.dataset.version || 'v?'; }, 4000); }
@@ -1170,9 +1177,9 @@ const CONTROL_PANEL_HTML = `<!DOCTYPE html>
         panel.classList.add('visible', 'state-ready');
         icon.textContent = '✅';
         title.textContent = \`v\${data.version} ready to install\`;
-        sub.textContent = 'HomeStream will restart to apply the update.';
+        sub.textContent = 'HomeStream will restart and apply the update automatically. No reinstall needed.';
         actions.innerHTML =
-          '<button class="btn-update btn-update-success" onclick="window.electronAPI?.installUpdate()">Restart & Install</button>' +
+          '<button class="btn-update btn-update-success" onclick="window.electronAPI?.installUpdate()">Restart & Update</button>' +
           '<button class="btn-update btn-update-dismiss" onclick="dismissUpdate()">Later</button>';
         break;
 

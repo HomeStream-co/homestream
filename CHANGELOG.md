@@ -11,8 +11,12 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+#### API
+- `POST /api/vpn/bind` — fixed malformed handler line (two statements on one line); added missing `isSetupComplete` import; auth now correctly allows unauthenticated access during setup wizard, requires auth after setup is complete
+- `GET /api/setup` — now returns `vpnInterface` and `vpnKillSwitch` fields so the Settings panel can display the current VPN binding without a separate API call
+
 #### CI / E2E Tests
-- `waitForApp()` now waits for the auth check (`GET /api/auth/check`) to resolve before asserting — previously the app rendered `null` while `authenticated === null`, causing all 77 Playwright tests to time out on a blank page
+- `waitForApp()` hardened: now uses `waitForSelector` with a list of post-auth-check selectors (`nav`, `main`, `h1`, `header`, `input[type="password"]`, etc.) instead of fragile `waitForFunction` polling — eliminates the all-77-fail blank-page scenario
 - `auth.spec.ts`: "shows login gate when not authenticated" now accepts the home page as a valid state when no admin password is configured (fresh CI environment skips auth entirely)
 
 #### v1.3.5 Fixes (tagged in this release)
@@ -27,6 +31,25 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - Profiles page: top-aligned layout
 
 ### Added
+
+#### VPN Kill-Switch — Settings Panel
+- VPN binding section added directly to Settings panel (no need to re-run setup wizard)
+- Shows current bound interface with green status badge
+- Dropdown lists all active IPv4 adapters; likely VPN adapters marked with 🔒
+- "Apply VPN Binding" / "Clear VPN Binding" button with live feedback
+- Kill-switch monitor restarts immediately after rebind — no server restart needed
+
+#### E2E Test Coverage
+- `e2e/profiles.spec.ts` — 6 tests for the Profiles page
+- `e2e/discover.spec.ts` — 7 tests for the Discover page (all 4 tabs)
+- `e2e/setup-wizard.spec.ts` — 5 tests for the Setup Wizard
+
+#### Electron Auto-Updater — Polish
+- **Delta updates**: `differentialPackage: true` in NSIS config — users download only the diff (a few MB), not the full installer (~150MB). No reinstall required.
+- **"Check for Updates" button** added to control panel action bar — always visible, not just when an update is available
+- Update panel messaging clarified: "No reinstall needed" / "Restart & Update"
+- `electron-builder.yml` publish config now uses `${HOMESTREAM_GH_OWNER}` / `${HOMESTREAM_GH_REPO}` env vars (was hardcoded)
+- Release workflow: `GH_OWNER`/`GH_REPO` fall back to `github.repository_owner` / `github.event.repository.name` if secrets aren't set; artifact upload includes `.yml` update metadata files
 
 #### Samsung TV Setup Guide (`/samsung-tv`)
 - 6-section interactive guide with auto-detected HomeStream URL via `/api/network/info`
@@ -45,11 +68,11 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - `vpnKillSwitch.ts` — polls every 10s; pauses torrents if VPN drops
 
 #### Playwright E2E Suite
-- 77 tests across 8 spec files: auth, setup, home, discover, downloads, profiles, settings, navigation
+- 80 tests across 11 spec files: auth, setup, home, discover, downloads, profiles, settings, navigation, profiles, discover, setup-wizard
 
 ### Tests
 - 867 unit tests passing (48 files)
-- 77 Playwright E2E tests (CI-ready)
+- 80 Playwright E2E tests (CI-ready)
 
 ---
 
