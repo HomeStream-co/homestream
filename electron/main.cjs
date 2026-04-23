@@ -210,6 +210,10 @@ async function startServer() {
     env: {
       ...cleanEnv,
       PORT: String(activePort),
+      // Bind to all network interfaces so the TV/phone can reach HomeStream
+      // over the LAN. vite-plugin-api-routes reads SERVER_HOST to set the
+      // Express listen address (defaults to 127.0.0.1 which blocks LAN access).
+      SERVER_HOST: '0.0.0.0',
       NODE_ENV: 'production',
       ELECTRON: '1',
       // Pass resourcesPath so the server bundle can locate client files.
