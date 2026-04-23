@@ -64,13 +64,15 @@ export default defineConfig({
 
   // Start the Vite dev server automatically before running tests
   webServer: {
-    command: 'npm run dev',
+    // Explicitly pass --port so Vite never picks a random port in CI
+    command: process.env.CI ? 'npx vite --port 5173' : 'npm run dev',
     // In CI use port 5173 (Vite default); in Airo preview environment use 20010
     url: process.env.CI ? 'http://localhost:5173' : 'http://localhost:20010',
     // Reuse an already-running server in the preview environment; always start fresh in CI
     reuseExistingServer: !process.env.CI,
     timeout: process.env.CI ? 120_000 : 60_000,
-    stdout: 'ignore',
+    // Pipe both stdout and stderr so CI logs show Vite startup errors
+    stdout: 'pipe',
     stderr: 'pipe',
   },
 

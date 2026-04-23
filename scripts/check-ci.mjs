@@ -25,11 +25,16 @@ function get(path) {
   });
 }
 
-const runId = '24811681575';
+// Always fetch the latest E2E run
+const runs = JSON.parse(await get('/repos/trevorrossworn-code/homestream/actions/runs?per_page=6&branch=main'));
+const e2eRun = runs.workflow_runs.find(r => r.name === 'E2E Tests (Playwright)');
+const runId = e2eRun.id;
+console.log('Run ID:', runId, '| status:', e2eRun.status, '| conclusion:', e2eRun.conclusion);
 const jobs = JSON.parse(await get(`/repos/trevorrossworn-code/homestream/actions/runs/${runId}/jobs`));
 const job = jobs.jobs[0];
 console.log('Job:', job.name, '| ID:', job.id);
 
 const logs = await get(`/repos/trevorrossworn-code/homestream/actions/jobs/${job.id}/logs`);
 const lines = logs.split('\n');
-lines.slice(-120).forEach(l => console.log(l));
+// Print ALL lines — don't truncate
+lines.forEach(l => console.log(l));

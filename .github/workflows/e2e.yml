@@ -34,6 +34,28 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install chromium --with-deps
 
+      - name: Verify dev server starts
+        run: |
+          npx vite --port 5173 &
+          SERVER_PID=$!
+          echo "Vite PID: $SERVER_PID"
+          # Wait up to 60s for the server to respond
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:5173 > /dev/null 2>&1; then
+              echo "✅ Dev server is up after ${i}s"
+              kill $SERVER_PID 2>/dev/null || true
+              exit 0
+            fi
+            echo "Waiting... ($i/30)"
+            sleep 2
+          done
+          echo "❌ Dev server did not start in 60s"
+          kill $SERVER_PID 2>/dev/null || true
+          exit 1
+        env:
+          SETUP_COMPLETE: 'true'
+          NODE_ENV: test
+
       - name: Run E2E tests
         run: npm run test:e2e
         env:
