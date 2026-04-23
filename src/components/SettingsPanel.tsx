@@ -332,6 +332,7 @@ export default function SettingsPanel({
     try {
       const res = await fetch('/api/vpn/bind', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ interface: vpnSelectedInterface || null }),
       });
