@@ -113,7 +113,7 @@ export function attachDownloadBroadcaster(server: Server): void {
 
   _wss.on('connection', async (ws: WebSocket, req: IncomingMessage) => {
     if (!isAuthed(req)) {
-      ws.terminate();
+      ws.close();
       return;
     }
 
