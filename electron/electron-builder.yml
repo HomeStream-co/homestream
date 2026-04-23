@@ -15,6 +15,14 @@ appId: com.homestream.app
 productName: HomeStream
 copyright: Copyright © 2026 HomeStream
 
+# The server bundle (dist/server.bundle.cjs) is fully self-contained — all
+# node_modules are inlined by esbuild. The only node_modules shipped in the
+# asar are pure-JS packages (electron-updater, builder-util-runtime, semver).
+# Disabling npmRebuild prevents @electron/rebuild from attempting to
+# cross-compile native addons (bufferutil, utf-8-validate) from source, which
+# always fails when building Windows .exe from a Linux CI host.
+npmRebuild: false
+
 # Bake the GitHub owner/repo into the packaged app so the auto-updater knows
 # where to check for new releases.
 # updater.cjs reads pkg.build.ghOwner / pkg.build.ghRepo at runtime.
@@ -78,45 +86,16 @@ extraResources:
 # ── Windows ───────────────────────────────────────────────────────────────────
 win:
   target:
-    # Full NSIS installer — creates Start Menu + Desktop shortcuts, uninstallable
-    # This is the primary deliverable: HomeStream-Setup-x.x.x.exe inside a ZIP.
-    - target: nsis
+    # zip target — packages the unpacked Electron app into a .zip archive.
+    # Does not require NSIS or 7zip toolchain, so it builds cleanly from Linux CI.
+    # Users extract and run HomeStream.exe.
+    # Switch to nsis when building from a Windows host or with wine+7zip.
+    - target: zip
       arch: [x64]
+  # Disable forced code signing — no cert available.
+  forceCodeSigning: false
   # electron-builder auto-converts icon.png → .ico if no .ico is provided
   icon: electron/assets/icon.png
-  #
-  # ── Code Signing (v1.2 — activate when cert is ready) ──────────────────────
-  # Without a valid Authenticode cert, Windows Defender SmartScreen will show
-  # a "Windows protected your PC" warning on first run. Users can click
-  # "More info → Run anyway" to bypass it, but it erodes trust.
-  #
-  # Recommended path: Certum Open Source Code Signing (free for OSS projects)
-  #   https://www.certum.eu/en/cert_offer_en_open_source_cs.xml
-  #
-  # Once you have a PFX cert:
-  #   1. Add the PFX as a GitHub Actions secret: WIN_CSC_LINK (base64-encoded)
-  #   2. Add the password as: WIN_CSC_KEY_PASSWORD
-  #   3. Uncomment the four lines below
-  #   4. Add to release.yml env block:
-  #        WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
-  #        WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
-  #
-  # certificateSubjectName: "HomeStream"
-  # signingHashAlgorithms: [sha256]
-  # rfc3161TimeStampServer: http://timestamp.certum.pl
-  # signDlls: false
-
-nsis:
-  oneClick: false
-  allowToChangeInstallationDirectory: true
-  createDesktopShortcut: true
-  createStartMenuShortcut: true
-  shortcutName: HomeStream
-  runAfterFinish: true
-  # Delta updates — only downloads the diff between versions, not the full installer.
-  # This means users get updates in seconds (a few MB) instead of minutes (full ~150MB installer).
-  # electron-builder generates a .nsis.7z delta package alongside the full installer.
-  differentialPackage: true
 
 # ── macOS ─────────────────────────────────────────────────────────────────────
 mac:

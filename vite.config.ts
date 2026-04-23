@@ -69,11 +69,23 @@ function serverBundlePlugin(): Plugin {
 				plugins: [externalizePlugin],
 				// Fix: server source files use import.meta.url for __dirname emulation
 				// and createRequire(import.meta.url). In CJS output, import.meta is
-				// undefined — this define replaces every occurrence at bundle time with
-				// a CJS-compatible equivalent so require('module').createRequire(...)
-				// and fileURLToPath(...) both receive a valid file URL string.
+				// undefined.
+				//
+				// Newer esbuild (≥0.19) rejects function-call expressions as define
+				// values — only JS literals and entity names are allowed. The workaround
+				// is to:
+				//   1. Inject a CJS-compatible shim variable via `banner` (runs before
+				//      any bundled code, so __importMetaUrl is always defined).
+				//   2. Replace every `import.meta.url` occurrence with that identifier
+				//      via `define` (a plain identifier is always a valid define value).
+				banner: {
+					js: [
+						"// HomeStream CJS shim — replaces import.meta.url in bundled server code",
+						"var __importMetaUrl = require('url').pathToFileURL(__filename).href;",
+					].join("\n"),
+				},
 				define: {
-					"import.meta.url": "require('url').pathToFileURL(__filename).href",
+					"import.meta.url": "__importMetaUrl",
 					// Bake version so health/GET.ts and mdnsService.ts don't need
 					// createRequire just to read package.json.
 					__APP_VERSION__: JSON.stringify(pkg.version),
