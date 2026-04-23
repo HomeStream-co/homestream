@@ -13,7 +13,7 @@ const { getSecret } = require('#airo/secrets');
 const TOKEN = getSecret('GH_TOKEN');
 const REPO  = 'trevorrossworn-code/homestream';
 const TAG   = 'v1.5.1';
-const ARTIFACT_ID = '6610408502';
+const ARTIFACT_ID = '6610826986'; // run 24855594808 — v1.5.1 with correct package.json version
 const TMP = '/tmp/hs-release';
 
 // ── HTTP helpers ──────────────────────────────────────────────────────────────
