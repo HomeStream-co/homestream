@@ -619,6 +619,7 @@ function TipsSection() {
             'Confirm both TV and PC are on the same WiFi network (not guest vs. main)',
             'Try pinging the IP from another device on the network',
             'Check Windows Firewall — allow HomeStream through on port 3000',
+            'Norton VPN users: Norton\'s Smart Firewall can block LAN traffic when the VPN is active. Open Norton → Settings → Firewall → Traffic Rules and add an Allow rule for 192.168.0.0/24 (your local network). Your HomeStream IP never changes when the VPN is on — only your public internet IP changes.',
           ],
           severity: 'warning' as const,
         },
@@ -688,6 +689,42 @@ function TipsSection() {
           </ul>
         </div>
       ))}
+
+      {/* Norton VPN callout */}
+      <div className="rounded-xl border border-orange-500/30 bg-orange-500/5 p-5 space-y-3">
+        <h3 className="font-semibold text-foreground flex items-center gap-2">
+          <TriangleAlert className="w-4 h-4 text-orange-400" />
+          Using Norton VPN? Read This First
+        </h3>
+        <p className="text-sm text-muted-foreground leading-relaxed">
+          Norton's Smart Firewall can block local network (LAN) traffic when the VPN is active,
+          preventing your TV from reaching HomeStream even though the server is running fine.
+          Your HomeStream IP address (<strong className="text-foreground">192.168.0.20</strong>) never
+          changes when Norton VPN is on — only your public internet IP changes. The fix is to whitelist
+          your local network in Norton's firewall:
+        </p>
+        <ol className="space-y-2 text-sm text-foreground/80">
+          {[
+            'Open Norton Security on your PC',
+            'Go to Settings → Firewall → Traffic Rules',
+            'Click "Add" to create a new rule',
+            'Set Action: Allow, Direction: Both',
+            'Set Local IP range: 192.168.0.0 – 192.168.0.255',
+            'Save the rule — your TV can now reach HomeStream while Norton VPN is active',
+          ].map((step, i) => (
+            <li key={i} className="flex items-start gap-2.5">
+              <span className="w-4 h-4 rounded-full bg-orange-500/20 text-orange-400 flex items-center justify-center text-[10px] font-bold flex-shrink-0 mt-0.5">
+                {i + 1}
+              </span>
+              {step}
+            </li>
+          ))}
+        </ol>
+        <p className="text-xs text-muted-foreground pt-1">
+          Note: This only allows LAN traffic — all internet traffic still routes through the VPN as normal.
+          Your downloads remain protected.
+        </p>
+      </div>
 
       {/* Alternative devices */}
       <div className="rounded-xl border border-border bg-card/50 p-5 space-y-3">
