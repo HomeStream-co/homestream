@@ -61,6 +61,8 @@ export default async function handler(req: Request, res: Response) {
           // VPN fields
           'vpnEnabled', 'vpnProtocol', 'vpnProvider',
           'vpnConfigContent', 'vpnUsername', 'vpnPassword', 'vpnAutoConnect',
+          // Prowlarr
+          'prowlarrUrl', 'prowlarrApiKey',
         ];
         const updates: Record<string, unknown> = {};
         for (const key of allowed) {
@@ -127,6 +129,28 @@ export default async function handler(req: Request, res: Response) {
         const apiKey = fields.jellyfinApiKey || config.jellyfinApiKey;
         const result = await testJellyfin(url, apiKey);
         res.json(result);
+        break;
+      }
+
+      case 'test_prowlarr': {
+        const config = readConfig();
+        const prowlarrUrl    = (fields.prowlarrUrl    || config.prowlarrUrl    || '').trim();
+        const prowlarrApiKey = (fields.prowlarrApiKey || config.prowlarrApiKey || '').trim();
+        if (!prowlarrUrl) {
+          res.json({ ok: false, error: 'No Prowlarr URL provided' });
+          return;
+        }
+        try {
+          const r = await fetch(`${prowlarrUrl}/api/v1/system/status`, {
+            headers: { 'X-Api-Key': prowlarrApiKey, 'User-Agent': 'HomeStream/1.5' },
+            signal: AbortSignal.timeout(8_000),
+          });
+          if (!r.ok) { res.json({ ok: false, error: `HTTP ${r.status}` }); return; }
+          const data = await r.json() as { version?: string; appName?: string };
+          res.json({ ok: true, version: data.version ?? 'unknown', appName: data.appName ?? 'Prowlarr' });
+        } catch (err) {
+          res.json({ ok: false, error: err instanceof Error ? err.message : String(err) });
+        }
         break;
       }
 

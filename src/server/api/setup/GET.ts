@@ -88,6 +88,8 @@ export default async function handler(req: Request, res: Response) {
       googleAiApiKey: mask(config.googleAiApiKey),
       tmdbApiKey: mask(config.tmdbApiKey),
       virusTotalApiKey: mask(config.virusTotalApiKey),
+      prowlarrUrl: config.prowlarrUrl ?? '',
+      hasProwlarrKey: !!config.prowlarrApiKey,
     },
   };
   res.json(response);

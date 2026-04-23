@@ -110,6 +110,10 @@ export interface SetupStepProps {
   setVpnTestState: (v: 'idle' | 'testing' | 'ok' | 'error') => void;
   vpnTestMsg: string;
   setVpnTestMsg: (v: string) => void;
+  prowlarrTest: KeyTestState;
+  setProwlarrTest: (v: KeyTestState) => void;
+  prowlarrTestMsg: string;
+  setProwlarrTestMsg: (v: string) => void;
   /** True once /api/electron has responded — prevents saving stale mediaDir on fast clicks */
   platformDefaultsReady: boolean;
 }

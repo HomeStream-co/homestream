@@ -8,7 +8,7 @@ import { useState, useEffect } from 'react';
 import {
   Wifi, Tv2, ChevronLeft, ChevronRight, CheckCircle2,
   XCircle, Loader2, RefreshCw, Eye, EyeOff, SkipForward,
-  Shield, AlertTriangle,
+  Shield, AlertTriangle, Search,
 } from 'lucide-react';
 import type { SetupStepProps } from './types';
 
@@ -26,6 +26,8 @@ export default function StepOptional({
   qbitVersion, setQbitVersion,
   jellyfinVersion, setJellyfinVersion,
   testError, setTestError,
+  prowlarrTest, setProwlarrTest,
+  prowlarrTestMsg, setProwlarrTestMsg,
 }: SetupStepProps) {
   const [qbitTest, setQbitTest] = useState<'idle' | 'testing' | 'ok' | 'error'>('idle');
   const [jellyfinTest, setJellyfinTest] = useState<'idle' | 'testing' | 'ok' | 'error'>('idle');
@@ -328,6 +330,58 @@ export default function StepOptional({
             )}
           </div>
         )}
+      </div>
+
+      {/* ── Prowlarr ─────────────────────────────────────────────────────── */}
+      <div className="p-4 rounded-xl border border-border bg-muted/20">
+        <div className="flex items-center gap-2 mb-1">
+          <Search className="w-4 h-4 text-primary" />
+          <p className="text-sm font-semibold text-foreground">Prowlarr</p>
+          <span className="text-[10px] bg-muted text-muted-foreground px-1.5 py-0.5 rounded font-medium">Optional</span>
+        </div>
+        <p className="text-xs text-muted-foreground mb-3">
+          Self-hosted indexer aggregator — queries 500+ torrent trackers in parallel.
+          Dramatically improves coverage for niche, regional, and foreign-language content beyond Torrentio.
+          Install from <a href="https://prowlarr.com" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">prowlarr.com</a>.
+        </p>
+        <div className="flex flex-col gap-2">
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={form.prowlarrUrl}
+              onChange={e => { set('prowlarrUrl', e.target.value); setProwlarrTest('idle'); }}
+              placeholder="http://localhost:9696"
+              className="flex-1 bg-background border border-border rounded-lg px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary font-mono min-w-0"
+            />
+            <button
+              onClick={testProwlarr}
+              disabled={!form.prowlarrUrl.trim() || prowlarrTest === 'testing'}
+              className="flex items-center gap-1.5 px-3 py-2.5 rounded-lg bg-muted hover:bg-muted/80 text-foreground text-xs font-medium transition-colors disabled:opacity-40 flex-shrink-0"
+            >
+              {prowlarrTest === 'testing' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />} Test
+            </button>
+          </div>
+          <div>
+            <label className="text-[10px] font-medium text-foreground/70 block mb-1">API Key</label>
+            <input
+              type="text"
+              value={form.prowlarrApiKey}
+              onChange={e => { set('prowlarrApiKey', e.target.value); setProwlarrTest('idle'); }}
+              placeholder="Prowlarr → Settings → General → API Key"
+              className="w-full bg-background border border-border rounded-lg px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary font-mono"
+            />
+          </div>
+          {prowlarrTest === 'ok' && (
+            <div className="flex items-center gap-1.5 text-[11px] text-green-400 bg-green-500/10 border border-green-500/20 rounded-lg px-2.5 py-1.5">
+              <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" />{prowlarrTestMsg}
+            </div>
+          )}
+          {prowlarrTest === 'error' && (
+            <div className="flex items-center gap-1.5 text-[11px] text-destructive bg-destructive/10 border border-destructive/20 rounded-lg px-2.5 py-1.5">
+              <XCircle className="w-3.5 h-3.5 flex-shrink-0" />{prowlarrTestMsg}
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="flex gap-3">

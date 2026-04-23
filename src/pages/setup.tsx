@@ -123,6 +123,8 @@ export default function SetupPage() {
 
   const [vpnTestState, setVpnTestState]   = useState<'idle' | 'testing' | 'ok' | 'error'>('idle');
   const [vpnTestMsg, setVpnTestMsg]       = useState('');
+  const [prowlarrTest, setProwlarrTest]   = useState<KeyTestState>('idle');
+  const [prowlarrTestMsg, setProwlarrTestMsg] = useState('');
 
   // Track whether the Electron platform defaults have been fetched.
   // StepMediaFolder disables its "Save & Continue" button until this resolves
@@ -229,6 +231,8 @@ export default function SetupPage() {
     importExisting, setImportExisting,
     vpnTestState, setVpnTestState,
     vpnTestMsg, setVpnTestMsg,
+    prowlarrTest, setProwlarrTest,
+    prowlarrTestMsg, setProwlarrTestMsg,
     platformDefaultsReady,
   };
 
