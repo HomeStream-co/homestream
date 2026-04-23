@@ -18,6 +18,7 @@ const HttpsSetupPage = lazy(() => import('./pages/https-setup'));
 const HistoryPage = lazy(() => import('./pages/history'));
 const RemotePage = lazy(() => import('./pages/remote'));
 const StatsPage  = lazy(() => import('./pages/stats'));
+const SamsungTvPage = lazy(() => import('./pages/samsung-tv'));
 
 const NotFoundPage = lazy(() => import('./pages/_404'));
 
@@ -40,6 +41,7 @@ export const routes: RouteObject[] = [
   { path: '/https-setup', element: <HttpsSetupPage /> },
   { path: '/remote', element: <RemotePage /> },
   { path: '/stats', element: <StatsPage /> },
+  { path: '/samsung-tv', element: <SamsungTvPage /> },
   { path: '*', element: <NotFoundPage /> },
 ];
 

@@ -1189,6 +1189,20 @@ export default function SettingsPanel({ onOpenSecurity, onOpenDebug, forceOpen, 
                     </div>
                   </button>
 
+                  {/* Samsung TV Setup */}
+                  <button
+                    onClick={() => { setOpen(false); navigate('/samsung-tv'); }}
+                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border border-border hover:border-primary/40 hover:bg-primary/5 transition-colors text-left group"
+                  >
+                    <div className="w-7 h-7 rounded-lg bg-cyan-500/10 flex items-center justify-center flex-shrink-0 group-hover:bg-cyan-500/20 transition-colors">
+                      <Tv2 className="w-4 h-4 text-cyan-400" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-foreground leading-tight">Samsung TV Setup</p>
+                      <p className="text-[11px] text-muted-foreground">Browser guide, bookmarks &amp; remote tips</p>
+                    </div>
+                  </button>
+
                   {/* Setup Wizard */}
                   <button
                     onClick={() => { setOpen(false); navigate('/setup'); }}
