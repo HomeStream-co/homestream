@@ -24,7 +24,7 @@ import {
   RefreshCw, X, ChevronDown, ChevronUp, Activity,
   Settings2, Save, BarChart3, Layers,
   Bell, BellOff, Calendar, RotateCcw, TrendingUp,
-  ChevronsUp, ChevronsDown, Link2, Send,
+  ChevronsUp, ChevronsDown, Link2, Send, CalendarClock,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import VPNPanel from '@/components/VPNPanel';
@@ -105,6 +105,22 @@ interface StorageStats {
   mediaDir: string | null;
   categoryBytes: { movies: number; tv: number; other: number };
   storageAllocation: { moviesPct: number; tvPct: number; otherPct: number };
+}
+
+interface ScheduledJob {
+  id: string;
+  title: string;
+  imdbId: string;
+  type: 'movie' | 'series';
+  season?: number;
+  episode?: number;
+  poster?: string;
+  year?: string;
+  scheduledFor: string;
+  status: 'pending' | 'fired' | 'error';
+  createdAt: string;
+  firedAt?: string;
+  error?: string;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -879,7 +895,38 @@ export default function DownloadsPage() {
 
   useEffect(() => { fetchSubscriptions(); }, [fetchSubscriptions]);
 
-  // Storage state
+  // Scheduled downloads state
+  const [scheduledJobs, setScheduledJobs] = useState<ScheduledJob[]>([]);
+  const [cancellingScheduleId, setCancellingScheduleId] = useState<string | null>(null);
+
+  const fetchScheduled = useCallback(async () => {
+    try {
+      const res = await fetch('/api/stremio/schedule');
+      if (!res.ok) return;
+      const json = await res.json() as ScheduledJob[];
+      setScheduledJobs(json);
+    } catch { /* silent */ }
+  }, []);
+
+  const handleCancelScheduled = async (id: string, title: string) => {
+    setCancellingScheduleId(id);
+    try {
+      const res = await fetch(`/api/stremio/schedule/${id}`, { method: 'DELETE' });
+      const data = await res.json() as { ok?: boolean; error?: string };
+      if (data.ok) {
+        setScheduledJobs(j => j.filter(x => x.id !== id));
+        toast.success(`Cancelled scheduled download for "${title}"`);
+      } else {
+        toast.error(data.error ?? 'Failed to cancel');
+      }
+    } catch {
+      toast.error('Failed to cancel scheduled download');
+    } finally {
+      setCancellingScheduleId(null);
+    }
+  };
+
+  useEffect(() => { fetchScheduled(); }, [fetchScheduled]);
   const [storage, setStorage] = useState<StorageStats | null>(null);
   const [showStorageSettings, setShowStorageSettings] = useState(false);
   const [moviesPct, setMoviesPct] = useState(60);
@@ -1392,6 +1439,129 @@ export default function DownloadsPage() {
                   </AnimatePresence>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* ── Scheduled Queue ── */}
+          {scheduledJobs.length > 0 && (
+            <div className="mt-8">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <CalendarClock className="w-4 h-4 text-primary" />
+                  <h2 className="text-sm font-semibold text-foreground uppercase tracking-wide">Scheduled Downloads</h2>
+                  <span className="text-xs text-muted-foreground">
+                    ({scheduledJobs.filter(j => j.status === 'pending').length} pending)
+                  </span>
+                </div>
+                <button
+                  onClick={fetchScheduled}
+                  className="p-1.5 text-muted-foreground hover:text-foreground transition-colors"
+                  title="Refresh"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              <div className="space-y-2">
+                <AnimatePresence initial={false}>
+                  {scheduledJobs.map(job => {
+                    const isPending = job.status === 'pending';
+                    const isFired = job.status === 'fired';
+                    const isError = job.status === 'error';
+                    const fireDate = new Date(job.scheduledFor);
+                    const isOverdue = isPending && fireDate.getTime() < Date.now();
+
+                    return (
+                      <motion.div
+                        key={job.id}
+                        layout
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -8 }}
+                        className={`flex items-center gap-3 p-3 rounded-xl border transition-colors ${
+                          isFired
+                            ? 'bg-green-500/5 border-green-500/20'
+                            : isError
+                            ? 'bg-destructive/5 border-destructive/20'
+                            : isOverdue
+                            ? 'bg-amber-500/5 border-amber-500/20'
+                            : 'bg-card border-border'
+                        }`}
+                      >
+                        {/* Poster */}
+                        {job.poster ? (
+                          <img
+                            src={job.poster}
+                            alt={job.title}
+                            className="w-10 h-14 object-cover rounded-lg flex-shrink-0"
+                            onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                          />
+                        ) : (
+                          <div className="w-10 h-14 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
+                            {job.type === 'series' ? <Tv2 className="w-4 h-4 text-muted-foreground" /> : <Film className="w-4 h-4 text-muted-foreground" />}
+                          </div>
+                        )}
+
+                        {/* Info */}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-foreground truncate">{job.title}</p>
+                          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                            {job.type === 'series' && job.season != null && (
+                              <span className="text-[10px] text-muted-foreground">
+                                S{String(job.season).padStart(2, '0')}{job.episode != null ? `E${String(job.episode).padStart(2, '0')}` : ''}
+                              </span>
+                            )}
+                            {/* Status badge */}
+                            {isPending && !isOverdue && (
+                              <span className="flex items-center gap-1 text-[10px] text-primary">
+                                <Clock className="w-3 h-3" />
+                                {fireDate.toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                              </span>
+                            )}
+                            {isPending && isOverdue && (
+                              <span className="flex items-center gap-1 text-[10px] text-amber-400">
+                                <Loader2 className="w-3 h-3 animate-spin" />
+                                Firing soon…
+                              </span>
+                            )}
+                            {isFired && (
+                              <span className="flex items-center gap-1 text-[10px] text-green-400">
+                                <CheckCircle2 className="w-3 h-3" />
+                                Fired {job.firedAt ? new Date(job.firedAt).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : ''}
+                              </span>
+                            )}
+                            {isError && (
+                              <span className="flex items-center gap-1 text-[10px] text-destructive" title={job.error}>
+                                <AlertCircle className="w-3 h-3" />
+                                Failed — {job.error?.slice(0, 60)}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Cancel button (pending only) */}
+                        {isPending && (
+                          <button
+                            onClick={() => handleCancelScheduled(job.id, job.title)}
+                            disabled={cancellingScheduleId === job.id}
+                            className="p-2 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50 flex-shrink-0"
+                            title="Cancel scheduled download"
+                          >
+                            {cancellingScheduleId === job.id
+                              ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              : <X className="w-3.5 h-3.5" />
+                            }
+                          </button>
+                        )}
+                      </motion.div>
+                    );
+                  })}
+                </AnimatePresence>
+              </div>
+
+              <p className="text-xs text-muted-foreground mt-3">
+                Schedule a download from the <strong>Stremio</strong> panel — click the <CalendarClock className="w-3 h-3 inline" /> icon next to any stream.
+              </p>
             </div>
           )}
 
