@@ -193,7 +193,18 @@ export function usePlayerKeyboard({
             case 'rewind':     video.currentTime = Math.max(video.currentTime - 10, 0); flashSeek('back'); break;
             case 'forward':    video.currentTime = Math.min(video.currentTime + 10, video.duration); flashSeek('forward'); break;
             case 'mute':       video.muted = !video.muted; setMuted(video.muted); break;
-            case 'fullscreen': if (!document.fullscreenElement) containerRef.current?.requestFullscreen(); else document.exitFullscreen(); break;
+            case 'fullscreen': {
+              const fsEl = document.fullscreenElement ?? (document as Document & { webkitFullscreenElement?: Element }).webkitFullscreenElement;
+              const el = containerRef.current;
+              if (!fsEl && el) {
+                if (el.requestFullscreen) el.requestFullscreen();
+                else (el as HTMLElement & { webkitRequestFullscreen?: () => void }).webkitRequestFullscreen?.();
+              } else {
+                if (document.exitFullscreen) document.exitFullscreen();
+                else (document as Document & { webkitExitFullscreen?: () => void }).webkitExitFullscreen?.();
+              }
+              break;
+            }
             case 'speed': {
               const idx = SPEEDS.indexOf(video.playbackRate);
               const next = SPEEDS[(idx + 1) % SPEEDS.length];
@@ -259,11 +270,19 @@ export function usePlayerKeyboard({
 
         // ── F — fullscreen ──
         case 'f':
-        case 'F':
+        case 'F': {
           e.preventDefault();
-          if (!document.fullscreenElement) containerRef.current?.requestFullscreen();
-          else document.exitFullscreen();
+          const fsEl = document.fullscreenElement ?? (document as Document & { webkitFullscreenElement?: Element }).webkitFullscreenElement;
+          const el = containerRef.current;
+          if (!fsEl && el) {
+            if (el.requestFullscreen) el.requestFullscreen();
+            else (el as HTMLElement & { webkitRequestFullscreen?: () => void }).webkitRequestFullscreen?.();
+          } else {
+            if (document.exitFullscreen) document.exitFullscreen();
+            else (document as Document & { webkitExitFullscreen?: () => void }).webkitExitFullscreen?.();
+          }
           break;
+        }
 
         // ── I — info panel ──
         case 'i':

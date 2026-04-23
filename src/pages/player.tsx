@@ -162,7 +162,17 @@ export default function PlayerPage() {
     onSkipForward: (secs) => { if (ps.videoRef.current) ps.videoRef.current.currentTime = Math.min(ps.videoRef.current.currentTime + secs, ps.duration); },
     onSkipBack:    (secs) => { if (ps.videoRef.current) ps.videoRef.current.currentTime = Math.max(ps.videoRef.current.currentTime - secs, 0); },
     onSkipIntro:   () => { if (ps.videoRef.current) ps.videoRef.current.currentTime = SKIP_INTRO_END; },
-    onFullscreen:  () => { if (!document.fullscreenElement) ps.containerRef.current?.requestFullscreen(); else document.exitFullscreen(); },
+    onFullscreen:  () => {
+      const fsEl = document.fullscreenElement ?? (document as Document & { webkitFullscreenElement?: Element }).webkitFullscreenElement;
+      const el = ps.containerRef.current;
+      if (!fsEl && el) {
+        if (el.requestFullscreen) el.requestFullscreen();
+        else (el as HTMLElement & { webkitRequestFullscreen?: () => void }).webkitRequestFullscreen?.();
+      } else {
+        if (document.exitFullscreen) document.exitFullscreen();
+        else (document as Document & { webkitExitFullscreen?: () => void }).webkitExitFullscreen?.();
+      }
+    },
     onSpeed:       (rate) => { if (ps.videoRef.current) { ps.videoRef.current.playbackRate = rate; ps.setPlaybackRate(rate); } },
     onSubtitle:    (track) => { setCcLangRef.current?.(track === -1 ? 'off' : track === 0 ? 'en' : 'es'); },
     onCast:        () => castButtonRef.current?.(),
@@ -280,9 +290,16 @@ export default function PlayerPage() {
 
   // ── Fullscreen listener ───────────────────────────────────────────────────
   useEffect(() => {
-    const onFsChange = () => ps.setFullscreen(!!document.fullscreenElement);
+    const onFsChange = () => {
+      const fsEl = document.fullscreenElement ?? (document as Document & { webkitFullscreenElement?: Element }).webkitFullscreenElement;
+      ps.setFullscreen(!!fsEl);
+    };
     document.addEventListener('fullscreenchange', onFsChange);
-    return () => document.removeEventListener('fullscreenchange', onFsChange);
+    document.addEventListener('webkitfullscreenchange', onFsChange); // Samsung Tizen / Safari
+    return () => {
+      document.removeEventListener('fullscreenchange', onFsChange);
+      document.removeEventListener('webkitfullscreenchange', onFsChange);
+    };
   }, [ps]);
 
   // ── PiP listener ─────────────────────────────────────────────────────────
@@ -452,7 +469,19 @@ export default function PlayerPage() {
 
   const togglePlay = () => { if (!ps.videoRef.current) return; if (ps.playing) ps.videoRef.current.pause(); else ps.videoRef.current.play(); };
   const toggleMute = () => { if (!ps.videoRef.current) return; ps.videoRef.current.muted = !ps.muted; ps.setMuted(!ps.muted); };
-  const toggleFullscreen = () => { if (!ps.containerRef.current) return; if (!document.fullscreenElement) ps.containerRef.current.requestFullscreen(); else document.exitFullscreen(); };
+  const toggleFullscreen = () => {
+    const el = ps.containerRef.current;
+    if (!el) return;
+    const fsEl = document.fullscreenElement ?? (document as Document & { webkitFullscreenElement?: Element }).webkitFullscreenElement;
+    if (!fsEl) {
+      // Standard API first, webkit fallback for older Samsung Tizen / Safari
+      if (el.requestFullscreen) el.requestFullscreen();
+      else (el as HTMLElement & { webkitRequestFullscreen?: () => void }).webkitRequestFullscreen?.();
+    } else {
+      if (document.exitFullscreen) document.exitFullscreen();
+      else (document as Document & { webkitExitFullscreen?: () => void }).webkitExitFullscreen?.();
+    }
+  };
   const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => { const v = parseFloat(e.target.value); if (ps.videoRef.current) ps.videoRef.current.volume = v; ps.setVolume(v); ps.setMuted(v === 0); };
   const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => { const t = parseFloat(e.target.value); if (ps.videoRef.current) ps.videoRef.current.currentTime = t; ps.setCurrentTime(t); };
   const changeSpeed = (rate: number) => { if (ps.videoRef.current) ps.videoRef.current.playbackRate = rate; ps.setPlaybackRate(rate); ps.setShowSpeedMenu(false); };
