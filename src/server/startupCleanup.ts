@@ -269,6 +269,18 @@ export function runStartupCleanup(): void {
   // entries are pruned. Keeps the cache dir from growing unbounded over time.
   pruneStaleTmdbCache();
 
+  // ── probeCache TTL eviction ───────────────────────────────────────────────────
+  // Evicts in-memory ffprobe results not accessed in the last 24 hours.
+  // Without this, entries for deleted files stay cached forever since their
+  // mtime never changes and probe() is never called again for them.
+  // Dynamic import avoids a circular dependency (probeCache → configure → startupCleanup).
+  import('./probeCache.js').then(({ evictStaleProbeCache }) => {
+    const evicted = evictStaleProbeCache();
+    if (evicted > 0) {
+      console.log(`[startup] probeCache TTL eviction: removed ${evicted} stale entry(ies).`);
+    }
+  }).catch(() => { /* non-fatal — cache will self-correct on next probe() */ });
+
   const stuckTranscoding = library.filter(m => m.transcoding === true);
   const stuckEnriching   = library.filter(m => m.enriching === true);
 

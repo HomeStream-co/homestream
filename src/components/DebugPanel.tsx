@@ -11,7 +11,7 @@
  * Always visible (not DEV-only). Designed to get any user unstuck.
  */
 
-import { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   X, RefreshCw, CheckCircle2, AlertTriangle, XCircle,
@@ -21,7 +21,13 @@ import {
   Activity, Zap, Globe, MemoryStick, Clock, Terminal,
   RotateCcw, ShieldOff, Play,
 } from 'lucide-react';
-import { DevVersionTrigger, DevDrawer } from './DevDrawer';
+import { DevVersionTrigger } from './DevDrawer';
+// DevDrawer is lazy-loaded so Vite can tree-shake it from production bundles
+// when DEVELOPER_LOCK is not set. The runtime devLocked gate ensures it is
+// never rendered on family installs regardless.
+const DevDrawer = React.lazy(() =>
+  import('./DevDrawer').then(m => ({ default: m.DevDrawer }))
+);
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -1010,7 +1016,9 @@ export default function DebugPanel({ open, onClose }: DebugPanelProps) {
               <AnimatePresence>
                 {devLocked && devDrawerOpen && (
                   <div className="p-3 border-b border-violet-500/20">
-                    <DevDrawer onClose={() => setDevDrawerOpen(false)} />
+                    <React.Suspense fallback={null}>
+                      <DevDrawer onClose={() => setDevDrawerOpen(false)} />
+                    </React.Suspense>
                   </div>
                 )}
               </AnimatePresence>

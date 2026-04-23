@@ -75,6 +75,7 @@ interface CacheEntry {
 }
 
 const MAX_ENTRIES = 500;
+const TTL_MS = 24 * 60 * 60 * 1000; // 24 hours — evicts entries for deleted files
 const cache = new Map<string, CacheEntry>();
 
 function evictLRU() {
@@ -88,6 +89,27 @@ function evictLRU() {
     }
   }
   if (oldestKey) cache.delete(oldestKey);
+}
+
+/**
+ * Evict all cache entries that haven't been accessed in the last 24 hours.
+ *
+ * Without TTL eviction, entries for deleted files stay in the cache forever —
+ * the mtime-based invalidation only fires on the next probe() call, which
+ * never happens for deleted files. Called from startupCleanup on boot.
+ *
+ * @returns number of entries evicted
+ */
+export function evictStaleProbeCache(): number {
+  const cutoff = Date.now() - TTL_MS;
+  let evicted = 0;
+  for (const [key, entry] of cache) {
+    if (entry.lastAccess < cutoff) {
+      cache.delete(key);
+      evicted++;
+    }
+  }
+  return evicted;
 }
 
 const LANG_NAMES: Record<string, string> = {
