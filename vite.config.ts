@@ -44,31 +44,20 @@ function serverBundlePlugin(): Plugin {
 				target: "node22",
 				format: "esm",
 				outfile,
-				packages: "bundle",
+				// external: keep node_modules out of the bundle so esbuild never
+				// tries to inline CJS packages that use createRequire internally.
+				// Those packages ship with the app via electron extraResources /
+				// node_modules and are resolved at runtime by Node.
+				packages: "external",
 				sourcemap: true,
 				plugins: [externalizePlugin],
+				// Provide a top-level require() shim so any bundled app code that
+				// calls require() directly still works in ESM context.
+				// Use a unique name that cannot clash with esbuild's own helpers.
 				banner: {
-					js: `import { createRequire as __airo_createRequire } from 'module';\nconst require = __airo_createRequire(import.meta.url);`,
+					js: `import { createRequire as ___hs_createRequire } from 'module';\nconst require = ___hs_createRequire(import.meta.url);`,
 				},
 			});
-
-			// Post-process: deduplicate `import { createRequire } from "module"` lines.
-			{
-				const fs2 = await import("fs");
-				let src = fs2.readFileSync(outfile, "utf8");
-				let firstSeen = false;
-				src = src.replace(
-					/^import \{ createRequire(?: as \w+)? \} from ["']module["'];?\r?\n/gm,
-					(match) => {
-						if (!firstSeen) { firstSeen = true; return match; }
-						return "";
-					}
-				);
-				if (!firstSeen) {
-					src = `import { createRequire } from "module";\nconst require = createRequire(import.meta.url);\n` + src;
-				}
-				fs2.writeFileSync(outfile, src);
-			}
 			console.log("Server bundle created at dist/server.bundle.mjs");
 		},
 	};
