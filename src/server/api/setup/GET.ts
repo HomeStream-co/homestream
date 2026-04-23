@@ -90,6 +90,10 @@ export default async function handler(req: Request, res: Response) {
       virusTotalApiKey: mask(config.virusTotalApiKey),
       prowlarrUrl: config.prowlarrUrl ?? '',
       hasProwlarrKey: !!config.prowlarrApiKey,
+      // Timestamps for lifespan countdown in Settings
+      omdbApiKeySavedAt:     config.omdbApiKeySavedAt     ?? null,
+      googleAiApiKeySavedAt: config.googleAiApiKeySavedAt ?? null,
+      tmdbApiKeySavedAt:     config.tmdbApiKeySavedAt     ?? null,
     },
   };
   res.json(response);

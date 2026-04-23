@@ -108,6 +108,13 @@ export default async function handler(req: Request, res: Response) {
           updates.libraryDir   = libraryDir;
         }
 
+        // Stamp save timestamps for API keys so the Settings panel can show
+        // a lifespan countdown and regeneration reminder.
+        const now = new Date().toISOString();
+        if (fields.omdbApiKey)     updates.omdbApiKeySavedAt     = now;
+        if (fields.googleAiApiKey) updates.googleAiApiKeySavedAt = now;
+        if (fields.tmdbApiKey)     updates.tmdbApiKeySavedAt     = now;
+
         const config = writeConfig(updates);
         res.json({ ok: true, config });
         break;

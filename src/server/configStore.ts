@@ -48,6 +48,10 @@ export interface AppConfig {
   // Prowlarr — self-hosted indexer aggregator (queries 500+ trackers)
   prowlarrUrl: string;        // e.g. http://localhost:9696
   prowlarrApiKey: string;     // Settings → General → API Key in Prowlarr UI
+  // API key save timestamps (ISO strings) — used for lifespan countdown in Settings
+  omdbApiKeySavedAt?: string;
+  googleAiApiKeySavedAt?: string;
+  tmdbApiKeySavedAt?: string;
 }
 
 const DEFAULTS: AppConfig = {

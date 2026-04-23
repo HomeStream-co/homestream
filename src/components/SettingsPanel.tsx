@@ -143,18 +143,33 @@ export default function SettingsPanel({
   const [apiKeysSavedState, setApiKeysSavedState] = useState<ApiKeysSavedState>({
     omdb: false, googleAi: false, tmdb: false,
   });
+  const [apiKeyTimestamps, setApiKeyTimestamps] = useState<{
+    omdb: string | null; googleAi: string | null; tmdb: string | null;
+  }>({ omdb: null, googleAi: null, tmdb: null });
 
   useEffect(() => {
     if (!open || apiKeysLoaded) return;
     fetch('/api/setup')
       .then(r => r.json())
-      .then((data: { config?: { omdbApiKey?: string; googleAiApiKey?: string; tmdbApiKey?: string } }) => {
+      .then((data: {
+        config?: {
+          omdbApiKey?: string; googleAiApiKey?: string; tmdbApiKey?: string;
+          omdbApiKeySavedAt?: string | null;
+          googleAiApiKeySavedAt?: string | null;
+          tmdbApiKeySavedAt?: string | null;
+        }
+      }) => {
         if (data.config) {
           setApiKeys({ omdbApiKey: '', googleAiApiKey: '', tmdbApiKey: '' });
           setApiKeysSavedState({
             omdb: !!data.config.omdbApiKey,
             googleAi: !!data.config.googleAiApiKey,
             tmdb: !!data.config.tmdbApiKey,
+          });
+          setApiKeyTimestamps({
+            omdb:     data.config.omdbApiKeySavedAt     ?? null,
+            googleAi: data.config.googleAiApiKeySavedAt ?? null,
+            tmdb:     data.config.tmdbApiKeySavedAt     ?? null,
           });
           setApiKeysLoaded(true);
         }
@@ -455,6 +470,7 @@ export default function SettingsPanel({
                 <SettingsApiKeys
                   apiKeys={apiKeys}
                   apiKeysSavedState={apiKeysSavedState}
+                  apiKeyTimestamps={apiKeyTimestamps}
                   apiKeysSaving={apiKeysSaving}
                   apiKeysSaved={apiKeysSaved}
                   onChangeKey={handleChangeKey}
