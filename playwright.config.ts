@@ -38,8 +38,8 @@ export default defineConfig({
   ],
 
   use: {
-    // Base URL — Vite dev server
-    baseURL: process.env.E2E_BASE_URL ?? 'http://localhost:5173',
+    // Base URL — Vite dev server (port 20010 in this environment, 5173 locally)
+    baseURL: process.env.E2E_BASE_URL ?? 'http://localhost:20010',
 
     // Capture trace on first retry for debugging
     trace: 'on-first-retry',
@@ -65,8 +65,8 @@ export default defineConfig({
   // Start the Vite dev server automatically before running tests
   webServer: {
     command: 'npm run dev',
-    url: 'http://localhost:5173',
-    reuseExistingServer: !process.env.CI,
+    url: 'http://localhost:20010',
+    reuseExistingServer: true, // Always reuse — dev server is managed externally
     timeout: 60_000,
     stdout: 'ignore',
     stderr: 'pipe',
