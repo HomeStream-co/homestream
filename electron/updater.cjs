@@ -112,6 +112,25 @@ function setupAutoUpdater({ controlWindowGetter, pushLog }) {
 
   log(`Auto-updater configured for ${owner}/${repo}`);
 
+  // ── Private repo: inject GitHub token ───────────────────────────────────────
+  // The repo is private so electron-updater must authenticate with a GitHub
+  // Personal Access Token (read:packages + contents scope) to:
+  //   1. Fetch the latest.yml release manifest
+  //   2. Download the delta/full installer asset
+  //
+  // The token is baked into the app at build time via electron-builder
+  // extraMetadata.ghToken (set from the GH_TOKEN CI secret).
+  // It is NOT a secret in the traditional sense — anyone who unpacks the asar
+  // can read it — so use a fine-grained PAT scoped to read-only release assets
+  // on this repo only. Never use a broad admin token here.
+  const ghToken = process.env.HOMESTREAM_GH_TOKEN || pkg?.build?.ghToken || '';
+  if (ghToken) {
+    autoUpdater.requestHeaders = { Authorization: `token ${ghToken}` };
+    log('GitHub token configured for private repo update checks');
+  } else {
+    log('No GitHub token found — update checks will fail on private repos. Set GH_TOKEN in CI and add ghToken to extraMetadata.', 'warn');
+  }
+
   // electron-updater reads publish config from electron-builder.yml automatically.
   // Disable auto-download so the user controls when to download.
   autoUpdater.autoDownload = false;

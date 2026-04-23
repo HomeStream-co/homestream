@@ -44,6 +44,7 @@ jobs:
         run: npm run build
         env:
           CI: true
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
 
       - name: Package & publish installer
         # Runs on windows-latest — NSIS is available, so we override the default
