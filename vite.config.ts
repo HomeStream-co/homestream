@@ -37,6 +37,17 @@ function serverBundlePlugin(): Plugin {
 				},
 			};
 
+			// Write the require-shim to a temp file so esbuild can `inject` it.
+			// Using inject (not banner) means esbuild sees our createRequire import
+			// BEFORE it processes bundled CJS modules, so it de-duplicates correctly
+			// instead of generating conflicting createRequireN helper variables.
+			const shimPath = path.resolve(__dirname, "dist", "_require-shim.mjs");
+			const fs1 = await import("fs");
+			fs1.writeFileSync(
+				shimPath,
+				`import { createRequire } from "module";\nglobalThis.require = globalThis.require ?? createRequire(import.meta.url);\n`
+			);
+
 			await esbuild.build({
 				entryPoints: [path.resolve(__dirname, "dist", "app.js")],
 				bundle: true,
@@ -44,20 +55,19 @@ function serverBundlePlugin(): Plugin {
 				target: "node22",
 				format: "esm",
 				outfile,
-				// external: keep node_modules out of the bundle so esbuild never
-				// tries to inline CJS packages that use createRequire internally.
-				// Those packages ship with the app via electron extraResources /
-				// node_modules and are resolved at runtime by Node.
-				packages: "external",
+				// Bundle everything so node_modules are inlined — no runtime
+				// dependency on a node_modules folder next to the binary.
+				packages: "bundle",
 				sourcemap: true,
+				// inject provides the shim before bundling so esbuild de-duplicates
+				// createRequire imports rather than generating createRequireN helpers.
+				inject: [shimPath],
 				plugins: [externalizePlugin],
-				// Provide a top-level require() shim so any bundled app code that
-				// calls require() directly still works in ESM context.
-				// Use a unique name that cannot clash with esbuild's own helpers.
-				banner: {
-					js: `import { createRequire as ___hs_createRequire } from 'module';\nconst require = ___hs_createRequire(import.meta.url);`,
-				},
 			});
+
+			// Clean up temp shim
+			try { fs1.unlinkSync(shimPath); } catch { /* ignore */ }
+
 			console.log("Server bundle created at dist/server.bundle.mjs");
 		},
 	};
