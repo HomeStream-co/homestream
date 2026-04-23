@@ -15,6 +15,11 @@ import { requireAuth } from '../../../authMiddleware.js';
  *   1. qBittorrent (preferred) — full BitTorrent swarm, resume on restart
  *   2. WebTorrent (fallback)   — built-in, works without qBittorrent
  *
+ * Stream sources (queried in parallel, same as /api/stremio/stream):
+ *   1. Torrentio  — always queried (public, no config needed)
+ *   2. Prowlarr   — queried when prowlarrUrl + prowlarrApiKey are set in config
+ *   3. Nyaa.si    — queried for anime (always, public API, no auth)
+ *
  * For MOVIES: picks the best single stream and queues one download.
  * For SERIES: fetches streams per episode, picks best, queues all.
  */
@@ -26,6 +31,7 @@ interface StreamResult {
   seeds: string;
   magnet: string;
   infoHash: string;
+  source: 'torrentio' | 'prowlarr' | 'nyaa';
 }
 
 interface TorrentioResponse {
@@ -37,10 +43,31 @@ interface TorrentioResponse {
   }>;
 }
 
-const TORRENTIO = 'https://torrentio.strem.fun';
+interface ProwlarrResult {
+  title: string;
+  downloadUrl?: string;
+  magnetUrl?: string;
+  infoHash?: string;
+  seeders?: number;
+  size?: number;
+}
+interface ProwlarrResponse { results?: ProwlarrResult[] }
+
+interface NyaaItem {
+  id: number;
+  title: string;
+  magnet: string;
+  seeders: number;
+  leechers: number;
+  size: string;
+  hash: string;
+}
+
+const TORRENTIO  = 'https://torrentio.strem.fun';
+const NYAA_API   = 'https://nyaa.si/api';
 const TIMEOUT_MS = 15_000;
 
-// ── 5-minute in-memory stream cache (avoids duplicate Torrentio fetches) ──────
+// ── 5-minute in-memory stream cache (avoids duplicate fetches) ────────────────
 interface CacheEntry { streams: StreamResult[]; expiresAt: number }
 const streamCache = new Map<string, CacheEntry>();
 
@@ -51,12 +78,13 @@ function getCached(key: string): StreamResult[] | null {
 }
 function setCached(key: string, streams: StreamResult[]) {
   streamCache.set(key, { streams, expiresAt: Date.now() + 5 * 60 * 1000 });
-  // Evict entries beyond 200 to prevent unbounded growth
   if (streamCache.size > 200) {
     const oldest = streamCache.keys().next().value;
     if (oldest) streamCache.delete(oldest);
   }
 }
+
+// ── Shared helpers ────────────────────────────────────────────────────────────
 
 function parseStreamTitle(raw: string): { quality: string; size: string; seeds: string } {
   const lines = raw.split('\n').map(l => l.trim()).filter(Boolean);
@@ -79,7 +107,16 @@ function buildMagnet(infoHash: string, sources?: string[]): string {
   return `magnet:?xt=urn:btih:${infoHash}${trackers}`;
 }
 
-async function fetchStreamsForEpisode(
+function formatBytes(bytes: number): string {
+  if (!bytes) return '';
+  if (bytes >= 1e9) return `${(bytes / 1e9).toFixed(1)} GB`;
+  if (bytes >= 1e6) return `${(bytes / 1e6).toFixed(0)} MB`;
+  return `${bytes} B`;
+}
+
+// ── Per-source fetchers ───────────────────────────────────────────────────────
+
+async function fetchTorrentio(
   imdbId: string,
   type: 'movie' | 'series',
   season?: number,
@@ -89,42 +126,157 @@ async function fetchStreamsForEpisode(
     type === 'series' && season != null && episode != null
       ? `${imdbId}:${season}:${episode}`
       : imdbId;
-
-  const cacheKey = `${type}:${streamId}`;
-  const cached = getCached(cacheKey);
-  if (cached) return cached;
-
   const url = `${TORRENTIO}/stream/${type}/${streamId}.json`;
   const controller = new AbortController();
   const t = setTimeout(() => controller.abort(), TIMEOUT_MS);
-
   try {
     const res = await fetch(url, {
       signal: controller.signal,
-      headers: { 'User-Agent': 'HomeStream/1.0' },
+      headers: { 'User-Agent': 'HomeStream/1.5' },
     });
     clearTimeout(t);
     if (!res.ok) return [];
     const data = await res.json() as TorrentioResponse;
-    const streams = (data.streams ?? [])
+    return (data.streams ?? [])
       .filter(s => s.infoHash)
       .map(s => {
         const { quality, size, seeds } = parseStreamTitle(s.title ?? s.name ?? '');
         return {
-          name: s.name ?? 'Stream',
+          name: s.name ?? 'Torrentio',
           quality,
           size,
           seeds,
           infoHash: s.infoHash!,
           magnet: buildMagnet(s.infoHash!, s.sources),
+          source: 'torrentio' as const,
         };
       });
-    setCached(cacheKey, streams);
-    return streams;
   } catch {
     clearTimeout(t);
     return [];
   }
+}
+
+async function fetchProwlarr(
+  query: string,
+  prowlarrUrl: string,
+  prowlarrApiKey: string,
+): Promise<StreamResult[]> {
+  if (!prowlarrUrl || !prowlarrApiKey) return [];
+  const url = `${prowlarrUrl.replace(/\/$/, '')}/api/v1/search?query=${encodeURIComponent(query)}&type=search&limit=30`;
+  const controller = new AbortController();
+  const t = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  try {
+    const res = await fetch(url, {
+      signal: controller.signal,
+      headers: { 'X-Api-Key': prowlarrApiKey, 'User-Agent': 'HomeStream/1.5' },
+    });
+    clearTimeout(t);
+    if (!res.ok) return [];
+    const data = await res.json() as ProwlarrResponse;
+    const mapped: (StreamResult | null)[] = (data.results ?? [])
+      .filter(r => r.magnetUrl || r.infoHash)
+      .map(r => {
+        const infoHash = r.infoHash ?? r.magnetUrl?.match(/btih:([a-fA-F0-9]{40})/i)?.[1] ?? '';
+        const magnet = r.magnetUrl ?? (infoHash ? `magnet:?xt=urn:btih:${infoHash}` : '');
+        if (!infoHash && !magnet) return null;
+        return {
+          name: r.title,
+          quality: r.title.match(/\b(2160p|4K|1080p|720p|480p)\b/i)?.[1] ?? 'Unknown',
+          size: formatBytes(r.size ?? 0),
+          seeds: String(r.seeders ?? 0),
+          infoHash: infoHash || magnet,
+          magnet,
+          source: 'prowlarr' as const,
+        } satisfies StreamResult;
+      });
+    return mapped.filter((r): r is StreamResult => r !== null);
+  } catch {
+    clearTimeout(t);
+    return [];
+  }
+}
+
+async function fetchNyaa(query: string): Promise<StreamResult[]> {
+  const url = `${NYAA_API}?q=${encodeURIComponent(query)}&c=1_0&f=0&limit=20`;
+  const controller = new AbortController();
+  const t = setTimeout(() => controller.abort(), 10_000);
+  try {
+    const res = await fetch(url, { signal: controller.signal, headers: { 'User-Agent': 'HomeStream/1.5' } });
+    clearTimeout(t);
+    if (!res.ok) return [];
+    const data = await res.json() as { results?: NyaaItem[] } | NyaaItem[];
+    const items: NyaaItem[] = Array.isArray(data) ? data : (data.results ?? []);
+    return items
+      .filter(i => i.hash && i.magnet)
+      .map(i => ({
+        name: i.title,
+        quality: i.title.match(/\b(2160p|4K|1080p|720p|480p)\b/i)?.[1] ?? 'Unknown',
+        size: i.size ?? '',
+        seeds: String(i.seeders ?? 0),
+        infoHash: i.hash,
+        magnet: i.magnet,
+        source: 'nyaa' as const,
+      }));
+  } catch {
+    clearTimeout(t);
+    return [];
+  }
+}
+
+// ── Multi-source fetch + merge (mirrors /api/stremio/stream logic) ────────────
+
+async function fetchStreamsForEpisode(
+  imdbId: string,
+  type: 'movie' | 'series',
+  title: string,
+  season?: number,
+  episode?: number,
+): Promise<StreamResult[]> {
+  const streamId =
+    type === 'series' && season != null && episode != null
+      ? `${imdbId}:${season}:${episode}`
+      : imdbId;
+
+  const cacheKey = `dl:${type}:${streamId}`;
+  const cached = getCached(cacheKey);
+  if (cached) return cached;
+
+  // Build search query for Prowlarr + Nyaa (same format as stream/POST.ts)
+  let searchQuery = title || imdbId;
+  if (type === 'series' && season != null && episode != null) {
+    const s = String(season).padStart(2, '0');
+    const e = String(episode).padStart(2, '0');
+    searchQuery = `${title || imdbId} S${s}E${e}`;
+  }
+
+  const config = readConfig();
+
+  // Fire all sources in parallel — failures are isolated via allSettled
+  const [torrentioRes, prowlarrRes, nyaaRes] = await Promise.allSettled([
+    fetchTorrentio(imdbId, type, season, episode),
+    fetchProwlarr(searchQuery, config.prowlarrUrl, config.prowlarrApiKey),
+    fetchNyaa(searchQuery),
+  ]);
+
+  const torrentioStreams = torrentioRes.status === 'fulfilled' ? torrentioRes.value : [];
+  const prowlarrStreams  = prowlarrRes.status  === 'fulfilled' ? prowlarrRes.value  : [];
+  const nyaaStreams      = nyaaRes.status      === 'fulfilled' ? nyaaRes.value      : [];
+
+  // Merge + deduplicate by infoHash (case-insensitive), sort by seeds desc
+  const seen = new Set<string>();
+  const merged: StreamResult[] = [];
+  for (const stream of [...torrentioStreams, ...prowlarrStreams, ...nyaaStreams]) {
+    const key = stream.infoHash.toLowerCase();
+    if (!seen.has(key)) {
+      seen.add(key);
+      merged.push(stream);
+    }
+  }
+  merged.sort((a, b) => (parseInt(b.seeds) || 0) - (parseInt(a.seeds) || 0));
+
+  setCached(cacheKey, merged);
+  return merged;
 }
 
 // ─── qBittorrent job tracker (in-memory, mirrors torrentManager shape) ────────
@@ -310,7 +462,7 @@ export default async function handler(req: Request, res: Response) {
     if (type === 'movie') {
       let streams = preloadedStreams;
       if (!streams || streams.length === 0) {
-        streams = await fetchStreamsForEpisode(imdbId, 'movie');
+        streams = await fetchStreamsForEpisode(imdbId, 'movie', title);
       }
       const best = pickBestStream(streams ?? []);
       if (!best) {
@@ -367,7 +519,7 @@ export default async function handler(req: Request, res: Response) {
       // just fetch + queue that one episode directly.
       if (season != null && episode != null) {
         const epTitle = `${title} S${String(season).padStart(2, '0')}E${String(episode).padStart(2, '0')}`;
-        const streams = await fetchStreamsForEpisode(imdbId, 'series', season, episode);
+        const streams = await fetchStreamsForEpisode(imdbId, 'series', title, season, episode);
         const best = pickBestStream(streams);
         if (!best) {
           await releaseVPN();
@@ -413,7 +565,7 @@ export default async function handler(req: Request, res: Response) {
       for (const s of seasonsToFetch) {
         for (let ep = 1; ep <= MAX_EPISODES_PER_SEASON; ep++) {
           // Probe this episode — if Torrentio returns nothing, season is done
-          const probe = await fetchStreamsForEpisode(imdbId, 'series', s, ep);
+          const probe = await fetchStreamsForEpisode(imdbId, 'series', title, s, ep);
           if (probe.length === 0) {
             console.log(`[download] S${s} ends at E${ep - 1} (no streams found for E${ep})`);
             break;
@@ -429,7 +581,7 @@ export default async function handler(req: Request, res: Response) {
         const batch = episodeTasks.slice(i, i + BATCH);
         const batchResults = await Promise.all(
           batch.map(({ season: s, episode: ep }) =>
-            fetchStreamsForEpisode(imdbId, 'series', s, ep)
+            fetchStreamsForEpisode(imdbId, 'series', title, s, ep)
           )
         );
 
