@@ -949,46 +949,58 @@ export default function DownloadsPage() {
       <title>Downloads — HomeStream</title>
       <meta name="description" content="Live torrent download queue — track progress, speed, and manage all active downloads." />
 
-      <div className="min-h-screen bg-background pt-20 pb-12 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-5xl mx-auto">
-
-          {/* ── Header ── */}
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h1 className="text-2xl font-heading font-bold text-foreground flex items-center gap-2">
-                <Download className="w-6 h-6 text-primary" />
-                Downloads
-              </h1>
-              <p className="text-muted-foreground text-sm mt-0.5">
-                {totalActive > 0
-                  ? `${totalActive} active download${totalActive !== 1 ? 's' : ''}`
-                  : totalAll === 0 ? 'No downloads yet — use Discover to start downloading'
-                  : `${totalAll} total download${totalAll !== 1 ? 's' : ''}`}
-              </p>
-            </div>
-
-            <div className="flex items-center gap-2">
-              {data && (
-                <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border ${
-                  data.qbitOnline
-                    ? 'bg-green-500/10 border-green-500/20 text-green-400'
-                    : 'bg-muted border-border text-muted-foreground'
-                }`}>
-                  {data.qbitOnline
-                    ? <><Wifi className="w-3 h-3" />qBittorrent</>
-                    : <><WifiOff className="w-3 h-3" />WebTorrent</>
-                  }
-                </div>
-              )}
-              <button
-                onClick={fetchData}
-                className="p-2 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
-                title="Refresh"
-              >
-                <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-              </button>
-            </div>
+      <div className="min-h-screen bg-background pb-12">
+        {/* ── Cinematic page header ── */}
+        <div className="relative pt-24 pb-8 px-4 sm:px-6 lg:px-8 overflow-hidden">
+          <div className="absolute inset-0 pointer-events-none">
+            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[500px] h-[250px] bg-primary/6 rounded-full blur-3xl" />
           </div>
+          <div className="relative max-w-5xl mx-auto">
+            <motion.div
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, ease: 'easeOut' as const }}
+              className="flex items-start justify-between gap-4 flex-wrap"
+            >
+              <div>
+                <div className="flex items-center gap-3 mb-1.5">
+                  <div className="w-1 h-8 rounded-full bg-primary shadow-[0_0_12px_hsl(var(--primary)/0.6)]" />
+                  <h1 className="text-4xl sm:text-5xl font-heading font-bold text-foreground tracking-tight">Downloads</h1>
+                </div>
+                <p className="text-muted-foreground text-sm ml-4 pl-3 border-l border-border">
+                  {totalActive > 0
+                    ? `${totalActive} active download${totalActive !== 1 ? 's' : ''} in progress`
+                    : totalAll === 0 ? 'No downloads yet — use Discover to start downloading'
+                    : `${totalAll} total download${totalAll !== 1 ? 's' : ''}`}
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2 flex-shrink-0">
+                {data && (
+                  <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border ${
+                    data.qbitOnline
+                      ? 'bg-green-500/10 border-green-500/20 text-green-400'
+                      : 'bg-muted border-border text-muted-foreground'
+                  }`}>
+                    {data.qbitOnline
+                      ? <><Wifi className="w-3 h-3" />qBittorrent</>
+                      : <><WifiOff className="w-3 h-3" />WebTorrent</>
+                    }
+                  </div>
+                )}
+                <button
+                  onClick={fetchData}
+                  className="p-2 rounded-xl hover:bg-muted transition-colors text-muted-foreground hover:text-foreground border border-border"
+                  title="Refresh"
+                >
+                  <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        </div>
+
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
 
           {/* ── VPN Panel ── */}
           <div className="mb-6">

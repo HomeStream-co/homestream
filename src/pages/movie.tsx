@@ -152,48 +152,53 @@ export default function MoviePage() {
 
       <div className="min-h-screen bg-background">
 
-        {/* ── Hero backdrop ── */}
-        <div className="relative w-full" style={{ minHeight: '70vh' }}>
-          {/* Blurred backdrop */}
+        {/* ── Cinematic hero backdrop ── */}
+        <div className="relative w-full" style={{ minHeight: '72vh' }}>
+          {/* Full-bleed blurred backdrop */}
           <div className="absolute inset-0 overflow-hidden">
             {!imgError && item.poster ? (
               <img
                 src={item.poster}
                 alt=""
                 aria-hidden="true"
-                className="w-full h-full object-cover scale-110 blur-2xl opacity-30"
+                className="w-full h-full object-cover scale-110 blur-3xl opacity-25"
               />
             ) : (
               <div className="w-full h-full bg-gradient-to-br from-primary/10 to-background" />
             )}
-            {/* Gradient overlays */}
-            <div className="absolute inset-0 bg-gradient-to-t from-background via-background/60 to-transparent" />
-            <div className="absolute inset-0 bg-gradient-to-r from-background/80 via-transparent to-transparent" />
+            {/* Multi-layer gradient for depth */}
+            <div className="absolute inset-0 bg-gradient-to-t from-background via-background/70 to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-r from-background/90 via-background/40 to-transparent" />
+            {/* Subtle vignette */}
+            <div className="absolute inset-0 bg-gradient-to-b from-background/40 via-transparent to-transparent" />
           </div>
 
           {/* Back button */}
           <div className="relative z-10 pt-20 px-4 sm:px-8 lg:px-16">
-            <button
+            <motion.button
+              initial={{ opacity: 0, x: -8 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.3 }}
               onClick={() => navigate(-1)}
-              className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors text-sm mb-8"
+              className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors text-sm mb-8 group"
             >
-              <ArrowLeft className="w-4 h-4" />
+              <ArrowLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" />
               Back
-            </button>
+            </motion.button>
           </div>
 
-          {/* Content */}
-          <div className="relative z-10 px-4 sm:px-8 lg:px-16 pb-12">
+          {/* Hero content */}
+          <div className="relative z-10 px-4 sm:px-8 lg:px-16 pb-14">
             <div className="flex flex-col md:flex-row gap-8 max-w-6xl">
 
-              {/* Poster */}
+              {/* Poster with glow */}
               <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4 }}
+                initial={{ opacity: 0, y: 24, scale: 0.97 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                transition={{ duration: 0.45, ease: 'easeOut' as const }}
                 className="flex-shrink-0"
               >
-                <div className="w-44 sm:w-56 rounded-xl overflow-hidden shadow-2xl border border-border/30">
+                <div className="w-44 sm:w-56 rounded-2xl overflow-hidden shadow-[0_20px_60px_rgba(0,0,0,0.6)] border border-white/10 relative">
                   {!imgError && item.poster ? (
                     <img
                       src={item.poster}
@@ -207,15 +212,19 @@ export default function MoviePage() {
                       <p className="text-xs text-muted-foreground text-center leading-snug">{item.title}</p>
                     </div>
                   )}
+                  {/* Poster shine overlay */}
+                  <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-transparent pointer-events-none" />
                 </div>
 
                 {/* Progress bar under poster */}
                 {progress > 0 && progress < 95 && (
-                  <div className="mt-2">
-                    <div className="h-1 bg-muted/40 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-primary rounded-full transition-all"
-                        style={{ width: `${Math.min(progress, 100)}%` }}
+                  <div className="mt-3">
+                    <div className="h-1.5 bg-muted/40 rounded-full overflow-hidden">
+                      <motion.div
+                        className="h-full bg-primary rounded-full"
+                        initial={{ width: 0 }}
+                        animate={{ width: `${Math.min(progress, 100)}%` }}
+                        transition={{ duration: 0.6, ease: 'easeOut' as const }}
                       />
                     </div>
                     <p className="text-[10px] text-muted-foreground mt-1 text-center">
@@ -229,46 +238,49 @@ export default function MoviePage() {
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4, delay: 0.08 }}
+                transition={{ duration: 0.45, delay: 0.1, ease: 'easeOut' as const }}
                 className="flex-1 min-w-0"
               >
-                {/* Type badge */}
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-primary">
-                    {item.type === 'series' ? 'TV Series' : 'Movie'}
-                  </span>
+                {/* Type + year badge row */}
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-1 h-4 rounded-full bg-primary shadow-[0_0_8px_hsl(var(--primary)/0.6)]" />
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-primary">
+                      {item.type === 'series' ? 'TV Series' : 'Movie'}
+                    </span>
+                  </div>
                   {item.year && (
-                    <span className="text-[10px] text-muted-foreground">{item.year}</span>
+                    <span className="text-[10px] text-muted-foreground bg-muted/60 px-2 py-0.5 rounded-full">{item.year}</span>
                   )}
                 </div>
 
                 {/* Title */}
-                <h1 className="text-3xl sm:text-4xl lg:text-5xl font-heading font-bold text-foreground leading-tight mb-3">
+                <h1 className="text-3xl sm:text-4xl lg:text-5xl font-heading font-bold text-foreground leading-tight mb-4 drop-shadow-sm">
                   {item.title}
                 </h1>
 
                 {/* Meta row */}
-                <div className="flex flex-wrap items-center gap-3 mb-4 text-sm text-muted-foreground">
+                <div className="flex flex-wrap items-center gap-2.5 mb-4 text-sm text-muted-foreground">
                   {item.imdbRating && item.imdbRating !== 'N/A' && (
-                    <span className="flex items-center gap-1 text-yellow-400 font-semibold">
+                    <span className="flex items-center gap-1 text-yellow-400 font-semibold bg-yellow-400/10 px-2.5 py-1 rounded-full">
                       <Star className="w-3.5 h-3.5 fill-yellow-400" />
                       {item.imdbRating}
-                      <span className="text-muted-foreground font-normal text-xs">/10 IMDb</span>
+                      <span className="text-yellow-400/70 font-normal text-xs">/10</span>
                     </span>
                   )}
                   {item.rated && item.rated !== 'N/A' && (
-                    <span className={`text-xs font-bold border rounded px-1.5 py-0.5 ${ratedColor}`}>
+                    <span className={`text-xs font-bold border rounded-lg px-2 py-0.5 ${ratedColor}`}>
                       {item.rated}
                     </span>
                   )}
                   {item.runtime && item.runtime !== 'N/A' && (
-                    <span className="flex items-center gap-1">
+                    <span className="flex items-center gap-1 bg-muted/60 px-2.5 py-1 rounded-full">
                       <Clock className="w-3.5 h-3.5" />
                       {fmtRuntime(item.runtime)}
                     </span>
                   )}
                   {item.year && (
-                    <span className="flex items-center gap-1">
+                    <span className="flex items-center gap-1 bg-muted/60 px-2.5 py-1 rounded-full">
                       <Calendar className="w-3.5 h-3.5" />
                       {item.year}
                     </span>
@@ -277,12 +289,12 @@ export default function MoviePage() {
 
                 {/* Genre pills */}
                 {item.genre.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5 mb-5">
+                  <div className="flex flex-wrap gap-1.5 mb-6">
                     {item.genre.map(g => (
                       <Link
                         key={g}
                         to={`/browse?q=${encodeURIComponent(g)}`}
-                        className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-muted text-muted-foreground hover:bg-primary/15 hover:text-primary transition-colors"
+                        className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-muted/60 text-muted-foreground hover:bg-primary/15 hover:text-primary transition-colors border border-border/50"
                       >
                         {g}
                       </Link>
@@ -291,14 +303,16 @@ export default function MoviePage() {
                 )}
 
                 {/* Action buttons */}
-                <div className="flex flex-wrap items-center gap-3 mb-6">
-                  <button
+                <div className="flex flex-wrap items-center gap-3 mb-7">
+                  <motion.button
+                    whileHover={{ scale: 1.03 }}
+                    whileTap={{ scale: 0.97 }}
                     onClick={handlePlay}
-                    className="flex items-center gap-2 px-6 py-3 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20"
+                    className="flex items-center gap-2 px-7 py-3 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 transition-colors shadow-[0_4px_20px_hsl(var(--primary)/0.35)]"
                   >
                     <Play className="w-4 h-4 fill-current" />
                     {isResuming ? 'Resume' : 'Play'}
-                  </button>
+                  </motion.button>
 
                   <TrailerButton title={item.title} year={item.year} type={item.type} />
 
@@ -328,29 +342,29 @@ export default function MoviePage() {
 
                 {/* AI summary or plot */}
                 {(item.enrichment?.aiSummary || item.plot) && (
-                  <p className="text-sm text-muted-foreground leading-relaxed mb-4 max-w-2xl">
+                  <p className="text-sm text-muted-foreground leading-relaxed mb-5 max-w-2xl">
                     {item.enrichment?.aiSummary || item.plot}
                   </p>
                 )}
 
                 {/* Why Watch hook */}
                 {item.enrichment?.whyWatch && (
-                  <div className="flex items-start gap-2 mb-5 bg-primary/5 border border-primary/15 rounded-xl px-4 py-3 max-w-2xl">
+                  <div className="flex items-start gap-2.5 mb-5 bg-primary/8 border border-primary/20 rounded-2xl px-4 py-3.5 max-w-2xl">
                     <Zap className="w-4 h-4 text-primary flex-shrink-0 mt-0.5" />
                     <p className="text-sm text-foreground font-medium italic">{item.enrichment.whyWatch}</p>
                   </div>
                 )}
 
                 {/* Director / Cast */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-2xl">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl">
                   {item.director && item.director !== 'N/A' && (
-                    <div>
+                    <div className="bg-card/60 border border-border/50 rounded-xl px-3.5 py-3">
                       <p className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">Director</p>
-                      <p className="text-sm text-foreground">{item.director}</p>
+                      <p className="text-sm text-foreground font-medium">{item.director}</p>
                     </div>
                   )}
                   {item.actors && item.actors !== 'N/A' && (
-                    <div>
+                    <div className="bg-card/60 border border-border/50 rounded-xl px-3.5 py-3">
                       <p className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">Cast</p>
                       <p className="text-sm text-foreground line-clamp-2">{toActorsString(item.actors)}</p>
                     </div>
