@@ -162,7 +162,12 @@ export default function StepApiKeys({
               {tmdbTest === 'testing' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />} Test
             </button>
           </div>
-          {tmdbTest === 'ok' && <div className="mt-2 flex items-center gap-1.5 text-[11px] text-green-400 bg-green-500/10 border border-green-500/20 rounded-lg px-2.5 py-1.5"><CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" />{tmdbTestMsg}</div>}
+          {tmdbTest === 'ok' && (
+            <div className="mt-2 flex items-center justify-between gap-2 text-[11px] text-green-400 bg-green-500/10 border border-green-500/20 rounded-lg px-2.5 py-1.5">
+              <span className="flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" />{tmdbTestMsg}</span>
+              <span className="text-muted-foreground flex-shrink-0">Valid ~365 days</span>
+            </div>
+          )}
           {tmdbTest === 'error' && <div className="mt-2 flex items-center gap-1.5 text-[11px] text-destructive bg-destructive/10 border border-destructive/20 rounded-lg px-2.5 py-1.5"><XCircle className="w-3.5 h-3.5 flex-shrink-0" />{tmdbTestMsg}</div>}
           <div className="mt-2 flex flex-col gap-1 text-[10px] text-muted-foreground">
             <p className="font-medium text-foreground/70">How to get your key:</p>
@@ -194,7 +199,12 @@ export default function StepApiKeys({
               {omdbTest === 'testing' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />} Test
             </button>
           </div>
-          {omdbTest === 'ok' && <div className="mt-2 flex items-center gap-1.5 text-[11px] text-green-400 bg-green-500/10 border border-green-500/20 rounded-lg px-2.5 py-1.5"><CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" />{omdbTestMsg}</div>}
+          {omdbTest === 'ok' && (
+            <div className="mt-2 flex items-center justify-between gap-2 text-[11px] text-green-400 bg-green-500/10 border border-green-500/20 rounded-lg px-2.5 py-1.5">
+              <span className="flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" />{omdbTestMsg}</span>
+              <span className="text-muted-foreground flex-shrink-0">Valid ~365 days</span>
+            </div>
+          )}
           {omdbTest === 'error' && <div className="mt-2 flex items-center gap-1.5 text-[11px] text-destructive bg-destructive/10 border border-destructive/20 rounded-lg px-2.5 py-1.5"><XCircle className="w-3.5 h-3.5 flex-shrink-0" />{omdbTestMsg}</div>}
           <div className="mt-2 flex flex-col gap-1 text-[10px] text-muted-foreground">
             <p className="font-medium text-foreground/70">How to get your key:</p>
@@ -245,7 +255,12 @@ export default function StepApiKeys({
                   {googleAiTest === 'testing' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />} Test
                 </button>
               </div>
-              {googleAiTest === 'ok' && <div className="flex items-center gap-1.5 text-[11px] text-green-400 bg-green-500/10 border border-green-500/20 rounded-lg px-2.5 py-1.5"><CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" />{googleAiTestMsg}</div>}
+              {googleAiTest === 'ok' && (
+                <div className="flex items-center justify-between gap-2 text-[11px] text-green-400 bg-green-500/10 border border-green-500/20 rounded-lg px-2.5 py-1.5">
+                  <span className="flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" />{googleAiTestMsg}</span>
+                  <span className="text-muted-foreground flex-shrink-0">Valid ~90 days</span>
+                </div>
+              )}
               {googleAiTest === 'error' && <div className="flex items-center gap-1.5 text-[11px] text-destructive bg-destructive/10 border border-destructive/20 rounded-lg px-2.5 py-1.5"><XCircle className="w-3.5 h-3.5 flex-shrink-0" />{googleAiTestMsg}</div>}
               <div className="flex flex-col gap-1 text-[10px] text-muted-foreground mt-1">
                 <p className="font-medium text-foreground/70">How to get your key:</p>
