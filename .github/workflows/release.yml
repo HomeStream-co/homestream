@@ -46,14 +46,17 @@ jobs:
           CI: true
 
       - name: Package & publish installer
-        # electron-builder reads publish config from electron/electron-builder.yml.
+        # Runs on windows-latest — NSIS is available, so we override the default
+        # zip target (used for local Linux builds) with nsis to produce a proper
+        # .exe installer for end-users.
         # --publish always → creates/updates the GitHub Release and uploads assets.
-        # owner/repo are hardcoded in electron-builder.yml (yml does not support env var expansion).
         # GH_TOKEN must be set in repo Settings → Secrets → Actions.
-        run: npx electron-builder --win -c electron/electron-builder.yml --publish always
+        run: npx electron-builder --win --config electron/electron-builder.yml --config.win.target=nsis --publish always
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
-          # Code signing — uncomment when WIN_CSC_LINK secret is added
+          # signAndEditExecutable defaults to true on Windows — rcedit works fine
+          # on windows-latest so the app icon will be patched into the .exe.
+          # Code signing — uncomment when WIN_CSC_LINK secret is added:
           # WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
           # WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
 
@@ -66,6 +69,7 @@ jobs:
           name: HomeStream-Windows-Installer-${{ github.ref_name }}
           path: |
             dist-electron/*.exe
+            dist-electron/*.zip
             dist-electron/*.yml
           retention-days: 30
           if-no-files-found: warn

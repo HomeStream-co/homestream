@@ -84,22 +84,22 @@ extraResources:
       - "ffmpeg.exe"
 
 # ── Windows ───────────────────────────────────────────────────────────────────
+# Default target is zip — builds cleanly from Linux (no NSIS/7zip toolchain needed).
+# The GitHub Actions release workflow overrides this to nsis via:
+#   --config.win.target=nsis
+# which runs on windows-latest where NSIS is available, producing a proper
+# HomeStream-Setup-x.x.x.exe installer for end-users.
 win:
   target:
-    # zip target — packages the unpacked Electron app into a .zip archive.
-    # Does not require NSIS or 7zip toolchain, so it builds cleanly from Linux CI.
-    # Users extract and run HomeStream.exe.
-    # Switch to nsis when building from a Windows host or with wine+7zip.
     - target: zip
       arch: [x64]
   # Disable forced code signing — no cert available.
   forceCodeSigning: false
-  # Skip rcedit (icon/resource patching of the .exe). rcedit requires
-  # winCodeSign which needs 7zip to extract — 7zip is a glibc binary that
-  # cannot run on Alpine (musl). The .exe will use the default Electron icon
-  # until this is built on a Windows host or with wine+7zip available.
-  signAndEditExecutable: false
-  # electron-builder auto-converts icon.png → .ico if no .ico is provided
+  # signAndEditExecutable is intentionally NOT set here.
+  # - Local Linux builds (electron:win) pass --config.win.signAndEditExecutable=false
+  #   via the npm script to skip rcedit (7zip/winCodeSign not available on musl).
+  # - GitHub Actions release (windows-latest) lets it default to true so rcedit
+  #   runs normally and patches the HomeStream icon into the .exe.
   icon: electron/assets/icon.png
 
 # ── macOS ─────────────────────────────────────────────────────────────────────
