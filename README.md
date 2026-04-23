@@ -21,18 +21,18 @@ You need a **free GitHub account** to download HomeStream. If you don't have one
 
 1. Open your web browser (Chrome, Edge, Firefox — any of them)
 2. Go to: **https://github.com/trevorrossworn-code/homestream/releases/latest**
-3. You'll see a page that says **"HomeStream v1.1.0"** at the top
+3. You'll see a page that says **"HomeStream v1.3.7"** at the top
 
 ### Step 2 — Download the installer
 
 1. Scroll down on that page until you see a section called **"Assets"**
-2. Click on the file named **`HomeStream-Setup-1.1.0.exe`**
+2. Click on the file named **`HomeStream-Setup-1.3.7.exe`**
 3. Your browser will download it — check your **Downloads** folder
 
 ### Step 3 — Run the installer
 
 1. Open your **Downloads** folder
-2. Double-click **`HomeStream-Setup-1.1.0.exe`**
+2. Double-click **`HomeStream-Setup-1.3.7.exe`**
 3. Windows will show a blue warning that says **"Windows protected your PC"**
    - This is normal — the app just isn't signed yet
    - Click **"More info"** (it's a small link in the middle of the box)
@@ -65,7 +65,7 @@ HomeStream will open a setup page in your browser automatically. It has **5 step
 ### Step 1 — Download
 
 1. Go to **https://github.com/trevorrossworn-code/homestream/releases/latest**
-2. Scroll to **Assets** and click **`HomeStream-1.1.0.dmg`**
+2. Scroll to **Assets** and click **`HomeStream-1.3.7.dmg`**
 
 ### Step 2 — Install
 
@@ -89,11 +89,11 @@ HomeStream will open a setup page in your browser automatically. It has **5 step
 
 ```bash
 # Download the AppImage
-chmod +x HomeStream-1.1.0.AppImage
-./HomeStream-1.1.0.AppImage
+chmod +x HomeStream-1.3.7.AppImage
+./HomeStream-1.3.7.AppImage
 ```
 
-A `.deb` package is also available: `sudo dpkg -i HomeStream-1.1.0.deb`
+A `.deb` package is also available: `sudo dpkg -i HomeStream-1.3.7.deb`
 
 ---
 
@@ -184,23 +184,23 @@ services:
     container_name: homestream
     restart: unless-stopped
     ports:
-      - "8080:5173"
+      - "3000:3000"
     volumes:
       - /your/media/folder:/media
-      - homestream-data:/data
+      - homestream_data:/app/homestream-data
     environment:
       MEDIA_DIR: /media
-      ADMIN_PASSWORD: ""
+      HOMESTREAM_DATA: /app/homestream-data
       TMDB_API_KEY: ""
-      GEMINI_API_KEY: ""
+      GOOGLE_AI_API_KEY: ""
 
 volumes:
-  homestream-data:
+  homestream_data:
 ```
 
 ```bash
 docker compose up -d
-# Open http://localhost:8080
+# Open http://localhost:3000
 ```
 
 ---
