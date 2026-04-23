@@ -159,7 +159,7 @@ export default function Header({ onChatOpen: _onChatOpen }: HeaderProps) {
             : 'bg-gradient-to-b from-black/90 via-black/50 to-transparent'
         }`}
       >
-        <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="w-full px-4 sm:px-6 lg:px-10">
           <div className="flex items-center justify-between h-16">
 
             {/* ── Logo ── */}

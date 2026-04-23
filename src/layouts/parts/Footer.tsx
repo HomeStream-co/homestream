@@ -13,7 +13,7 @@ const NAV_LINKS = [
 export default function Footer() {
   return (
     <footer className="bg-card border-t border-border mt-16">
-      <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="w-full px-4 sm:px-6 lg:px-10">
 
         {/* Main footer row */}
         <div className="py-10 grid grid-cols-1 sm:grid-cols-3 gap-8 items-start">

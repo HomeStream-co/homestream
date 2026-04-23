@@ -214,6 +214,8 @@ export const serverBefore = (server) => {
           "img-src 'self' data: blob:",
           "media-src 'self' blob:",
           "connect-src 'self' ws: wss: https://api.themoviedb.org https://torrentio.strem.fun",
+          // Allow YouTube privacy-enhanced embeds for trailers
+          "frame-src https://www.youtube-nocookie.com https://www.youtube.com",
           "frame-ancestors 'none'",
         ].join('; '),
       });
