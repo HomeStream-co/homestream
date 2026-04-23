@@ -207,7 +207,8 @@ export default function StremioPanel() {
     setLoginLoading(true);
     setLoginError('');
     try {
-      const res = await fetch('https://api.strem.io/api/login', {
+      // Proxy through our backend to avoid CORS / mixed-content blocks
+      const res = await fetch('/api/stremio/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: loginEmail, password: loginPassword }),
@@ -225,7 +226,7 @@ export default function StremioPanel() {
         setLoginError(data.error ?? 'Invalid email or password');
       }
     } catch {
-      setLoginError('Could not reach Stremio — check your connection');
+      setLoginError('Could not reach HomeStream server — is it running?');
     } finally {
       setLoginLoading(false);
     }
