@@ -188,6 +188,8 @@ export default function VPNPanel() {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action:       'save',
           enabled:      true,
           protocol:     editProtocol,
           provider:     editProvider,
