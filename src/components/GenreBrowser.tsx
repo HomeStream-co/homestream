@@ -231,6 +231,7 @@ function DownloadModal({ target, onClose }: { target: DownloadTarget; onClose: (
     try {
       await fetch('/api/stremio/download', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           imdbId: stream.imdbId,

@@ -882,7 +882,7 @@ export default function DownloadsPage() {
 
   const fetchSubscriptions = useCallback(async () => {
     try {
-      const res = await fetch('/api/subscriptions');
+      const res = await fetch('/api/subscriptions', { credentials: 'include' });
       if (!res.ok) return;
       const json = await res.json() as { subscriptions: Subscription[] };
       setSubscriptions(json.subscriptions ?? []);
@@ -892,6 +892,7 @@ export default function DownloadsPage() {
   const handleUnsubscribe = async (imdbId: string) => {
     await fetch('/api/subscriptions', {
       method: 'POST',
+      credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ imdbId, action: 'unsubscribe' }),
     });
@@ -902,6 +903,7 @@ export default function DownloadsPage() {
   const handleToggle = async (imdbId: string) => {
     await fetch('/api/subscriptions', {
       method: 'POST',
+      credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ imdbId, action: 'toggle' }),
     });
@@ -911,7 +913,7 @@ export default function DownloadsPage() {
   const handleCheckNow = async (imdbId: string, title: string) => {
     setCheckingId(imdbId);
     try {
-      await fetch(`/api/subscriptions/${imdbId}/check`, { method: 'POST' });
+      await fetch(`/api/subscriptions/${imdbId}/check`, { method: 'POST', credentials: 'include' });
       toast.success(`Checked "${title}" — see downloads for new episodes`);
       fetchSubscriptions();
     } catch {
@@ -929,7 +931,7 @@ export default function DownloadsPage() {
 
   const fetchScheduled = useCallback(async () => {
     try {
-      const res = await fetch('/api/stremio/schedule');
+      const res = await fetch('/api/stremio/schedule', { credentials: 'include' });
       if (!res.ok) return;
       const json = await res.json() as ScheduledJob[];
       setScheduledJobs(json);
@@ -939,7 +941,7 @@ export default function DownloadsPage() {
   const handleCancelScheduled = async (id: string, title: string) => {
     setCancellingScheduleId(id);
     try {
-      const res = await fetch(`/api/stremio/schedule/${id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/stremio/schedule/${id}`, { method: 'DELETE', credentials: 'include' });
       const data = await res.json() as { ok?: boolean; error?: string };
       if (data.ok) {
         setScheduledJobs(j => j.filter(x => x.id !== id));
@@ -963,7 +965,7 @@ export default function DownloadsPage() {
 
   const fetchStorage = useCallback(async () => {
     try {
-      const res = await fetch('/api/library/storage');
+      const res = await fetch('/api/library/storage', { credentials: 'include' });
       if (!res.ok) return;
       const json = await res.json() as StorageStats;
       setStorage(json);
@@ -981,6 +983,7 @@ export default function DownloadsPage() {
     try {
       const res = await fetch('/api/library/storage', {
         method: 'PATCH',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ moviesPct, tvPct }),
       });

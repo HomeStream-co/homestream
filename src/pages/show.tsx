@@ -144,6 +144,7 @@ export default function ShowPage() {
     try {
       await fetch('/api/subscriptions', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           imdbId: showImdbId,
@@ -165,6 +166,7 @@ export default function ShowPage() {
     if (!showImdbId) return;
     await fetch('/api/subscriptions', {
       method: 'POST',
+      credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ imdbId: showImdbId, action: 'unsubscribe' }),
     });

@@ -94,6 +94,7 @@ export default function ShowDownloadDialog({ open, onOpenChange, item, seasons }
         // Queue all seasons — server probes episode counts dynamically
         const res = await fetch('/api/stremio/download', {
           method: 'POST',
+          credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             imdbId: item.imdbId,
@@ -110,6 +111,7 @@ export default function ShowDownloadDialog({ open, onOpenChange, item, seasons }
         // Queue one full season
         const res = await fetch('/api/stremio/download', {
           method: 'POST',
+          credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             imdbId: item.imdbId,
@@ -141,6 +143,7 @@ export default function ShowDownloadDialog({ open, onOpenChange, item, seasons }
           tasks.map(({ season, episode }) =>
             fetch('/api/stremio/download', {
               method: 'POST',
+              credentials: 'include',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 imdbId: item.imdbId,
