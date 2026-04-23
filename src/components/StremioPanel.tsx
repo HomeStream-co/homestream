@@ -191,7 +191,7 @@ export default function StremioPanel() {
   // ── Poll downloads ──
   const fetchJobs = useCallback(async () => {
     try {
-      const res = await fetch('/api/stremio/downloads');
+      const res = await fetch('/api/stremio/downloads', { credentials: 'include' });
       const data = await res.json() as { jobs?: TorrentJob[] };
       if (data.jobs) setJobs(data.jobs);
     } catch { /* ignore */ }
@@ -216,6 +216,7 @@ export default function StremioPanel() {
       // Proxy through our backend to avoid CORS / mixed-content blocks
       const res = await fetch('/api/stremio/login', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: loginEmail, password: loginPassword }),
       });
@@ -256,6 +257,7 @@ export default function StremioPanel() {
     try {
       const res = await fetch('/api/stremio/search', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query: q, type: typeFilter === 'all' ? undefined : typeFilter }),
       });
@@ -290,6 +292,7 @@ export default function StremioPanel() {
     try {
       const res = await fetch('/api/stremio/stream', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ imdbId: meta.id, type: meta.type, season: s ?? season, episode: ep ?? episode }),
       });
@@ -330,6 +333,7 @@ export default function StremioPanel() {
 
       const res = await fetch('/api/stremio/download', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
@@ -363,6 +367,7 @@ export default function StremioPanel() {
     try {
       const res = await fetch('/api/stremio/schedule', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           imdbId: selected.id,
