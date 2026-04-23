@@ -835,10 +835,37 @@ function MagnetInput({ onAdded }: { onAdded: () => void }) {
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function DownloadsPage() {
-  const [data, setData] = useState<DownloadsResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<'all' | 'active' | 'done' | 'error'>('all');
+  // ── Download state via WebSocket push (replaces 2s poll) ──────────────────
+  const socketState = useDownloadSocket();
+  const data: DownloadsResponse | null = socketState.qbitTorrents !== undefined || socketState.jobs !== undefined
+    ? {
+        jobs: socketState.jobs as unknown as DownloadsResponse['jobs'],
+        qbitTorrents: socketState.qbitTorrents as unknown as DownloadsResponse['qbitTorrents'],
+        transferInfo: socketState.transferInfo as DownloadsResponse['transferInfo'],
+        backend: socketState.backend,
+        qbitOnline: socketState.qbitOnline,
+      }
+    : null;
+  const loading = data === null;
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+
+  // Update lastUpdated timestamp whenever socket pushes new data
+  useEffect(() => {
+    if (data !== null) setLastUpdated(new Date());
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [socketState]);
+
+  // Manual refresh used after mutations (delete, pause, resume, etc.)
+  // The WebSocket will push the updated state within 2s anyway, but this
+  // gives immediate feedback after user actions.
+  const fetchData = useCallback(async () => {
+    try {
+      const res = await fetch('/api/stremio/downloads', { credentials: 'include' });
+      if (!res.ok) return;
+      // No-op — the WebSocket push will update state automatically
+    } catch { /* ignore */ }
+  }, []);
+  const [filter, setFilter] = useState<'all' | 'active' | 'done' | 'error'>('all');
 
   // Subscriptions state
   interface Subscription {
@@ -968,42 +995,22 @@ export default function DownloadsPage() {
     }
   };
 
-  const fetchData = useCallback(async () => {
-    try {
-      const res = await fetch('/api/stremio/downloads');
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const json = await res.json() as DownloadsResponse;
-      setData(json);
-      setLastUpdated(new Date());
-    } catch (err) {
-      console.error('[downloads] Fetch error:', err);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
   useEffect(() => {
-    fetchData();
     fetchStorage();
-    const interval = setInterval(() => {
-      if (!document.hidden) fetchData();
-    }, 2000);
     const storageInterval = setInterval(() => {
       if (!document.hidden) fetchStorage();
     }, 15000);
-    // Also resume immediately when the tab becomes visible again
-    const onVisible = () => { if (!document.hidden) { fetchData(); fetchStorage(); } };
+    const onVisible = () => { if (!document.hidden) fetchStorage(); };
     document.addEventListener('visibilitychange', onVisible);
     return () => {
-      clearInterval(interval);
       clearInterval(storageInterval);
       document.removeEventListener('visibilitychange', onVisible);
     };
-  }, [fetchData, fetchStorage]);
+  }, [fetchStorage]);
 
   const handleDelete = useCallback(async (hash: string, deleteFiles: boolean) => {
     try {
-      const res = await fetch(`/api/stremio/downloads/${hash}?deleteFiles=${deleteFiles}`, { method: 'DELETE' });
+      const res = await fetch(`/api/stremio/downloads/${hash}?deleteFiles=${deleteFiles}`, { method: 'DELETE', credentials: 'include' });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       toast.success(deleteFiles ? 'Torrent and files removed' : 'Torrent removed from queue');
       fetchData();
@@ -1016,6 +1023,7 @@ export default function DownloadsPage() {
     try {
       const res = await fetch('/api/stremio/downloads/pause', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ hash }),
       });
@@ -1031,6 +1039,7 @@ export default function DownloadsPage() {
     try {
       const res = await fetch('/api/stremio/downloads/resume', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ hash }),
       });
@@ -1046,6 +1055,7 @@ export default function DownloadsPage() {
     try {
       await fetch('/api/stremio/downloads/priority', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ hash, direction: 'up' }),
       });
@@ -1057,6 +1067,7 @@ export default function DownloadsPage() {
     try {
       await fetch('/api/stremio/downloads/priority', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ hash, direction: 'down' }),
       });
@@ -1068,6 +1079,7 @@ export default function DownloadsPage() {
     try {
       const res = await fetch('/api/stremio/downloads/retry', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ jobId }),
       });

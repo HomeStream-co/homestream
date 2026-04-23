@@ -9,6 +9,7 @@ import {
   Search, X, Film, Download, Loader2, CheckCircle2, Clock,
   Pause as PauseIcon, Play as PlayIcon, Trash2,
 } from 'lucide-react';
+import { useDownloadSocket } from '@/hooks/useDownloadSocket';
 
 function haptic(pattern: number | number[] = 30) {
   try { navigator.vibrate?.(pattern); } catch { /* ignore */ }
@@ -72,41 +73,20 @@ function statusLabel(s: DownloadJob['status']): string {
 }
 
 export default function DownloadTab() {
-  const [jobs, setJobs] = useState<DownloadJob[]>([]);
-  const [loadingJobs, setLoadingJobs] = useState(true);
-  const [qbitOnline, setQbitOnline] = useState(false);
+  // Use WebSocket push instead of polling
+  const socketState = useDownloadSocket();
+  const jobs: DownloadJob[] = [
+    ...(socketState.qbitTorrents ?? []),
+    ...(socketState.jobs ?? []).filter(j => !socketState.qbitTorrents?.some(q => q.hash === (j as DownloadJob).jobId)),
+  ] as DownloadJob[];
+  const loadingJobs = socketState.qbitTorrents === undefined && socketState.jobs === undefined;
+  const qbitOnline = socketState.qbitOnline ?? false;
   const [query, setQuery] = useState('');
   const [searching, setSearching] = useState(false);
   const [results, setResults] = useState<TMDBSearchResult[]>([]);
   const [queueing, setQueueing] = useState<number | null>(null);
   const [queueMsg, setQueueMsg] = useState<{ id: number; ok: boolean; text: string } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-
-  // Poll active downloads every 3s — paused when tab is hidden
-  useEffect(() => {
-    let cancelled = false;
-    async function poll() {
-      if (document.hidden) return;
-      try {
-        const r = await fetch('/api/stremio/downloads');
-        if (!r.ok) return;
-        const data = await r.json() as { jobs: DownloadJob[]; qbitTorrents: DownloadJob[]; qbitOnline: boolean };
-        if (cancelled) return;
-        const all: DownloadJob[] = [
-          ...(data.qbitTorrents ?? []),
-          ...(data.jobs ?? []).filter(j => !data.qbitTorrents?.some(q => q.hash === j.jobId)),
-        ];
-        setJobs(all);
-        setQbitOnline(data.qbitOnline ?? false);
-        setLoadingJobs(false);
-      } catch {
-        if (!cancelled) setLoadingJobs(false);
-      }
-    }
-    poll();
-    const id = setInterval(poll, 3000);
-    return () => { cancelled = true; clearInterval(id); };
-  }, []);
 
   const doSearch = useCallback(async (q: string) => {
     if (!q.trim()) { setResults([]); return; }
@@ -149,6 +129,7 @@ export default function DownloadTab() {
       }
       const r = await fetch('/api/stremio/download', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ imdbId, type, title, poster }),
       });
@@ -166,18 +147,17 @@ export default function DownloadTab() {
 
   const pauseJob = useCallback(async (hash: string) => {
     haptic(20);
-    await fetch('/api/stremio/downloads/pause', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ hash }) });
+    await fetch('/api/stremio/downloads/pause', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ hash }) });
   }, []);
 
   const resumeJob = useCallback(async (hash: string) => {
     haptic(20);
-    await fetch('/api/stremio/downloads/resume', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ hash }) });
+    await fetch('/api/stremio/downloads/resume', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ hash }) });
   }, []);
 
   const deleteJob = useCallback(async (hash: string) => {
     haptic([30, 20, 60]);
-    await fetch(`/api/stremio/downloads/${encodeURIComponent(hash)}`, { method: 'DELETE' });
-    setJobs(prev => prev.filter(j => (j.hash ?? j.jobId) !== hash));
+    await fetch(`/api/stremio/downloads/${encodeURIComponent(hash)}`, { method: 'DELETE', credentials: 'include' });
   }, []);
 
   const activeJobs = jobs.filter(j => j.status !== 'done' && j.status !== 'seeding');
