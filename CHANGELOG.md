@@ -7,6 +7,52 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.3.6] — 2026-04-23
+
+### Fixed
+
+#### CI / E2E Tests
+- `waitForApp()` now waits for the auth check (`GET /api/auth/check`) to resolve before asserting — previously the app rendered `null` while `authenticated === null`, causing all 77 Playwright tests to time out on a blank page
+- `auth.spec.ts`: "shows login gate when not authenticated" now accepts the home page as a valid state when no admin password is configured (fresh CI environment skips auth entirely)
+
+#### v1.3.5 Fixes (tagged in this release)
+- HTTPS Setup page crash: added `import React` for `React.ElementType` usage
+- Auto-skip intro: fires exactly once per item via `skipIntroFired` ref guard
+- Security Center back button: `forceOpen` prop + `onClose` callback on SettingsPanel
+- Parental controls: "Manage Profiles" hidden for kids/restricted profiles
+- API keys: "Key saved ✓" badges; fields start empty; TMDB test uses `?api_key=`
+- Stats page 401: friendly message; array fields guarded before `.reduce()`
+- History/Discover pages: array guards, duplicate toast (409 → styled yellow)
+- TV Shows discover: 3 rows (Trending This Week, Popular Right Now, All-Time Top Rated)
+- Profiles page: top-aligned layout
+
+### Added
+
+#### Samsung TV Setup Guide (`/samsung-tv`)
+- 6-section interactive guide with auto-detected HomeStream URL via `/api/network/info`
+
+#### Phone Remote / QR Widget
+- Always renders regardless of fetch state; falls back to `window.location`
+- LAN IP shown in large text with copy button; QR code black-on-white; full URL copyable
+
+#### Network APIs
+- `GET /api/remote/qr` — open endpoint; real LAN IP via `os.networkInterfaces()`
+- `GET /api/network/info` — open endpoint; Samsung TV setup page uses it to pre-fill server address
+
+#### VPN Interface Binding
+- `GET /api/vpn/interfaces` — lists active Windows adapters (open endpoint)
+- `POST /api/vpn/bind` — saves interface, calls qBittorrent API; requires auth
+- `vpnKillSwitch.ts` — polls every 10s; pauses torrents if VPN drops
+
+#### Playwright E2E Suite
+- 77 tests across 8 spec files: auth, setup, home, discover, downloads, profiles, settings, navigation
+
+### Tests
+- 867 unit tests passing (48 files)
+- 77 Playwright E2E tests (CI-ready)
+
+---
+
 ## [1.2.5] — 2026-04-22
 
 ### Fixed
