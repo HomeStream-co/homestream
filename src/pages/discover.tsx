@@ -18,7 +18,7 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
-  Compass, Star, Calendar, Download, Bookmark, BookmarkCheck,
+  Star, Calendar, Download, Bookmark, BookmarkCheck,
   Loader2, WifiOff, RefreshCw, Film, TrendingUp, Sparkles,
   ChevronDown, Search, X, Tv2, Clapperboard, Play, Volume2, VolumeX, Layers,
   AlertCircle,
@@ -820,224 +820,272 @@ export default function DiscoverPage() {
       <title>Discover — HomeStream</title>
       <meta name="description" content="Browse new releases, trending movies, and personalised recommendations. Download directly to your HomeStream server." />
 
-      <div className="min-h-screen bg-background pt-20 pb-16 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-screen-2xl mx-auto">
+      <div className="min-h-screen bg-background pb-20">
 
-          {/* ── Page header ── */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-            <div>
-              <h1 className="text-2xl font-heading font-bold text-foreground flex items-center gap-2">
-                <Compass className="w-6 h-6 text-primary" />
-                Discover
-              </h1>
-              <p className="text-muted-foreground text-sm mt-0.5">
-                New releases, trending titles, and direct search to download anything
-              </p>
-            </div>
-
-            <div className="flex items-center gap-2">
-              {activeTab !== 'search' && activeTab !== 'genres' && (
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={e => setSearchQuery(e.target.value)}
-                    placeholder="Filter titles…"
-                    className="pl-8 pr-3 py-2 text-xs bg-card border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary w-44"
-                  />
-                  {searchQuery && (
-                    <button onClick={() => setSearchQuery('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
-                      <X className="w-3 h-3" />
-                    </button>
-                  )}
+        {/* ── Cinematic page header ── */}
+        <div className="relative pt-24 pb-10 px-4 sm:px-6 lg:px-8 overflow-hidden">
+          {/* Subtle background glow */}
+          <div className="absolute inset-0 bg-gradient-to-b from-primary/5 via-transparent to-transparent pointer-events-none" />
+          <div className="max-w-screen-2xl mx-auto relative">
+            <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-5">
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-1 h-6 bg-primary rounded-full" />
+                  <span className="text-xs text-primary font-bold uppercase tracking-widest">Browse</span>
                 </div>
-              )}
-              <button
-                onClick={refresh}
-                disabled={loading}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-border hover:border-primary/40 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
-                title="Force refresh from TMDB"
-              >
-                <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-                Refresh
-              </button>
+                <h1 className="text-4xl sm:text-5xl font-heading text-foreground tracking-wide">
+                  Discover
+                </h1>
+                <p className="text-muted-foreground text-sm mt-1.5 max-w-md">
+                  New releases, trending titles, and direct search to download anything to your server
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2 flex-shrink-0">
+                {activeTab !== 'search' && activeTab !== 'genres' && (
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
+                    <input
+                      type="text"
+                      value={searchQuery}
+                      onChange={e => setSearchQuery(e.target.value)}
+                      placeholder="Filter titles…"
+                      className="pl-9 pr-3 py-2 text-xs glass rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary/50 w-48"
+                    />
+                    {searchQuery && (
+                      <button onClick={() => setSearchQuery('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                        <X className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
+                )}
+                <button
+                  onClick={refresh}
+                  disabled={loading}
+                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl glass text-xs font-medium text-muted-foreground hover:text-foreground transition-all disabled:opacity-50"
+                  title="Force refresh from TMDB"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+                  Refresh
+                </button>
+              </div>
+            </div>
+
+            {/* ── Premium tab bar ── */}
+            <div className="flex gap-1 mt-8 border-b border-border/40">
+              {TABS.map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`relative flex items-center gap-2 px-4 py-3 text-sm font-medium transition-all duration-200 ${
+                    activeTab === tab.id
+                      ? 'text-foreground'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  <tab.icon className="w-3.5 h-3.5" />
+                  {tab.label}
+                  {activeTab === tab.id && (
+                    <motion.div
+                      layoutId="discover-tab-indicator"
+                      className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-full"
+                      transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                    />
+                  )}
+                </button>
+              ))}
             </div>
           </div>
+        </div>
 
-          {/* ── Tabs ── */}
-          <div className="flex gap-1 mb-6 bg-muted/30 p-1 rounded-xl w-fit">
-            {TABS.map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  activeTab === tab.id
-                    ? 'bg-card text-foreground shadow-sm border border-border'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                <tab.icon className="w-3.5 h-3.5" />
-                {tab.label}
-              </button>
-            ))}
-          </div>
+        {/* ── Content area ── */}
+        <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8">
 
-          {/* ── Status notices ── */}
+          {/* Status notices */}
           {stale && !loading && (
-            <div className="flex items-center gap-2 mb-6 px-4 py-2.5 rounded-xl bg-muted/40 border border-border text-xs text-muted-foreground">
-              <WifiOff className="w-3.5 h-3.5 flex-shrink-0" />
+            <div className="flex items-center gap-2 mb-6 px-4 py-3 rounded-xl glass border-yellow-500/20 text-xs text-muted-foreground">
+              <WifiOff className="w-3.5 h-3.5 flex-shrink-0 text-yellow-400" />
               Showing cached data — TMDB was unreachable.
               {lastRefreshed && <span className="ml-auto">Last updated: {lastRefreshed.toLocaleDateString()}</span>}
             </div>
           )}
           {error && !stale && (
-            <div className="flex items-center gap-2 mb-6 px-4 py-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-xs text-red-400">
+            <div className="flex items-center gap-2 mb-6 px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20 text-xs text-red-400">
               <WifiOff className="w-3.5 h-3.5 flex-shrink-0" />{error}
             </div>
           )}
 
           {/* ── Movies tab ── */}
-          {activeTab === 'movies' && (
-            <>
-              {loading && upcoming.length === 0 && (
-                <div className="flex flex-col items-center justify-center py-24 gap-3">
-                  <Loader2 className="w-8 h-8 animate-spin text-primary" />
-                  <p className="text-muted-foreground text-sm">Fetching new releases from TMDB…</p>
-                </div>
-              )}
-              {(!loading || upcoming.length > 0) && (
-                <>
-                  <Section key={`upcoming-${searchQuery}`} title="New This Month" icon={Calendar} movies={filteredUpcoming} libraryTitles={libraryTitles} watchlist={watchlist} onAddToWatchlist={addToWatchlist} onRemoveFromWatchlist={removeFromWatchlist} onDownload={handleTMDBDownload} />
-                  <Section key={`trending-${searchQuery}`} title="Trending This Week" icon={TrendingUp} movies={filteredTrending} libraryTitles={libraryTitles} watchlist={watchlist} onAddToWatchlist={addToWatchlist} onRemoveFromWatchlist={removeFromWatchlist} onDownload={handleTMDBDownload} />
-                  {recommended.length > 0 && (
-                    <Section key={`recommended-${searchQuery}`} title="Recommended For You" icon={Sparkles} movies={filteredRecommended} libraryTitles={libraryTitles} watchlist={watchlist} onAddToWatchlist={addToWatchlist} onRemoveFromWatchlist={removeFromWatchlist} onDownload={handleTMDBDownload} />
-                  )}
-                  {filteredUpcoming.length === 0 && filteredTrending.length === 0 && filteredRecommended.length === 0 && searchQuery && (
-                    <div className="text-center py-16 text-muted-foreground text-sm">No results for "{searchQuery}"</div>
-                  )}
-                </>
-              )}
-            </>
-          )}
-
-          {/* ── TV Shows tab ── */}
-          {activeTab === 'shows' && (
-            <div>
-              {loading && trendingShows.length === 0 ? (
-                <div className="text-center py-16">
-                  <Loader2 className="w-8 h-8 text-primary animate-spin mx-auto mb-4" />
-                  <p className="text-muted-foreground text-sm">Loading TV shows…</p>
-                </div>
-              ) : trendingShows.length === 0 && topRatedShows.length === 0 && popularShows.length === 0 ? (
-                <div className="text-center py-16">
-                  <Tv2 className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
-                  <p className="text-muted-foreground text-sm mb-2">No TV shows found.</p>
-                  <p className="text-muted-foreground text-xs">Use the <button onClick={() => setActiveTab('search')} className="text-primary hover:underline">Search & Download</button> tab to find any TV show by name.</p>
-                </div>
-              ) : (
-                <>
-                  {filteredShows.length > 0 && (
-                    <Section key={`shows-trending-${searchQuery}`} title="Trending This Week" icon={TrendingUp} movies={filteredShows} libraryTitles={libraryTitles} watchlist={watchlist} onAddToWatchlist={addToWatchlist} onRemoveFromWatchlist={removeFromWatchlist} onDownload={handleTMDBDownload} />
-                  )}
-                  {filteredPopularShows.length > 0 && (
-                    <Section key={`shows-popular-${searchQuery}`} title="Popular Right Now" icon={Sparkles} movies={filteredPopularShows} libraryTitles={libraryTitles} watchlist={watchlist} onAddToWatchlist={addToWatchlist} onRemoveFromWatchlist={removeFromWatchlist} onDownload={handleTMDBDownload} />
-                  )}
-                  {filteredTopRatedShows.length > 0 && (
-                    <Section key={`shows-toprated-${searchQuery}`} title="All-Time Top Rated" icon={Star} movies={filteredTopRatedShows} libraryTitles={libraryTitles} watchlist={watchlist} onAddToWatchlist={addToWatchlist} onRemoveFromWatchlist={removeFromWatchlist} onDownload={handleTMDBDownload} />
-                  )}
-                  {filteredShows.length === 0 && filteredPopularShows.length === 0 && filteredTopRatedShows.length === 0 && searchQuery && (
-                    <div className="text-center py-16 text-muted-foreground text-sm">No TV shows match "{searchQuery}"</div>
-                  )}
-                </>
-              )}
-            </div>
-          )}
-
-          {/* ── Genres tab ── */}
-          {activeTab === 'genres' && (
-            <GenreBrowser />
-          )}
-
-          {/* ── Search & Download tab ── */}
-          {activeTab === 'search' && (
-            <div>
-              <div className="bg-card border border-border rounded-2xl p-5 mb-6">
-                <h2 className="text-sm font-semibold text-foreground mb-1 flex items-center gap-2">
-                  <Clapperboard className="w-4 h-4 text-primary" />
-                  Search Any Movie or TV Show
-                </h2>
-                <p className="text-xs text-muted-foreground mb-4">
-                  Search the Cinemeta catalog (same database as Stremio) and download anything directly to your HomeStream server.
-                </p>
-
-                <div className="flex gap-2 mb-3">
-                  {(['movie', 'series'] as const).map(t => (
-                    <button
-                      key={t}
-                      onClick={() => setDirectType(t)}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border ${
-                        directType === t ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:text-foreground'
-                      }`}
-                    >
-                      {t === 'movie' ? <Film className="w-3 h-3" /> : <Tv2 className="w-3 h-3" />}
-                      {t === 'movie' ? 'Movies' : 'TV Shows'}
-                    </button>
-                  ))}
-                </div>
-
-                <div className="flex gap-2">
-                  <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-                    <input
-                      type="text"
-                      value={directQuery}
-                      onChange={e => setDirectQuery(e.target.value)}
-                      onKeyDown={e => e.key === 'Enter' && runDirectSearch()}
-                      placeholder={`Search ${directType === 'movie' ? 'movies' : 'TV shows'}…`}
-                      className="w-full pl-9 pr-3 py-2.5 bg-background border border-border rounded-lg text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary"
-                    />
+          <AnimatePresence mode="wait">
+            {activeTab === 'movies' && (
+              <motion.div key="movies" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
+                {loading && upcoming.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-32 gap-3">
+                    <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                    <p className="text-muted-foreground text-sm">Fetching new releases from TMDB…</p>
                   </div>
-                  <button
-                    onClick={runDirectSearch}
-                    disabled={!directQuery.trim() || directLoading}
-                    className="flex items-center gap-1.5 px-4 py-2.5 bg-primary hover:bg-primary/80 text-primary-foreground rounded-lg text-sm font-semibold transition-colors disabled:opacity-50"
-                  >
-                    {directLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
-                    Search
-                  </button>
-                </div>
-              </div>
+                ) : (
+                  <>
+                    <Section key={`upcoming-${searchQuery}`} title="New This Month" icon={Calendar} movies={filteredUpcoming} libraryTitles={libraryTitles} watchlist={watchlist} onAddToWatchlist={addToWatchlist} onRemoveFromWatchlist={removeFromWatchlist} onDownload={handleTMDBDownload} />
+                    <Section key={`trending-${searchQuery}`} title="Trending This Week" icon={TrendingUp} movies={filteredTrending} libraryTitles={libraryTitles} watchlist={watchlist} onAddToWatchlist={addToWatchlist} onRemoveFromWatchlist={removeFromWatchlist} onDownload={handleTMDBDownload} />
+                    {recommended.length > 0 && (
+                      <Section key={`recommended-${searchQuery}`} title="Recommended For You" icon={Sparkles} movies={filteredRecommended} libraryTitles={libraryTitles} watchlist={watchlist} onAddToWatchlist={addToWatchlist} onRemoveFromWatchlist={removeFromWatchlist} onDownload={handleTMDBDownload} />
+                    )}
+                    {filteredUpcoming.length === 0 && filteredTrending.length === 0 && filteredRecommended.length === 0 && searchQuery && (
+                      <div className="text-center py-20 text-muted-foreground text-sm">No results for "{searchQuery}"</div>
+                    )}
+                  </>
+                )}
+              </motion.div>
+            )}
 
-              {directError && (
-                <div className="text-center py-8 text-red-400 text-sm">{directError}</div>
-              )}
+            {/* ── TV Shows tab ── */}
+            {activeTab === 'shows' && (
+              <motion.div key="shows" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
+                {loading && trendingShows.length === 0 ? (
+                  <div className="text-center py-32">
+                    <Loader2 className="w-8 h-8 text-primary animate-spin mx-auto mb-4" />
+                    <p className="text-muted-foreground text-sm">Loading TV shows…</p>
+                  </div>
+                ) : trendingShows.length === 0 && topRatedShows.length === 0 && popularShows.length === 0 ? (
+                  <div className="text-center py-32">
+                    <Tv2 className="w-14 h-14 text-muted-foreground/20 mx-auto mb-4" />
+                    <p className="text-muted-foreground text-sm mb-2">No TV shows found.</p>
+                    <p className="text-muted-foreground text-xs">
+                      Use the{' '}
+                      <button onClick={() => setActiveTab('search')} className="text-primary hover:underline font-medium">
+                        Search &amp; Download
+                      </button>{' '}
+                      tab to find any TV show by name.
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    {filteredShows.length > 0 && (
+                      <Section key={`shows-trending-${searchQuery}`} title="Trending This Week" icon={TrendingUp} movies={filteredShows} libraryTitles={libraryTitles} watchlist={watchlist} onAddToWatchlist={addToWatchlist} onRemoveFromWatchlist={removeFromWatchlist} onDownload={handleTMDBDownload} />
+                    )}
+                    {filteredPopularShows.length > 0 && (
+                      <Section key={`shows-popular-${searchQuery}`} title="Popular Right Now" icon={Sparkles} movies={filteredPopularShows} libraryTitles={libraryTitles} watchlist={watchlist} onAddToWatchlist={addToWatchlist} onRemoveFromWatchlist={removeFromWatchlist} onDownload={handleTMDBDownload} />
+                    )}
+                    {filteredTopRatedShows.length > 0 && (
+                      <Section key={`shows-toprated-${searchQuery}`} title="All-Time Top Rated" icon={Star} movies={filteredTopRatedShows} libraryTitles={libraryTitles} watchlist={watchlist} onAddToWatchlist={addToWatchlist} onRemoveFromWatchlist={removeFromWatchlist} onDownload={handleTMDBDownload} />
+                    )}
+                    {filteredShows.length === 0 && filteredPopularShows.length === 0 && filteredTopRatedShows.length === 0 && searchQuery && (
+                      <div className="text-center py-20 text-muted-foreground text-sm">No TV shows match "{searchQuery}"</div>
+                    )}
+                  </>
+                )}
+              </motion.div>
+            )}
 
-              {directResults.length > 0 && (
-                <div>
-                  <p className="text-xs text-muted-foreground mb-4">{directResults.length} results for "{directQuery}"</p>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
-                    {directResults.map(r => (
-                      <DirectSearchCard
-                        key={r.id}
-                        result={r}
-                        alreadyInLibrary={libraryTitles.has(r.name.toLowerCase())}
-                        onDownload={handleDirectDownload}
-                      />
+            {/* ── Genres tab ── */}
+            {activeTab === 'genres' && (
+              <motion.div key="genres" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
+                <GenreBrowser />
+              </motion.div>
+            )}
+
+            {/* ── Search & Download tab ── */}
+            {activeTab === 'search' && (
+              <motion.div key="search" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
+                {/* Search card */}
+                <div className="glass rounded-2xl p-6 mb-8 border border-border/60">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center">
+                      <Clapperboard className="w-5 h-5 text-primary" />
+                    </div>
+                    <div>
+                      <h2 className="text-sm font-semibold text-foreground">Search Any Movie or TV Show</h2>
+                      <p className="text-xs text-muted-foreground">Powered by Cinemeta — same database as Stremio</p>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2 mb-4">
+                    {(['movie', 'series'] as const).map(t => (
+                      <button
+                        key={t}
+                        onClick={() => setDirectType(t)}
+                        className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold transition-all ${
+                          directType === t
+                            ? 'bg-primary text-primary-foreground shadow-sm shadow-primary/30'
+                            : 'glass text-muted-foreground hover:text-foreground'
+                        }`}
+                      >
+                        {t === 'movie' ? <Film className="w-3.5 h-3.5" /> : <Tv2 className="w-3.5 h-3.5" />}
+                        {t === 'movie' ? 'Movies' : 'TV Shows'}
+                      </button>
                     ))}
                   </div>
-                </div>
-              )}
 
-              {!directLoading && directResults.length === 0 && !directError && (
-                <div className="text-center py-16 text-muted-foreground">
-                  <Search className="w-12 h-12 mx-auto mb-4 opacity-20" />
-                  <p className="text-sm">Search for any movie or TV show above to find download options</p>
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+                      <input
+                        type="text"
+                        value={directQuery}
+                        onChange={e => setDirectQuery(e.target.value)}
+                        onKeyDown={e => e.key === 'Enter' && runDirectSearch()}
+                        placeholder={`Search ${directType === 'movie' ? 'movies' : 'TV shows'}…`}
+                        className="w-full pl-10 pr-4 py-3 glass rounded-xl text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary/50"
+                      />
+                    </div>
+                    <motion.button
+                      onClick={runDirectSearch}
+                      disabled={!directQuery.trim() || directLoading}
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.97 }}
+                      className="flex items-center gap-2 px-5 py-3 bg-primary hover:bg-primary/85 text-primary-foreground rounded-xl text-sm font-semibold transition-all disabled:opacity-50 shadow-md shadow-primary/25"
+                    >
+                      {directLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                      Search
+                    </motion.button>
+                  </div>
                 </div>
-              )}
-            </div>
-          )}
 
+                {directError && (
+                  <div className="text-center py-8 text-red-400 text-sm">{directError}</div>
+                )}
+
+                {directResults.length > 0 && (
+                  <div>
+                    <div className="flex items-center gap-3 mb-5">
+                      <div className="w-1 h-5 bg-primary rounded-full" />
+                      <p className="text-sm font-heading tracking-widest text-foreground uppercase">
+                        {directResults.length} Results
+                      </p>
+                      <span className="text-xs text-muted-foreground">for "{directQuery}"</span>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                      {directResults.map((r, i) => (
+                        <motion.div
+                          key={r.id}
+                          initial={{ opacity: 0, y: 12 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: Math.min(i * 0.04, 0.5), duration: 0.25 }}
+                        >
+                          <DirectSearchCard
+                            result={r}
+                            alreadyInLibrary={libraryTitles.has(r.name.toLowerCase())}
+                            onDownload={handleDirectDownload}
+                          />
+                        </motion.div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {!directLoading && directResults.length === 0 && !directError && (
+                  <div className="text-center py-24 text-muted-foreground">
+                    <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-4">
+                      <Search className="w-7 h-7 text-muted-foreground/30" />
+                    </div>
+                    <p className="text-sm font-medium text-foreground mb-1">Find anything</p>
+                    <p className="text-xs">Search for any movie or TV show to find download options</p>
+                  </div>
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </div>
 

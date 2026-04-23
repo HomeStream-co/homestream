@@ -16,7 +16,7 @@
  *  - Fullscreen + Cast buttons
  */
 
-import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Play, Pause, SkipForward, SkipBack, Volume2, VolumeX,
@@ -34,8 +34,7 @@ import BrowseTab from './remote/BrowseTab';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 // Re-exported from ./remote/types for use in sub-components
-export type { RemoteTab, LibraryItem, SubtitleTrack, CastSessionInfo, PlayerState, ConnStatus } from './remote/types';
-import type { RemoteTab, LibraryItem, SubtitleTrack, CastSessionInfo, PlayerState, ConnStatus } from './remote/types';
+import type { RemoteTab, CastSessionInfo, PlayerState, ConnStatus } from './remote/types';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
