@@ -38,6 +38,8 @@ jobs:
         run: npm run test:e2e
         env:
           CI: true
+          E2E_BASE_URL: 'http://localhost:5173'
+          VITE_PORT: '5173'
 
       - name: Upload Playwright report
         uses: actions/upload-artifact@v4

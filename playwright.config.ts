@@ -38,8 +38,8 @@ export default defineConfig({
   ],
 
   use: {
-    // Base URL — Vite dev server (port 20010 in this environment, 5173 locally)
-    baseURL: process.env.E2E_BASE_URL ?? 'http://localhost:20010',
+    // Base URL — 5173 in CI/local, 20010 in the Airo preview environment
+    baseURL: process.env.E2E_BASE_URL ?? (process.env.CI ? 'http://localhost:5173' : 'http://localhost:20010'),
 
     // Capture trace on first retry for debugging
     trace: 'on-first-retry',
@@ -65,9 +65,11 @@ export default defineConfig({
   // Start the Vite dev server automatically before running tests
   webServer: {
     command: 'npm run dev',
-    url: 'http://localhost:20010',
-    reuseExistingServer: true, // Always reuse — dev server is managed externally
-    timeout: 60_000,
+    // In CI use port 5173 (Vite default); in Airo preview environment use 20010
+    url: process.env.CI ? 'http://localhost:5173' : 'http://localhost:20010',
+    // Reuse an already-running server in the preview environment; always start fresh in CI
+    reuseExistingServer: !process.env.CI,
+    timeout: process.env.CI ? 120_000 : 60_000,
     stdout: 'ignore',
     stderr: 'pipe',
   },
