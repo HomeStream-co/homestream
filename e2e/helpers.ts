@@ -18,12 +18,21 @@ export const TEST_PASSWORD = process.env.E2E_PASSWORD ?? 'homestream';
 
 /**
  * Wait for the React app shell to be mounted and hydrated.
- * Checks for the root element and absence of loading spinners.
+ * Waits for auth check to complete so the app renders actual content
+ * (not the blank null state while authenticated === null).
  */
 export async function waitForApp(page: Page) {
   await page.waitForSelector('#root', { state: 'attached' });
-  // Give React a tick to hydrate
-  await page.waitForTimeout(300);
+  // Wait for auth check to resolve — the app renders null while checking.
+  // We wait for ANY visible content: login gate, setup page, or main nav.
+  await page.waitForFunction(() => {
+    const root = document.getElementById('root');
+    if (!root) return false;
+    // App has rendered something meaningful (not blank)
+    return root.children.length > 0 && (root.textContent?.trim().length ?? 0) > 0;
+  }, { timeout: 10_000 }).catch(() => {});
+  // Small extra tick for React state to settle
+  await page.waitForTimeout(200);
 }
 
 /**
