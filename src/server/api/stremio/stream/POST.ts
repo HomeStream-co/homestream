@@ -143,7 +143,7 @@ async function fetchProwlarr(
     clearTimeout(t);
     if (!res.ok) return [];
     const data = await res.json() as ProwlarrResponse;
-    return (data.results ?? [])
+    const mapped: (StreamResult | null)[] = (data.results ?? [])
       .filter(r => r.magnetUrl || r.infoHash)
       .map(r => {
         const infoHash = r.infoHash ?? r.magnetUrl?.match(/btih:([a-fA-F0-9]{40})/i)?.[1] ?? '';
@@ -157,9 +157,9 @@ async function fetchProwlarr(
           infoHash: infoHash || magnet,
           magnet,
           source: 'prowlarr' as const,
-        };
-      })
-      .filter((r): r is StreamResult => r !== null);
+        } satisfies StreamResult;
+      });
+    return mapped.filter((r): r is StreamResult => r !== null);
   } catch {
     clearTimeout(t);
     return [];

@@ -30,9 +30,8 @@ let mockConfig = {
   prowlarrApiKey: '',
 };
 
-// Per-test fetch responses keyed by URL prefix
+// Per-test fetch handler
 type FetchHandler = (url: string, init?: RequestInit) => Promise<Response>;
-let fetchHandlers: FetchHandler[] = [];
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
@@ -112,7 +111,6 @@ const originalFetch = global.fetch;
 beforeEach(() => {
   mockAuthed = true;
   mockConfig = { prowlarrUrl: '', prowlarrApiKey: '' };
-  fetchHandlers = [];
   vi.resetModules();
 });
 
@@ -120,8 +118,8 @@ afterEach(() => {
   global.fetch = originalFetch;
 });
 
-function mockFetch(handler: FetchHandler) {
-  global.fetch = vi.fn(handler) as unknown as typeof fetch;
+function mockFetch(handler: ((url: string) => Promise<Response>) | ((url: string, init?: RequestInit) => Promise<Response>)) {
+  global.fetch = vi.fn(handler as FetchHandler) as unknown as typeof fetch;
 }
 
 // ── Import handler (after mocks) ──────────────────────────────────────────────

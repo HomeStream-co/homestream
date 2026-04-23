@@ -6,23 +6,22 @@
  * electron-builder --dir produces an unpacked Windows app at:
  *   dist-electron/win-unpacked/
  *
- * This script packages that directory into a distributable archive:
- *   dist-electron/HomeStream-<version>-win-x64.zip   (if zip available)
- *   dist-electron/HomeStream-<version>-win-x64.tar.gz (fallback via tar)
- *   dist-electron/HomeStream-<version>-win-x64.zip   (pure-JS fallback)
+ * This script packages that directory into a proper .zip file using:
+ *   1. System `zip` command (macOS / Linux with zip installed)
+ *   2. Pure-JS ZIP writer (Node.js built-ins only — no dependencies)
  *
  * Why this exists:
  *   The build environment is Alpine Linux (musl). electron-builder's
  *   zip/nsis/portable targets all invoke app-builder which requires
  *   7zip (glibc binary) to extract winCodeSign. Since 7zip can't run
- *   on musl, we use --dir to skip that step and archive manually here.
+ *   on musl, we use --dir to skip that step and zip manually here.
  */
 
 import { execSync } from 'child_process';
-import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, createWriteStream, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'fs';
+import { deflateRawSync } from 'zlib';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { createGzip } from 'zlib';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, '..');
@@ -33,6 +32,8 @@ const version = pkg.version;
 
 const unpacked = path.join(root, 'dist-electron', 'win-unpacked');
 const outDir = path.join(root, 'dist-electron');
+const zipName = `HomeStream-${version}-win-x64.zip`;
+const zipPath = path.join(outDir, zipName);
 
 if (!existsSync(unpacked)) {
   console.error(`[zip-win] ERROR: unpacked dir not found: ${unpacked}`);
@@ -42,73 +43,63 @@ if (!existsSync(unpacked)) {
 mkdirSync(outDir, { recursive: true });
 
 // ── Attempt 1: system zip ────────────────────────────────────────────────────
-const zipName = `HomeStream-${version}-win-x64.zip`;
-const zipPath = path.join(outDir, zipName);
+const hasZip = (() => {
+  try { execSync('which zip', { stdio: 'pipe' }); return true; }
+  catch { return false; }
+})();
 
-try {
-  execSync(
-    `cd "${outDir}" && zip -r "${zipName}" win-unpacked/`,
-    { stdio: 'inherit' }
-  );
-  console.log(`[zip-win] ✓ Created ${zipName}`);
-  process.exit(0);
-} catch {
-  console.warn('[zip-win] system zip not available, trying tar.gz...');
+if (hasZip) {
+  try {
+    execSync(`cd "${outDir}" && zip -r "${zipName}" win-unpacked/`, { stdio: 'inherit' });
+    console.log(`[zip-win] ✓ Created ${zipName}`);
+    process.exit(0);
+  } catch {
+    console.warn('[zip-win] system zip failed, falling back to pure-JS writer...');
+  }
 }
 
-// ── Attempt 2: tar.gz via system tar ────────────────────────────────────────
-const tarName = `HomeStream-${version}-win-x64.tar.gz`;
-const tarPath = path.join(outDir, tarName);
-
-try {
-  execSync(
-    `tar -czf "${tarPath}" -C "${outDir}" win-unpacked/`,
-    { stdio: 'inherit' }
-  );
-  console.log(`[zip-win] ✓ Created ${tarName} (tar.gz archive)`);
-  console.log('[zip-win] Note: Windows users can extract with 7-Zip or WinRAR');
-  process.exit(0);
-} catch {
-  console.warn('[zip-win] tar.gz also failed, using pure-JS ZIP writer...');
-}
-
-// ── Attempt 3: pure-JS ZIP writer ────────────────────────────────────────────
-// Minimal ZIP implementation using Node.js built-ins only.
-// Produces a valid ZIP file without any external dependencies.
-
-import { deflateRawSync } from 'zlib';
+// ── Attempt 2: pure-JS ZIP writer ────────────────────────────────────────────
+// Minimal but spec-compliant ZIP implementation using Node.js built-ins only.
+// Handles deflate compression and CRC-32 checksums correctly.
 
 function crc32(buf) {
-  const table = crc32.table || (crc32.table = (() => {
+  if (!crc32._table) {
     const t = new Uint32Array(256);
     for (let i = 0; i < 256; i++) {
       let c = i;
       for (let j = 0; j < 8; j++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
       t[i] = c;
     }
-    return t;
-  })());
+    crc32._table = t;
+  }
   let crc = 0xFFFFFFFF;
-  for (let i = 0; i < buf.length; i++) crc = table[(crc ^ buf[i]) & 0xFF] ^ (crc >>> 8);
+  for (let i = 0; i < buf.length; i++) {
+    crc = crc32._table[(crc ^ buf[i]) & 0xFF] ^ (crc >>> 8);
+  }
   return (crc ^ 0xFFFFFFFF) >>> 0;
 }
 
-function writeUint16LE(buf, offset, val) { buf[offset] = val & 0xFF; buf[offset+1] = (val >> 8) & 0xFF; }
-function writeUint32LE(buf, offset, val) {
-  buf[offset] = val & 0xFF; buf[offset+1] = (val >> 8) & 0xFF;
-  buf[offset+2] = (val >> 16) & 0xFF; buf[offset+3] = (val >> 24) & 0xFF;
+function u16(buf, off, val) {
+  buf[off] = val & 0xFF;
+  buf[off + 1] = (val >> 8) & 0xFF;
+}
+function u32(buf, off, val) {
+  buf[off]     =  val        & 0xFF;
+  buf[off + 1] = (val >>  8) & 0xFF;
+  buf[off + 2] = (val >> 16) & 0xFF;
+  buf[off + 3] = (val >> 24) & 0xFF;
 }
 
 function collectFiles(dir, base = '') {
   const results = [];
   for (const name of readdirSync(dir)) {
     const full = path.join(dir, name);
-    const rel = base ? `${base}/${name}` : name;
-    const st = statSync(full);
+    const rel  = base ? `${base}/${name}` : name;
+    const st   = statSync(full);
     if (st.isDirectory()) {
       results.push(...collectFiles(full, rel));
     } else {
-      results.push({ full, rel, size: st.size });
+      results.push({ full, rel });
     }
   }
   return results;
@@ -117,78 +108,80 @@ function collectFiles(dir, base = '') {
 console.log('[zip-win] Building ZIP with pure-JS writer...');
 
 const files = collectFiles(unpacked, 'win-unpacked');
-const localHeaders = [];
-const centralHeaders = [];
-let offset = 0;
-const parts = [];
+const entries = [];  // { nameBytes, crc, compSize, rawSize, method, offset, payload }
+const parts   = [];
+let   offset  = 0;
 
-for (const { full, rel, size } of files) {
+for (const { full, rel } of files) {
   const nameBytes = Buffer.from(rel, 'utf-8');
-  const data = readFileSync(full);
-  const compressed = deflateRawSync(data, { level: 6 });
-  const useCompressed = compressed.length < data.length;
-  const payload = useCompressed ? compressed : data;
-  const crc = crc32(data);
+  const data      = readFileSync(full);
+  const deflated  = deflateRawSync(data, { level: 6 });
+  const useDeflate = deflated.length < data.length;
+  const payload   = useDeflate ? deflated : data;
+  const crc       = crc32(data);
+  const method    = useDeflate ? 8 : 0;
 
-  // Local file header (30 bytes + name)
+  // Local file header (30 bytes + filename)
   const lh = Buffer.alloc(30 + nameBytes.length);
-  writeUint32LE(lh, 0, 0x04034b50);   // signature
-  writeUint16LE(lh, 4, 20);            // version needed
-  writeUint16LE(lh, 6, 0x0800);        // flags: UTF-8
-  writeUint16LE(lh, 8, useCompressed ? 8 : 0); // compression
-  writeUint16LE(lh, 10, 0);            // mod time
-  writeUint16LE(lh, 12, 0);            // mod date
-  writeUint32LE(lh, 14, crc);
-  writeUint32LE(lh, 18, payload.length);
-  writeUint32LE(lh, 22, data.length);
-  writeUint16LE(lh, 26, nameBytes.length);
-  writeUint16LE(lh, 28, 0);            // extra length
+  u32(lh,  0, 0x04034b50);          // local file header signature
+  u16(lh,  4, 20);                   // version needed: 2.0
+  u16(lh,  6, 0x0800);               // general purpose bit flag: UTF-8
+  u16(lh,  8, method);               // compression method
+  u16(lh, 10, 0);                    // last mod time
+  u16(lh, 12, 0);                    // last mod date
+  u32(lh, 14, crc);                  // crc-32
+  u32(lh, 18, payload.length);       // compressed size
+  u32(lh, 22, data.length);          // uncompressed size
+  u16(lh, 26, nameBytes.length);     // file name length
+  u16(lh, 28, 0);                    // extra field length
   nameBytes.copy(lh, 30);
 
-  localHeaders.push({ offset, nameBytes, crc, compressedSize: payload.length, uncompressedSize: data.length, method: useCompressed ? 8 : 0 });
+  entries.push({ nameBytes, crc, compSize: payload.length, rawSize: data.length, method, offset });
   parts.push(lh, payload);
   offset += lh.length + payload.length;
 }
 
 // Central directory
-const cdStart = offset;
-for (let i = 0; i < files.length; i++) {
-  const { nameBytes, crc, compressedSize, uncompressedSize, method } = localHeaders[i];
+const cdOffset = offset;
+for (const { nameBytes, crc, compSize, rawSize, method, offset: localOffset } of entries) {
   const cd = Buffer.alloc(46 + nameBytes.length);
-  writeUint32LE(cd, 0, 0x02014b50);   // signature
-  writeUint16LE(cd, 4, 20);            // version made by
-  writeUint16LE(cd, 6, 20);            // version needed
-  writeUint16LE(cd, 8, 0x0800);        // flags: UTF-8
-  writeUint16LE(cd, 10, method);
-  writeUint16LE(cd, 12, 0);            // mod time
-  writeUint16LE(cd, 14, 0);            // mod date
-  writeUint32LE(cd, 16, crc);
-  writeUint32LE(cd, 20, compressedSize);
-  writeUint32LE(cd, 24, uncompressedSize);
-  writeUint16LE(cd, 28, nameBytes.length);
-  writeUint16LE(cd, 30, 0);            // extra length
-  writeUint16LE(cd, 32, 0);            // comment length
-  writeUint16LE(cd, 34, 0);            // disk start
-  writeUint16LE(cd, 36, 0);            // internal attrs
-  writeUint32LE(cd, 38, 0);            // external attrs
-  writeUint32LE(cd, 42, localHeaders[i].offset);
+  u32(cd,  0, 0x02014b50);           // central directory file header signature
+  u16(cd,  4, 20);                   // version made by
+  u16(cd,  6, 20);                   // version needed
+  u16(cd,  8, 0x0800);               // general purpose bit flag: UTF-8
+  u16(cd, 10, method);               // compression method
+  u16(cd, 12, 0);                    // last mod time
+  u16(cd, 14, 0);                    // last mod date
+  u32(cd, 16, crc);
+  u32(cd, 20, compSize);
+  u32(cd, 24, rawSize);
+  u16(cd, 28, nameBytes.length);
+  u16(cd, 30, 0);                    // extra field length
+  u16(cd, 32, 0);                    // file comment length
+  u16(cd, 34, 0);                    // disk number start
+  u16(cd, 36, 0);                    // internal file attributes
+  u32(cd, 38, 0);                    // external file attributes
+  u32(cd, 42, localOffset);          // relative offset of local header
   nameBytes.copy(cd, 46);
   parts.push(cd);
   offset += cd.length;
 }
 
+const cdSize = offset - cdOffset;
+
 // End of central directory record
 const eocd = Buffer.alloc(22);
-writeUint32LE(eocd, 0, 0x06054b50);
-writeUint16LE(eocd, 4, 0);
-writeUint16LE(eocd, 6, 0);
-writeUint16LE(eocd, 8, files.length);
-writeUint16LE(eocd, 10, files.length);
-writeUint32LE(eocd, 12, offset - cdStart);
-writeUint32LE(eocd, 16, cdStart);
-writeUint16LE(eocd, 20, 0);
+u32(eocd,  0, 0x06054b50);           // end of central dir signature
+u16(eocd,  4, 0);                    // disk number
+u16(eocd,  6, 0);                    // disk with start of central dir
+u16(eocd,  8, entries.length);       // entries on this disk
+u16(eocd, 10, entries.length);       // total entries
+u32(eocd, 12, cdSize);               // size of central directory
+u32(eocd, 16, cdOffset);             // offset of central directory
+u16(eocd, 20, 0);                    // comment length
 parts.push(eocd);
 
 writeFileSync(zipPath, Buffer.concat(parts));
-console.log(`[zip-win] ✓ Created ${zipName} (pure-JS, ${files.length} files)`);
-process.exit(0);
+
+const sizeMB = (statSync(zipPath).size / 1024 / 1024).toFixed(1);
+console.log(`[zip-win] ✓ Created ${zipName} (${sizeMB} MB, ${entries.length} files)`);
