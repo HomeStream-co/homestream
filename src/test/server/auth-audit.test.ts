@@ -78,6 +78,16 @@ const OPEN_ENDPOINTS = new Set([
   // the user can pick their VPN adapter during initial setup.
   // Returns only OS network interface names and IP addresses (no secrets).
   'src/server/api/vpn/interfaces/GET.ts',
+
+  // Network info — returns LAN IP and hostname so the Samsung TV setup guide
+  // and QR widget can display the correct server address before login.
+  // No secrets, no library data — just the machine's network interface info.
+  'src/server/api/network/info/GET.ts',
+
+  // Remote QR code — generates a QR code pointing to /remote (the phone
+  // remote PWA). Must be open so the QR widget renders on the TV home screen
+  // before the user has logged in. /remote itself is also a public page.
+  'src/server/api/remote/qr/GET.ts',
 ]);
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
