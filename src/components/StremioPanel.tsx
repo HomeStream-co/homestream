@@ -444,36 +444,68 @@ export default function StremioPanel() {
                       <div className="text-center">
                         <StremioLogo className="w-16 h-16 mx-auto mb-3" />
                         <h2 className="text-xl font-heading text-foreground">Sign in to Stremio</h2>
-                        <p className="text-sm text-muted-foreground mt-1">Search and auto-download directly to your server</p>
+                        <p className="text-sm text-muted-foreground mt-1">Optional — search and streams work without an account</p>
                       </div>
                       <form onSubmit={handleLogin} className="flex flex-col gap-3">
                         <div>
                           <label className="text-xs text-muted-foreground mb-1 block">Email</label>
-                          <input type="email" value={loginEmail} onChange={e => setLoginEmail(e.target.value)} placeholder="you@example.com" required
+                          <input type="email" value={loginEmail} onChange={e => setLoginEmail(e.target.value)} placeholder="you@example.com"
                             className="w-full bg-background border border-border rounded-lg px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary" />
                         </div>
                         <div>
                           <label className="text-xs text-muted-foreground mb-1 block">Password</label>
-                          <input type="password" value={loginPassword} onChange={e => setLoginPassword(e.target.value)} placeholder="••••••••" required
+                          <input type="password" value={loginPassword} onChange={e => setLoginPassword(e.target.value)} placeholder="••••••••"
                             className="w-full bg-background border border-border rounded-lg px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary" />
                         </div>
                         {loginError && (
-                          <div className="flex items-center gap-2 text-destructive text-xs">
-                            <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />{loginError}
+                          <div className="flex flex-col gap-1 bg-destructive/10 border border-destructive/30 rounded-lg p-3">
+                            <div className="flex items-center gap-2 text-destructive text-xs font-medium">
+                              <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />{loginError}
+                            </div>
+                            {loginError.includes('reach') && (
+                              <p className="text-[10px] text-muted-foreground pl-5">
+                                Stremio login requires your HomeStream server to have internet access. You can still search and download without signing in.
+                              </p>
+                            )}
                           </div>
                         )}
-                        <button type="submit" disabled={loginLoading}
-                          className="flex items-center justify-center gap-2 bg-[#8A5FFF] hover:bg-[#7a4fff] text-white py-2.5 rounded-lg font-medium text-sm transition-colors disabled:opacity-60">
+                        <button type="submit" disabled={loginLoading || !loginEmail || !loginPassword}
+                          className="flex items-center justify-center gap-2 bg-[#8A5FFF] hover:bg-[#7a4fff] text-white py-2.5 rounded-lg font-medium text-sm transition-colors disabled:opacity-50">
                           {loginLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <LogIn className="w-4 h-4" />}
                           {loginLoading ? 'Signing in…' : 'Sign In'}
                         </button>
                       </form>
-                      <div className="text-center">
+
+                      {/* Skip login — account not required for public Torrentio streams */}
+                      <div className="relative flex items-center gap-3">
+                        <div className="flex-1 h-px bg-border" />
+                        <span className="text-[10px] text-muted-foreground uppercase tracking-wider">or</span>
+                        <div className="flex-1 h-px bg-border" />
+                      </div>
+                      <button
+                        onClick={() => {
+                          const guest: StremioAccount = { email: 'guest' };
+                          setAccount(guest);
+                          localStorage.setItem('stremio_account', JSON.stringify(guest));
+                          setView('search');
+                        }}
+                        className="flex items-center justify-center gap-2 border border-border hover:border-primary/40 text-foreground py-2.5 rounded-lg font-medium text-sm transition-colors"
+                      >
+                        <Search className="w-4 h-4" />
+                        Continue without account
+                      </button>
+
+                      <div className="flex items-center justify-between">
                         <a href="https://www.stremio.com/register" target="_blank" rel="noopener noreferrer"
-                          className="text-xs text-[#8A5FFF] hover:underline flex items-center justify-center gap-1">
-                          Create a Stremio account <ExternalLink className="w-3 h-3" />
+                          className="text-xs text-[#8A5FFF] hover:underline flex items-center gap-1">
+                          Create account <ExternalLink className="w-3 h-3" />
+                        </a>
+                        <a href="https://www.stremio.com/forgot-password" target="_blank" rel="noopener noreferrer"
+                          className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1">
+                          Forgot password <ExternalLink className="w-3 h-3" />
                         </a>
                       </div>
+
                       <div className="bg-muted/50 rounded-lg p-3 text-xs text-muted-foreground leading-relaxed">
                         <strong className="text-foreground">How it works:</strong> Search any movie or show, click Download — the server fetches the torrent, transcodes it, and adds it to your library automatically. No torrent client needed.
                       </div>

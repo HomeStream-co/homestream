@@ -21,7 +21,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import {
   Play, Pause, SkipForward, SkipBack, Volume2, VolumeX,
   Wifi, WifiOff, Film, FastForward, ChevronRight, Zap,
-  RotateCcw, QrCode, X, ExternalLink, Subtitles,
+  RotateCcw, QrCode, X, Subtitles,
   Maximize2, Cast, ChevronUp, ChevronDown, Tv2, Square,
   Search, Sparkles, Download, Copy, Check,
 } from 'lucide-react';
@@ -903,6 +903,15 @@ function IdleState({
 }
 
 function QrModal({ qrData, onClose }: { qrData: { url: string; qr: string }; onClose: () => void }) {
+  const [copied, setCopied] = useState(false);
+
+  const copyUrl = () => {
+    navigator.clipboard.writeText(qrData.url).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.95, y: -8 }}
@@ -914,7 +923,7 @@ function QrModal({ qrData, onClose }: { qrData: { url: string; qr: string }; onC
       <div className="flex items-start justify-between mb-3">
         <div>
           <p className="text-sm font-semibold text-foreground">Open on another device</p>
-          <p className="text-xs text-muted-foreground mt-0.5">Scan to open this remote on your phone</p>
+          <p className="text-xs text-muted-foreground mt-0.5">Scan with your phone camera</p>
         </div>
         <button
           onClick={onClose}
@@ -923,17 +932,37 @@ function QrModal({ qrData, onClose }: { qrData: { url: string; qr: string }; onC
           <X className="w-3.5 h-3.5" />
         </button>
       </div>
+
+      {/* QR code */}
       <div
-        className="w-48 h-48 mx-auto rounded-xl overflow-hidden bg-background p-2 border border-border"
+        className="w-48 h-48 mx-auto rounded-xl overflow-hidden bg-white p-2 border border-border"
         dangerouslySetInnerHTML={{ __html: qrData.qr }}
       />
-      <div className="mt-3 flex items-center gap-2 bg-muted/50 rounded-lg px-3 py-2">
-        <code className="text-[11px] text-muted-foreground flex-1 truncate">{qrData.url}</code>
-        <a href={qrData.url} target="_blank" rel="noopener noreferrer" className="text-primary hover:text-primary/80 flex-shrink-0">
-          <ExternalLink className="w-3.5 h-3.5" />
-        </a>
+
+      {/* URL row with copy */}
+      <button
+        onClick={copyUrl}
+        className="mt-3 w-full flex items-center gap-2 bg-muted/50 hover:bg-muted rounded-lg px-3 py-2 transition-colors group"
+        title="Tap to copy URL"
+      >
+        <code className="flex-1 text-[11px] text-muted-foreground truncate text-left font-mono">{qrData.url}</code>
+        {copied
+          ? <Check className="w-3.5 h-3.5 text-green-400 flex-shrink-0" />
+          : <Copy className="w-3.5 h-3.5 text-muted-foreground/50 group-hover:text-muted-foreground flex-shrink-0" />}
+      </button>
+
+      {/* Same-Wi-Fi requirement + troubleshooting */}
+      <div className="mt-3 bg-amber-500/10 border border-amber-500/25 rounded-xl p-3">
+        <p className="text-[11px] font-semibold text-amber-400 mb-1.5 flex items-center gap-1.5">
+          <Wifi className="w-3.5 h-3.5" /> Requires same Wi-Fi network
+        </p>
+        <ul className="text-[10px] text-muted-foreground space-y-1 leading-relaxed">
+          <li>• Your phone must be on the <strong className="text-foreground">same Wi-Fi</strong> as this computer</li>
+          <li>• Mobile data / 4G / 5G will <strong className="text-foreground">not</strong> work — Wi-Fi only</li>
+          <li>• If it still fails, try typing the address above directly into your phone browser</li>
+          <li>• Firewall blocking? Allow port <strong className="text-foreground">{qrData.url.split(':')[2]?.split('/')[0] ?? '3000'}</strong> in Windows Defender / your router</li>
+        </ul>
       </div>
-      <p className="text-[10px] text-muted-foreground text-center mt-2">Both devices must be on the same Wi-Fi network</p>
     </motion.div>
   );
 }
