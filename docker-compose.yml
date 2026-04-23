@@ -34,6 +34,8 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3000
+      # Data directory — must match the VOLUME path in Dockerfile
+      HOMESTREAM_DATA: /app/homestream-data
       # API keys (optional — app works without them)
       GOOGLE_AI_API_KEY: ${GOOGLE_AI_API_KEY:-}
       OMDB_API_KEY: ${OMDB_API_KEY:-}
@@ -49,8 +51,8 @@ services:
       # Setup flag — set to "true" after wizard completes
       SETUP_COMPLETE: ${SETUP_COMPLETE:-false}
     volumes:
-      # Persistent app data (library JSON, captions, config)
-      - homestream_data:/app/data
+      # Persistent app data (library JSON, captions, config) — matches HOMESTREAM_DATA
+      - homestream_data:/app/homestream-data
       # Shared media folder — HomeStream reads/writes here
       - ${MEDIA_DIR:-./media}:/media
       # Uploads staging area (in-progress transcodes)
@@ -60,9 +62,10 @@ services:
     networks:
       - medianet
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
+      test: ["CMD", "curl", "-sf", "http://localhost:3000/api/health"]
       interval: 30s
-      timeout: 10s
+      timeout: 5s
+      start_period: 15s
       retries: 3
 
   # ── qBittorrent ─────────────────────────────────────────────────────────────

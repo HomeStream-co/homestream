@@ -11,6 +11,10 @@
  */
 
 import Bonjour from 'bonjour-service';
+import { createRequire } from 'module';
+
+const _require = createRequire(import.meta.url);
+const pkg = _require('../../package.json') as { version: string };
 
 let bonjour: InstanceType<typeof Bonjour> | null = null;
 
@@ -25,7 +29,7 @@ export function startMDNS(port: number = 3000): void {
       port,
       txt: {
         path: '/',
-        version: '1.0.0',
+        version: pkg.version,
         description: 'HomeStream Media Server',
       },
     });

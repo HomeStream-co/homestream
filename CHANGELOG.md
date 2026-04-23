@@ -11,29 +11,43 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+#### Docker — Data Persistence Bug (Critical)
+- `Dockerfile`: volume was declared at `/app/data` but `dataDir.ts` writes to `process.cwd()/homestream-data` when `HOMESTREAM_DATA` is unset — data was silently lost on container restart
+- Fixed by: setting `ENV HOMESTREAM_DATA=/app/homestream-data` in Dockerfile and declaring `VOLUME ["/app/homestream-data", "/app/uploads"]`
+- `docker-compose.yml`: updated volume mount from `homestream_data:/app/data` → `homestream_data:/app/homestream-data` to match; added `HOMESTREAM_DATA` env var
+- `docker-compose.yml`: healthcheck updated from `wget` (not always available in Alpine) to `curl` (now explicitly installed in Dockerfile)
+- `Dockerfile`: added `curl` to `apk add` for healthcheck; added `HEALTHCHECK` directive so Docker marks the container unhealthy if `/api/health` stops responding; added `start_period: 15s` so the container isn't marked unhealthy during startup
+
+#### Version Strings
+- `health/GET.ts`: hardcoded `version: '1.0.0'` replaced with live `package.json` version via `createRequire`
+- `mdnsService.ts`: hardcoded `version: '1.0.0'` in mDNS TXT record replaced with live `package.json` version
+
+#### Setup Wizard
+- `setup.tsx`: stale doc comment said "9 steps" — updated to accurately describe the current 5-step flow (Requirements → Media Folder → Optional Services → API Keys → Finish)
+
 #### VPN Kill-Switch — Settings Panel
 - `POST /api/vpn/bind`: kill-switch monitor now restarts immediately after rebind so the new interface is enforced without a server restart
 - `GET /api/setup`: confirmed `vpnInterface` and `vpnKillSwitch` are returned so the Settings panel loads the current binding on open
 
 #### CI / Release Workflow
-- `e2e.yml`: `Run E2E tests` step now passes `SETUP_COMPLETE=true`, `E2E_PASSWORD`, and `NODE_ENV=test` env vars — previously these were only set at the job level and not forwarded to the step
-- `release.yml`: `GH_OWNER`/`GH_REPO` now fall back to `github.repository_owner` / `github.event.repository.name` if secrets aren't set — release no longer fails when only `GH_TOKEN` is configured
-- `electron-builder.yml`: publish config `owner` was hardcoded; now uses `${HOMESTREAM_GH_OWNER}` env var consistent with `extraMetadata`
+- `e2e.yml`: `Run E2E tests` step now passes `SETUP_COMPLETE=true`, `E2E_PASSWORD`, and `NODE_ENV=test` env vars
+- `release.yml`: `GH_OWNER`/`GH_REPO` fall back to `github.repository_owner` / `github.event.repository.name` if secrets aren't set
+- `electron-builder.yml`: publish config `owner` was hardcoded; now uses `${HOMESTREAM_GH_OWNER}` env var
 
 #### Electron Control Panel
-- "Check for Updates" button added to action bar (always visible, not just when update is available)
-- Update panel messaging: "No reinstall needed" / "Restart & Update" (was "Restart & Install")
-- `differentialPackage: true` in NSIS config — delta updates download only the diff (~a few MB), not the full installer
+- "Check for Updates" button added to action bar (always visible)
+- Update panel messaging: "No reinstall needed" / "Restart & Update"
+- `differentialPackage: true` in NSIS — delta updates, no full reinstall
 
 ### Added
 
 #### E2E Test Coverage (80 total, up from 77)
-- `e2e/profiles.spec.ts` — 6 tests: page loads, heading visible, no 404, no crash
-- `e2e/discover.spec.ts` — 7 tests: page loads, 4 tabs present, each tab clickable without crash
-- `e2e/setup-wizard.spec.ts` — 5 tests: page loads, wizard content visible, navigation buttons present
+- `e2e/profiles.spec.ts` — 6 tests
+- `e2e/discover.spec.ts` — 7 tests
+- `e2e/setup-wizard.spec.ts` — 5 tests
 
 ### Tests
-- 867 unit tests passing (48 files) — unchanged
+- 867 unit tests passing (48 files)
 - 80 Playwright E2E tests across 9 spec files (CI-ready)
 
 ---

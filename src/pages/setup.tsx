@@ -1,20 +1,20 @@
 /**
  * Setup Wizard — Orchestrator
  *
- * Thin shell that owns all shared state and routes between the 9 step
+ * Thin shell that owns all shared state and routes between the 5 step
  * components in src/pages/setup/.  Zero business logic lives here —
  * each step component handles its own API calls and validation.
  *
  * Steps:
- *   0  StepSysReqs    — System requirements checklist
- *   1  StepWelcome    — What HomeStream needs (overview)
- *   2  StepMediaFolder — Media directory + quality settings
- *   3  StepQBittorrent — Optional qBittorrent connection
- *   4  StepJellyfin   — Optional Jellyfin connection
- *   5  StepVPN        — Optional VPN for downloads
- *   6  StepApiKeys    — TMDB / OMDB / AI keys + admin password
- *   7  StepHttps      — HTTPS options (informational)
- *   8  StepFinish     — Config summary + launch
+ *   0  StepSysReqs    — System requirements checklist (FFmpeg, disk space)
+ *   1  StepMediaFolder — Media directory + preferred quality setting
+ *   2  StepOptional   — qBittorrent + Jellyfin + VPN (all optional, one screen)
+ *   3  StepApiKeys    — TMDB / OMDB / Google AI keys + admin password
+ *   4  StepFinish     — Config summary + media scan + launch
+ *
+ * Note: StepWelcome, StepQBittorrent, StepJellyfin, StepVPN, StepHttps exist
+ * as standalone components for potential future use but are currently merged
+ * into StepOptional to keep the wizard concise.
  */
 
 import { useState, useEffect, useCallback } from 'react';
