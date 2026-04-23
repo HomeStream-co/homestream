@@ -777,24 +777,46 @@ export default function LibraryPage() {
                 <motion.div
                   key={u.id}
                   layout
-                  className="bg-card border border-border rounded-xl p-4"
+                  className="bg-card border border-border rounded-2xl p-5 shadow-sm"
                 >
                   {/* Header row */}
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <Film className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                      <span className="text-sm text-foreground truncate font-medium">{u.name}</span>
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                        u.phase === 'done' ? 'bg-green-500/15' :
+                        u.phase === 'error' ? 'bg-destructive/15' :
+                        'bg-primary/15'
+                      }`}>
+                        {phaseIcon(u.phase)}
+                      </div>
+                      <div className="min-w-0">
+                        <span className="text-sm text-foreground truncate font-semibold block">{u.name}</span>
+                        <span className={`text-xs ${phaseColor(u.phase)}`}>{phaseLabel(u)}</span>
+                      </div>
                     </div>
-                    <div className={`flex items-center gap-1.5 text-xs flex-shrink-0 ml-2 ${phaseColor(u.phase)}`}>
-                      {phaseIcon(u.phase)}
-                      <span>{phaseLabel(u)}</span>
-                    </div>
+                    {u.phase === 'transcoding' && u.transcode.fps && (
+                      <div className="flex items-center gap-3 text-[10px] text-muted-foreground flex-shrink-0 ml-2">
+                        <span className="flex items-center gap-1 bg-muted/60 px-2 py-1 rounded-full">
+                          <Cpu className="w-3 h-3" /> {u.transcode.fps.toFixed(0)} fps
+                        </span>
+                        {u.transcode.speed && (
+                          <span className="flex items-center gap-1 bg-muted/60 px-2 py-1 rounded-full">
+                            <Zap className="w-3 h-3" /> {u.transcode.speed}
+                          </span>
+                        )}
+                        {u.transcode.eta && u.transcode.eta > 0 && (
+                          <span className="flex items-center gap-1 bg-muted/60 px-2 py-1 rounded-full">
+                            <Clock className="w-3 h-3" /> ~{u.transcode.eta}s
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   {/* 3-phase progress bar */}
                   {u.phase !== 'error' && (
-                    <div className="space-y-1.5">
-                      <div className="h-2 bg-secondary rounded-full overflow-hidden">
+                    <div className="space-y-2">
+                      <div className="h-2 bg-muted/60 rounded-full overflow-hidden">
                         <motion.div
                           className={`h-full rounded-full ${
                             u.phase === 'done' ? 'bg-green-500' : 'bg-primary'
@@ -806,77 +828,57 @@ export default function LibraryPage() {
                       </div>
                       {/* Phase labels */}
                       <div className="flex justify-between text-[10px] text-muted-foreground px-0.5">
-                        <span className={u.phase === 'uploading' ? 'text-primary' : u.uploadProgress === 100 ? 'text-green-400' : ''}>
+                        <span className={u.phase === 'uploading' ? 'text-primary font-semibold' : u.uploadProgress === 100 ? 'text-green-400' : ''}>
                           Upload
                         </span>
-                        <span className={u.phase === 'transcoding' ? 'text-primary' : u.phase === 'done' ? 'text-green-400' : ''}>
+                        <span className={u.phase === 'transcoding' ? 'text-primary font-semibold' : u.phase === 'done' ? 'text-green-400' : ''}>
                           Transcode
                         </span>
-                        <span className={u.phase === 'done' ? 'text-green-400' : ''}>
+                        <span className={u.phase === 'done' ? 'text-green-400 font-semibold' : ''}>
                           Ready
                         </span>
                       </div>
                     </div>
                   )}
 
-                  {/* Transcode stats row */}
-                  {u.phase === 'transcoding' && u.transcode.fps && (
-                    <div className="flex items-center gap-4 mt-2 text-[10px] text-muted-foreground">
-                      <span className="flex items-center gap-1">
-                        <Cpu className="w-3 h-3" /> {u.transcode.fps.toFixed(0)} fps
-                      </span>
-                      {u.transcode.speed && (
-                        <span className="flex items-center gap-1">
-                          <Zap className="w-3 h-3" /> {u.transcode.speed}
-                        </span>
-                      )}
-                      {u.transcode.eta && u.transcode.eta > 0 && (
-                        <span className="flex items-center gap-1">
-                          <Clock className="w-3 h-3" /> ~{u.transcode.eta}s remaining
-                        </span>
-                      )}
-                    </div>
-                  )}
-
                   {/* Error */}
                   {u.phase === 'error' && (
-                    <p className="text-xs text-destructive mt-1 flex items-center gap-1">
-                      <AlertCircle className="w-3 h-3" /> {u.error}
+                    <p className="text-xs text-destructive mt-1 flex items-center gap-1.5 bg-destructive/10 px-3 py-2 rounded-xl">
+                      <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" /> {u.error}
                     </p>
                   )}
 
                   {/* Done — show result card */}
                   {u.phase === 'done' && u.result && (
-                    <div className="flex items-center gap-3 mt-3 pt-3 border-t border-border">
+                    <div className="flex items-center gap-4 mt-4 pt-4 border-t border-border">
                       {u.result.poster ? (
-                        <img src={u.result.poster} alt={u.result.title} className="w-10 h-14 object-cover rounded" />
+                        <img src={u.result.poster} alt={u.result.title} className="w-10 h-14 object-cover rounded-lg shadow-md" />
                       ) : (
-                        <div className="w-10 h-14 rounded bg-secondary flex items-center justify-center flex-shrink-0">
+                        <div className="w-10 h-14 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
                           <Film className="w-4 h-4 text-muted-foreground" />
                         </div>
                       )}
-                      <div>
-                        <p className="text-sm font-medium text-foreground">{u.result.title}</p>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-foreground">{u.result.title}</p>
                         <p className="text-xs text-muted-foreground">{u.result.year} · {u.result.genre.slice(0, 2).join(', ')}</p>
                         {u.result.imdbRating !== 'N/A' && (
-                          <p className="text-xs text-accent flex items-center gap-0.5 mt-0.5">
-                            <Star className="w-3 h-3 fill-accent" /> {u.result.imdbRating}
+                          <p className="text-xs text-yellow-400 flex items-center gap-0.5 mt-0.5">
+                            <Star className="w-3 h-3 fill-yellow-400" /> {u.result.imdbRating}
                           </p>
                         )}
                       </div>
-                      <div className="ml-auto flex flex-col items-end gap-1.5">
-                        <span className="text-xs text-green-400 flex items-center gap-1">
-                          <CheckCircle2 className="w-3.5 h-3.5" /> H.264 faststart
+                      <div className="flex flex-col items-end gap-1.5">
+                        <span className="text-xs text-green-400 flex items-center gap-1 bg-green-500/10 px-2 py-1 rounded-full">
+                          <CheckCircle2 className="w-3 h-3" /> H.264 faststart
                         </span>
-                        {/* CC download status */}
                         {u.ccStatus === 'fetching' && (
                           <span className="text-xs text-muted-foreground flex items-center gap-1 animate-pulse">
-                            <Captions className="w-3.5 h-3.5" /> Fetching CC…
+                            <Captions className="w-3 h-3" /> Fetching CC…
                           </span>
                         )}
                         {u.ccStatus === 'done' && (
-                          <span className="text-xs text-primary flex items-center gap-1">
-                            <Captions className="w-3.5 h-3.5" />
+                          <span className="text-xs text-primary flex items-center gap-1 bg-primary/10 px-2 py-1 rounded-full">
+                            <Captions className="w-3 h-3" />
                             CC {[
                               u.ccLangs?.en === 'downloaded' ? 'EN' : null,
                               u.ccLangs?.es === 'downloaded' ? 'ES' : null,
@@ -885,19 +887,19 @@ export default function LibraryPage() {
                         )}
                         {u.ccStatus === 'offline' && (
                           <span className="text-xs text-yellow-500 flex items-center gap-1">
-                            <WifiOff className="w-3 h-3" /> CC offline — retry later
+                            <WifiOff className="w-3 h-3" /> CC offline
                           </span>
                         )}
                         {u.ccStatus === 'failed' && (
                           <span className="text-xs text-muted-foreground flex items-center gap-1">
-                            <Captions className="w-3.5 h-3.5" /> No CC found
+                            <Captions className="w-3 h-3" /> No CC found
                           </span>
                         )}
                       </div>
                     </div>
                   )}
 
-                  {/* Offline notice — shown when OMDB was unreachable */}
+                  {/* Offline notice */}
                   {u.offlineMode && u.phase === 'done' && (
                     <OfflineMetadataNotice
                       mediaId={u.transcodeId!}
@@ -914,7 +916,7 @@ export default function LibraryPage() {
                     />
                   )}
 
-                  {/* AI Enrichment Wizard — appears after transcode completes (skipped in offline mode) */}
+                  {/* AI Enrichment Wizard */}
                   {u.showEnrichment && u.transcodeId && u.result && !u.offlineMode && (
                     <div className="mt-3">
                       <EnrichmentWizard
@@ -925,7 +927,6 @@ export default function LibraryPage() {
                             f.id === u.id ? { ...f, enrichmentDone: true } : f
                           ));
                           refreshLibrary();
-                          // Pop the Netflix-style reveal modal
                           if (u.result) {
                             setRevealModal({ item: u.result, enrichment });
                           }
@@ -945,15 +946,22 @@ export default function LibraryPage() {
           )}
         </AnimatePresence>
 
-        {/* ── Library Grid ── */}
-        <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
-          <h2 className="text-xl font-heading text-foreground">
-            {library.length} Title{library.length !== 1 ? 's' : ''}
-          </h2>
+        {/* ── Library Grid header ── */}
+        <div className="flex items-center justify-between mb-5 gap-3 flex-wrap">
+          <div className="flex items-center gap-3">
+            <h2 className="text-xl font-heading font-semibold text-foreground">
+              {library.length} Title{library.length !== 1 ? 's' : ''}
+            </h2>
+            {library.length > 0 && (
+              <span className="text-xs text-muted-foreground bg-muted/60 px-2.5 py-1 rounded-full">
+                {library.filter(m => m.type === 'series').length} shows · {library.filter(m => m.type !== 'series').length} movies
+              </span>
+            )}
+          </div>
           <div className="flex items-center gap-2">
             {selectMode ? (
               <>
-                <span className="text-xs text-muted-foreground">
+                <span className="text-xs text-muted-foreground bg-muted/60 px-2.5 py-1 rounded-full">
                   {selectedIds.size} selected
                 </span>
                 <button
@@ -973,14 +981,14 @@ export default function LibraryPage() {
                     <button
                       onClick={handleBulkEnrich}
                       disabled={bulkEnriching}
-                      className="flex items-center gap-1.5 text-xs bg-primary/10 hover:bg-primary/20 text-primary border border-primary/30 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50"
+                      className="flex items-center gap-1.5 text-xs bg-primary/10 hover:bg-primary/20 text-primary border border-primary/30 px-3 py-1.5 rounded-xl transition-colors disabled:opacity-50"
                     >
                       <Zap className="w-3.5 h-3.5" />
                       {bulkEnriching ? 'Enriching…' : `Enrich ${selectedIds.size}`}
                     </button>
                     <button
                       onClick={() => setBulkDeleteConfirm(true)}
-                      className="flex items-center gap-1.5 text-xs bg-destructive/15 hover:bg-destructive/25 text-destructive border border-destructive/30 px-3 py-1.5 rounded-lg transition-colors"
+                      className="flex items-center gap-1.5 text-xs bg-destructive/10 hover:bg-destructive/20 text-destructive border border-destructive/30 px-3 py-1.5 rounded-xl transition-colors"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                       Delete {selectedIds.size}
@@ -989,7 +997,7 @@ export default function LibraryPage() {
                 )}
                 <button
                   onClick={() => { setSelectMode(false); setSelectedIds(new Set()); }}
-                  className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground border border-border px-3 py-1.5 rounded-lg transition-colors"
+                  className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground border border-border px-3 py-1.5 rounded-xl transition-colors"
                 >
                   <X className="w-3.5 h-3.5" /> Cancel
                 </button>
@@ -998,7 +1006,7 @@ export default function LibraryPage() {
               library.length > 0 && (
                 <button
                   onClick={() => setSelectMode(true)}
-                  className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground border border-border px-3 py-1.5 rounded-lg transition-colors"
+                  className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground border border-border px-3 py-1.5 rounded-xl transition-colors hover:bg-muted/40"
                 >
                   <Check className="w-3.5 h-3.5" /> Select
                 </button>
@@ -1011,28 +1019,41 @@ export default function LibraryPage() {
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
             {Array.from({ length: 12 }).map((_, i) => (
               <div key={i}>
-                <Skeleton className="aspect-[2/3] rounded-lg" />
-                <Skeleton className="h-3 mt-2 rounded" />
+                <Skeleton className="aspect-[2/3] rounded-xl" />
+                <Skeleton className="h-3 mt-2 rounded w-3/4" />
+                <Skeleton className="h-2.5 mt-1 rounded w-1/2" />
               </div>
             ))}
           </div>
         ) : library.length === 0 ? (
-          <div className="text-center py-16 text-muted-foreground">
-            <Film className="w-12 h-12 mx-auto mb-3 opacity-30" />
-            <p>No media yet. Upload your first file above!</p>
-          </div>
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="text-center py-24"
+          >
+            <div className="w-20 h-20 rounded-2xl bg-muted/60 flex items-center justify-center mx-auto mb-4">
+              <Film className="w-10 h-10 text-muted-foreground/40" />
+            </div>
+            <p className="text-foreground font-medium mb-1">Your library is empty</p>
+            <p className="text-muted-foreground text-sm">Upload your first video file above to get started.</p>
+          </motion.div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-            {library.map((item: MediaItem & { transcoding?: boolean; transcodeWarning?: string; transcodeError?: string }) => (
+            {library.map((item: MediaItem & { transcoding?: boolean; transcodeWarning?: string; transcodeError?: string }, idx) => (
               <MediaContextMenu key={item.id} item={item} disabled={selectMode}>
-              <div
+              <motion.div
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, delay: Math.min(idx * 0.025, 0.4), ease: 'easeOut' as const }}
                 className={`group relative ${selectMode ? 'cursor-pointer' : ''}`}
                 onClick={selectMode ? () => toggleSelect(item.id) : undefined}
               >
-                <div className={`aspect-[2/3] rounded-lg overflow-hidden bg-card relative transition-all ${
-                  selectMode && selectedIds.has(item.id) ? 'ring-2 ring-primary ring-offset-2 ring-offset-background' : ''
+                <div className={`aspect-[2/3] rounded-xl overflow-hidden bg-card relative transition-all duration-200 ${
+                  selectMode && selectedIds.has(item.id)
+                    ? 'ring-2 ring-primary ring-offset-2 ring-offset-background shadow-[0_0_20px_hsl(var(--primary)/0.3)]'
+                    : 'group-hover:shadow-[0_8px_30px_rgba(0,0,0,0.4)] group-hover:-translate-y-0.5'
                 }`}>
-                  {/* Poster — with proper icon fallback (no external placeholder URLs) */}
+                  {/* Poster */}
                   {item.poster ? (
                     <PosterImage poster={item.poster} title={item.title} />
                   ) : (
@@ -1042,11 +1063,11 @@ export default function LibraryPage() {
                     </div>
                   )}
 
-                  {/* Select mode checkbox overlay */}
+                  {/* Select mode checkbox */}
                   {selectMode && (
                     <div className={`absolute top-2 left-2 z-10 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${
                       selectedIds.has(item.id)
-                        ? 'bg-primary border-primary'
+                        ? 'bg-primary border-primary shadow-[0_0_8px_hsl(var(--primary)/0.5)]'
                         : 'bg-black/50 border-white/60'
                     }`}>
                       {selectedIds.has(item.id) && <Check className="w-3.5 h-3.5 text-white" />}
@@ -1055,16 +1076,18 @@ export default function LibraryPage() {
 
                   {/* Transcoding overlay */}
                   {item.transcoding && (
-                    <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center gap-2">
-                      <Cpu className="w-6 h-6 text-primary animate-pulse" />
-                      <span className="text-white text-[10px] font-medium">Transcoding…</span>
+                    <div className="absolute inset-0 bg-black/75 flex flex-col items-center justify-center gap-2">
+                      <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
+                        <Cpu className="w-5 h-5 text-primary animate-pulse" />
+                      </div>
+                      <span className="text-white text-[10px] font-semibold">Transcoding…</span>
                     </div>
                   )}
 
-                  {/* Transcode error overlay — Option B: stays in grid, red badge, still playable */}
+                  {/* Transcode error overlay */}
                   {item.transcodeError && !item.transcoding && (
-                    <div className="absolute inset-0 bg-black/75 flex flex-col items-center justify-center gap-2 p-3">
-                      <div className="w-8 h-8 rounded-full bg-destructive/20 border border-destructive/50 flex items-center justify-center">
+                    <div className="absolute inset-0 bg-black/80 flex flex-col items-center justify-center gap-2 p-3">
+                      <div className="w-9 h-9 rounded-full bg-destructive/20 border border-destructive/50 flex items-center justify-center">
                         <AlertCircle className="w-4 h-4 text-destructive" />
                       </div>
                       <p className="text-white text-[10px] font-semibold text-center leading-tight">Transcode Failed</p>
@@ -1072,39 +1095,37 @@ export default function LibraryPage() {
                     </div>
                   )}
 
-                  {/* Actions overlay — shown when not transcoding/errored */}
+                  {/* Actions overlay */}
                   {!item.transcoding && !item.transcodeError && (
-                    <div className="absolute inset-0 bg-black/70 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2 p-2">
-                      {/* Top row: Play + Trailer */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-black/20 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col items-center justify-center gap-2 p-2">
                       <div className="flex items-center gap-2">
-                        {/* Play */}
-                        <button
+                        <motion.button
+                          whileHover={{ scale: 1.1 }}
+                          whileTap={{ scale: 0.95 }}
                           onClick={e => { e.stopPropagation(); window.location.href = `/player/${item.id}`; }}
-                          className="w-10 h-10 rounded-full bg-primary flex items-center justify-center hover:bg-primary/80 transition-colors"
+                          className="w-11 h-11 rounded-full bg-primary flex items-center justify-center shadow-[0_0_20px_hsl(var(--primary)/0.5)] hover:bg-primary/90 transition-colors"
                           title="Play"
                         >
-                          <Play className="w-4 h-4 text-white fill-white ml-0.5" />
-                        </button>
-                        {/* Trailer */}
+                          <Play className="w-5 h-5 text-white fill-white ml-0.5" />
+                        </motion.button>
                         <TrailerButton
                           title={item.title}
                           year={item.year}
                           type={item.type === 'series' ? 'series' : 'movie'}
-                          className="w-10 h-10 rounded-full bg-red-600/80 hover:bg-red-600 flex items-center justify-center transition-colors disabled:opacity-40"
+                          className="w-9 h-9 rounded-full bg-red-600/80 hover:bg-red-600 flex items-center justify-center transition-colors disabled:opacity-40"
                         />
                       </div>
-                      {/* Bottom row: Edit + Delete */}
                       <div className="flex items-center gap-2">
                         <button
                           onClick={e => { e.stopPropagation(); startEdit(item); }}
-                          className="p-1.5 bg-white/20 hover:bg-white/30 rounded-full transition-colors"
+                          className="p-1.5 bg-white/15 hover:bg-white/25 rounded-full transition-colors backdrop-blur-sm"
                           title="Edit"
                         >
                           <Edit2 className="w-3.5 h-3.5 text-white" />
                         </button>
                         <button
                           onClick={e => { e.stopPropagation(); setDeleteId(item.id); }}
-                          className="p-1.5 bg-destructive/80 hover:bg-destructive rounded-full transition-colors"
+                          className="p-1.5 bg-destructive/70 hover:bg-destructive rounded-full transition-colors"
                           title="Delete"
                         >
                           <Trash2 className="w-3.5 h-3.5 text-white" />
@@ -1113,7 +1134,7 @@ export default function LibraryPage() {
                     </div>
                   )}
 
-                  {/* Error state — show delete button so user can remove and re-upload */}
+                  {/* Error delete button */}
                   {item.transcodeError && !item.transcoding && (
                     <div className="absolute top-1.5 right-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button
@@ -1127,20 +1148,20 @@ export default function LibraryPage() {
                   )}
                 </div>
 
-                <div className="mt-1.5">
-                  <p className="text-xs font-medium text-foreground truncate">{item.title}</p>
-                  <div className="flex items-center justify-between">
+                <div className="mt-2 px-0.5">
+                  <p className="text-xs font-semibold text-foreground truncate leading-snug">{item.title}</p>
+                  <div className="flex items-center justify-between mt-0.5">
                     <p className="text-[10px] text-muted-foreground">{item.year}</p>
                     {item.imdbRating !== 'N/A' && !item.transcodeError && (
-                      <p className="text-[10px] text-accent flex items-center gap-0.5">
-                        <Star className="w-2.5 h-2.5 fill-accent" /> {item.imdbRating}
+                      <p className="text-[10px] text-yellow-400 flex items-center gap-0.5">
+                        <Star className="w-2.5 h-2.5 fill-yellow-400" /> {item.imdbRating}
                       </p>
                     )}
                     {item.transcodeError && (
                       <p className="text-[9px] text-destructive font-medium">Re-upload to fix</p>
                     )}
                   </div>
-                  {/* Storage savings badge — shown when encode saved meaningful space */}
+                  {/* Storage savings badge */}
                   {appSettings.showStorageBadges && !item.transcodeError && !item.transcoding && (item as MediaItem & { savedBytes?: number }).savedBytes != null && (item as MediaItem & { savedBytes?: number }).savedBytes! > 1_048_576 && (
                     <StorageSavingsBadge
                       savedBytes={(item as MediaItem & { savedBytes?: number }).savedBytes!}
@@ -1151,18 +1172,18 @@ export default function LibraryPage() {
                   {appSettings.showEnrichmentTags && (item.enrichment?.mood?.length || item.enrichment?.tags?.length) ? (
                     <div className="flex flex-wrap gap-0.5 mt-1">
                       {item.enrichment?.mood?.slice(0, 1).map((m: string) => (
-                        <span key={m} className="text-[9px] px-1 py-0.5 rounded bg-primary/20 text-primary font-medium leading-none truncate max-w-[64px]">
+                        <span key={m} className="text-[9px] px-1 py-0.5 rounded-full bg-primary/15 text-primary font-medium leading-none truncate max-w-[64px]">
                           {m}
                         </span>
                       ))}
                       {item.enrichment?.tags?.slice(0, 2).map((t: string) => (
-                        <span key={t} className="text-[9px] px-1 py-0.5 rounded bg-muted text-muted-foreground font-medium leading-none truncate max-w-[64px]">
+                        <span key={t} className="text-[9px] px-1 py-0.5 rounded-full bg-muted text-muted-foreground font-medium leading-none truncate max-w-[64px]">
                           {t}
                         </span>
                       ))}
                     </div>
                   ) : null}
-                  {/* CC manager — re-fetch + upload UI */}
+                  {/* CC manager */}
                   {!item.transcoding && !item.transcodeError && (
                     <CaptionManager
                       mediaId={item.id}
@@ -1177,7 +1198,7 @@ export default function LibraryPage() {
                     </p>
                   )}
                 </div>
-              </div>
+              </motion.div>
               </MediaContextMenu>
             ))}
           </div>
