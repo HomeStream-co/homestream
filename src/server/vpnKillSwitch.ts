@@ -100,7 +100,8 @@ export function startVpnKillSwitch(): void {
 
   console.log(`[vpn-killswitch] Monitoring interface "${cfg.vpnInterface}" every ${POLL_INTERVAL_MS / 1000}s`);
   wasUp = isInterfaceUp(cfg.vpnInterface); // seed initial state
-  timer = setInterval(() => { poll().catch(() => {}); }, POLL_INTERVAL_MS);
+  // .unref() so this timer never prevents a clean process exit (SIGTERM/SIGINT)
+  timer = setInterval(() => { poll().catch(() => {}); }, POLL_INTERVAL_MS).unref();
 }
 
 export function stopVpnKillSwitch(): void {

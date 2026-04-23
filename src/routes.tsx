@@ -24,6 +24,8 @@ const SamsungTvPage = lazy(() => import('./pages/samsung-tv'));
 
 const NotFoundPage = lazy(() => import('./pages/_404'));
 
+// Fallback is an internal loading spinner — not a public export.
+// eslint-disable-next-line react-refresh/only-export-components
 const Fallback = () => (
   <div className="flex justify-center py-8 h-screen items-center">
     <Spinner />

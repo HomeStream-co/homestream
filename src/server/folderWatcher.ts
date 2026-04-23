@@ -260,7 +260,8 @@ export function startWatcher(watchDir: string): void {
   }
 
   // Polling fallback — catches network drives, Docker bind mounts, NFS
-  pollTimer = setInterval(() => scanDirectory(watchDir), POLL_INTERVAL_MS);
+  // .unref() so this timer never prevents a clean process exit (SIGTERM/SIGINT)
+  pollTimer = setInterval(() => scanDirectory(watchDir), POLL_INTERVAL_MS).unref();
 }
 
 /**
