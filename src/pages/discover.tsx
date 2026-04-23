@@ -21,7 +21,9 @@ import {
   Compass, Star, Calendar, Download, Bookmark, BookmarkCheck,
   Loader2, WifiOff, RefreshCw, Film, TrendingUp, Sparkles,
   ChevronDown, Search, X, Tv2, Clapperboard, Play, Volume2, VolumeX, Layers,
+  AlertCircle,
 } from 'lucide-react';
+import { toast } from 'sonner';
 import { useMedia } from '@/context/MediaContext';
 import { useTMDBContext } from '@/context/TMDBContext';
 import type { TMDBMovie } from '@/server/tmdbCache';
@@ -538,9 +540,36 @@ function DownloadModal({ target, onClose }: { target: DownloadTarget; onClose: (
           streams: [{ infoHash: stream.url, magnet: `magnet:?xt=urn:btih:${stream.url}`, quality: stream.name, name: stream.name, size: '', seeds: '' }],
         }),
       });
+
+      if (res.status === 409) {
+        // Duplicate — already queued or downloading
+        const data = await res.json() as { jobId?: string; message?: string };
+        toast.custom(() => (
+          <div className="flex items-start gap-3 bg-card border border-yellow-500/30 rounded-xl px-4 py-3 shadow-xl max-w-sm">
+            <AlertCircle className="w-4 h-4 text-yellow-400 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-semibold text-foreground">Already in queue</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                <span className="font-medium text-foreground">{target.title}</span> is already being downloaded
+                {data.jobId ? ` (job ${data.jobId.slice(0, 8)}…)` : ''}.
+                Check the Downloads page.
+              </p>
+            </div>
+          </div>
+        ), { duration: 5000 });
+        onClose();
+        return;
+      }
+
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+      toast.success(`Download queued — ${target.title}`, {
+        description: stream.name,
+        duration: 4000,
+      });
       onClose();
-    } catch {
+    } catch (err) {
+      toast.error(`Download failed: ${String(err)}`);
       setDownloading(null);
     }
   };
