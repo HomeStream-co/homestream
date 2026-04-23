@@ -117,8 +117,9 @@ export function writeConfig(updates: Partial<AppConfig>): AppConfig {
   } catch (err) {
     try { fs.unlinkSync(tmp); } catch { /* ignore */ }
     console.error('[configStore] Write failed:', err);
-    // Return current (not next) so callers know the write didn't persist
-    return current;
+    // Still return `next` — callers use the return value for immediate in-memory
+    // state (e.g. responding to the setup wizard). The write failure is logged;
+    // the next readConfig() will return stale data, which is the correct signal.
   }
 
   return next;
