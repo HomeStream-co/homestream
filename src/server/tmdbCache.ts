@@ -382,20 +382,42 @@ export async function getTMDBData(forceRefresh = false): Promise<TMDBCacheEntry 
   // If we have the baked (or stale live) cache, serve it immediately and
   // kick off a background refresh so next request gets fresh data.
   if (cached) {
+    // If this is a forced refresh, wait for it synchronously so the caller
+    // gets fresh data immediately (e.g. user clicks "Refresh" in Settings).
+    if (forceRefresh) {
+      try {
+        const fresh = await fetchFresh();
+        writeCache(CACHE_KEY, fresh);
+        console.info('[tmdbCache] Force refresh succeeded');
+        return fresh;
+      } catch (err) {
+        console.warn('[tmdbCache] Force refresh failed — returning stale cache:', err);
+        return { ...cached, stale: true };
+      }
+    }
     // Background refresh — don't await, don't block the response
     fetchFresh()
-      .then(fresh => writeCache(CACHE_KEY, fresh))
-      .catch(err => console.warn('[tmdbCache] Background refresh failed:', err));
+      .then(fresh => {
+        writeCache(CACHE_KEY, fresh);
+        console.info('[tmdbCache] Background refresh succeeded — cache updated');
+      })
+      .catch(err => {
+        console.warn('[tmdbCache] Background refresh failed:', err);
+      });
     return cached;
   }
 
   // No cache at all — must fetch synchronously (first cold start)
   try {
+    console.info('[tmdbCache] Cold start — fetching fresh TMDB data...');
     const fresh = await fetchFresh();
     writeCache(CACHE_KEY, fresh);
+    console.info('[tmdbCache] Cold fetch succeeded');
     return fresh;
   } catch (err) {
-    console.warn('[tmdbCache] Cold fetch failed:', err);
+    const cfg = (await import('./configStore.js')).readConfig();
+    const hasKey = !!(cfg?.tmdbApiKey || process.env.TMDB_API_KEY);
+    console.warn(`[tmdbCache] Cold fetch failed (key configured: ${hasKey}):`, err);
     return { fetchedAt: 0, upcoming: [], trending: [], trendingShows: [], topRatedShows: [], popularShows: [], stale: true };
   }
 }
