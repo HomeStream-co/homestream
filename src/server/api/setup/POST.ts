@@ -153,7 +153,7 @@ export default async function handler(req: Request, res: Response) {
           const signal = AbortSignal.timeout(8_000);
 
           // Fetch status first (sequential so URL capture in tests is deterministic)
-          let statusResp: Response;
+          let statusResp: globalThis.Response;
           try {
             statusResp = await fetch(`${base}/api/v1/system/status`, { headers, signal });
           } catch (err) {
