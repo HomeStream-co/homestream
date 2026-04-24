@@ -1,17 +1,20 @@
 /**
- * GET /api/tmdb-proxy?url=<encoded-tmdb-cdn-url>
+ * GET /api/tmdb-proxy?url=<encoded-image-url>
  *
- * Server-side proxy for TMDB image CDN (image.tmdb.org).
+ * Server-side proxy for poster image CDNs.
  * Fetches the image server-side and streams it back, bypassing any
  * browser-level CORS or mixed-content restrictions.
  *
- * Only allows image.tmdb.org URLs — all other hosts are rejected.
+ * Allowed hosts:
+ *   - image.tmdb.org       — TMDB poster/backdrop CDN
+ *   - images.metahub.space — Cinemeta/Stremio poster CDN
+ *
  * No auth required (images are public).
  */
 import type { Request, Response } from 'express';
 import https from 'https';
 
-const ALLOWED_HOST = 'image.tmdb.org';
+const ALLOWED_HOSTS = new Set(['image.tmdb.org', 'images.metahub.space']);
 const TIMEOUT_MS = 10_000;
 
 export default function handler(req: Request, res: Response) {
@@ -30,8 +33,8 @@ export default function handler(req: Request, res: Response) {
     return;
   }
 
-  if (parsed.hostname !== ALLOWED_HOST) {
-    res.status(403).json({ error: 'Only image.tmdb.org URLs are allowed' });
+  if (!ALLOWED_HOSTS.has(parsed.hostname)) {
+    res.status(403).json({ error: `Host not allowed: ${parsed.hostname}` });
     return;
   }
 
