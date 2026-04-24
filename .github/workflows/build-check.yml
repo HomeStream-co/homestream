@@ -1,25 +1,19 @@
 # ── HomeStream Build Check Workflow ──────────────────────────────────────────
 #
-# Runs on every push to main/develop and on every pull request.
-# Also runs on version branches (v1.x) so pre-release work is validated.
-#
-# Catches TypeScript errors, lint errors, and build failures before they
-# reach a release tag.
+# Runs on pushes to version branches (v1.x, v2.x etc.) and on pull requests
+# to main/develop. ci.yml already covers main/develop pushes with a superset
+# of these checks (type-check + lint + test + build), so this workflow only
+# adds value for version branches and as a lightweight PR gate.
 #
 # Does NOT produce an installer — that's the release.yml job.
 # Runs on ubuntu-latest (faster + cheaper than windows-latest for checks).
-#
-# NOTE: ci.yml runs the same checks on feature/** and fix/** branches.
-# This workflow is the gate for main/develop/version branches specifically.
 
 name: Build Check
 
 on:
   push:
     branches:
-      - main
-      - develop
-      - 'v*'
+      - 'v*'          # version branches only — ci.yml covers main/develop
     paths-ignore:
       - '**.md'
       - 'docs/**'
