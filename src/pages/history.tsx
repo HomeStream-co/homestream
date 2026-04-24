@@ -217,7 +217,7 @@ export default function HistoryPage() {
                             />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center">
-                              {item.type === 'show'
+                              {item.type === 'series'
                                 ? <Tv className="w-5 h-5 text-muted-foreground/40" />
                                 : <Film className="w-5 h-5 text-muted-foreground/40" />
                               }

@@ -104,7 +104,10 @@ export default function ShowDownloadDialog({ open, onOpenChange, item, seasons }
             totalSeasons,
           }),
         });
-        if (!res.ok) throw new Error(await res.text());
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({})) as { message?: string; error?: string };
+          throw new Error(errData.message ?? errData.error ?? `Server error ${res.status}`);
+        }
         toast.success(`Queued all seasons of "${item.title}"`);
 
       } else if (mode === 'season') {
@@ -122,7 +125,10 @@ export default function ShowDownloadDialog({ open, onOpenChange, item, seasons }
             totalSeasons,
           }),
         });
-        if (!res.ok) throw new Error(await res.text());
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({})) as { message?: string; error?: string };
+          throw new Error(errData.message ?? errData.error ?? `Server error ${res.status}`);
+        }
         toast.success(`Queued Season ${selectedSeason} of "${item.title}"`);
 
       } else {
@@ -140,8 +146,8 @@ export default function ShowDownloadDialog({ open, onOpenChange, item, seasons }
 
         // Fire all in parallel (server handles VPN + queueing)
         const results = await Promise.allSettled(
-          tasks.map(({ season, episode }) =>
-            fetch('/api/stremio/download', {
+          tasks.map(async ({ season, episode }) => {
+            const res = await fetch('/api/stremio/download', {
               method: 'POST',
               credentials: 'include',
               headers: { 'Content-Type': 'application/json' },
@@ -154,8 +160,13 @@ export default function ShowDownloadDialog({ open, onOpenChange, item, seasons }
                 episode,
                 totalSeasons,
               }),
-            })
-          )
+            });
+            if (!res.ok) {
+              const errData = await res.json().catch(() => ({})) as { message?: string; error?: string };
+              throw new Error(errData.message ?? errData.error ?? `Server error ${res.status}`);
+            }
+            return res;
+          })
         );
 
         const failed = results.filter(r => r.status === 'rejected').length;
