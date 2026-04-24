@@ -338,12 +338,12 @@ function TvNotConnected({ serverIP }: { serverIP: string }) {
           </div>
         ) : (
           <div className="mt-4 bg-black/40 rounded-xl px-6 py-4 font-mono text-lg text-white/60 text-center">
-            http://[your-server-ip]:3000/tv
+            http://hs.local:3000/tv
           </div>
         )}
       </div>
       <p className="text-white/30 text-sm">
-        Find your server IP in HomeStream Settings → Network
+        Try <span className="font-mono text-white/50">http://hs.local:3000/tv</span> or find your server IP in HomeStream Settings → Network
       </p>
     </div>
   );
@@ -366,9 +366,11 @@ export default function TvPage() {
 
     fetch('/api/network/info')
       .then(r => r.json())
-      .then((d: { lanIP?: string; port?: string }) => {
-        if (d.lanIP && d.lanIP !== 'localhost') {
-          setServerIP(`http://${d.lanIP}:${d.port ?? '3000'}/tv`);
+      .then((d: { mdnsHostname?: string; primary?: string; lanIP?: string; port?: string | number }) => {
+        // Prefer hs.local — works on all modern devices without typing an IP
+        const host = d.mdnsHostname || d.primary || d.lanIP;
+        if (host && host !== 'localhost' && host !== '127.0.0.1') {
+          setServerIP(`http://${host}:${d.port ?? '3000'}/tv`);
         }
       })
       .catch(() => {});

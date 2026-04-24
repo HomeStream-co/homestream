@@ -201,9 +201,11 @@ export default function RemotePage() {
 
     fetch('/api/network/info')
       .then(r => r.json())
-      .then((d: { lanIP?: string; port?: string }) => {
-        if (d.lanIP && d.lanIP !== 'localhost') {
-          setServerIP(`http://${d.lanIP}:${d.port ?? '3000'}/remote`);
+      .then((d: { mdnsHostname?: string; primary?: string; lanIP?: string; port?: string | number }) => {
+        // Prefer hs.local — works on all modern devices without typing an IP
+        const host = d.mdnsHostname || d.primary || d.lanIP;
+        if (host && host !== 'localhost' && host !== '127.0.0.1') {
+          setServerIP(`http://${host}:${d.port ?? '3000'}/remote`);
         }
       })
       .catch(() => {});
