@@ -159,6 +159,7 @@ export default function ShowPage() {
       setSubDialogOpen(false);
     } catch {
       setSubStatus('idle');
+      toast.error('Failed to subscribe — check your connection and try again');
     }
   };
 

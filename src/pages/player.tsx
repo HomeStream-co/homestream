@@ -401,7 +401,8 @@ export default function PlayerPage() {
     try {
       if (document.pictureInPictureElement) await document.exitPictureInPicture();
       else await video.requestPictureInPicture();
-    } catch { /* not supported */ }
+    } catch { // non-fatal — ignore (PiP not supported in this browser/context)
+    }
   }, [ps.videoRef]);
 
   // ── Seek hover thumbnail ──────────────────────────────────────────────────
