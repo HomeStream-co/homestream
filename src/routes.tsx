@@ -45,7 +45,6 @@ function route(element: React.ReactNode, name: string): React.ReactNode {
 
 export const routes: RouteObject[] = [
   { path: '/', element: <HomePage /> },
-  { path: '/browse', element: <HomePage /> },
   { path: '/movies', element: route(<MoviesPage />, 'Movies') },
   { path: '/movie/:id', element: route(<MoviePage />, 'Movie') },
   { path: '/library', element: route(<LibraryPage />, 'Library') },
