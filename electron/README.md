@@ -122,7 +122,7 @@ when to download and install.
 GitHub repo is configured in `electron-builder.yml`:
 ```yaml
 publish:
-  owner: trevorrossworn-code
+  owner: HomeStream-co
   repo: homestream
 ```
 

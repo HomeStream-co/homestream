@@ -123,14 +123,15 @@ jobs:
           if-no-files-found: warn
 
       # Portable — NO auto-updater support. For smoke testing only.
+      # Only runs if NSIS succeeded — avoids burning windows-latest minutes on a broken build.
       - name: Package portable .exe
-        if: always()
+        if: success()
         run: npx electron-builder --win --config electron/electron-builder.yml --config.win.target=portable --publish never
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
 
       - name: Upload portable artifact
-        if: always()
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: HomeStream-Portable-${{ github.ref_name }}
