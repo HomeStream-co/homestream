@@ -23,7 +23,7 @@ export default function StepFinish({
   const navigate = useNavigate();
 
   // ── QR code for phone remote ───────────────────────────────────────────────
-  const [qrData, setQrData] = useState<{ url: string; qr: string; lanIP?: string; port?: string } | null>(null);
+  const [qrData, setQrData] = useState<{ url: string; qr: string; lanIP?: string; mdnsUrl?: string; ipUrl?: string; port?: string } | null>(null);
   const [qrError, setQrError] = useState(false);
   const [copied, setCopied] = useState(false);
 
@@ -36,9 +36,9 @@ export default function StepFinish({
     function tryFetch() {
       fetch('/api/remote/qr')
         .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
-        .then((d: { url?: string; qr?: string; lanIP?: string; port?: string }) => {
+        .then((d: { url?: string; qr?: string; lanIP?: string; mdnsUrl?: string; ipUrl?: string; port?: string }) => {
           if (cancelled) return;
-          if (d?.url && d?.qr) setQrData({ url: d.url, qr: d.qr, lanIP: d.lanIP, port: d.port });
+          if (d?.url && d?.qr) setQrData({ url: d.url, qr: d.qr, lanIP: d.lanIP, mdnsUrl: d.mdnsUrl, ipUrl: d.ipUrl, port: d.port });
           else setQrError(true);
         })
         .catch(() => {

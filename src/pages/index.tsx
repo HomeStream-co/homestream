@@ -58,19 +58,22 @@ function isLocalhostIP(ip: string): boolean {
 }
 
 function RemoteQRWidget() {
-  const [data, setData] = useState<{ url: string; qr: string; lanIP?: string; port?: string } | null>(null);
+  const [data, setData] = useState<{ url: string; qr: string; lanIP?: string; mdnsUrl?: string; ipUrl?: string; port?: string } | null>(null);
   const [qrError, setQrError] = useState(false);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
   const [copiedIP, setCopiedIP] = useState(false);
 
-  const lanIP     = data?.lanIP ?? window.location.hostname;
+  // Prefer hs.local for display; fall back to raw IP
+  const displayAddress = data?.mdnsUrl
+    ? data.mdnsUrl.replace(/^https?:\/\//, '').replace(/\/remote$/, '')
+    : (data?.lanIP ?? window.location.hostname);
   const port      = data?.port  ?? '3000';
-  const remoteUrl = data?.url   ?? `http://${lanIP}:${port}/remote`;
+  const remoteUrl = data?.url   ?? `http://${displayAddress}:${port}/remote`;
 
   // True when the server returned localhost — QR would be useless on a phone
-  const isLocalhost = isLocalhostIP(lanIP);
+  const isLocalhost = isLocalhostIP(data?.lanIP ?? window.location.hostname);
 
   function copyUrl() {
     navigator.clipboard.writeText(remoteUrl).then(() => {
@@ -80,7 +83,7 @@ function RemoteQRWidget() {
   }
 
   function copyIP() {
-    navigator.clipboard.writeText(lanIP).then(() => {
+    navigator.clipboard.writeText(displayAddress).then(() => {
       setCopiedIP(true);
       setTimeout(() => setCopiedIP(false), 2000);
     }).catch(() => {});
@@ -90,9 +93,9 @@ function RemoteQRWidget() {
     setLoading(true);
     fetch('/api/remote/qr?format=svg')
       .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
-      .then((d: { url?: string; qr?: string; lanIP?: string; port?: string }) => {
+      .then((d: { url?: string; qr?: string; lanIP?: string; mdnsUrl?: string; ipUrl?: string; port?: string }) => {
         if (d?.url && d?.qr) {
-          setData({ url: d.url, qr: d.qr, lanIP: d.lanIP, port: d.port });
+          setData({ url: d.url, qr: d.qr, lanIP: d.lanIP, mdnsUrl: d.mdnsUrl, ipUrl: d.ipUrl, port: d.port });
         } else {
           setQrError(true);
         }
@@ -155,21 +158,27 @@ function RemoteQRWidget() {
               </div>
             )}
 
-            {/* LAN IP — big and easy to read for TV/phone typing */}
+            {/* Address — hs.local preferred, big and easy to read */}
             {!loading && (
               <div className="w-full rounded-xl border border-border bg-muted/50 px-3 py-2.5">
                 <p className="text-[10px] text-muted-foreground mb-1 uppercase tracking-wider font-medium">Server address</p>
                 <div className="flex items-center gap-2">
                   <code className={`flex-1 text-sm font-mono font-bold tracking-wide ${isLocalhost ? 'text-muted-foreground' : 'text-foreground'}`}>
-                    {isLocalhost ? 'Not on LAN' : lanIP}
+                    {isLocalhost ? 'Not on LAN' : displayAddress}
                   </code>
                   {!isLocalhost && (
-                    <button onClick={copyIP} title="Copy IP" className="text-muted-foreground hover:text-foreground transition-colors flex-shrink-0">
+                    <button onClick={copyIP} title="Copy address" className="text-muted-foreground hover:text-foreground transition-colors flex-shrink-0">
                       {copiedIP ? <Check className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
                     </button>
                   )}
                 </div>
                 <p className="text-[10px] text-muted-foreground mt-0.5">Port: {port}</p>
+                {/* Show raw IP as fallback hint if hs.local is primary */}
+                {!isLocalhost && data?.ipUrl && data.mdnsUrl && (
+                  <p className="text-[9px] text-muted-foreground/60 mt-1 font-mono">
+                    Fallback: {data.ipUrl.replace(/^https?:\/\//, '').replace(/\/remote$/, '')}
+                  </p>
+                )}
               </div>
             )}
 

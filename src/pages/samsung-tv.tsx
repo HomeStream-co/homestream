@@ -27,6 +27,7 @@ interface NetworkInfo {
   lanIPs: string[];
   primary: string;
   port: number;
+  mdnsHostname?: string;   // e.g. "hs.local"
 }
 
 type GuideSection = 'overview' | 'browser' | 'navigate' | 'bookmark' | 'remote' | 'tips';
@@ -124,9 +125,10 @@ const SECTIONS: { id: GuideSection; label: string; icon: React.ElementType; shor
 // ── Section content components ─────────────────────────────────────────────────
 
 function OverviewSection({ networkInfo, netLoading }: { networkInfo: NetworkInfo | null; netLoading: boolean }) {
-  const url = networkInfo
-    ? `http://${networkInfo.primary}:${networkInfo.port}`
-    : 'http://192.168.1.100:3000';
+  const host = networkInfo?.mdnsHostname || networkInfo?.primary;
+  const url = host
+    ? `http://${host}:${networkInfo!.port}`
+    : 'http://hs.local:3000';
 
   return (
     <div className="space-y-6">
@@ -149,7 +151,7 @@ function OverviewSection({ networkInfo, netLoading }: { networkInfo: NetworkInfo
             'Samsung Smart TV (2016 or newer — Tizen OS)',
             'TV and HomeStream server on the same WiFi network',
             'HomeStream running and accessible from your PC',
-            'Your HomeStream local IP address (shown below)',
+            'Your HomeStream address — hs.local (shown below)',
           ].map((item, i) => (
             <li key={i} className="flex items-start gap-2.5 text-sm text-foreground/80">
               <Check className="w-4 h-4 text-green-400 mt-0.5 flex-shrink-0" />
@@ -168,7 +170,7 @@ function OverviewSection({ networkInfo, netLoading }: { networkInfo: NetworkInfo
         {netLoading ? (
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <RefreshCw className="w-4 h-4 animate-spin" />
-            Detecting your local IP…
+            Detecting your address…
           </div>
         ) : (
           <>
@@ -176,9 +178,9 @@ function OverviewSection({ networkInfo, netLoading }: { networkInfo: NetworkInfo
               Type this address into your Samsung TV browser:
             </p>
             <CodeBlock code={url} />
-            {networkInfo && networkInfo.lanIPs.length > 1 && (
+            {networkInfo && networkInfo.lanIPs.length > 0 && (
               <p className="text-xs text-muted-foreground">
-                Other IPs on this machine: {networkInfo.lanIPs.filter(ip => ip !== networkInfo.primary).join(', ')}
+                Fallback IP (if hs.local doesn't work): {networkInfo.primary}
               </p>
             )}
           </>
@@ -308,9 +310,10 @@ function BrowserSection() {
 }
 
 function NavigateSection({ networkInfo, netLoading }: { networkInfo: NetworkInfo | null; netLoading: boolean }) {
-  const url = networkInfo
-    ? `http://${networkInfo.primary}:${networkInfo.port}`
-    : 'http://192.168.1.100:3000';
+  const host = networkInfo?.mdnsHostname || networkInfo?.primary;
+  const url = host
+    ? `http://${host}:${networkInfo!.port}`
+    : 'http://hs.local:3000';
 
   return (
     <div className="space-y-6">
@@ -407,9 +410,10 @@ function NavigateSection({ networkInfo, netLoading }: { networkInfo: NetworkInfo
 }
 
 function BookmarkSection({ networkInfo }: { networkInfo: NetworkInfo | null }) {
-  const url = networkInfo
-    ? `http://${networkInfo.primary}:${networkInfo.port}`
-    : 'http://192.168.1.100:3000';
+  const host = networkInfo?.mdnsHostname || networkInfo?.primary;
+  const url = host
+    ? `http://${host}:${networkInfo!.port}`
+    : 'http://hs.local:3000';
 
   return (
     <div className="space-y-6">
@@ -587,7 +591,7 @@ function RemoteSection() {
         </ul>
         <div className="pt-1 text-xs text-muted-foreground">
           Scan the QR code on the HomeStream home page, or open{' '}
-          <span className="text-primary font-mono">http://[your-ip]:3000/remote</span> on your phone.
+          <span className="text-primary font-mono">http://hs.local:3000/remote</span> on your phone.
         </div>
       </div>
 
@@ -615,11 +619,11 @@ function TipsSection() {
           problem: 'Page won\'t load / "Connection refused"',
           solutions: [
             'Make sure HomeStream is running on your PC (check the system tray icon)',
-            'Verify the IP address — your PC\'s IP may have changed. Check Settings → Network on your PC',
+            'Verify the address — try hs.local first, then the raw IP from Settings → Network',
             'Confirm both TV and PC are on the same WiFi network (not guest vs. main)',
-            'Try pinging the IP from another device on the network',
+            'Try pinging hs.local from another device on the network',
             'Check Windows Firewall — allow HomeStream through on port 3000',
-            'Norton VPN users: Norton\'s Smart Firewall can block LAN traffic when the VPN is active. Open Norton → Settings → Firewall → Traffic Rules and add an Allow rule for 192.168.0.0/24 (your local network). Your HomeStream IP never changes when the VPN is on — only your public internet IP changes.',
+            'Norton VPN users: Norton\'s Smart Firewall can block LAN traffic when the VPN is active. Open Norton → Settings → Firewall → Traffic Rules and add an Allow rule for 192.168.0.0/24 (your local network). Your HomeStream address (hs.local) always resolves correctly on the LAN — only your public internet IP changes.',
           ],
           severity: 'warning' as const,
         },
@@ -699,9 +703,9 @@ function TipsSection() {
         <p className="text-sm text-muted-foreground leading-relaxed">
           Norton's Smart Firewall can block local network (LAN) traffic when the VPN is active,
           preventing your TV from reaching HomeStream even though the server is running fine.
-          Your HomeStream IP address (<strong className="text-foreground">192.168.0.20</strong>) never
-          changes when Norton VPN is on — only your public internet IP changes. The fix is to whitelist
-          your local network in Norton's firewall:
+          Your HomeStream address (<strong className="text-foreground">hs.local</strong>) always
+          resolves correctly on the LAN — only your public internet IP changes when Norton VPN is on.
+          The fix is to whitelist your local network in Norton's firewall:
         </p>
         <ol className="space-y-2 text-sm text-foreground/80">
           {[
@@ -770,7 +774,7 @@ export default function SamsungTvPage() {
     fetch('/api/network/info')
       .then(r => r.ok ? r.json() as Promise<NetworkInfo> : Promise.reject())
       .then(info => setNetworkInfo(info))
-      .catch(() => setNetworkInfo({ hostname: 'homestream', lanIPs: [], primary: '192.168.1.100', port: 3000 }))
+      .catch(() => setNetworkInfo({ hostname: 'homestream', lanIPs: [], primary: 'hs.local', port: 3000, mdnsHostname: 'hs.local' }))
       .finally(() => setNetLoading(false));
   }, []);
 
