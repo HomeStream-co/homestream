@@ -59,7 +59,7 @@ function OfflineMetadataNotice({ mediaId, currentTitle, onSaved }: OfflineMetada
       } else {
         toast.error(data.message || 'Still offline — try again when connected');
       }
-    } catch {
+    } catch { // non-fatal — network error, toast shown to user
       toast.error('Could not reach server');
     } finally {
       setRetrying(false);
@@ -87,7 +87,7 @@ function OfflineMetadataNotice({ mediaId, currentTitle, onSaved }: OfflineMetada
       });
       onSaved((body.title as string));
       setEditing(false);
-    } catch {
+    } catch { // non-fatal — network error, toast shown to user
       toast.error('Failed to save metadata');
     } finally {
       setSaving(false);
@@ -432,7 +432,7 @@ export default function LibraryPage() {
         });
         refreshLibrary();
       }
-    } catch {
+    } catch { // non-fatal — caption upload failed, UI shows ccStatus:'failed'
       setUploading(prev => prev.map(u =>
         u.id === uiId ? { ...u, ccStatus: 'failed' } : u
       ));
@@ -558,7 +558,7 @@ export default function LibraryPage() {
             try {
               const err = JSON.parse(xhr.responseText);
               reject(new Error(err.error || 'Upload failed'));
-            } catch {
+            } catch { // non-fatal — JSON parse failed, fall through to generic error
               reject(new Error(`Upload failed (${xhr.status})`));
             }
           }

@@ -194,7 +194,7 @@ export default function CastButton({ streamUrl, hlsUrl, title, className = '' }:
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      // Fallback: select text
+      // non-fatal — ignore (clipboard API not available in this context; user can copy manually)
     }
   };
 

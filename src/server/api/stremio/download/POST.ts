@@ -151,7 +151,7 @@ async function fetchTorrentio(
           source: 'torrentio' as const,
         };
       });
-  } catch {
+  } catch { // non-fatal — Torrentio unreachable or returned bad data; caller falls back to other sources
     clearTimeout(t);
     return [];
   }
@@ -191,7 +191,7 @@ async function fetchProwlarr(
         } satisfies StreamResult;
       });
     return mapped.filter((r): r is StreamResult => r !== null);
-  } catch {
+  } catch { // non-fatal — Prowlarr unreachable or returned bad data; caller falls back to other sources
     clearTimeout(t);
     return [];
   }
@@ -218,7 +218,7 @@ async function fetchNyaa(query: string): Promise<StreamResult[]> {
         magnet: i.magnet,
         source: 'nyaa' as const,
       }));
-  } catch {
+  } catch { // non-fatal — Nyaa unreachable or returned bad data; caller falls back to other sources
     clearTimeout(t);
     return [];
   }
