@@ -1,0 +1,223 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* HomeStream — Forest Green (default; overridden at runtime by ThemeContext) */
+    --background: 0 0% 3%;
+    --foreground: 140 8% 94%;
+    --card: 140 10% 6%;
+    --card-foreground: 140 8% 94%;
+    --popover: 140 10% 6%;
+    --popover-foreground: 140 8% 94%;
+    --primary: 145 60% 22%;
+    --primary-foreground: 140 8% 94%;
+    --secondary: 140 8% 11%;
+    --secondary-foreground: 140 8% 94%;
+    --muted: 140 8% 11%;
+    --muted-foreground: 140 5% 48%;
+    --accent: 145 45% 30%;
+    --accent-foreground: 140 8% 94%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 140 8% 14%;
+    --input: 140 8% 14%;
+    --ring: 145 60% 22%;
+
+    /* Extended Colors */
+    --chart-1: 0 86% 47%;
+    --chart-2: 45 100% 54%;
+    --chart-3: 220 70% 50%;
+    --chart-4: 160 60% 45%;
+    --chart-5: 280 65% 60%;
+
+    /* Sidebar Colors */
+    --sidebar: 140 10% 6%;
+    --sidebar-foreground: 140 8% 94%;
+    --sidebar-primary: 145 60% 22%;
+    --sidebar-primary-foreground: 140 8% 94%;
+    --sidebar-accent: 140 8% 11%;
+    --sidebar-accent-foreground: 140 8% 94%;
+    --sidebar-border: 140 8% 14%;
+    --sidebar-ring: 145 60% 22%;
+
+    /* Typography */
+    --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    --font-heading: "Bebas Neue", "Inter", sans-serif;
+    --font-serif: ui-serif, Georgia, "Times New Roman", serif;
+    --font-mono: ui-monospace, "SF Mono", Monaco, "Cascadia Code", "Roboto Mono", Consolas, "Courier New", monospace;
+
+    /* Border Radius */
+    --radius: 0.5rem;
+
+    /* Cinematic Shadows */
+    --shadow-2xs: 0 1px 3px 0px hsl(0 0% 0% / 0.12);
+    --shadow-xs:  0 1px 4px 0px hsl(0 0% 0% / 0.18);
+    --shadow-sm:  0 2px 8px -1px hsl(0 0% 0% / 0.28);
+    --shadow:     0 4px 16px -2px hsl(0 0% 0% / 0.36);
+    --shadow-md:  0 8px 24px -4px hsl(0 0% 0% / 0.44);
+    --shadow-lg:  0 16px 40px -6px hsl(0 0% 0% / 0.52);
+    --shadow-xl:  0 24px 56px -8px hsl(0 0% 0% / 0.60);
+    --shadow-2xl: 0 32px 72px -10px hsl(0 0% 0% / 0.70);
+
+    /* Glow — uses primary color */
+    --glow-primary: 0 0 24px hsl(var(--primary) / 0.35), 0 0 48px hsl(var(--primary) / 0.15);
+    --glow-primary-sm: 0 0 12px hsl(var(--primary) / 0.40);
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-heading) !important;
+  }
+
+  /* Cinematic scrollbar — thin, themed */
+  ::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: hsl(var(--border));
+    border-radius: 99px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground) / 0.5);
+  }
+
+  /* Selection */
+  ::selection {
+    background: hsl(var(--primary) / 0.35);
+    color: hsl(var(--foreground));
+  }
+}
+
+/* ── Custom utility classes ─────────────────────────────────────────────────── */
+@layer utilities {
+  /* Hide scrollbar but keep scroll functionality */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Glass morphism */
+  .glass {
+    background: hsl(var(--card) / 0.72);
+    backdrop-filter: blur(20px) saturate(1.4);
+    -webkit-backdrop-filter: blur(20px) saturate(1.4);
+    border: 1px solid hsl(var(--border) / 0.6);
+  }
+
+  .glass-dark {
+    background: hsl(0 0% 0% / 0.55);
+    backdrop-filter: blur(24px) saturate(1.2);
+    -webkit-backdrop-filter: blur(24px) saturate(1.2);
+    border: 1px solid hsl(var(--border) / 0.4);
+  }
+
+  /* Cinematic text gradient */
+  .text-gradient {
+    background: linear-gradient(135deg, hsl(var(--foreground)), hsl(var(--foreground) / 0.7));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .text-gradient-primary {
+    background: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--accent)));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* Glow utilities */
+  .glow-primary {
+    box-shadow: var(--glow-primary);
+  }
+  .glow-primary-sm {
+    box-shadow: var(--glow-primary-sm);
+  }
+
+  /* Poster aspect ratio */
+  .aspect-poster {
+    aspect-ratio: 2 / 3;
+  }
+
+  /* Cinematic fade-in animations */
+  .animate-in {
+    animation-duration: 0.25s;
+    animation-fill-mode: both;
+  }
+  .fade-in {
+    animation-name: fadeIn;
+  }
+  .slide-up {
+    animation-name: slideUp;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Shimmer skeleton */
+  .shimmer {
+    background: linear-gradient(
+      90deg,
+      hsl(var(--muted)) 0%,
+      hsl(var(--muted-foreground) / 0.12) 50%,
+      hsl(var(--muted)) 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.6s ease-in-out infinite;
+  }
+
+  @keyframes shimmer {
+    0%   { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+
+  /* Line clamp utilities */
+  .line-clamp-1 { overflow: hidden; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; }
+  .line-clamp-2 { overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .line-clamp-3 { overflow: hidden; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; }
+  .line-clamp-4 { overflow: hidden; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; }
+}
+
+/* ── Global layout ──────────────────────────────────────────────────────────── */
+html {
+  scroll-behavior: smooth;
+}
+
+html, body {
+  width: 100%;
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
+}
+
+#app {
+  width: 100%;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}

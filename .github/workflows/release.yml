@@ -1,0 +1,159 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release-windows:
+    name: Build & Publish Windows Installer
+    runs-on: windows-latest
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # Windows-specific cache key — never restores a Linux cache onto Windows
+      - name: Cache node_modules
+        id: cache-node-modules
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: Windows-node22-modules-${{ hashFiles('package-lock.json') }}
+
+      # Do NOT use --ignore-scripts here — ffmpeg-static's postinstall script
+      # downloads the platform-specific FFmpeg binary (ffmpeg.exe on Windows).
+      # Without it, node_modules/ffmpeg-static/ffmpeg.exe is never created and
+      # the packaged app ships with no FFmpeg, breaking transcoding and HLS.
+      # npmRebuild: false in electron-builder.yml already prevents native addon
+      # recompilation, so --ignore-scripts is not needed for that purpose.
+      - name: Install dependencies
+        if: steps.cache-node-modules.outputs.cache-hit != 'true'
+        run: npm ci
+        env:
+          npm_config_optional: true
+
+      # Delete any existing GitHub Release for this tag so electron-builder
+      # can create it fresh. Uses PowerShell — native on windows-latest.
+      - name: Delete existing GitHub Release (if any)
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: |
+          $tag = "${{ github.ref_name }}"
+          $headers = @{ Authorization = "token $env:GH_TOKEN"; Accept = "application/vnd.github+json" }
+          $uri = "https://api.github.com/repos/${{ github.repository }}/releases/tags/$tag"
+          try {
+            $release = Invoke-RestMethod -Uri $uri -Headers $headers -ErrorAction Stop
+            $id = $release.id
+            if ($id) {
+              Write-Host "Deleting existing release id=$id for tag $tag"
+              Invoke-RestMethod -Method Delete -Uri "https://api.github.com/repos/${{ github.repository }}/releases/$id" -Headers $headers
+              Write-Host "Deleted."
+            }
+          } catch {
+            Write-Host "No existing release found for $tag — proceeding"
+          }
+
+      - name: Build app (Vite + server bundle)
+        run: npm run build
+        env:
+          CI: true
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+
+      - name: Verify build artifacts
+        shell: pwsh
+        run: |
+          if (!(Test-Path "dist/server.bundle.cjs")) {
+            Write-Error "dist/server.bundle.cjs MISSING"
+            exit 1
+          }
+          if (!(Test-Path "dist/client/index.html")) {
+            Write-Error "dist/client/index.html MISSING"
+            exit 1
+          }
+          $size = [math]::Round((Get-Item "dist/server.bundle.cjs").Length / 1MB, 1)
+          Write-Host "server.bundle.cjs: $size MB"
+          # Verify ffmpeg-static downloaded the Windows binary
+          if (Test-Path "node_modules/ffmpeg-static/ffmpeg.exe") {
+            $ffSize = [math]::Round((Get-Item "node_modules/ffmpeg-static/ffmpeg.exe").Length / 1MB, 1)
+            Write-Host "ffmpeg-static/ffmpeg.exe: $ffSize MB — OK"
+          } else {
+            Write-Warning "ffmpeg-static/ffmpeg.exe NOT FOUND — transcoding will be broken in packaged app"
+          }
+          Write-Host "Build artifacts verified."
+
+      # Patch package.json so updater.cjs can read pkg.build.ghToken at runtime.
+      # electron-builder --extraMetadata.X CLI flag is not supported in this version.
+      - name: Inject build metadata into package.json
+        shell: pwsh
+        run: |
+          $pkg = Get-Content package.json -Raw | ConvertFrom-Json
+          if (-not $pkg.PSObject.Properties['build']) {
+            $pkg | Add-Member -NotePropertyName build -NotePropertyValue ([PSCustomObject]@{})
+          }
+          $pkg.build | Add-Member -NotePropertyName ghToken -NotePropertyValue "${{ secrets.GH_TOKEN }}" -Force
+          $pkg.build | Add-Member -NotePropertyName ghOwner -NotePropertyValue "HomeStream-co" -Force
+          $pkg.build | Add-Member -NotePropertyName ghRepo  -NotePropertyValue "homestream" -Force
+          $pkg | ConvertTo-Json -Depth 10 | Set-Content package.json
+          Write-Host "package.json patched with build metadata"
+
+      # NSIS installer — the only build that supports auto-updater.
+      # Publishes latest.yml + HomeStream-Setup-*.exe to the GitHub Release.
+      - name: Package & publish NSIS installer
+        run: npx electron-builder --win --config electron/electron-builder.yml --config.win.target=nsis --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          DEBUG: electron-builder
+
+      - name: Upload NSIS installer artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: HomeStream-Windows-Installer-${{ github.ref_name }}
+          path: |
+            dist-electron/*Setup*.exe
+            dist-electron/*.yml
+          retention-days: 30
+          if-no-files-found: warn
+
+      # Portable — NO auto-updater support. For smoke testing only.
+      # Only runs if NSIS succeeded — avoids burning windows-latest minutes on a broken build.
+      - name: Package portable .exe
+        if: success()
+        run: npx electron-builder --win --config electron/electron-builder.yml --config.win.target=portable --publish never
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+
+      - name: Upload portable artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: HomeStream-Portable-${{ github.ref_name }}
+          path: dist-electron/*Portable*.exe
+          retention-days: 14
+          if-no-files-found: warn
+
+      # electron-builder sometimes leaves the release as a draft even with
+      # releaseType: release. Explicitly un-draft and mark as latest so
+      # electron-updater's latest.yml points at the correct release.
+      - name: Publish release (un-draft + mark latest)
+        if: success()
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: |
+          $tag = "${{ github.ref_name }}"
+          $headers = @{ Authorization = "token $env:GH_TOKEN"; Accept = "application/vnd.github+json"; "Content-Type" = "application/json" }
+          $uri = "https://api.github.com/repos/${{ github.repository }}/releases/tags/$tag"
+          $release = Invoke-RestMethod -Uri $uri -Headers $headers
+          $id = $release.id
+          Write-Host "Un-drafting release id=$id tag=$tag"
+          $body = '{"draft":false,"prerelease":false,"make_latest":"true"}'
+          Invoke-RestMethod -Method Patch -Uri "https://api.github.com/repos/${{ github.repository }}/releases/$id" -Headers $headers -Body $body
+          Write-Host "Release $tag is now published and marked as latest."

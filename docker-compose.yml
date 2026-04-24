@@ -1,0 +1,157 @@
+version: "3.9"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# HomeStream — Self-Hosted Media Server Stack
+#
+# Services:
+#   homestream   — The HomeStream app (port 3000)
+#   qbittorrent  — Download engine with Web UI (port 8080)
+#   jellyfin     — Media playback server for all devices (port 8096)
+#
+# Quick start:
+#   1. Copy .env.example to .env and fill in your values
+#   2. docker compose up -d
+#   3. Open http://localhost:3000 — HomeStream setup wizard will guide you
+#   4. Open http://localhost:8096 — Jellyfin first-run setup
+#
+# RAID / NAS users:
+#   Set MEDIA_DIR in .env to your RAID mount point, e.g. /mnt/raid/media
+#   All three services share the same /media volume so files move instantly
+#   (no copying across filesystems).
+# ═══════════════════════════════════════════════════════════════════════════════
+
+services:
+
+  # ── HomeStream ──────────────────────────────────────────────────────────────
+  homestream:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: homestream
+    restart: unless-stopped
+    ports:
+      - "${HOMESTREAM_PORT:-3000}:3000"
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      # Data directory — must match the VOLUME path in Dockerfile
+      HOMESTREAM_DATA: /app/homestream-data
+      # API keys (optional — app works without them)
+      GOOGLE_AI_API_KEY: ${GOOGLE_AI_API_KEY:-}
+      OMDB_API_KEY: ${OMDB_API_KEY:-}
+      # qBittorrent connection (HomeStream sends magnets here)
+      QBIT_URL: http://qbittorrent:8080
+      QBIT_USERNAME: ${QBIT_USERNAME:-admin}
+      QBIT_PASSWORD: ${QBIT_PASSWORD:-homestream}
+      # Jellyfin connection (for library sync)
+      JELLYFIN_URL: http://jellyfin:8096
+      JELLYFIN_API_KEY: ${JELLYFIN_API_KEY:-}
+      # Admin password for HomeStream itself
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-changeme}
+      # Setup flag — set to "true" after wizard completes
+      SETUP_COMPLETE: ${SETUP_COMPLETE:-false}
+    volumes:
+      # Persistent app data (library JSON, captions, config) — matches HOMESTREAM_DATA
+      - homestream_data:/app/homestream-data
+      # Shared media folder — HomeStream reads/writes here
+      - ${MEDIA_DIR:-./media}:/media
+      # Uploads staging area (in-progress transcodes)
+      - homestream_uploads:/app/uploads
+    depends_on:
+      - qbittorrent
+    networks:
+      - medianet
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+
+  # ── qBittorrent ─────────────────────────────────────────────────────────────
+  qbittorrent:
+    image: lscr.io/linuxserver/qbittorrent:latest
+    container_name: qbittorrent
+    restart: unless-stopped
+    environment:
+      PUID: ${PUID:-1000}
+      PGID: ${PGID:-1000}
+      TZ: ${TZ:-America/New_York}
+      WEBUI_PORT: 8080
+    ports:
+      - "${QBIT_WEBUI_PORT:-8080}:8080"
+      - "${QBIT_TORRENT_PORT:-6881}:6881"
+      - "${QBIT_TORRENT_PORT:-6881}:6881/udp"
+    volumes:
+      # qBittorrent config and state
+      - qbittorrent_config:/config
+      # Downloads land here — HomeStream watches this folder
+      - ${MEDIA_DIR:-./media}/downloads:/downloads
+    networks:
+      - medianet
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # ── Jellyfin ─────────────────────────────────────────────────────────────────
+  jellyfin:
+    image: jellyfin/jellyfin:latest
+    container_name: jellyfin
+    restart: unless-stopped
+    ports:
+      - "${JELLYFIN_PORT:-8096}:8096"
+      # HTTPS (optional)
+      - "${JELLYFIN_HTTPS_PORT:-8920}:8920"
+      # Local network discovery (optional — comment out if not needed)
+      - "7359:7359/udp"
+      - "1900:1900/udp"
+    environment:
+      TZ: ${TZ:-America/New_York}
+      JELLYFIN_PublishedServerUrl: ${JELLYFIN_PUBLIC_URL:-http://localhost:8096}
+    volumes:
+      # Jellyfin config, metadata cache, transcoding temp
+      - jellyfin_config:/config
+      - jellyfin_cache:/cache
+      # Jellyfin reads your finished library here
+      - ${MEDIA_DIR:-./media}/library:/media/library:ro
+    networks:
+      - medianet
+    # GPU hardware transcoding (uncomment for your GPU type):
+    #
+    # NVIDIA:
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+    #
+    # Intel QuickSync / AMD VAAPI:
+    # devices:
+    #   - /dev/dri:/dev/dri
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8096/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+# ── Volumes ───────────────────────────────────────────────────────────────────
+volumes:
+  homestream_data:
+    driver: local
+  homestream_uploads:
+    driver: local
+  qbittorrent_config:
+    driver: local
+  jellyfin_config:
+    driver: local
+  jellyfin_cache:
+    driver: local
+
+# ── Network ───────────────────────────────────────────────────────────────────
+networks:
+  medianet:
+    driver: bridge
