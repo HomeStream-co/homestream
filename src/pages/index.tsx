@@ -18,9 +18,9 @@
  * the library or watchlist actually changes.
  */
 
-import { useState, useMemo, useRef, useEffect } from 'react';
+import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Play, Plus, Check, Star, Upload, Clock, Search, X, SlidersHorizontal, Bookmark, Smartphone, QrCode, Copy, Tv2 } from 'lucide-react';
+import { Play, Plus, Check, Star, Upload, Clock, Search, X, SlidersHorizontal, Bookmark, Smartphone, QrCode, Copy, Tv2, RefreshCw } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useMedia } from '@/context/MediaContext';
 import { useProfile } from '@/context/ProfileContext';
@@ -75,6 +75,22 @@ function RemoteQRWidget() {
   // True when the server returned localhost — QR would be useless on a phone
   const isLocalhost = isLocalhostIP(data?.lanIP ?? window.location.hostname);
 
+  const fetchQr = useCallback(() => {
+    setLoading(true);
+    setQrError(false);
+    fetch('/api/remote/qr?format=svg')
+      .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
+      .then((d: { url?: string; qr?: string; lanIP?: string; mdnsUrl?: string; ipUrl?: string; port?: string }) => {
+        if (d?.url && d?.qr) {
+          setData({ url: d.url, qr: d.qr, lanIP: d.lanIP, mdnsUrl: d.mdnsUrl, ipUrl: d.ipUrl, port: d.port });
+        } else {
+          setQrError(true);
+        }
+      })
+      .catch(() => setQrError(true))
+      .finally(() => setLoading(false));
+  }, []);
+
   function copyUrl() {
     navigator.clipboard.writeText(remoteUrl).then(() => {
       setCopied(true);
@@ -90,19 +106,8 @@ function RemoteQRWidget() {
   }
 
   useEffect(() => {
-    setLoading(true);
-    fetch('/api/remote/qr?format=svg')
-      .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
-      .then((d: { url?: string; qr?: string; lanIP?: string; mdnsUrl?: string; ipUrl?: string; port?: string }) => {
-        if (d?.url && d?.qr) {
-          setData({ url: d.url, qr: d.qr, lanIP: d.lanIP, mdnsUrl: d.mdnsUrl, ipUrl: d.ipUrl, port: d.port });
-        } else {
-          setQrError(true);
-        }
-      })
-      .catch(() => setQrError(true))
-      .finally(() => setLoading(false));
-  }, []);
+    fetchQr();
+  }, [fetchQr]);
 
   // Determine what to show in the QR area
   const showQR   = data && !qrError && !isLocalhost;
@@ -123,7 +128,15 @@ function RemoteQRWidget() {
             <div className="flex items-center gap-2 w-full">
               <Smartphone className="w-4 h-4 text-primary flex-shrink-0" />
               <p className="text-xs font-semibold text-foreground">Phone Remote</p>
-              <button onClick={() => setExpanded(false)} className="ml-auto text-muted-foreground hover:text-foreground transition-colors">
+              <button
+                onClick={fetchQr}
+                disabled={loading}
+                className="ml-auto text-muted-foreground hover:text-foreground transition-colors disabled:opacity-40"
+                title="Refresh QR code"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+              </button>
+              <button onClick={() => setExpanded(false)} className="text-muted-foreground hover:text-foreground transition-colors">
                 <X className="w-3.5 h-3.5" />
               </button>
             </div>
@@ -152,9 +165,17 @@ function RemoteQRWidget() {
                 <QrCode className="w-8 h-8 text-muted-foreground/40" />
                 <p className="text-[10px] text-muted-foreground leading-tight">
                   {isLocalhost
-                    ? 'Open the Electron app on your PC — QR requires a real LAN IP'
+                    ? 'Running on localhost — connect to your LAN to get a scannable QR code'
                     : 'QR unavailable — type the address below on your phone'}
                 </p>
+                {isLocalhost && (
+                  <button
+                    onClick={fetchQr}
+                    className="text-[9px] text-primary hover:text-primary/80 transition-colors flex items-center gap-1"
+                  >
+                    <RefreshCw className="w-2.5 h-2.5" /> Retry
+                  </button>
+                )}
               </div>
             )}
 

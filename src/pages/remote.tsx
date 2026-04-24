@@ -31,6 +31,7 @@ import SearchTab from './remote/SearchTab';
 import AITab from './remote/AITab';
 import DownloadTab from './remote/DownloadTab';
 import BrowseTab from './remote/BrowseTab';
+import CastTab from './remote/CastTab';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 // Re-exported from ./remote/types for use in sub-components
@@ -632,14 +633,14 @@ function RemotePageInner() {
                       onClick={() => {
                         haptic(30);
                         if (state.cast?.active) setShowCastPanel(v => !v);
-                        else send({ type: 'cast' });
+                        else { haptic(30); setActiveTab('cast'); }
                       }}
                       className={`w-9 h-9 rounded-xl flex items-center justify-center transition-colors ${
                         state.cast?.active
                           ? 'bg-primary/20 text-primary'
                           : 'bg-muted text-muted-foreground hover:text-foreground'
                       }`}
-                      title={state.cast?.active ? 'Casting' : 'Cast'}
+                      title={state.cast?.active ? 'Casting' : 'Cast to TV'}
                     >
                       <Cast className="w-4 h-4" />
                     </button>
@@ -861,6 +862,20 @@ function RemotePageInner() {
               </motion.div>
             )}
           </AnimatePresence>
+
+          {/* ── Cast tab content ── */}
+          <AnimatePresence mode="wait">
+            {activeTab === 'cast' && (
+              <motion.div
+                key="cast"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+              >
+                <CastTab playerState={state} />
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       )}
 
@@ -921,6 +936,15 @@ function RemotePageInner() {
             >
               <Sparkles className="w-5 h-5" />
               Ask AI
+            </button>
+            <button
+              onClick={() => { haptic(20); setActiveTab('cast'); }}
+              className={`flex-1 flex flex-col items-center gap-1 py-2.5 text-[10px] font-medium transition-colors relative ${
+                activeTab === 'cast' ? 'text-primary' : 'text-muted-foreground'
+              }`}
+            >
+              <Cast className="w-5 h-5" />
+              Cast
             </button>
           </div>
           {/* Safe area spacer for iOS home indicator */}

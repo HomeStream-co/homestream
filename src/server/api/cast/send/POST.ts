@@ -18,7 +18,50 @@
 import type { Request, Response } from 'express';
 import http from 'http';
 import { URL } from 'url';
+import os from 'os';
 import { requireAuth } from '../../../authMiddleware.js';
+import { readLibrary } from '../../../libraryStore.js';
+
+// ── Resolve LAN IP (same logic as /api/remote/qr) ────────────────────────────
+
+function getLanIP(): string {
+  const interfaces = os.networkInterfaces();
+  const candidates: string[] = [];
+  for (const [name, iface] of Object.entries(interfaces)) {
+    if (!iface) continue;
+    const nameLower = name.toLowerCase();
+    const isVirtual = nameLower.includes('vethernet') || nameLower.includes('docker') ||
+      nameLower.includes('vmware') || nameLower.includes('virtualbox') ||
+      nameLower.includes('wsl') || nameLower.includes('loopback');
+    for (const addr of iface) {
+      if (addr.family === 'IPv4' && !addr.internal) {
+        candidates.push(isVirtual ? `__virtual__${addr.address}` : addr.address);
+      }
+    }
+  }
+  const real = candidates.filter(ip => !ip.startsWith('__virtual__'));
+  const pool = real.length > 0 ? real : candidates.map(ip => ip.replace('__virtual__', ''));
+  return pool.find(ip => ip.startsWith('192.168.')) ||
+    pool.find(ip => ip.startsWith('10.')) ||
+    pool[0] || 'localhost';
+}
+
+// ── Resolve stream URL from mediaId ──────────────────────────────────────────
+
+function resolveStreamUrl(mediaId: string, port: string): string | null {
+  try {
+    const library = readLibrary<{ id: string; filePath?: string; filename?: string }>();
+    const item = library.find(i => i.id === mediaId);
+    if (!item) return null;
+    const filename = item.filename ?? item.filePath?.split('/').pop() ?? item.filePath;
+    if (!filename) return null;
+    const lanIP = getLanIP();
+    // Prefer HLS for broadest TV codec support; fall back to direct stream
+    return `http://${lanIP}:${port}/api/hls/${mediaId}/index.m3u8`;
+  } catch {
+    return null; // non-fatal — ignore
+  }
+}
 
 // ── UPnP SOAP helpers ─────────────────────────────────────────────────────────
 
@@ -130,14 +173,31 @@ const AV_TRANSPORT = 'urn:schemas-upnp-org:service:AVTransport:1';
 export default async function handler(req: Request, res: Response) {
   if (!requireAuth(req, res)) return;
 
-  const { deviceLocation, streamUrl, title } = req.body as {
+  const { deviceLocation, streamUrl: rawStreamUrl, mediaId, title } = req.body as {
     deviceLocation?: string;
     streamUrl?: string;
+    mediaId?: string;
     title?: string;
   };
 
-  if (!deviceLocation || !streamUrl) {
-    res.status(400).json({ error: 'deviceLocation and streamUrl are required' });
+  if (!deviceLocation) {
+    res.status(400).json({ error: 'deviceLocation is required' });
+    return;
+  }
+
+  // Resolve stream URL — accept either a pre-built URL or a mediaId
+  let streamUrl = rawStreamUrl;
+  if (!streamUrl && mediaId) {
+    const port = process.env.PORT ?? '3000';
+    streamUrl = resolveStreamUrl(mediaId, port) ?? undefined;
+    if (!streamUrl) {
+      res.status(404).json({ error: `Media item '${mediaId}' not found in library` });
+      return;
+    }
+  }
+
+  if (!streamUrl) {
+    res.status(400).json({ error: 'Either streamUrl or mediaId is required' });
     return;
   }
 

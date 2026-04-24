@@ -453,7 +453,7 @@ function TvPageInner() {
     const q = search.toLowerCase();
     return library.filter(m =>
       m.title.toLowerCase().includes(q) ||
-      m.genre.some(g => g.toLowerCase().includes(q)) ||
+      (m.genre ?? []).some(g => g.toLowerCase().includes(q)) ||
       m.director?.toLowerCase().includes(q)
     ).slice(0, 30);
   }, [library, search]);
