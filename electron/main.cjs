@@ -996,6 +996,9 @@ const CONTROL_PANEL_HTML = `<!DOCTYPE html>
   let isFirstRun = false;
   let qrLoaded = false;
 
+  // Store the real version so the badge can restore it after "Checking…"
+  window._appVersion = '${app.getVersion()}';
+
   function openBrowser()  { window.electronAPI?.openBrowser(); }
   function openSetup()    { window.electronAPI?.openBrowserPage('/setup'); }
   function openLan()      { if (lanUrl) window.electronAPI?.openBrowserLan(lanUrl); }
@@ -1049,19 +1052,23 @@ const CONTROL_PANEL_HTML = `<!DOCTYPE html>
     if (qrLoaded || !networkUrl) return;
     qrLoaded = true;
     const wrap = document.getElementById('qr-wrap');
-    // Fetch QR from the server's built-in QR endpoint
-    const qrUrl = networkUrl + '/api/remote/qr?size=200';
-    const img = document.createElement('img');
-    img.src = qrUrl;
-    img.alt = 'QR code';
-    img.onerror = () => {
-      // QR endpoint needs auth — show a manual hint instead
-      wrap.innerHTML = '<div class="qr-placeholder">Open network URL on phone</div>';
-    };
-    img.onload = () => {
-      wrap.innerHTML = '';
-      wrap.appendChild(img);
-    };
+    // Fetch QR JSON from the server — format=png returns a base64 data URL
+    fetch(networkUrl + '/api/remote/qr?format=png')
+      .then(r => r.ok ? r.json() : Promise.reject(r.status))
+      .then(data => {
+        if (!data.qr) throw new Error('no qr');
+        const img = document.createElement('img');
+        img.src = data.qr; // base64 data URL
+        img.alt = 'QR code';
+        img.style.width = '68px';
+        img.style.height = '68px';
+        img.style.display = 'block';
+        wrap.innerHTML = '';
+        wrap.appendChild(img);
+      })
+      .catch(() => {
+        wrap.innerHTML = '<div class="qr-placeholder">Open network URL on phone</div>';
+      });
   }
 
   function escHtml(s) {
@@ -1131,7 +1138,7 @@ const CONTROL_PANEL_HTML = `<!DOCTYPE html>
     }
     // Show a brief "checking" indicator on the version badge
     const badge = document.getElementById('version-badge');
-    if (badge) { badge.textContent = 'Checking…'; setTimeout(() => { badge.textContent = badge.dataset.version || 'v?'; }, 4000); }
+    if (badge) { badge.textContent = 'Checking…'; setTimeout(() => { badge.textContent = 'v' + (window._appVersion || '?'); }, 4000); }
   }
 
   function handleUpdateStatus(data) {
