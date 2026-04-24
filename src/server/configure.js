@@ -258,19 +258,40 @@ export const serverAfter = (server) => {
   });
 
   // ── SPA fallback ───────────────────────────────────────────────────────────
+  // In dev mode (Vite), index.html is served in-memory by Vite — dist/ does
+  // not exist. Calling res.sendFile() on a missing file throws ENOENT which
+  // gets logged as a crash. Guard with an existence check so unmatched routes
+  // fall through to Vite's own handler instead of crashing Express.
   server.use((req, res, next) => {
     if (req.method !== 'GET') return next();
     if (req.path.startsWith('/api')) return next();
+    if (req.path.startsWith('/ws/')) return next(); // WebSocket paths — let ws lib handle
     if (extname(req.path)) return next();
-    res.sendFile(join(CLIENT_DIR, 'index.html'));
+    const indexPath = join(CLIENT_DIR, 'index.html');
+    import('node:fs').then(({ existsSync }) => {
+      if (!existsSync(indexPath)) {
+        // Dev mode — Vite handles this route
+        return next();
+      }
+      res.sendFile(indexPath);
+    }).catch(() => next());
   });
 
   const errorHandler = (err, req, res, next) => {
     if (err instanceof Error) {
-      // Log to persistent crash log so it shows up in the Debug Panel
-      import('./crashLogger.js').then(({ logCrash }) => {
-        logCrash('expressError', err, `${req.method} ${req.path}`);
-      }).catch(() => {});
+      // Suppress ENOENT for index.html in dev mode — this is expected when
+      // Vite serves the SPA in-memory and dist/ doesn't exist yet. Logging
+      // it as a crash fills the crash log with noise and confuses debugging.
+      const isDevIndexMissing =
+        err.code === 'ENOENT' &&
+        err.message?.includes('index.html') &&
+        process.env.NODE_ENV !== 'production';
+
+      if (!isDevIndexMissing) {
+        import('./crashLogger.js').then(({ logCrash }) => {
+          logCrash('expressError', err, `${req.method} ${req.path}`);
+        }).catch(() => {});
+      }
       res.status(500).json({ error: err.message });
     } else {
       next(err);
