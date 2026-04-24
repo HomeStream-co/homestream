@@ -52,40 +52,58 @@ const SORT_OPTIONS = [
 // Shown in the bottom-right corner of the TV home screen.
 // Scan with your phone → opens the remote instantly.
 
+/** Returns true when the IP is a loopback / non-routable address that phones can't reach */
+function isLocalhostIP(ip: string): boolean {
+  return ip === 'localhost' || ip === '127.0.0.1' || ip === '::1' || ip.startsWith('127.');
+}
+
 function RemoteQRWidget() {
   const [data, setData] = useState<{ url: string; qr: string; lanIP?: string; port?: string } | null>(null);
   const [qrError, setQrError] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
   const [copiedIP, setCopiedIP] = useState(false);
 
-  const remoteUrl = data?.url ?? `http://${window.location.hostname}:3000/remote`;
   const lanIP     = data?.lanIP ?? window.location.hostname;
   const port      = data?.port  ?? '3000';
+  const remoteUrl = data?.url   ?? `http://${lanIP}:${port}/remote`;
+
+  // True when the server returned localhost — QR would be useless on a phone
+  const isLocalhost = isLocalhostIP(lanIP);
 
   function copyUrl() {
     navigator.clipboard.writeText(remoteUrl).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    });
+    }).catch(() => {});
   }
 
   function copyIP() {
     navigator.clipboard.writeText(lanIP).then(() => {
       setCopiedIP(true);
       setTimeout(() => setCopiedIP(false), 2000);
-    });
+    }).catch(() => {});
   }
 
   useEffect(() => {
+    setLoading(true);
     fetch('/api/remote/qr?format=svg')
       .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
       .then((d: { url?: string; qr?: string; lanIP?: string; port?: string }) => {
-        if (d?.url && d?.qr) setData({ url: d.url, qr: d.qr, lanIP: d.lanIP, port: d.port });
-        else setQrError(true);
+        if (d?.url && d?.qr) {
+          setData({ url: d.url, qr: d.qr, lanIP: d.lanIP, port: d.port });
+        } else {
+          setQrError(true);
+        }
       })
-      .catch(() => setQrError(true));
+      .catch(() => setQrError(true))
+      .finally(() => setLoading(false));
   }, []);
+
+  // Determine what to show in the QR area
+  const showQR   = data && !qrError && !isLocalhost;
+  const showNoLAN = !loading && (qrError || isLocalhost);
 
   return (
     <div className="fixed bottom-6 right-6 z-40 flex flex-col items-end gap-2">
@@ -107,57 +125,78 @@ function RemoteQRWidget() {
               </button>
             </div>
 
-            {/* QR code or fallback */}
-            {data && !qrError ? (
-              <div
-                className="w-40 h-40 [&_svg]:w-full [&_svg]:h-full rounded-xl overflow-hidden bg-white p-2 flex-shrink-0"
-                dangerouslySetInnerHTML={{ __html: data.qr }}
-              />
-            ) : (
-              <div className="w-40 h-40 rounded-xl bg-muted flex flex-col items-center justify-center gap-2 text-center px-3">
-                <QrCode className="w-8 h-8 text-muted-foreground/40" />
-                <p className="text-[10px] text-muted-foreground leading-tight">Type the address below on your phone</p>
+            {/* QR code */}
+            {loading && (
+              <div className="w-40 h-40 rounded-xl bg-muted flex items-center justify-center">
+                <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
               </div>
             )}
 
-            {data && !qrError && (
-              <p className="text-[10px] text-muted-foreground text-center leading-relaxed -mt-1">
-                Scan with your phone camera
-              </p>
+            {showQR && (
+              <>
+                <div
+                  className="w-40 h-40 [&_svg]:w-full [&_svg]:h-full rounded-xl overflow-hidden bg-white p-2 flex-shrink-0"
+                  dangerouslySetInnerHTML={{ __html: data!.qr }}
+                />
+                <p className="text-[10px] text-muted-foreground text-center leading-relaxed -mt-1">
+                  Scan with your phone camera
+                </p>
+              </>
+            )}
+
+            {showNoLAN && (
+              <div className="w-40 h-40 rounded-xl bg-muted flex flex-col items-center justify-center gap-2 text-center px-3">
+                <QrCode className="w-8 h-8 text-muted-foreground/40" />
+                <p className="text-[10px] text-muted-foreground leading-tight">
+                  {isLocalhost
+                    ? 'Open the Electron app on your PC — QR requires a real LAN IP'
+                    : 'QR unavailable — type the address below on your phone'}
+                </p>
+              </div>
             )}
 
             {/* LAN IP — big and easy to read for TV/phone typing */}
-            <div className="w-full rounded-xl border border-border bg-muted/50 px-3 py-2.5">
-              <p className="text-[10px] text-muted-foreground mb-1 uppercase tracking-wider font-medium">Server address</p>
-              <div className="flex items-center gap-2">
-                <code className="flex-1 text-sm font-mono font-bold text-foreground tracking-wide">{lanIP}</code>
-                <button onClick={copyIP} title="Copy IP" className="text-muted-foreground hover:text-foreground transition-colors flex-shrink-0">
-                  {copiedIP ? <Check className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
-                </button>
+            {!loading && (
+              <div className="w-full rounded-xl border border-border bg-muted/50 px-3 py-2.5">
+                <p className="text-[10px] text-muted-foreground mb-1 uppercase tracking-wider font-medium">Server address</p>
+                <div className="flex items-center gap-2">
+                  <code className={`flex-1 text-sm font-mono font-bold tracking-wide ${isLocalhost ? 'text-muted-foreground' : 'text-foreground'}`}>
+                    {isLocalhost ? 'Not on LAN' : lanIP}
+                  </code>
+                  {!isLocalhost && (
+                    <button onClick={copyIP} title="Copy IP" className="text-muted-foreground hover:text-foreground transition-colors flex-shrink-0">
+                      {copiedIP ? <Check className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
+                    </button>
+                  )}
+                </div>
+                <p className="text-[10px] text-muted-foreground mt-0.5">Port: {port}</p>
               </div>
-              <p className="text-[10px] text-muted-foreground mt-0.5">Port: {port}</p>
-            </div>
+            )}
 
-            {/* Full URL — copy */}
-            <button
-              onClick={copyUrl}
-              title="Copy full URL"
-              className="w-full flex items-center gap-1.5 bg-muted hover:bg-muted/80 rounded-lg px-2.5 py-2 transition-colors group"
-            >
-              <code className="flex-1 text-[10px] text-muted-foreground truncate text-left font-mono">{remoteUrl}</code>
-              {copied
-                ? <Check className="w-3 h-3 text-green-400 flex-shrink-0" />
-                : <Copy className="w-3 h-3 text-muted-foreground flex-shrink-0 group-hover:text-foreground transition-colors" />}
-            </button>
+            {/* Full URL — copy (only when we have a real LAN address) */}
+            {!loading && !isLocalhost && (
+              <button
+                onClick={copyUrl}
+                title="Copy full URL"
+                className="w-full flex items-center gap-1.5 bg-muted hover:bg-muted/80 rounded-lg px-2.5 py-2 transition-colors group"
+              >
+                <code className="flex-1 text-[10px] text-muted-foreground truncate text-left font-mono">{remoteUrl}</code>
+                {copied
+                  ? <Check className="w-3 h-3 text-green-400 flex-shrink-0" />
+                  : <Copy className="w-3 h-3 text-muted-foreground flex-shrink-0 group-hover:text-foreground transition-colors" />}
+              </button>
+            )}
 
-            <a
-              href={remoteUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="w-full text-center text-[10px] bg-primary/10 text-primary rounded-lg py-1.5 font-medium hover:bg-primary/20 transition-colors"
-            >
-              Open on this device
-            </a>
+            {!loading && !isLocalhost && (
+              <a
+                href={remoteUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full text-center text-[10px] bg-primary/10 text-primary rounded-lg py-1.5 font-medium hover:bg-primary/20 transition-colors"
+              >
+                Open on this device
+              </a>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
