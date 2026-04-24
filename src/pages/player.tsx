@@ -157,7 +157,7 @@ export default function PlayerPage() {
   const { sendState } = useRemoteControl(id, {
     onPlay:        () => ps.videoRef.current?.play(),
     onPause:       () => ps.videoRef.current?.pause(),
-    onSeek:        (pos) => { if (ps.videoRef.current) { ps.videoRef.current.currentTime = pos; ps.setCurrentTime(pos); } },
+    onSeek:        (pos) => { if (ps.videoRef.current) { ps.videoRef.current.currentTime = pos; ps.currentTimeRef.current = pos; } },
     onVolume:      (lvl) => { if (ps.videoRef.current) { ps.videoRef.current.volume = lvl; ps.setVolume(lvl); ps.setMuted(lvl === 0); } },
     onSkipForward: (secs) => { if (ps.videoRef.current) ps.videoRef.current.currentTime = Math.min(ps.videoRef.current.currentTime + secs, ps.duration); },
     onSkipBack:    (secs) => { if (ps.videoRef.current) ps.videoRef.current.currentTime = Math.max(ps.videoRef.current.currentTime - secs, 0); },
@@ -246,17 +246,39 @@ export default function PlayerPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
-  // ── Watch-complete at 85% ─────────────────────────────────────────────────
+  // ── Watch-complete + Skip-intro: poll refs on an interval ────────────────
+  // Previously these were effects on ps.currentTime (state), which caused
+  // re-renders 4× per second. Now they run on a 500ms interval reading the
+  // ref — accurate enough, zero React overhead.
+  const autoSkipFiredRef = useRef(false);
+  useEffect(() => { autoSkipFiredRef.current = false; }, [id]);
+
   useEffect(() => {
-    if (!id || ps.duration === 0 || ps.watchCompleteTriggered.current) return;
-    if ((ps.currentTime / ps.duration) * 100 >= 85) {
-      ps.watchCompleteTriggered.current = true;
-      triggerPostWatchRecommendation(id);
-      ps.setShowEndOverlay(true);
-      ps.setAutoplayCountdown(AUTOPLAY_SECONDS);
-      ps.setAutoplayCancelled(false);
-    }
-  }, [ps.currentTime, ps.duration, id, triggerPostWatchRecommendation, ps]);
+    if (!id) return;
+    const interval = setInterval(() => {
+      const ct = ps.currentTimeRef.current;
+      const dur = ps.duration;
+      const playing = ps.videoRef.current ? !ps.videoRef.current.paused : false;
+
+      // Watch-complete at 85%
+      if (dur > 0 && !ps.watchCompleteTriggered.current && (ct / dur) * 100 >= 85) {
+        ps.watchCompleteTriggered.current = true;
+        triggerPostWatchRecommendation(id);
+        ps.setShowEndOverlay(true);
+        ps.setAutoplayCountdown(AUTOPLAY_SECONDS);
+        ps.setAutoplayCancelled(false);
+      }
+
+      // Skip-intro button visibility + auto-skip
+      const inIntro = ct > 30 && ct < SKIP_INTRO_END && playing;
+      ps.setShowSkipIntro(inIntro);
+      if (inIntro && appSettings.autoSkipIntro && !autoSkipFiredRef.current) {
+        autoSkipFiredRef.current = true;
+        if (ps.videoRef.current) ps.videoRef.current.currentTime = SKIP_INTRO_END;
+      }
+    }, 500);
+    return () => clearInterval(interval);
+  }, [id, ps, appSettings.autoSkipIntro, triggerPostWatchRecommendation]);
 
   // ── Autoplay countdown ────────────────────────────────────────────────────
   useEffect(() => {
@@ -271,22 +293,8 @@ export default function PlayerPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ps.showEndOverlay, ps.autoplayCancelled, nextItem, appSettings.autoplayNext]);
 
-  // ── Skip Intro ────────────────────────────────────────────────────────────
+  // ── Skip intro — exposed for keyboard shortcut ────────────────────────────
   const skipIntro = useCallback(() => { if (ps.videoRef.current) ps.videoRef.current.currentTime = SKIP_INTRO_END; }, [ps.videoRef]);
-  const autoSkipFiredRef = useRef(false);
-  // Reset auto-skip guard when the item changes
-  useEffect(() => { autoSkipFiredRef.current = false; }, [id]);
-  useEffect(() => {
-    const inIntro = ps.currentTime > 30 && ps.currentTime < SKIP_INTRO_END && ps.playing;
-    ps.setShowSkipIntro(inIntro);
-    // Auto-skip fires exactly once per item — never repeatedly
-    if (inIntro && appSettings.autoSkipIntro && !autoSkipFiredRef.current) {
-      autoSkipFiredRef.current = true;
-      skipIntro();
-    }
-  }, [ps.currentTime, ps.playing, appSettings.autoSkipIntro, skipIntro, ps]);
-
-  // ── Auto-hide controls ────────────────────────────────────────────────────
   const resetControlsTimer = useCallback(() => {
     ps.setShowControls(true);
     clearTimeout(ps.controlsTimerRef.current);
@@ -489,7 +497,14 @@ export default function PlayerPage() {
     }
   };
   const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => { const v = parseFloat(e.target.value); if (ps.videoRef.current) ps.videoRef.current.volume = v; ps.setVolume(v); ps.setMuted(v === 0); };
-  const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => { const t = parseFloat(e.target.value); if (ps.videoRef.current) ps.videoRef.current.currentTime = t; ps.setCurrentTime(t); };
+  // handleSeek: drives the video element only — seek bar is uncontrolled,
+  // its visual state is updated by onTimeUpdate via direct DOM mutation.
+  const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const t = parseFloat(e.target.value);
+    if (ps.videoRef.current) ps.videoRef.current.currentTime = t;
+    // Also update the ref immediately so progress saves are accurate mid-seek
+    ps.currentTimeRef.current = t;
+  };
   const changeSpeed = (rate: number) => { if (ps.videoRef.current) ps.videoRef.current.playbackRate = rate; ps.setPlaybackRate(rate); ps.setShowSpeedMenu(false); };
 
   // ── Not found ─────────────────────────────────────────────────────────────

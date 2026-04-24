@@ -41,14 +41,12 @@ interface MediaItem {
 
 interface Props {
   item: MediaItem;
-  // Playback state
+  // Playback state — only values that legitimately trigger re-renders
   playing: boolean;
-  currentTime: number;
   duration: number;
   volume: number;
   muted: boolean;
   fullscreen: boolean;
-  buffered: number;
   playbackRate: number;
   isPiP: boolean;
   // UI state
@@ -67,6 +65,11 @@ interface Props {
   seekHover: { x: number; time: number; dataUrl: string } | null;
   seekBarRef: React.RefObject<HTMLInputElement | null>;
   thumbCanvasRef: React.RefObject<HTMLCanvasElement | null>;
+  // Refs for direct DOM updates (no React re-renders on time tick)
+  currentTimeRef: React.MutableRefObject<number>;
+  bufferedRef: React.MutableRefObject<number>;
+  timeDisplayRef: React.MutableRefObject<HTMLSpanElement | null>;
+  bufferedBarRef: React.MutableRefObject<HTMLDivElement | null>;
   // Refs for cast
   castButtonRef: React.MutableRefObject<(() => void) | null>;
   videoRef: React.RefObject<HTMLVideoElement | null>;
@@ -99,11 +102,12 @@ interface Props {
 }
 
 export default function PlayerControlsOverlay({
-  item, playing, currentTime, duration, volume, muted, fullscreen,
-  buffered, playbackRate, isPiP, showInfo, showSpeedMenu, showCcMenu,
+  item, playing, duration, volume, muted, fullscreen,
+  playbackRate, isPiP, showInfo, showSpeedMenu, showCcMenu,
   showAudioMenu, ccLang, ccFontSize, ccBgOpacity, audioTracks,
   activeAudioTrack, tvFocus, playerAccent, seekHover, seekBarRef,
-  thumbCanvasRef, castButtonRef, videoRef,
+  thumbCanvasRef, currentTimeRef, bufferedRef, timeDisplayRef, bufferedBarRef,
+  castButtonRef, videoRef,
   togglePlay, toggleMute, toggleFullscreen, togglePiP,
   handleSeek, handleVolumeChange, handleSeekHover, changeSpeed,
   setCcLang, setCcFontSize, setCcBgOpacity, setActiveAudioTrack,
@@ -209,21 +213,24 @@ export default function PlayerControlsOverlay({
               </div>
             </div>
           )}
+          {/* Buffered bar — updated via ref in onTimeUpdate, no React re-render */}
           <div
-            className="absolute top-1/2 -translate-y-1/2 h-1 rounded-full opacity-40"
-            style={{ width: duration > 0 ? `${(buffered / duration) * 100}%` : '0%', background: playerAccent }}
+            ref={bufferedBarRef}
+            className="absolute top-1/2 -translate-y-1/2 h-1 rounded-full opacity-40 pointer-events-none"
+            style={{ width: '0%', background: playerAccent }}
           />
+          {/* Seek input — uncontrolled; value driven by onTimeUpdate DOM mutation */}
           <input
             ref={seekBarRef}
             type="range"
             min={0}
             max={duration || 100}
-            value={currentTime}
+            defaultValue={0}
             onChange={handleSeek}
             onMouseMove={handleSeekHover}
             onMouseLeave={() => setSeekHover(null)}
             className={`w-full h-1 appearance-none bg-white/20 rounded-full cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary ${tvFocus === 'seek' ? 'ring-2 ring-white/60 ring-offset-1 ring-offset-transparent' : ''}`}
-            style={{ background: `linear-gradient(to right, ${playerAccent} ${duration > 0 ? (currentTime / duration) * 100 : 0}%, rgba(255,255,255,0.2) 0%)` }}
+            style={{ background: `linear-gradient(to right, ${playerAccent} 0%, rgba(255,255,255,0.2) 0%)` }}
           />
           <canvas ref={thumbCanvasRef} className="hidden" />
         </div>
@@ -266,8 +273,9 @@ export default function PlayerControlsOverlay({
               onChange={handleVolumeChange}
               className={`hidden sm:block w-20 h-1 appearance-none bg-white/30 rounded-full cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white ${tvFocus === 'volume' ? 'ring-2 ring-white/60' : ''}`}
             />
-            <span className="text-white/70 text-[10px] sm:text-xs whitespace-nowrap">
-              {formatTime(currentTime)} / {formatTime(duration)}
+            {/* Time display — updated via ref in onTimeUpdate, no React re-render */}
+            <span ref={timeDisplayRef} className="text-white/70 text-[10px] sm:text-xs whitespace-nowrap font-mono">
+              {formatTime(currentTimeRef.current)} / {formatTime(duration)}
             </span>
           </div>
 
@@ -482,7 +490,7 @@ export default function PlayerControlsOverlay({
                   streamUrl={`/api/stream/${item.filename}`}
                   title={item.title}
                   poster={item.poster}
-                  currentTime={currentTime}
+                  currentTime={currentTimeRef.current}
                   onTriggerRef={(fn) => { castButtonRef.current = fn; }}
                   onCastStateChange={(info) => setCastInfo(info.active ? info : null)}
                 />
