@@ -201,23 +201,24 @@ function DownloadModal({ target, onClose }: { target: DownloadTarget; onClose: (
     setSearching(true);
     setError('');
     try {
-      let imdbId = target.imdbId;
-      if (!imdbId) {
-        const metaRes = await fetch(
-          `https://v3-cinemeta.strem.io/catalog/${target.type}/top/search=${encodeURIComponent(target.title)}.json`
-        );
-        const metaData = await metaRes.json() as { metas?: { id: string }[] };
-        imdbId = metaData.metas?.[0]?.id;
-        if (!imdbId) throw new Error('Title not found in Cinemeta');
-      }
-      const streamRes = await fetch(
-        `https://torrentio.strem.fun/sort=seeders/stream/${target.type}/${imdbId}.json`
-      );
-      const streamData = await streamRes.json() as { streams?: { name: string; title: string; infoHash: string }[] };
-      const found = (streamData.streams ?? []).slice(0, 10).map(s => ({
-        name: s.name, title: s.title, url: s.infoHash, imdbId: imdbId!,
+      // Route through backend proxy — direct browser fetches to Cinemeta/Torrentio
+      // are blocked by CORS in the packaged Electron app and in cloud preview.
+      const res = await fetch('/api/stremio/stream', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: target.title,
+          type: target.type,
+          imdbId: target.imdbId ?? undefined,
+        }),
+      });
+      const data = await res.json() as { streams?: { name: string; title: string; infoHash: string; imdbId?: string }[]; error?: string };
+      if (!res.ok || data.error) throw new Error(data.error ?? 'No streams found');
+      const found = (data.streams ?? []).slice(0, 10).map(s => ({
+        name: s.name, title: s.title, url: s.infoHash, imdbId: s.imdbId ?? target.imdbId ?? '',
       }));
-      if (found.length === 0) throw new Error('No streams found');
+      if (found.length === 0) throw new Error('No streams found — try again later or check your network');
       setStreams(found);
     } catch (err) {
       setError(String(err));
