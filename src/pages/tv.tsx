@@ -278,7 +278,52 @@ function TvHero({ item, onPlay }: { item: MediaItem; onPlay: (item: MediaItem) =
   );
 }
 
-// ── Nav Bar ───────────────────────────────────────────────────────────────────
+// ── Genre Filter Row ──────────────────────────────────────────────────────────
+
+function TvGenreFilter({
+  genres,
+  active,
+  onChange,
+}: {
+  genres: string[];
+  active: string;
+  onChange: (g: string) => void;
+}) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Scroll the active pill into view whenever it changes
+  useEffect(() => {
+    const el = scrollRef.current?.querySelector<HTMLButtonElement>('[data-active="true"]');
+    el?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+  }, [active]);
+
+  if (genres.length === 0) return null;
+
+  return (
+    <div
+      ref={scrollRef}
+      className="flex items-center gap-2 px-12 mb-6 overflow-x-auto scrollbar-none"
+      style={{ scrollbarWidth: 'none' }}
+    >
+      {['All', ...genres].map(g => (
+        <button
+          key={g}
+          data-active={active === g}
+          onClick={() => onChange(g)}
+          className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-all focus:outline-none focus:ring-4 focus:ring-white/40 ${
+            active === g
+              ? 'bg-primary text-primary-foreground'
+              : 'bg-white/10 text-white/70 hover:bg-white/20 hover:text-white'
+          }`}
+        >
+          {g}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+
 
 type NavTab = 'home' | 'movies' | 'shows' | 'watchlist';
 
@@ -398,6 +443,7 @@ function TvPageInner() {
   const [tab, setTab] = useState<NavTab>('home');
   const [search, setSearch] = useState('');
   const [showSearch, setShowSearch] = useState(false);
+  const [activeGenre, setActiveGenre] = useState('All');
   const [focusedRow, setFocusedRow] = useState(0);
   const [focusedCol, setFocusedCol] = useState(0);
 
@@ -460,27 +506,55 @@ function TvPageInner() {
 
   // ── Rows for current tab ──
 
+  // Pool of items for the current tab (before genre filter) — used to derive genre list
+  const tabPool = useMemo((): MediaItem[] => {
+    switch (tab) {
+      case 'home':     return library;
+      case 'movies':   return movies;
+      case 'shows':    return shows;
+      case 'watchlist': return watchlist;
+      default:         return [];
+    }
+  }, [tab, library, movies, shows, watchlist]);
+
+  // All genres present in the current tab pool, sorted alphabetically
+  const availableGenres = useMemo(() => {
+    const set = new Set<string>();
+    for (const item of tabPool) {
+      for (const g of (item.genre ?? [])) {
+        if (g) set.add(g);
+      }
+    }
+    return [...set].sort();
+  }, [tabPool]);
+
+  // Apply genre filter to an item list
+  const applyGenre = useCallback((items: MediaItem[]) => {
+    if (activeGenre === 'All') return items;
+    return items.filter(m => (m.genre ?? []).includes(activeGenre));
+  }, [activeGenre]);
+
   const rows = useMemo((): { label: string; items: MediaItem[] }[] => {
     if (showSearch) return [{ label: `Results for "${search}"`, items: searchResults }];
     switch (tab) {
       case 'home':
         return [
-          ...(continueWatching.length > 0 ? [{ label: 'Continue Watching', items: continueWatching }] : []),
-          { label: 'Recently Added', items: recentlyAdded },
-          { label: 'Top Rated', items: topRated },
-          { label: 'Movies', items: movies.slice(0, 20) },
-          { label: 'TV Shows', items: shows.slice(0, 20) },
+          ...(continueWatching.length > 0 ? [{ label: 'Continue Watching', items: applyGenre(continueWatching) }] : []),
+          { label: 'Recently Added', items: applyGenre(recentlyAdded) },
+          { label: 'Top Rated', items: applyGenre(topRated) },
+          { label: 'Movies', items: applyGenre(movies.slice(0, 20)) },
+          { label: 'TV Shows', items: applyGenre(shows.slice(0, 20)) },
         ].filter(r => r.items.length > 0);
       case 'movies':
-        return [{ label: 'All Movies', items: movies }];
+        return [{ label: activeGenre === 'All' ? 'All Movies' : `${activeGenre} Movies`, items: applyGenre(movies) }];
       case 'shows':
-        return [{ label: 'All TV Shows', items: shows }];
+        return [{ label: activeGenre === 'All' ? 'All TV Shows' : `${activeGenre} Shows`, items: applyGenre(shows) }];
       case 'watchlist':
-        return [{ label: 'My List', items: watchlist }];
+        return [{ label: 'My List', items: applyGenre(watchlist) }];
       default:
         return [];
     }
-  }, [tab, showSearch, search, searchResults, continueWatching, recentlyAdded, topRated, movies, shows, watchlist]);
+  }, [tab, showSearch, search, searchResults, continueWatching, recentlyAdded, topRated, movies, shows, watchlist, applyGenre, activeGenre]);
 
   // Hero item — first item from continue watching, else first recently added
   const heroItem = continueWatching[0] ?? recentlyAdded[0];
@@ -546,6 +620,11 @@ function TvPageInner() {
     setFocusedRow(0);
     setFocusedCol(0);
   }, [tab, showSearch]);
+
+  // Reset genre filter when tab changes
+  useEffect(() => {
+    setActiveGenre('All');
+  }, [tab]);
 
   const handlePlay = (item: MediaItem) => {
     navigate(`/player/${item.id}`);
@@ -623,8 +702,17 @@ function TvPageInner() {
       {/* ── Nav tabs ── */}
       {!showSearch && <TvNav active={tab} onChange={t => { setTab(t); }} />}
 
-      {/* ── Hero (home tab only, no search) ── */}
-      {tab === 'home' && !showSearch && heroItem && (
+      {/* ── Genre filter row ── */}
+      {!showSearch && (
+        <TvGenreFilter
+          genres={availableGenres}
+          active={activeGenre}
+          onChange={setActiveGenre}
+        />
+      )}
+
+      {/* ── Hero (home tab only, no search, no genre filter active) ── */}
+      {tab === 'home' && !showSearch && activeGenre === 'All' && heroItem && (
         <TvHero item={heroItem} onPlay={handlePlay} />
       )}
 
