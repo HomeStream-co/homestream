@@ -144,15 +144,18 @@ export function usePlayerState() {
 
   // ── Unmount cleanup — clear all pending timers to prevent setState-after-unmount ──
   useEffect(() => {
+    const autoplayTimer = autoplayTimerRef.current;
+    const fadeInterval  = fadeIntervalRef.current;
+    const resumeTimer   = resumeBannerTimer.current;
+    const doubleTapTimer = doubleTapTimerRef.current;
     return () => {
       clearTimeout(controlsTimerRef.current);
-      clearInterval(autoplayTimerRef.current);
-      clearInterval(fadeIntervalRef.current);
-      clearTimeout(resumeBannerTimer.current);
+      clearInterval(autoplayTimer);
+      clearInterval(fadeInterval);
+      clearTimeout(resumeTimer);
       clearTimeout(actionToastTimer.current);
-      clearTimeout(doubleTapTimerRef.current);
+      clearTimeout(doubleTapTimer);
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ── Helpers ───────────────────────────────────────────────────────────────

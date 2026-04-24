@@ -95,7 +95,6 @@ export default function FeedbackButton({ className = '', compact = false }: Feed
   const [description, setDescription] = useState('');
   const [submitState, setSubmitState] = useState<SubmitState>('idle');
   const [errorMsg, setErrorMsg] = useState('');
-  const [issueUrl, setIssueUrl] = useState('');
   const [issueNumber, setIssueNumber] = useState<number | null>(null);
   const [showTypeMenu, setShowTypeMenu] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -110,7 +109,6 @@ export default function FeedbackButton({ className = '', compact = false }: Feed
     setSubmitState('idle');
     setDescription('');
     setErrorMsg('');
-    setIssueUrl('');
     setIssueNumber(null);
     setTimeout(() => textareaRef.current?.focus(), 150);
   };
@@ -152,7 +150,6 @@ export default function FeedbackButton({ className = '', compact = false }: Feed
         throw new Error(data.error ?? 'Submission failed');
       }
 
-      setIssueUrl(data.issueUrl ?? '');
       setIssueNumber(data.issueNumber ?? null);
       setSubmitState('success');
     } catch (err) {
@@ -222,19 +219,14 @@ export default function FeedbackButton({ className = '', compact = false }: Feed
                     <p className="text-sm font-semibold text-foreground">Thanks for the feedback!</p>
                     <p className="text-xs text-muted-foreground mt-1">
                       {issueNumber
-                        ? `Issue #${issueNumber} created on GitHub.`
+                        ? `Logged as report #${issueNumber}.`
                         : 'Your report has been submitted.'}
                     </p>
                   </div>
-                  {issueUrl && (
-                    <a
-                      href={issueUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-xs text-primary hover:underline"
-                    >
-                      View issue on GitHub →
-                    </a>
+                  {issueNumber && (
+                    <p className="text-xs text-muted-foreground/60">
+                      We&apos;ll review it and ship a fix in the next update.
+                    </p>
                   )}
                   <button
                     onClick={handleClose}

@@ -55,9 +55,8 @@ let betaChannelEnabled = false;
 
 function loadBetaPreference() {
   try {
-    const { app } = require('electron');
     const fs = require('fs');
-    const p = require('path').join(app.getPath('userData'), 'homestream-prefs.json');
+    const p = path.join(app.getPath('userData'), 'homestream-prefs.json');
     if (fs.existsSync(p)) {
       const prefs = JSON.parse(fs.readFileSync(p, 'utf8'));
       betaChannelEnabled = !!prefs.betaChannel;
@@ -67,9 +66,8 @@ function loadBetaPreference() {
 
 function saveBetaPreference(enabled) {
   try {
-    const { app } = require('electron');
     const fs = require('fs');
-    const p = require('path').join(app.getPath('userData'), 'homestream-prefs.json');
+    const p = path.join(app.getPath('userData'), 'homestream-prefs.json');
     let prefs = {};
     try { prefs = JSON.parse(fs.readFileSync(p, 'utf8')); } catch { /* fresh file */ }
     prefs.betaChannel = enabled;

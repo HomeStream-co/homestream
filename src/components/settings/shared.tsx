@@ -5,6 +5,8 @@
  * Nothing here has its own state beyond local UI state.
  */
 
+/* eslint-disable react-refresh/only-export-components */
+
 import { memo, useState } from 'react';
 import { motion } from 'motion/react';
 import {

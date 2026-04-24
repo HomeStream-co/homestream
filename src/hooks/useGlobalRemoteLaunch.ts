@@ -63,7 +63,7 @@ export function useGlobalRemoteLaunch() {
         try {
           const msg = JSON.parse(e.data) as { type: string; mediaId?: string };
           if (msg.type === 'launch' && msg.mediaId) {
-            console.log('[remote] Launch command received — navigating to player:', msg.mediaId);
+            console.info('[remote] Launch command received — navigating to player:', msg.mediaId);
             navigateRef.current(`/player/${msg.mediaId}`);
           }
         } catch { /* ignore */ }

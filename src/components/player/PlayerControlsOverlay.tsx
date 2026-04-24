@@ -108,7 +108,7 @@ export default function PlayerControlsOverlay({
   playbackRate, isPiP, showInfo, showSpeedMenu, showCcMenu,
   showAudioMenu, ccLang, ccFontSize, ccBgOpacity, audioTracks,
   activeAudioTrack, tvFocus, playerAccent, seekHover, seekBarRef,
-  thumbCanvasRef, currentTimeRef, bufferedRef, timeDisplayRef, bufferedBarRef,
+  thumbCanvasRef, currentTimeRef, bufferedRef: _bufferedRef, timeDisplayRef, bufferedBarRef,
   castButtonRef, videoRef,
   togglePlay, toggleMute, toggleFullscreen, togglePiP,
   handleSeek, handleVolumeChange, handleSeekHover, changeSpeed,
