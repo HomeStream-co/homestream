@@ -1,5 +1,5 @@
 /* eslint-disable react-refresh/only-export-components */
-import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useRef, useMemo, type ReactNode } from 'react';
 import type { MediaItem } from '@/types/media';
 import { useProfile } from '@/context/ProfileContext';
 
@@ -81,9 +81,28 @@ export function MediaProvider({ children }: { children: ReactNode }) {
   const refreshLibrary = useCallback(async () => {
     try {
       setLoading(true);
-      // Pass active profile so server resolves per-profile progress fields
-      const res = await fetch(`/api/media?profile=${profileId}`);
+      // Send ETag from last fetch — server returns 304 if nothing changed,
+      // saving the full JSON round-trip on every page navigation.
+      const headers: HeadersInit = {};
+      const cachedEtag = libraryEtagRef.current;
+      if (cachedEtag) headers['If-None-Match'] = cachedEtag;
+
+      const res = await fetch(`/api/media?profile=${profileId}`, { headers });
+
+      // 304 Not Modified — library hasn't changed; keep current state as-is.
+      if (res.status === 304) {
+        setLoading(false);
+        return;
+      }
+
       if (res.ok) {
+        // Store the new ETag for the next request
+        const newEtag = res.headers.get('ETag');
+        if (newEtag) {
+          libraryEtagRef.current = newEtag;
+          localStorage.setItem(etagKey, newEtag);
+        }
+
         const data = await res.json() as MediaItem[];
         setLibrary(data);
         // Reconcile continueWatching from server — server is source of truth after restart.
@@ -110,7 +129,7 @@ export function MediaProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoading(false);
     }
-  }, [profileId, progressKey]);
+  }, [profileId, progressKey, etagKey]);
 
   useEffect(() => {
     refreshLibrary();
@@ -235,22 +254,28 @@ export function MediaProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const contextValue = useMemo(() => ({
+    library,
+    loading,
+    watchlist,
+    continueWatching,
+    pendingRecommendation,
+    refreshLibrary,
+    addToWatchlist,
+    removeFromWatchlist,
+    updateProgress,
+    deleteMedia,
+    updateMedia,
+    triggerPostWatchRecommendation,
+    clearPendingRecommendation,
+  }), [
+    library, loading, watchlist, continueWatching, pendingRecommendation,
+    refreshLibrary, addToWatchlist, removeFromWatchlist, updateProgress,
+    deleteMedia, updateMedia, triggerPostWatchRecommendation, clearPendingRecommendation,
+  ]);
+
   return (
-    <MediaContext.Provider value={{
-      library,
-      loading,
-      watchlist,
-      continueWatching,
-      pendingRecommendation,
-      refreshLibrary,
-      addToWatchlist,
-      removeFromWatchlist,
-      updateProgress,
-      deleteMedia,
-      updateMedia,
-      triggerPostWatchRecommendation,
-      clearPendingRecommendation,
-    }}>
+    <MediaContext.Provider value={contextValue}>
       {children}
     </MediaContext.Provider>
   );

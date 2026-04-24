@@ -20,7 +20,7 @@
  * If no trailer is found, the component is transparent — children render normally.
  */
 
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { Play, Plus, Star, Volume2, VolumeX } from 'lucide-react';
@@ -89,7 +89,8 @@ export default function TrailerHover({
 }: TrailerHoverProps) {
   const navigate = useNavigate();
   const { watchlist, addToWatchlist, removeFromWatchlist } = useMedia();
-  const inWatchlist = watchlist.includes(item.id);
+  // Memoize so this component only re-renders when THIS item's watchlist state changes
+  const inWatchlist = useMemo(() => watchlist.includes(item.id), [watchlist, item.id]);
 
   const [showPreview, setShowPreview] = useState(false);
   const [trailerKey, setTrailerKey] = useState<string | null>(null);

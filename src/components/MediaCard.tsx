@@ -9,7 +9,7 @@
  *  - Smooth scale + shadow on hover
  */
 
-import { useState, useRef, useCallback, useMemo } from 'react';
+import { useState, useRef, useCallback, useMemo, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { Play, Plus, Check, Star, Film, Tv2, Info, CheckCircle2 } from 'lucide-react';
@@ -44,7 +44,7 @@ function getEpisodeProgress(item: MediaItem) {
   return { watched, total: eps.length, pct: (watched / eps.length) * 100 };
 }
 
-export default function MediaCard({ item, showProgress = false, size = 'sm' }: MediaCardProps) {
+function MediaCard({ item, showProgress = false, size = 'sm' }: MediaCardProps) {
   const navigate = useNavigate();
   const { watchlist, addToWatchlist, removeFromWatchlist, continueWatching } = useMedia();
   const { settings } = useTheme();
@@ -239,3 +239,8 @@ export default function MediaCard({ item, showProgress = false, size = 'sm' }: M
     </MediaContextMenu>
   );
 }
+
+// Wrap in memo so React can bail out of re-rendering cards whose props haven't
+// changed. This is the primary guard against carousel-wide re-renders triggered
+// by unrelated context updates (e.g. another item's progress ticking up).
+export default memo(MediaCard);
