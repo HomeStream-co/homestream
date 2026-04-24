@@ -153,17 +153,77 @@ function VolumeFlash({ dir, pct }: { dir: 'up' | 'down'; pct: number }) {
 // Moved to ./remote/BrowseTab.tsx
 // ── Component ─────────────────────────────────────────────────────────────────
 
+// ── Server-ready gate — shown when setup is not complete ──────────────────────
+
+function RemoteNotConnected({ serverIP }: { serverIP: string }) {
+  return (
+    <div className="min-h-screen bg-zinc-950 text-white flex flex-col items-center justify-center gap-6 px-6 text-center">
+      <title>HomeStream Remote</title>
+      <div className="w-14 h-14 rounded-2xl bg-primary flex items-center justify-center">
+        <Play className="w-7 h-7 text-primary-foreground fill-primary-foreground ml-0.5" />
+      </div>
+      <div>
+        <h1 className="text-2xl font-bold mb-2">HomeStream Remote</h1>
+        <p className="text-white/50 text-sm max-w-xs">
+          This remote is not connected to a HomeStream server.
+        </p>
+      </div>
+      <div className="bg-white/5 border border-white/10 rounded-2xl px-6 py-5 max-w-sm w-full text-left space-y-3">
+        <p className="text-white/40 text-xs uppercase tracking-widest font-semibold">How to connect</p>
+        <p className="text-white/70 text-sm">Open HomeStream on your home PC, then visit the remote URL shown on the home screen QR code.</p>
+        {serverIP ? (
+          <div className="bg-black/40 rounded-xl px-4 py-3 font-mono text-sm text-primary font-bold text-center break-all">
+            {serverIP}
+          </div>
+        ) : (
+          <div className="bg-black/40 rounded-xl px-4 py-3 font-mono text-sm text-white/40 text-center">
+            http://[your-server-ip]:3000/remote
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function RemotePage() {
+  // ── Server connection check ──────────────────────────────────────────────
+  const [serverReady, setServerReady] = useState<boolean | null>(null);
+  const [serverIP, setServerIP] = useState('');
+
+  useEffect(() => {
+    fetch('/api/setup')
+      .then(r => r.json())
+      .then((d: { setupComplete?: boolean }) => setServerReady(!!d.setupComplete))
+      .catch(() => setServerReady(false));
+
+    fetch('/api/network/info')
+      .then(r => r.json())
+      .then((d: { lanIP?: string; port?: string }) => {
+        if (d.lanIP && d.lanIP !== 'localhost') {
+          setServerIP(`http://${d.lanIP}:${d.port ?? '3000'}/remote`);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  if (serverReady === null) {
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (!serverReady) return <RemoteNotConnected serverIP={serverIP} />;
+
+  return <RemotePageInner />;
+}
+
+function RemotePageInner() {
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Stable ref to the connect function — avoids stale-closure in onclose/onerror
-  // handlers that are set up once per WebSocket instance but need to call the
-  // latest version of connect (which itself reads from stable refs, so this is safe).
   const connectRef = useRef<(() => void) | null>(null);
-  // Destroyed flag — set on unmount so onclose/onerror don't call setState
-  // after the component has been removed from the tree.
   const destroyedRef = useRef(false);
-  // Exponential back-off state for reconnects (resets on successful open)
   const retryCountRef = useRef(0);
   const MAX_RETRY_DELAY_MS = 30_000;
   const BASE_RETRY_DELAY_MS = 3_000;

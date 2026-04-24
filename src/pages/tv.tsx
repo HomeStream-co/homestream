@@ -318,6 +318,79 @@ export default function TvPage() {
   const { activeProfile } = useProfile();
   const profileId = activeProfile?.id ?? 'adult';
 
+  // ── Server connection check ──────────────────────────────────────────────
+  // If setup hasn't been completed on this server, show a "not connected" screen
+  // instead of an empty library. This happens when the TV browser hits the
+  // cloud preview URL instead of the real home server LAN IP.
+  const [serverReady, setServerReady] = useState<boolean | null>(null);
+  const [serverIP, setServerIP] = useState('');
+
+  useEffect(() => {
+    fetch('/api/setup')
+      .then(r => r.json())
+      .then((d: { setupComplete?: boolean }) => {
+        setServerReady(!!d.setupComplete);
+      })
+      .catch(() => setServerReady(false));
+
+    // Try to get the LAN IP for the "use this address" hint
+    fetch('/api/network/info')
+      .then(r => r.json())
+      .then((d: { lanIP?: string; port?: string }) => {
+        if (d.lanIP && d.lanIP !== 'localhost') {
+          setServerIP(`http://${d.lanIP}:${d.port ?? '3000'}/tv`);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  // Still checking
+  if (serverReady === null) {
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        <div className="w-10 h-10 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  // Server not set up — show connection instructions
+  if (!serverReady) {
+    return (
+      <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center gap-8 px-12 text-center">
+        <title>HomeStream TV</title>
+        <div className="w-16 h-16 rounded-2xl bg-primary flex items-center justify-center">
+          <Play className="w-8 h-8 text-primary-foreground fill-primary-foreground ml-1" />
+        </div>
+        <div>
+          <h1 className="text-4xl font-bold mb-3">HomeStream TV</h1>
+          <p className="text-xl text-white/60 max-w-lg">
+            This TV is not connected to a HomeStream server.
+          </p>
+        </div>
+        <div className="bg-white/10 rounded-2xl px-8 py-6 max-w-lg w-full">
+          <p className="text-white/50 text-sm uppercase tracking-widest mb-4 font-semibold">How to connect</p>
+          <ol className="text-left space-y-3 text-white/80 text-lg">
+            <li><span className="text-primary font-bold mr-2">1.</span> Open HomeStream on your home PC or server</li>
+            <li><span className="text-primary font-bold mr-2">2.</span> Make sure your TV is on the same WiFi network</li>
+            <li><span className="text-primary font-bold mr-2">3.</span> In your TV browser, go to:</li>
+          </ol>
+          {serverIP ? (
+            <div className="mt-4 bg-black/40 rounded-xl px-6 py-4 font-mono text-2xl text-primary font-bold tracking-wide text-center">
+              {serverIP}
+            </div>
+          ) : (
+            <div className="mt-4 bg-black/40 rounded-xl px-6 py-4 font-mono text-lg text-white/60 text-center">
+              http://[your-server-ip]:3000/tv
+            </div>
+          )}
+        </div>
+        <p className="text-white/30 text-sm">
+          Find your server IP in HomeStream Settings → Network
+        </p>
+      </div>
+    );
+  }
+
   const [tab, setTab] = useState<NavTab>('home');
   const [search, setSearch] = useState('');
   const [showSearch, setShowSearch] = useState(false);
