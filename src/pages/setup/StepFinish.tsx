@@ -56,16 +56,16 @@ export default function StepFinish({
     return () => { cancelled = true; };
   }, []);
 
+  // The QR URL now points to hs.local — check the raw lanIP to decide if we're
+  // actually on a real LAN (hs.local is always a valid address, but if the
+  // server only found 127.0.0.1 it means there's no real network interface).
   const lanIP = qrData?.lanIP ?? window.location.hostname;
-  // Hide the QR only if the server itself couldn't find a real LAN IP —
-  // i.e. the QR URL would point to localhost, which is useless on a phone.
-  // We do NOT hide it just because the browser is on localhost (Electron app).
   const qrPointsToLocalhost =
     !qrData ||
     lanIP === 'localhost' ||
     lanIP === '127.0.0.1' ||
     lanIP === '::1';
-  const remoteUrl = qrData?.url ?? `http://${lanIP}:${qrData?.port ?? '3000'}/remote`;
+  const remoteUrl = qrData?.url ?? `http://hs.local:${qrData?.port ?? '3000'}/remote`;
 
   function copyUrl() {
     navigator.clipboard.writeText(remoteUrl).then(() => {

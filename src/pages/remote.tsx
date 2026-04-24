@@ -271,7 +271,7 @@ function RemotePageInner() {
 
   // QR code
   const [showQr, setShowQr] = useState(false);
-  const [qrData, setQrData] = useState<{ url: string; qr: string } | null>(null);
+  const [qrData, setQrData] = useState<{ url: string; qr: string; mdnsUrl?: string; ipUrl?: string } | null>(null);
 
   // Detect landscape orientation
   useEffect(() => {
@@ -288,7 +288,7 @@ function RemotePageInner() {
   useEffect(() => {
     fetch('/api/remote/qr')
       .then(r => r.json())
-      .then((d: { url: string; qr: string }) => setQrData(d))
+      .then((d: { url: string; qr: string; mdnsUrl?: string; ipUrl?: string }) => setQrData(d))
       .catch(() => {});
   }, []);
 
@@ -1019,7 +1019,7 @@ function IdleState({
   );
 }
 
-function QrModal({ qrData, onClose }: { qrData: { url: string; qr: string }; onClose: () => void }) {
+function QrModal({ qrData, onClose }: { qrData: { url: string; qr: string; mdnsUrl?: string; ipUrl?: string }; onClose: () => void }) {
   const [copied, setCopied] = useState(false);
 
   const copyUrl = () => {
@@ -1028,6 +1028,11 @@ function QrModal({ qrData, onClose }: { qrData: { url: string; qr: string }; onC
       setTimeout(() => setCopied(false), 2000);
     });
   };
+
+  // Safely extract port from the URL (works for both hs.local and IP URLs)
+  const port = (() => { try { return new URL(qrData.url).port || '3000'; } catch { return '3000'; } })();
+  // Raw IP fallback URL for display (strip /remote suffix for readability)
+  const ipFallback = qrData.ipUrl ?? null;
 
   return (
     <motion.div
@@ -1068,6 +1073,14 @@ function QrModal({ qrData, onClose }: { qrData: { url: string; qr: string }; onC
           : <Copy className="w-3.5 h-3.5 text-muted-foreground/50 group-hover:text-muted-foreground flex-shrink-0" />}
       </button>
 
+      {/* IP fallback hint — shown when hs.local is primary */}
+      {ipFallback && ipFallback !== qrData.url && (
+        <p className="mt-1.5 text-[9px] text-muted-foreground/50 font-mono text-center">
+          Fallback (if hs.local fails):{' '}
+          <span className="text-muted-foreground/70">{ipFallback}</span>
+        </p>
+      )}
+
       {/* Same-Wi-Fi requirement + troubleshooting */}
       <div className="mt-3 bg-amber-500/10 border border-amber-500/25 rounded-xl p-3">
         <p className="text-[11px] font-semibold text-amber-400 mb-1.5 flex items-center gap-1.5">
@@ -1076,8 +1089,8 @@ function QrModal({ qrData, onClose }: { qrData: { url: string; qr: string }; onC
         <ul className="text-[10px] text-muted-foreground space-y-1 leading-relaxed">
           <li>• Your phone must be on the <strong className="text-foreground">same Wi-Fi</strong> as this computer</li>
           <li>• Mobile data / 4G / 5G will <strong className="text-foreground">not</strong> work — Wi-Fi only</li>
-          <li>• If it still fails, try typing the address above directly into your phone browser</li>
-          <li>• Firewall blocking? Allow port <strong className="text-foreground">{qrData.url.split(':')[2]?.split('/')[0] ?? '3000'}</strong> in Windows Defender / your router</li>
+          <li>• If <code className="text-foreground">hs.local</code> doesn't load, try the fallback IP address above</li>
+          <li>• Firewall blocking? Allow port <strong className="text-foreground">{port}</strong> in Windows Defender / your router</li>
         </ul>
       </div>
     </motion.div>
@@ -1376,7 +1389,7 @@ function LandscapeControls({
   hasSubtitles: boolean;
   subtitleActive: boolean;
   screenCount: number;
-  qrData: { url: string; qr: string } | null;
+  qrData: { url: string; qr: string; mdnsUrl?: string; ipUrl?: string } | null;
   showQr: boolean;
   setShowQr: (v: boolean) => void;
   showCastPanel: boolean;
