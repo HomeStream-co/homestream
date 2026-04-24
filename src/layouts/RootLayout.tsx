@@ -18,19 +18,28 @@ interface RootLayoutProps {
   children: ReactElement;
 }
 
+// Routes that must always render regardless of setup/auth/profile state.
+// /remote — phone QR code lands here; must work before setup is complete.
+// /tv     — TV 10-foot UI; opened directly on smart TVs.
+// /samsung-tv — Samsung setup guide; shown before any config exists.
+const ALWAYS_ACCESSIBLE = ['/remote', '/tv', '/samsung-tv'];
+
 /**
  * SetupGuard — redirects to /setup if the server hasn't been configured yet.
  * Runs a single GET /api/setup check on mount. Skips the check when already
- * on /setup so the wizard can render without triggering a redirect loop.
+ * on /setup (redirect loop) or on always-accessible routes (/remote, /tv,
+ * /samsung-tv) which must render before setup is complete.
  */
 function SetupGuard({ children }: { children: ReactElement }) {
   const navigate = useNavigate();
   const location = useLocation();
   const [ready, setReady] = useState(false);
 
+  const bypass = location.pathname === '/setup' || ALWAYS_ACCESSIBLE.includes(location.pathname);
+
   useEffect(() => {
-    // Already on the setup page — don't check, just render
-    if (location.pathname === '/setup') {
+    // Setup page or always-accessible routes — skip the check entirely
+    if (bypass) {
       setReady(true);
       return;
     }
@@ -50,13 +59,14 @@ function SetupGuard({ children }: { children: ReactElement }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  if (!ready && location.pathname !== '/setup') return null;
+  if (!ready && !bypass) return null;
   return children;
 }
 
 /** Redirects to /profiles if no profile has been selected yet.
  *  Waits for auth to resolve (authenticated !== null) before redirecting
- *  so we don't race with the LoginGate and produce a blank screen. */
+ *  so we don't race with the LoginGate and produce a blank screen.
+ *  Always-accessible routes (/remote, /tv, /samsung-tv) are exempt. */
 function ProfileGuard({ children }: { children: ReactElement }) {
   const { activeProfile } = useProfile();
   const { authenticated } = useAuth();
@@ -66,6 +76,8 @@ function ProfileGuard({ children }: { children: ReactElement }) {
   useEffect(() => {
     // Don't redirect while auth is still resolving — avoids blank-screen race
     if (authenticated === null) return;
+    // Always-accessible routes don't need a profile
+    if (ALWAYS_ACCESSIBLE.includes(location.pathname)) return;
     if (!activeProfile && location.pathname !== '/profiles') {
       navigate('/profiles', { replace: true });
     }
@@ -82,13 +94,13 @@ function TMDBWrapper({ children }: { children: ReactElement }) {
 }
 
 /** Shows LoginGate if admin password is set and session is not valid.
- *  The /setup route bypasses auth entirely — the wizard must always be reachable. */
+ *  The /setup route and always-accessible routes bypass auth entirely. */
 function AuthGate({ children }: { children: ReactElement }) {
   const { authenticated } = useAuth();
   const location = useLocation();
 
-  // Setup wizard is always accessible — no auth required
-  if (location.pathname === '/setup') return children;
+  // Setup wizard and phone/TV routes are always accessible — no auth required
+  if (location.pathname === '/setup' || ALWAYS_ACCESSIBLE.includes(location.pathname)) return children;
 
   // Still checking — render nothing to avoid flash
   if (authenticated === null) return null;
@@ -104,6 +116,8 @@ export default function RootLayout({ children }: RootLayoutProps) {
   const isPlayer   = location.pathname.startsWith('/player/');
   const isProfiles = location.pathname === '/profiles';
   const isSetup    = location.pathname === '/setup';
+  // Always-accessible full-screen routes — no header, footer, auth, or profile guard
+  const isAlwaysAccessible = ALWAYS_ACCESSIBLE.includes(location.pathname);
 
   // Global listener: phone Browse tab sends 'launch' → navigate TV to player
   useGlobalRemoteLaunch();
@@ -115,8 +129,8 @@ export default function RootLayout({ children }: RootLayoutProps) {
           <MediaProvider>
             <TMDBWrapper>
               <Website>
-                {isSetup ? (
-                  // Setup wizard: no header, footer, auth gate, or profile guard
+                {isSetup || isAlwaysAccessible ? (
+                  // Setup wizard + phone/TV routes: no header, footer, auth, or profile guard
                   children
                 ) : (
                   <SetupGuard>
