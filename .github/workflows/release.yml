@@ -48,18 +48,33 @@ jobs:
           key: Windows-node22-modules-${{ hashFiles('package-lock.json') }}
 
       # ── Install (only if cache missed) ────────────────────────────────────
+<<<<<<< HEAD
       - name: Install dependencies
         if: steps.cache-node-modules.outputs.cache-hit != 'true'
         run: npm ci
+=======
+      # --ignore-scripts: skips native addon compilation (node-datachannel,
+      # bufferutil, etc.) — the server bundle is pre-compiled by esbuild so
+      # no native .node files are needed at package time.
+      # npm_config_optional=true: suppresses optional dep failures as a belt-and-suspenders.
+      - name: Install dependencies
+        if: steps.cache-node-modules.outputs.cache-hit != 'true'
+        run: npm ci --ignore-scripts
+>>>>>>> 20260424023549-9h9yrecco0
         env:
           npm_config_optional: true
 
       # ── Delete existing GitHub Release so electron-builder can recreate it ─
+<<<<<<< HEAD
+=======
+      # Uses PowerShell (native on windows-latest) to avoid python3/bash issues.
+>>>>>>> 20260424023549-9h9yrecco0
       - name: Delete existing GitHub Release (if any)
-        shell: bash
+        shell: pwsh
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: |
+<<<<<<< HEAD
           TAG="${{ github.ref_name }}"
           echo "Checking for existing release for tag: $TAG"
           RESPONSE=$(curl -s -H "Authorization: token $GH_TOKEN" \
@@ -74,6 +89,22 @@ jobs:
           else
             echo "No existing release found for $TAG — proceeding"
           fi
+=======
+          $tag = "${{ github.ref_name }}"
+          $headers = @{ Authorization = "token $env:GH_TOKEN"; Accept = "application/vnd.github+json" }
+          $uri = "https://api.github.com/repos/${{ github.repository }}/releases/tags/$tag"
+          try {
+            $release = Invoke-RestMethod -Uri $uri -Headers $headers -ErrorAction Stop
+            $id = $release.id
+            if ($id) {
+              Write-Host "Deleting existing release id=$id for tag $tag"
+              Invoke-RestMethod -Method Delete -Uri "https://api.github.com/repos/${{ github.repository }}/releases/$id" -Headers $headers
+              Write-Host "Deleted."
+            }
+          } catch {
+            Write-Host "No existing release found for $tag (or delete failed — continuing anyway)"
+          }
+>>>>>>> 20260424023549-9h9yrecco0
 
       # ── Build Vite + server bundle ─────────────────────────────────────────
       - name: Build app (Vite + server bundle)
@@ -84,22 +115,28 @@ jobs:
 
       # ── Verify build artifacts ─────────────────────────────────────────────
       - name: Verify build artifacts
-        shell: bash
+        shell: pwsh
         run: |
-          echo "=== dist/ top-level ==="
-          ls -lh dist/ || { echo "ERROR: dist/ missing"; exit 1; }
-          echo ""
-          echo "=== dist/client/ ==="
-          ls dist/client/ | head -15 || { echo "ERROR: dist/client/ missing"; exit 1; }
-          echo ""
-          echo "=== server bundle ==="
-          if [ -f dist/server.bundle.cjs ]; then
-            ls -lh dist/server.bundle.cjs
-            echo "✓ server.bundle.cjs present"
-          else
-            echo "ERROR: dist/server.bundle.cjs MISSING — build failed"
+          Write-Host "=== dist/ top-level ==="
+          if (!(Test-Path "dist")) { Write-Error "ERROR: dist/ missing"; exit 1 }
+          Get-ChildItem dist | Format-Table Name, Length
+          Write-Host ""
+          Write-Host "=== dist/client/ ==="
+          if (!(Test-Path "dist/client")) { Write-Error "ERROR: dist/client/ missing"; exit 1 }
+          Get-ChildItem dist/client | Select-Object -First 15 | Format-Table Name
+          Write-Host ""
+          Write-Host "=== server bundle ==="
+          if (Test-Path "dist/server.bundle.cjs") {
+            $size = (Get-Item "dist/server.bundle.cjs").Length / 1MB
+            Write-Host ("✓ server.bundle.cjs present ({0:N1} MB)" -f $size)
+          } else {
+            Write-Error "ERROR: dist/server.bundle.cjs MISSING — build failed"
             exit 1
+<<<<<<< HEAD
           fi
+=======
+          }
+>>>>>>> 20260424023549-9h9yrecco0
 
       # ── Package: NSIS installer + publish to GitHub Release ───────────────
       # This is the ONLY build that supports auto-updater.
