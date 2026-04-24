@@ -48,6 +48,35 @@ let availableVersion = null;
 let autoCheckTimer = null;
 let getControlWindow = null; // injected by main.js
 
+// Beta channel opt-in — persisted to a simple JSON file next to the app data.
+// When true, autoUpdater.allowPrerelease = true so pre-release tags (v1.6.0-beta.1)
+// are included in update checks alongside stable releases.
+let betaChannelEnabled = false;
+
+function loadBetaPreference() {
+  try {
+    const { app } = require('electron');
+    const fs = require('fs');
+    const p = require('path').join(app.getPath('userData'), 'homestream-prefs.json');
+    if (fs.existsSync(p)) {
+      const prefs = JSON.parse(fs.readFileSync(p, 'utf8'));
+      betaChannelEnabled = !!prefs.betaChannel;
+    }
+  } catch { /* ignore */ }
+}
+
+function saveBetaPreference(enabled) {
+  try {
+    const { app } = require('electron');
+    const fs = require('fs');
+    const p = require('path').join(app.getPath('userData'), 'homestream-prefs.json');
+    let prefs = {};
+    try { prefs = JSON.parse(fs.readFileSync(p, 'utf8')); } catch { /* fresh file */ }
+    prefs.betaChannel = enabled;
+    fs.writeFileSync(p, JSON.stringify(prefs, null, 2));
+  } catch { /* ignore */ }
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function sendStatus(state, extra = {}) {
@@ -86,6 +115,9 @@ function semverGt(a, b) {
 function setupAutoUpdater({ controlWindowGetter, pushLog }) {
   getControlWindow = controlWindowGetter;
   pushLogFn = pushLog;
+
+  // Load beta preference from disk before anything else
+  loadBetaPreference();
 
   // Skip entirely in dev mode
   if (!app.isPackaged) {
@@ -135,6 +167,10 @@ function setupAutoUpdater({ controlWindowGetter, pushLog }) {
   // Disable auto-download so the user controls when to download.
   autoUpdater.autoDownload = false;
   autoUpdater.autoInstallOnAppQuit = false;
+
+  // Apply beta channel preference
+  autoUpdater.allowPrerelease = betaChannelEnabled;
+  log(`Beta channel: ${betaChannelEnabled ? 'enabled' : 'disabled'}`);
 
   // ── Event handlers ──────────────────────────────────────────────────────────
 
@@ -221,6 +257,19 @@ function setupAutoUpdater({ controlWindowGetter, pushLog }) {
     log('Restarting to install update…', 'warn');
     setImmediate(() => autoUpdater.quitAndInstall(false, true));
   });
+
+  // Beta channel toggle — renderer sends { enabled: boolean }
+  ipcMain.on('set-beta-channel', (_event, { enabled }) => {
+    betaChannelEnabled = !!enabled;
+    saveBetaPreference(betaChannelEnabled);
+    autoUpdater.allowPrerelease = betaChannelEnabled;
+    log(`Beta channel ${betaChannelEnabled ? 'enabled' : 'disabled'} — next update check will ${betaChannelEnabled ? 'include' : 'exclude'} pre-releases`, 'info');
+    // Notify renderer of the current state so the toggle reflects reality
+    sendStatus(currentState, { betaChannel: betaChannelEnabled });
+  });
+
+  // Renderer can query current beta preference on load
+  ipcMain.handle('get-beta-channel', () => betaChannelEnabled);
 
   // ── Scheduled checks ────────────────────────────────────────────────────────
 

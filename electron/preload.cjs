@@ -30,7 +30,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   downloadUpdate:  () => ipcRenderer.send('download-update'),
   installUpdate:   () => ipcRenderer.send('install-update'),
 
-  // Event listener — receives { state, version?, percent?, error? }
+  // Beta channel
+  setBetaChannel:  (enabled) => ipcRenderer.send('set-beta-channel', { enabled }),
+  getBetaChannel:  () => ipcRenderer.invoke('get-beta-channel'),
+
+  // Event listener — receives { state, version?, percent?, error?, betaChannel? }
   onUpdateStatus: (callback) => ipcRenderer.on('update-status', (_event, data) => callback(data)),
 
   // ── Dev Drawer (Ctrl+Shift+Alt+D global shortcut) ───────────────────────────

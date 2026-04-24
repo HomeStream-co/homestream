@@ -1,5 +1,7 @@
-import { ShieldCheck, Lock, Tv2, Wand2, Wrench } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { ShieldCheck, Lock, Tv2, Wand2, Wrench, FlaskConical, MessageSquarePlus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import FeedbackButton from '@/components/FeedbackButton';
 
 interface SettingsToolsProps {
   onClose: () => void;
@@ -8,6 +10,77 @@ interface SettingsToolsProps {
   onClearHealth: () => void;
   healthStatus: 'ok' | 'warn' | 'error' | null;
 }
+
+// ── Beta channel toggle ───────────────────────────────────────────────────────
+// Reads/writes via the Electron IPC bridge (window.electronAPI).
+// In the browser (non-Electron) context, the toggle is hidden.
+
+type ElectronAPI = {
+  getBetaChannel?: () => Promise<boolean>;
+  setBetaChannel?: (enabled: boolean) => void;
+};
+
+function getElectronAPI(): ElectronAPI | null {
+  return (window as unknown as { electronAPI?: ElectronAPI }).electronAPI ?? null;
+}
+
+function BetaChannelToggle() {
+  const api = getElectronAPI();
+  const [betaEnabled, setBetaEnabled] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    if (!api?.getBetaChannel) return;
+    api.getBetaChannel().then(v => { setBetaEnabled(v); setLoaded(true); });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  if (!api?.setBetaChannel || !loaded) return null;
+
+  const toggle = () => {
+    const next = !betaEnabled;
+    setBetaEnabled(next);
+    api.setBetaChannel?.(next);
+  };
+
+  return (
+    <button
+      onClick={toggle}
+      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border transition-colors text-left group
+        ${betaEnabled
+          ? 'border-amber-500/40 bg-amber-500/5 hover:bg-amber-500/10'
+          : 'border-border hover:border-amber-500/30 hover:bg-amber-500/5'
+        }`}
+    >
+      <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors
+        ${betaEnabled ? 'bg-amber-500/20' : 'bg-amber-500/10 group-hover:bg-amber-500/20'}`}
+      >
+        <FlaskConical className="w-4 h-4 text-amber-400" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <p className="text-sm font-medium text-foreground leading-tight">Beta Channel</p>
+          {betaEnabled && (
+            <span className="text-[9px] font-bold bg-amber-500/20 text-amber-400 px-1.5 py-0.5 rounded-full uppercase tracking-wider">
+              ON
+            </span>
+          )}
+        </div>
+        <p className="text-[11px] text-muted-foreground">
+          {betaEnabled
+            ? 'Receiving pre-release builds — restart to check for beta updates'
+            : 'Enable to receive beta builds before stable release'}
+        </p>
+      </div>
+      {/* Toggle pill */}
+      <div className={`relative w-9 h-5 rounded-full transition-colors flex-shrink-0 ${betaEnabled ? 'bg-amber-500' : 'bg-muted'}`}>
+        <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${betaEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
+      </div>
+    </button>
+  );
+}
+
+// ── Main component ────────────────────────────────────────────────────────────
 
 export default function SettingsTools({
   onClose, onOpenSecurity, onOpenDebug, onClearHealth, healthStatus,
@@ -118,6 +191,26 @@ export default function SettingsTools({
           )}
         </button>
       )}
+
+      {/* Beta Channel toggle (Electron only) */}
+      <BetaChannelToggle />
+
+      {/* Feedback */}
+      <div className="pt-1">
+        <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-semibold mb-2">
+          Feedback
+        </p>
+        <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl border border-border bg-muted/20">
+          <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+            <MessageSquarePlus className="w-4 h-4 text-primary" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-foreground leading-tight">Send Feedback</p>
+            <p className="text-[11px] text-muted-foreground">Report bugs or suggest features — posts a GitHub Issue</p>
+          </div>
+          <FeedbackButton compact />
+        </div>
+      </div>
     </div>
   );
 }

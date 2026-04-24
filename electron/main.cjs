@@ -959,6 +959,7 @@ const CONTROL_PANEL_HTML = `<!DOCTYPE html>
   <button class="btn-secondary" id="btn-setup" disabled onclick="openSetup()">Setup Wizard</button>
   <button class="btn-secondary" id="btn-stop" disabled onclick="toggleServer()">Stop Server</button>
   <button class="btn-secondary" id="btn-check-update" onclick="checkForUpdate()" title="Check GitHub Releases for a newer version">Check for Updates</button>
+  <button class="btn-secondary" id="btn-beta-toggle" onclick="toggleBetaChannel()" title="Opt in to pre-release beta builds">Beta Channel: OFF</button>
   <button class="btn-secondary" id="btn-crashlog" onclick="toggleCrashLog()" title="View crash log to diagnose startup errors">Crash Log</button>
 </div>
 
@@ -1220,6 +1221,32 @@ const CONTROL_PANEL_HTML = `<!DOCTYPE html>
   }
 
   window.electronAPI?.onUpdateStatus(handleUpdateStatus);
+
+  // ── Beta channel toggle ────────────────────────────────────────────────────
+  let betaEnabled = false;
+
+  async function initBetaToggle() {
+    try {
+      betaEnabled = await window.electronAPI?.getBetaChannel?.() ?? false;
+      updateBetaBtn();
+    } catch { /* ignore */ }
+  }
+
+  function updateBetaBtn() {
+    const btn = document.getElementById('btn-beta-toggle');
+    if (!btn) return;
+    btn.textContent = betaEnabled ? 'Beta Channel: ON' : 'Beta Channel: OFF';
+    btn.style.borderColor = betaEnabled ? '#f59e0b' : '';
+    btn.style.color       = betaEnabled ? '#f59e0b' : '';
+  }
+
+  function toggleBetaChannel() {
+    betaEnabled = !betaEnabled;
+    window.electronAPI?.setBetaChannel?.(betaEnabled);
+    updateBetaBtn();
+  }
+
+  initBetaToggle();
 
   // ── Crash log panel ────────────────────────────────────────────────────────
   let crashPanelOpen = false;
