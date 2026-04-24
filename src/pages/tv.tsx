@@ -356,7 +356,10 @@ export default function TvPage() {
   const [serverIP, setServerIP] = useState('');
 
   useEffect(() => {
-    fetch('/api/setup')
+    // Use /api/health — always unauthenticated, includes setupComplete flag.
+    // /api/setup requires an auth cookie once setup is done, which the TV
+    // browser won't have, causing a false "not connected" screen.
+    fetch('/api/health')
       .then(r => r.json())
       .then((d: { setupComplete?: boolean }) => setServerReady(!!d.setupComplete))
       .catch(() => setServerReady(false));
