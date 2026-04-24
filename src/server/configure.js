@@ -2,6 +2,7 @@ import express from "express";
 import cookieParser from "cookie-parser";
 import { fileURLToPath } from "node:url";
 import { dirname, join, extname } from "node:path";
+import { existsSync } from "node:fs";
 import zlib from "node:zlib";
 
 // Install console capture FIRST — before anything else logs — so we
@@ -230,13 +231,20 @@ export const serverBefore = (server) => {
     next();
   });
 
-  server.use(express.static(CLIENT_DIR, {
-    setHeaders(res, filePath) {
-      res.set("Cache-Control", filePath.includes("/assets/")
-        ? "public, max-age=31536000, immutable"
-        : "no-cache");
-    }
-  }));
+  // Only mount express.static when the built client dir actually exists.
+  // In dev/cloud preview mode Vite serves index.html in-memory — CLIENT_DIR
+  // (dist/) doesn't exist yet and express.static would throw ENOENT on every
+  // request (including /tv, /samsung-tv, etc.) before Vite gets a chance to
+  // handle them.
+  if (existsSync(CLIENT_DIR)) {
+    server.use(express.static(CLIENT_DIR, {
+      setHeaders(res, filePath) {
+        res.set("Cache-Control", filePath.includes("/assets/")
+          ? "public, max-age=31536000, immutable"
+          : "no-cache");
+      }
+    }));
+  }
 
   server.use((req, res, next) => {
     res.set("Cache-Control", "no-cache");
@@ -268,13 +276,11 @@ export const serverAfter = (server) => {
     if (req.path.startsWith('/ws/')) return next(); // WebSocket paths — let ws lib handle
     if (extname(req.path)) return next();
     const indexPath = join(CLIENT_DIR, 'index.html');
-    import('node:fs').then(({ existsSync }) => {
-      if (!existsSync(indexPath)) {
-        // Dev mode — Vite handles this route
-        return next();
-      }
-      res.sendFile(indexPath);
-    }).catch(() => next());
+    if (!existsSync(indexPath)) {
+      // Dev mode — Vite handles this route
+      return next();
+    }
+    res.sendFile(indexPath);
   });
 
   const errorHandler = (err, req, res, next) => {
