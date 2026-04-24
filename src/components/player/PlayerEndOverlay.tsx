@@ -88,7 +88,7 @@ export default function PlayerEndOverlay({
           <p className="text-white/50 text-xs font-medium uppercase tracking-widest">You finished</p>
         </div>
         <h2 className="text-2xl font-heading text-white">{item.title}</h2>
-        <p className="text-white/40 text-sm">{item.year} · {item.genre.slice(0, 2).join(', ')}</p>
+        <p className="text-white/40 text-sm">{item.year} · {(item.genre ?? []).slice(0, 2).join(', ')}</p>
       </motion.div>
 
       {/* Up Next */}
@@ -116,7 +116,7 @@ export default function PlayerEndOverlay({
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-white font-medium text-sm truncate">{nextItem.title}</p>
-              <p className="text-white/40 text-xs">{nextItem.year} · {nextItem.genre.slice(0, 1).join(', ')}</p>
+              <p className="text-white/40 text-xs">{nextItem.year} · {(nextItem.genre ?? []).slice(0, 1).join(', ')}</p>
               {nextItem.imdbRating !== 'N/A' && (
                 <p className="text-white/40 text-xs flex items-center gap-1 mt-0.5">
                   <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />

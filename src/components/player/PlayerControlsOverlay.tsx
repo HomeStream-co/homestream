@@ -152,7 +152,7 @@ export default function PlayerControlsOverlay({
         </button>
         <div className="flex-1 min-w-0">
           <p className="text-white font-heading text-lg truncate">{item.title}</p>
-          <p className="text-white/60 text-xs">{item.year} · {item.genre.slice(0, 2).join(', ')}</p>
+          <p className="text-white/60 text-xs">{item.year} · {(item.genre ?? []).slice(0, 2).join(', ')}</p>
         </div>
 
         {(item.watchedSeconds ?? 0) > 5 && (

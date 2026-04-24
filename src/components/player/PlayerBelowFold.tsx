@@ -53,7 +53,7 @@ export default function PlayerBelowFold({
 
           {/* Genre chips */}
           <div className="flex flex-wrap gap-1 mb-3">
-            {item.genre.map((g: string) => (
+            {(item.genre ?? []).map((g: string) => (
               <span key={g} className="bg-secondary text-foreground text-xs px-2 py-0.5 rounded-full">{g}</span>
             ))}
           </div>

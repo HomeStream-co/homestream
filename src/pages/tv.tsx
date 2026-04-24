@@ -252,9 +252,9 @@ function TvHero({ item, onPlay }: { item: MediaItem; onPlay: (item: MediaItem) =
 
             <h1 className="text-4xl font-bold text-white mb-3 leading-tight">{item.title}</h1>
 
-            {item.genre.length > 0 && (
+            {(item.genre ?? []).length > 0 && (
               <div className="flex gap-2 mb-3">
-                {item.genre.slice(0, 3).map(g => (
+                {(item.genre ?? []).slice(0, 3).map(g => (
                   <span key={g} className="text-xs text-white/60 bg-white/10 px-2 py-0.5 rounded-full">{g}</span>
                 ))}
               </div>

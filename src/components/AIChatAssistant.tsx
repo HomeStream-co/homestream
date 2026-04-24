@@ -238,7 +238,7 @@ export default function AIChatAssistant() {
                             />
                             <div className="min-w-0">
                               <p className="text-xs font-medium text-foreground truncate">{item.title}</p>
-                              <p className="text-[10px] text-muted-foreground">{item.year} · {item.genre[0]}</p>
+                              <p className="text-[10px] text-muted-foreground">{item.year} · {(item.genre ?? [])[0]}</p>
                               {item.imdbRating !== 'N/A' && (
                                 <p className="text-[10px] text-accent">⭐ {item.imdbRating}</p>
                               )}

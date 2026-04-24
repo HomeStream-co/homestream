@@ -56,7 +56,7 @@ async function downloadSrt(downloadUrl: string): Promise<string | null> {
     return await res.text();
   } catch {
     clearTimeout(timeout);
-    return null;
+    return null; // non-fatal — network timeout or parse error, ignore
   }
 }
 
@@ -137,7 +137,7 @@ export default async function handler(req: Request, res: Response) {
           results = await searchRes.json() as SubResult[];
         }
       } catch {
-        clearTimeout(timeout);
+        clearTimeout(timeout); // non-fatal — network timeout or parse error, ignore
       }
 
       // Pick the first SRT result (most compatible)

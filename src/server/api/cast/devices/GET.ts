@@ -85,7 +85,7 @@ function fetchDeviceDescription(location: string): Promise<DeviceInfo | null> {
               isRenderer,
             });
           } catch {
-            resolve(null);
+            resolve(null); // non-fatal — ignore unresponsive UPnP device
           }
         });
       });
@@ -94,7 +94,7 @@ function fetchDeviceDescription(location: string): Promise<DeviceInfo | null> {
       req.on('timeout', () => { req.destroy(); resolve(null); });
       req.end();
     } catch {
-      resolve(null);
+      resolve(null); // non-fatal — ignore unresponsive UPnP device
     }
   });
 }
