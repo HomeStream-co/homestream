@@ -1,19 +1,20 @@
 name: Release
 
-# Triggered by pushing a version tag: git tag v1.5.7 && git push origin v1.5.7
+# Triggered by pushing a version tag: git tag v1.5.8 && git push origin v1.5.8
 #
 # Prerequisites (set in repo Settings → Secrets and variables → Actions):
 #   GH_TOKEN  — GitHub Personal Access Token with repo + write:packages scope
 #
 # Re-tag cycle (rebuild same version):
-#   git tag -d v1.5.7 && git push origin --delete v1.5.7
-#   git tag v1.5.7 && git push origin v1.5.7
+#   git tag -d v1.5.8 && git push origin --delete v1.5.8
+#   git tag v1.5.8 && git push origin v1.5.8
 #
 # Artifacts uploaded:
 #   1. HomeStream-Setup-*.exe  — NSIS installer (for real installs / auto-updater)
 #   2. HomeStream-Portable-*.exe — portable single-file exe (for quick testing)
 #
 # The portable build finishes ~5 min faster than NSIS — grab it first for smoke tests.
+# IMPORTANT: Only the NSIS installer supports auto-updater. Never use portable for real installs.
 
 on:
   push:
@@ -25,7 +26,7 @@ jobs:
   release-windows:
     name: Build & Publish Windows Installer
     runs-on: windows-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
 
     steps:
       - uses: actions/checkout@v4
@@ -33,19 +34,18 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: 'npm'
+          # Do NOT use actions/setup-node cache here — we manage it manually
+          # below with a Windows-specific key to avoid cross-OS cache poisoning.
 
-      # ── Restore node_modules cache ─────────────────────────────────────────
-      # Caches the full node_modules dir keyed on package-lock.json hash.
-      # On a cache hit npm ci is skipped entirely, saving 3-5 min per run.
+      # ── node_modules cache (Windows-specific key) ──────────────────────────
+      # Key includes runner.os so a Linux cache never restores on Windows.
+      # restore-keys intentionally omitted — partial cross-OS match would break native modules.
       - name: Cache node_modules
         id: cache-node-modules
         uses: actions/cache@v4
         with:
           path: node_modules
-          key: ${{ runner.os }}-node22-modules-${{ hashFiles('package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-node22-modules-
+          key: Windows-node22-modules-${{ hashFiles('package-lock.json') }}
 
       # ── Install (only if cache missed) ────────────────────────────────────
       - name: Install dependencies
@@ -54,7 +54,7 @@ jobs:
         env:
           npm_config_optional: true
 
-      # ── Delete existing release so electron-builder can create it fresh ───
+      # ── Delete existing GitHub Release so electron-builder can recreate it ─
       - name: Delete existing GitHub Release (if any)
         shell: bash
         env:
@@ -75,14 +75,14 @@ jobs:
             echo "No existing release found for $TAG — proceeding"
           fi
 
-      # ── Build ──────────────────────────────────────────────────────────────
+      # ── Build Vite + server bundle ─────────────────────────────────────────
       - name: Build app (Vite + server bundle)
         run: npm run build
         env:
           CI: true
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
 
-      # ── Verify artifacts ───────────────────────────────────────────────────
+      # ── Verify build artifacts ─────────────────────────────────────────────
       - name: Verify build artifacts
         shell: bash
         run: |
@@ -101,38 +101,54 @@ jobs:
             exit 1
           fi
 
-      # ── Package: Portable (fast — grab this first for smoke testing) ───────
-      # Portable builds in ~3 min vs ~8 min for NSIS.
-      # Does NOT support auto-updater — use NSIS installer for production.
-      - name: Package portable .exe (fast smoke-test build)
-        run: npx electron-builder --win --config electron/electron-builder.yml --config.win.target=portable --publish never --extraMetadata.ghToken=${{ secrets.GH_TOKEN }}
-        env:
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
-
-      - name: Upload portable artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: HomeStream-Portable-${{ github.ref_name }}
-          path: dist-electron/*Portable*.exe
-          retention-days: 14
-          if-no-files-found: warn
-
       # ── Package: NSIS installer + publish to GitHub Release ───────────────
+      # This is the ONLY build that supports auto-updater.
+      # It publishes latest.yml + HomeStream-Setup-*.exe to the GitHub Release.
+      # electron-builder creates the release automatically via GH_TOKEN.
       - name: Package & publish NSIS installer
-        run: npx electron-builder --win --config electron/electron-builder.yml --config.win.target=nsis --publish always --extraMetadata.ghToken=${{ secrets.GH_TOKEN }}
+        run: >
+          npx electron-builder
+          --win
+          --config electron/electron-builder.yml
+          --config.win.target=nsis
+          --publish always
+          --extraMetadata.ghToken=${{ secrets.GH_TOKEN }}
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
           DEBUG: electron-builder
 
-      # ── Safety-net artifact upload ─────────────────────────────────────────
-      - name: Upload NSIS installer artifact (safety net)
+      # ── Upload NSIS installer as artifact (safety net if publish fails) ────
+      - name: Upload NSIS installer artifact
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: HomeStream-Windows-Installer-${{ github.ref_name }}
           path: |
             dist-electron/*Setup*.exe
-            dist-electron/*.zip
             dist-electron/*.yml
           retention-days: 30
+          if-no-files-found: warn
+
+      # ── Package: Portable (fast smoke-test — NO auto-updater support) ─────
+      # Built AFTER NSIS so the real installer is already published.
+      # Grab this from artifacts for quick "does it boot?" testing.
+      - name: Package portable .exe (smoke-test only)
+        if: always()
+        run: >
+          npx electron-builder
+          --win
+          --config electron/electron-builder.yml
+          --config.win.target=portable
+          --publish never
+          --extraMetadata.ghToken=${{ secrets.GH_TOKEN }}
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+
+      - name: Upload portable artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: HomeStream-Portable-${{ github.ref_name }}
+          path: dist-electron/*Portable*.exe
+          retention-days: 14
           if-no-files-found: warn
