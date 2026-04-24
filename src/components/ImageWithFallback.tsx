@@ -21,7 +21,13 @@ interface Props extends React.ImgHTMLAttributes<HTMLImageElement> {
   fallbackClassName?: string;
 }
 
-const TMDB_CDN = 'image.tmdb.org';
+// Domains that can be proxied server-side to avoid CORS / mixed-content issues.
+// Cinemeta returns both image.tmdb.org and images.metahub.space poster URLs.
+const PROXYABLE_DOMAINS = ['image.tmdb.org', 'images.metahub.space'];
+
+function isProxyable(url: string): boolean {
+  return PROXYABLE_DOMAINS.some(d => url.includes(d));
+}
 
 export default function ImageWithFallback({
   src,
@@ -35,13 +41,13 @@ export default function ImageWithFallback({
   const [proxied, setProxied] = useState(false);
   const Icon = fallbackIcon === 'tv' ? Tv : Film;
 
-  // Build the proxy URL for TMDB CDN images
-  const proxyUrl = src && src.includes(TMDB_CDN)
+  // Build the proxy URL for known CDN images that may fail due to CORS/mixed-content
+  const proxyUrl = src && isProxyable(src)
     ? `/api/tmdb-proxy?url=${encodeURIComponent(src)}`
     : null;
 
   const handleError = useCallback(() => {
-    // If we haven't tried the proxy yet and this is a TMDB CDN URL, try it
+    // If we haven't tried the proxy yet and this is a proxiable URL, try it
     if (!proxied && proxyUrl) {
       setProxied(true);
     } else {
