@@ -292,9 +292,19 @@ export default function CastButton({ streamUrl, hlsUrl, title, className = '' }:
                   <p className="text-[10px] text-muted-foreground/70 leading-snug mb-3">
                     Make sure your TV is on the same WiFi network and DLNA/UPnP is enabled in its settings.
                   </p>
-                  <button onClick={scan} className="text-xs text-primary hover:text-primary/80">
-                    Scan again
-                  </button>
+                  <div className="flex flex-col gap-2">
+                    <button onClick={scan} className="text-xs text-primary hover:text-primary/80">
+                      Scan again
+                    </button>
+                    <a
+                      href="/samsung-tv"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[10px] text-muted-foreground hover:text-foreground underline underline-offset-2 transition-colors"
+                    >
+                      Samsung / Smart TV setup guide →
+                    </a>
+                  </div>
                 </div>
               )}
 

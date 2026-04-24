@@ -134,8 +134,8 @@ export default function DownloadTab() {
         headers: { 'Content-Type': 'application/json', ...remoteAuthHeaders() },
         body: JSON.stringify({ imdbId, type, title, poster }),
       });
-      const data = await r.json() as { queued?: number; error?: string };
-      if (!r.ok) throw new Error(data.error ?? 'Queue failed');
+      const data = await r.json() as { queued?: number; error?: string; message?: string };
+      if (!r.ok) throw new Error(data.message ?? data.error ?? 'Queue failed');
       setQueueMsg({ id: item.id, ok: true, text: `Queued ${data.queued ?? 1} file${(data.queued ?? 1) !== 1 ? 's' : ''}` });
       setQuery('');
       setResults([]);

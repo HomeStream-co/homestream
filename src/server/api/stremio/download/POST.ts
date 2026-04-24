@@ -418,8 +418,28 @@ export default async function handler(req: Request, res: Response) {
   // Determine backend — use testConnection() to validate auth, not just reachability
   const qbitResult = await testConnection();
   const useQbit = qbitResult.ok;
-  if (!useQbit && qbitResult.error) {
-    console.warn(`[download] qBittorrent unavailable: ${qbitResult.error} — falling back to WebTorrent`);
+  if (!useQbit) {
+    // Check if WebTorrent is available before committing to the fallback path.
+    // In production/Electron environments webtorrent may not be importable.
+    let wtAvailable = false;
+    try {
+      await import('../../../torrentManager.js');
+      wtAvailable = true;
+    } catch {
+      // non-fatal — ignore, handled below
+    }
+    if (!wtAvailable) {
+      res.status(503).json({
+        error: 'No download backend available',
+        message: qbitResult.error
+          ? `qBittorrent is offline (${qbitResult.error}) and the built-in downloader is not available in this environment. Please configure qBittorrent in Settings → Downloads.`
+          : 'No download backend is available. Please configure qBittorrent in Settings → Downloads.',
+      });
+      return;
+    }
+    if (qbitResult.error) {
+      console.warn(`[download] qBittorrent unavailable: ${qbitResult.error} — falling back to WebTorrent`);
+    }
   }
   console.log(`[download] Backend: ${useQbit ? 'qBittorrent' : 'WebTorrent (fallback)'}`);
 
@@ -644,6 +664,15 @@ export default async function handler(req: Request, res: Response) {
     }
   } catch (err) {
     await releaseVPN();
-    res.status(500).json({ error: 'Download queue failed', message: String(err) });
+    const msg = err instanceof Error ? err.message : String(err);
+    // Surface WebTorrent-unavailable errors with a clear actionable message
+    if (msg.includes('WebTorrent is not available')) {
+      res.status(503).json({
+        error: 'Built-in downloader unavailable',
+        message: 'qBittorrent is not running and the built-in downloader is not available in this environment. Please start qBittorrent or configure it in Settings → Downloads.',
+      });
+    } else {
+      res.status(500).json({ error: 'Download queue failed', message: msg });
+    }
   }
 }

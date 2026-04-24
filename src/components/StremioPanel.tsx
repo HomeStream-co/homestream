@@ -337,10 +337,11 @@ export default function StremioPanel() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
-      const data = await res.json() as { queued?: number; jobs?: TorrentJob[]; error?: string };
+      const data = await res.json() as { queued?: number; jobs?: TorrentJob[]; error?: string; message?: string };
 
       if (data.error) {
-        toast.error(data.error);
+        // Show the detailed message when available (e.g. qBit offline / WebTorrent unavailable)
+        toast.error(data.message ?? data.error);
       } else {
         const count = data.queued ?? 1;
         if (meta.type === 'series' && opts?.allEpisodes) {

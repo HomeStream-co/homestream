@@ -678,19 +678,7 @@ export default function HomePage() {
           >
             {/* ── Watch on TV banner ── */}
             <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 mb-6 flex flex-col sm:flex-row gap-3">
-              <a
-                href="/samsung-tv"
-                className="flex-1 flex items-center gap-4 bg-card border border-border hover:border-primary/40 rounded-2xl px-5 py-4 transition-all group hover:shadow-lg hover:shadow-primary/10"
-              >
-                <div className="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center flex-shrink-0 group-hover:bg-primary/25 transition-colors">
-                  <Tv2 className="w-5 h-5 text-primary" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-foreground">Watch on your Samsung TV</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">Step-by-step guide to open HomeStream in your TV browser — no app needed</p>
-                </div>
-                <span className="text-xs text-primary font-medium group-hover:underline flex-shrink-0">Get started →</span>
-              </a>
+              {/* TV Interface — primary action, shown first */}
               <a
                 href="/tv"
                 className="flex items-center gap-4 bg-card border border-border hover:border-primary/40 rounded-2xl px-5 py-4 transition-all group hover:shadow-lg hover:shadow-primary/10 sm:w-64"
@@ -703,6 +691,20 @@ export default function HomePage() {
                   <p className="text-xs text-muted-foreground mt-0.5">10-foot UI for D-pad navigation</p>
                 </div>
                 <span className="text-xs text-primary font-medium group-hover:underline flex-shrink-0">Open →</span>
+              </a>
+              {/* Samsung TV setup guide — secondary, clearly labelled as a setup guide */}
+              <a
+                href="/samsung-tv"
+                className="flex-1 flex items-center gap-4 bg-card border border-border hover:border-primary/40 rounded-2xl px-5 py-4 transition-all group hover:shadow-lg hover:shadow-primary/10"
+              >
+                <div className="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center flex-shrink-0 group-hover:bg-primary/25 transition-colors">
+                  <Tv2 className="w-5 h-5 text-primary" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-foreground">Samsung / Smart TV Setup Guide</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">First time? Step-by-step guide to open HomeStream in your TV browser</p>
+                </div>
+                <span className="text-xs text-primary font-medium group-hover:underline flex-shrink-0">Setup →</span>
               </a>
             </div>
             {continueWatchingItems.length > 0 && (
