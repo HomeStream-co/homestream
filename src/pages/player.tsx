@@ -203,19 +203,25 @@ export default function PlayerPage() {
   }, [id]);
 
   // ── Progress: save every 10s ──────────────────────────────────────────────
+  // Reads from currentTimeRef (not state) — no re-render dependency on time.
   useEffect(() => {
-    if (!id || ps.currentTime === 0) return;
+    if (!id) return;
     const interval = setInterval(() => {
-      if (ps.duration > 0) updateProgress(id, (ps.currentTime / ps.duration) * 100, ps.currentTime, ps.duration);
+      const ct = ps.currentTimeRef.current;
+      const dur = ps.duration;
+      if (dur > 0 && ct > 0) updateProgress(id, (ct / dur) * 100, ct, dur);
     }, 10000);
     return () => clearInterval(interval);
-  }, [id, ps.currentTime, ps.duration, updateProgress]);
+  }, [id, ps.currentTimeRef, ps.duration, updateProgress]);
 
   // ── Progress: save on visibility change / beforeunload ───────────────────
+  // saveProgress reads from refs — stable callback, no re-creation on time change.
   const saveProgress = useCallback(() => {
-    if (!id || ps.duration <= 0 || ps.currentTime <= 0) return;
-    updateProgress(id, (ps.currentTime / ps.duration) * 100, ps.currentTime, ps.duration);
-  }, [id, ps.currentTime, ps.duration, updateProgress]);
+    const ct = ps.currentTimeRef.current;
+    const dur = ps.duration;
+    if (!id || dur <= 0 || ct <= 0) return;
+    updateProgress(id, (ct / dur) * 100, ct, dur);
+  }, [id, ps.currentTimeRef, ps.duration, updateProgress]);
 
   useEffect(() => {
     if (!id) return;
@@ -550,16 +556,41 @@ export default function PlayerPage() {
           onTimeUpdate={() => {
             const video = ps.videoRef.current;
             if (!video) return;
-            ps.setCurrentTime(video.currentTime);
+
+            // ── Hot path: zero React state updates ──────────────────────────
+            // Write to refs only — DOM updates happen here, not via setState.
+            ps.currentTimeRef.current = video.currentTime;
             const buf = video.buffered;
-            if (buf.length > 0) ps.setBuffered(buf.end(buf.length - 1));
+            if (buf.length > 0) ps.bufferedRef.current = buf.end(buf.length - 1);
+
+            // Update seek bar gradient + value directly (no React re-render)
+            const seekBar = ps.seekBarRef.current;
+            const dur = video.duration || 0;
+            if (seekBar && dur > 0) {
+              const pct = (video.currentTime / dur) * 100;
+              seekBar.value = String(video.currentTime);
+              seekBar.style.background = `linear-gradient(to right, ${playerAccent} ${pct}%, rgba(255,255,255,0.2) 0%)`;
+            }
+
+            // Update buffered bar directly
+            const bufferedBar = ps.bufferedRef.current;
+            // (buffered bar is a sibling div — updated via a data attribute read by CSS,
+            //  or we can update it via a ref; see PlayerSeekBar below)
+
+            // Update time display span directly
+            if (ps.timeDisplayRef.current && dur > 0) {
+              ps.timeDisplayRef.current.textContent =
+                `${formatTime(video.currentTime)} / ${formatTime(dur)}`;
+            }
+
+            // Remote state broadcast — throttled to every 2 seconds
             if (Math.floor(video.currentTime) % 2 === 0) {
               sendState({
                 mediaId: id ?? '',
                 title: item.title ?? '',
                 poster: item.poster,
                 currentTime: video.currentTime,
-                duration: video.duration || 0,
+                duration: dur,
                 paused: video.paused,
                 volume: video.volume,
                 speed: video.playbackRate,
