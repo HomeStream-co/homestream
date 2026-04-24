@@ -278,16 +278,21 @@ export default function StepFinish({
         <button onClick={onBack} className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-border text-muted-foreground hover:text-foreground text-sm transition-colors">
           <ChevronLeft className="w-4 h-4" />Back
         </button>
-        <button onClick={completeSetup} disabled={status.complete === 'saving' || status.complete === 'done' || scanState === 'scanning'}
-          className="flex-1 flex items-center justify-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground py-3 rounded-xl font-bold text-sm transition-colors disabled:opacity-60">
-          {status.complete === 'saving' || scanState === 'importing'
-            ? <><Loader2 className="w-4 h-4 animate-spin" />Starting HomeStream…</>
-            : status.complete === 'done'
-            ? <><CheckCircle2 className="w-4 h-4" />Done! Redirecting…</>
-            : scanState === 'scanning'
-            ? <><Loader2 className="w-4 h-4 animate-spin" />Scanning media…</>
-            : <>Launch HomeStream <Zap className="w-4 h-4" /></>}
-        </button>
+        <div className="flex-1 flex flex-col gap-1.5">
+          {status.complete === 'error' && (
+            <p className="text-[11px] text-destructive text-center">Setup failed — check your settings and try again.</p>
+          )}
+          <button onClick={completeSetup} disabled={status.complete === 'saving' || status.complete === 'done' || scanState === 'scanning'}
+            className="w-full flex items-center justify-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground py-3 rounded-xl font-bold text-sm transition-colors disabled:opacity-60">
+            {status.complete === 'saving' || scanState === 'importing'
+              ? <><Loader2 className="w-4 h-4 animate-spin" />Starting HomeStream…</>
+              : status.complete === 'done'
+              ? <><CheckCircle2 className="w-4 h-4" />Done! Redirecting…</>
+              : scanState === 'scanning'
+              ? <><Loader2 className="w-4 h-4 animate-spin" />Scanning media…</>
+              : <>Launch HomeStream <Zap className="w-4 h-4" /></>}
+          </button>
+        </div>
       </div>
     </div>
   );

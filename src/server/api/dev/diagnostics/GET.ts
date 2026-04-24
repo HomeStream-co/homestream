@@ -61,7 +61,7 @@ export default function handler(req: Request, res: Response) {
   const libraryStats = {
     total: items.length,
     movies: items.filter(i => i.type === 'movie').length,
-    shows: items.filter(i => i.type === 'show').length,
+    shows: items.filter(i => i.type === 'series').length,
     transcoding: items.filter(i => i.transcoding).length,
     withProgress: items.filter(i => (i.watchProgress ?? 0) > 0).length,
   };
