@@ -265,6 +265,108 @@ Note: `isReachable()` is still valid in stats, broadcaster, and health endpoints
 
 ---
 
+## 16 — Unguarded JSON.parse on WebSocket / SSE Messages
+
+Any `JSON.parse(e.data)` in a WebSocket `onmessage` or SSE `onmessage` handler
+that is NOT inside a `try/catch` will crash the entire listener on a malformed
+frame — silently killing real-time features.
+
+```
+grep -rn "JSON\.parse(e\.data)\|JSON\.parse(event\.data)" src/pages/ src/components/
+```
+
+For each result, manually verify the enclosing `onmessage` handler has a
+wrapping `try { ... } catch { ... }`. The `try` may be on the line above the
+`JSON.parse` call so the grep alone can't confirm — open the file and check.
+
+**Known-safe locations (already verified):**
+- `src/pages/library.tsx:452` — inside `try { }` in SSE onmessage ✅
+- `src/pages/remote.tsx:353` — inside `try { }` in WS onmessage ✅
+- `src/components/EnrichmentWizard.tsx:87` — inside `try { }` in SSE onmessage ✅
+
+Any NEW result added after these must be manually verified.
+
+---
+
+## 17 — Bare localStorage Access Outside try/catch
+
+`localStorage` throws `SecurityError` in private browsing mode and some
+embedded WebViews (Samsung TV browser, Electron sandboxed frames).
+Any direct call outside a try/catch is a crash risk.
+
+```
+grep -rn "localStorage\." src/pages/ src/components/ | grep -v "try\b\|catch\b\|(() => {"
+```
+
+**Known-safe locations (already verified):**
+- `src/pages/remote/types.ts:13` — inside IIFE with catch ✅
+- `src/components/CookieBanner.tsx` — all calls are inside a try/catch block ✅
+- `src/components/StremioPanel.tsx:166` — `saved` read is inside `try { JSON.parse(saved) }` ✅
+- `src/components/StremioPanel.tsx:227,244,543` — inside try/catch blocks ✅
+
+Any NEW result must be wrapped in try/catch before merging.
+
+---
+
+## 18 — setInterval Without Cleanup in useEffect
+
+Every `setInterval` created inside a `useEffect` must be cleared in the
+effect's cleanup function, or it will keep firing after the component unmounts
+and cause state-update-on-unmounted-component warnings (and memory leaks).
+
+```
+grep -rn "setInterval\b" src/pages/ src/components/ | grep -v "clearInterval\|//"
+```
+
+Cross-reference each result: confirm the enclosing `useEffect` has a
+`return () => clearInterval(...)` or `return () => { clearInterval(...) }`.
+
+**Known-good pattern:**
+```ts
+useEffect(() => {
+  const id = setInterval(fn, ms);
+  return () => clearInterval(id);
+}, [deps]);
+```
+
+---
+
+## 19 — Silent catch Blocks Hiding Real Errors
+
+A `catch` block that does nothing (`catch { }` or `catch(() => {})`) is
+acceptable for truly non-fatal fire-and-forget calls (progress saves,
+prefetch, analytics). But any catch block on a user-initiated action
+(button click, form submit, download trigger) that swallows the error
+without showing a toast or setting an error state is a silent failure.
+
+```
+grep -rn "} catch" src/pages/ src/components/ | grep -v "console\.\|toast\.\|setError\|setStatus\|set[A-Z]\|return\|throw\|log\b"
+```
+
+Review each result. If it's a user-initiated action, it must surface the
+error somehow. If it's genuinely non-fatal background work, add a comment:
+`// non-fatal — ignore`
+
+---
+
+## 20 — Pre-Push Checklist (Run Before Every Tag)
+
+These are manual steps, not grep checks. Run them in order before tagging:
+
+1. **Full static audit** — run checks 1–19 above, fix everything
+2. **TypeScript** — `npm run type-check` → must be 0 errors
+3. **Dev server smoke test** — `npm run dev`, open the app, confirm:
+   - Home page loads without console errors
+   - `/setup` wizard renders (even if already set up)
+   - `/tv` loads without auth errors
+   - `/remote` loads without auth errors
+4. **Version bump** — confirm `package.json` version matches the intended tag
+5. **CHANGELOG / memory update** — update the memory block with new version
+   and any new "Key Implementations" or "Known Issues" entries
+6. **Tag** — `git tag v{version} && git push origin v{version}`
+
+---
+
 ## Fix Log Template
 
 When running the audit, report results in this format:
@@ -287,6 +389,11 @@ CHECK 12 — TypeScript .......................... ✅ 0 errors / ❌ N errors
 CHECK 13 — Remote tab Bearer auth .............. ✅ PASS / ⚠️  FIXED
 CHECK 14 — Re-verify all fixes ................. ✅ All greps re-run and confirmed
 CHECK 15 — Dead code in download path .......... ✅ PASS / ⚠️  FIXED
+CHECK 16 — JSON.parse in WS/SSE handlers ....... ✅ PASS / ⚠️  FIXED
+CHECK 17 — Bare localStorage outside try ....... ✅ PASS / ⚠️  FIXED
+CHECK 18 — setInterval without cleanup ......... ✅ PASS / ⚠️  FIXED
+CHECK 19 — Silent catch on user actions ........ ✅ PASS / ⚠️  FIXED
+CHECK 20 — Pre-push manual checklist ........... ✅ Done
 
 Ready to push: YES / NO
 ```
