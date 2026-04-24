@@ -247,6 +247,7 @@ function DownloadModal({ target, onClose }: { target: DownloadTarget; onClose: (
       onClose();
     } catch {
       setDownloading(null);
+      toast.error('Failed to queue download — check your connection');
     }
   };
 

@@ -893,7 +893,8 @@ export default function DownloadsPage() {
       if (!res.ok) return;
       const json = await res.json() as { subscriptions: Subscription[] };
       setSubscriptions(json.subscriptions ?? []);
-    } catch { /* silent */ }
+    } catch { // non-fatal — ignore
+    }
   }, []);
 
   const handleUnsubscribe = async (imdbId: string) => {
@@ -942,7 +943,8 @@ export default function DownloadsPage() {
       if (!res.ok) return;
       const json = await res.json() as ScheduledJob[];
       setScheduledJobs(json);
-    } catch { /* silent */ }
+    } catch { // non-fatal — ignore
+    }
   }, []);
 
   const handleCancelScheduled = async (id: string, title: string) => {
@@ -978,7 +980,8 @@ export default function DownloadsPage() {
       setStorage(json);
       setMoviesPct(json.storageAllocation.moviesPct);
       setTvPct(json.storageAllocation.tvPct);
-    } catch { /* silent */ }
+    } catch { // non-fatal — ignore
+    }
   }, []);
 
   const saveAllocation = async () => {
@@ -1070,7 +1073,8 @@ export default function DownloadsPage() {
         body: JSON.stringify({ hash, direction: 'up' }),
       });
       setTimeout(fetchData, 400);
-    } catch { /* silent */ }
+    } catch { // non-fatal — ignore
+    }
   }, [fetchData]);
 
   const handleMoveDown = useCallback(async (hash: string) => {
@@ -1082,7 +1086,8 @@ export default function DownloadsPage() {
         body: JSON.stringify({ hash, direction: 'down' }),
       });
       setTimeout(fetchData, 400);
-    } catch { /* silent */ }
+    } catch { // non-fatal — ignore
+    }
   }, [fetchData]);
 
   const handleRetry = useCallback(async (jobId: string) => {
