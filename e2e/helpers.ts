@@ -45,7 +45,7 @@ export const TEST_PASSWORD = process.env.E2E_PASSWORD || 'homestream';
  */
 export async function waitForApp(page: Page) {
   // Step 1: wait for #root to be in the DOM
-  await page.waitForSelector('#root', { state: 'attached', timeout: 15_000 }).catch(() => {});
+  await page.waitForSelector('#root', { state: 'attached', timeout: 8_000 }).catch(() => {});
 
   // Step 2: wait for auth check to resolve — any meaningful content
   const POST_AUTH_SELECTORS = [
@@ -61,13 +61,13 @@ export async function waitForApp(page: Page) {
 
   await page.waitForSelector(POST_AUTH_SELECTORS, {
     state: 'visible',
-    timeout: 12_000,
+    timeout: 6_000,
   }).catch(() => {
     // Timed out — app may be in an unexpected state; let the test assert
   });
 
   // Step 3: tiny tick for React state to fully settle after selector appears
-  await page.waitForTimeout(150);
+  await page.waitForTimeout(100);
 }
 
 /**
@@ -87,7 +87,7 @@ export async function login(page: Page, password = TEST_PASSWORD) {
     await passwordInput.fill(password);
     await page.keyboard.press('Enter');
     // Wait for login to complete — either home page or profile selector
-    await page.waitForURL(url => !url.pathname.includes('/setup'), { timeout: 10_000 });
+    await page.waitForURL(url => !url.pathname.includes('/setup'), { timeout: 8_000 });
     await waitForApp(page);
   }
 
