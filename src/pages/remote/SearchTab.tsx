@@ -7,6 +7,7 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Search, X, Mic, Film, Star, Tv2 } from 'lucide-react';
 import type { LibraryItem } from './types';
+import { remoteAuthHeaders } from './types';
 
 // Extend window type for Web Speech API (not in all TypeScript lib versions)
 declare global {
@@ -49,7 +50,7 @@ export default function SearchTab({ send }: SearchTabProps) {
   const recognitionRef = useRef<SpeechRecognition | null>(null);
 
   useEffect(() => {
-    fetch('/api/media')
+    fetch('/api/media', { headers: remoteAuthHeaders() })
       .then(r => r.json())
       .then((data: LibraryItem[]) => setAllItems(Array.isArray(data) ? data : []))
       .catch(() => {});

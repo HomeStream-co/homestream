@@ -49,7 +49,7 @@ export default function AITab({ send }: AITabProps) {
   const recognitionRef = useRef<SpeechRecognition | null>(null);
 
   useEffect(() => {
-    fetch('/api/media')
+    fetch('/api/media', { headers: remoteAuthHeaders() })
       .then(r => r.json())
       .then((data: LibraryItem[]) => setLibrary(Array.isArray(data) ? data : []))
       .catch(() => {});
@@ -86,7 +86,7 @@ export default function AITab({ send }: AITabProps) {
       const res = await fetch('/api/chat', {
         method: 'POST',
         credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...remoteAuthHeaders() },
         body: JSON.stringify({ message: text, library: libraryPayload, history: historyRef.current }),
       });
       const data = await res.json() as { reply?: string; error?: string };

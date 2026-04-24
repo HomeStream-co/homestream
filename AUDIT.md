@@ -217,25 +217,76 @@ Do NOT push if this fails.
 
 ---
 
+## 13 — Remote Sub-Tab Auth Headers
+
+The phone remote tabs (`BrowseTab`, `AITab`, `SearchTab`, `DownloadTab`) run on
+the phone over LAN. They cannot set httpOnly cookies cross-origin, so they must
+send the session token as a Bearer header on every authenticated API call.
+
+The token is stored in `localStorage` as `hs_token` after login.
+The helper `remoteAuthHeaders()` in `src/pages/remote/types.ts` returns it.
+
+```
+grep -rn "fetch('/api/" src/pages/remote/
+```
+
+Every result must spread `...remoteAuthHeaders()` into its headers object.
+The `requireAuth` middleware accepts both cookie AND `Authorization: Bearer <token>`.
+
+**Files to check:** `BrowseTab.tsx`, `AITab.tsx`, `SearchTab.tsx`, `DownloadTab.tsx`
+
+---
+
+## 14 — Re-verification After Every Fix
+
+After fixing ANY issue found in checks 1–13, re-run the specific grep for that
+check to confirm the fix actually landed and didn't introduce a new variant.
+
+**Pattern:**
+1. Fix found → apply fix
+2. Re-run the exact grep from that check → confirm zero matches
+3. Then move to the next check
+
+Never declare a check "FIXED" without re-running its grep to verify.
+
+---
+
+## 15 — Dead Code / Deprecated Functions Still Called
+
+```
+grep -rn "isReachable\b" src/server/api/stremio/download/
+```
+
+`isReachable()` in the download flow was replaced by `testConnection()`.
+Any remaining call to `isReachable()` in the download path is dead/wrong code.
+
+Note: `isReachable()` is still valid in stats, broadcaster, and health endpoints
+(it's a simple ping, not a credential check). Only flag it in the download path.
+
+---
+
 ## Fix Log Template
 
 When running the audit, report results in this format:
 
 ```
-CHECK 1 — Type String Consistency .............. ✅ PASS
-CHECK 2 — Auth-Gated Fetches .................. ✅ PASS
-CHECK 3a — Missing res.ok ..................... ⚠️  FIXED (ShowDownloadDialog.tsx:107)
-CHECK 3b — res.text() on JSON ................. ✅ PASS
-CHECK 3c — Parallel fetch res.ok .............. ⚠️  FIXED (ShowDownloadDialog.tsx:148)
-CHECK 4 — Null crashes ........................ ✅ PASS
-CHECK 5 — QR rendering ........................ ✅ PASS
-CHECK 6 — Stale closures ...................... ✅ PASS
-CHECK 7 — Missing error UI .................... ⚠️  FIXED (StepApiKeys.tsx:322)
-CHECK 8 — Server type strings ................. ✅ PASS
-CHECK 9 — WebSocket token ..................... ✅ PASS
-CHECK 10 — HTTPS warnings ..................... ⚠️  FIXED (tv.tsx:563)
-CHECK 11 — /api/health setupComplete .......... ✅ PASS
-CHECK 12 — TypeScript ......................... ✅ 0 errors
+CHECK 1  — Type string consistency ............. ✅ PASS / ⚠️  FIXED (file:line)
+CHECK 2  — Auth-gated fetches on /tv /remote ... ✅ PASS / ⚠️  FIXED
+CHECK 3a — Missing res.ok checks ............... ✅ PASS / ⚠️  FIXED
+CHECK 3b — res.text() on JSON bodies ........... ✅ PASS / ⚠️  FIXED
+CHECK 3c — Parallel fetch res.ok ............... ✅ PASS / ⚠️  FIXED
+CHECK 4  — Null crashes on optional fields ..... ✅ PASS / ⚠️  FIXED
+CHECK 5  — QR rendering format mismatch ........ ✅ PASS / ⚠️  FIXED
+CHECK 6  — Stale closures in setup steps ....... ✅ PASS / ⚠️  FIXED
+CHECK 7  — Missing error UI on save handlers ... ✅ PASS / ⚠️  FIXED
+CHECK 8  — Server-side type strings ............ ✅ PASS / ⚠️  FIXED
+CHECK 9  — WebSocket token auth ................ ✅ PASS / ⚠️  FIXED
+CHECK 10 — HTTPS warnings completeness ......... ✅ PASS / ⚠️  FIXED
+CHECK 11 — /api/health setupComplete ........... ✅ PASS / ⚠️  FIXED
+CHECK 12 — TypeScript .......................... ✅ 0 errors / ❌ N errors
+CHECK 13 — Remote tab Bearer auth .............. ✅ PASS / ⚠️  FIXED
+CHECK 14 — Re-verify all fixes ................. ✅ All greps re-run and confirmed
+CHECK 15 — Dead code in download path .......... ✅ PASS / ⚠️  FIXED
 
-Ready to push: YES
+Ready to push: YES / NO
 ```

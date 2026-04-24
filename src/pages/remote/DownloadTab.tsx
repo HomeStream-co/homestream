@@ -10,6 +10,7 @@ import {
   Pause as PauseIcon, Play as PlayIcon, Trash2,
 } from 'lucide-react';
 import { useDownloadSocket } from '@/hooks/useDownloadSocket';
+import { remoteAuthHeaders } from './types';
 
 function haptic(pattern: number | number[] = 30) {
   try { navigator.vibrate?.(pattern); } catch { /* ignore */ }
@@ -130,7 +131,7 @@ export default function DownloadTab() {
       const r = await fetch('/api/stremio/download', {
         method: 'POST',
         credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...remoteAuthHeaders() },
         body: JSON.stringify({ imdbId, type, title, poster }),
       });
       const data = await r.json() as { queued?: number; error?: string };
@@ -147,17 +148,17 @@ export default function DownloadTab() {
 
   const pauseJob = useCallback(async (hash: string) => {
     haptic(20);
-    await fetch('/api/stremio/downloads/pause', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ hash }) });
+    await fetch('/api/stremio/downloads/pause', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json', ...remoteAuthHeaders() }, body: JSON.stringify({ hash }) });
   }, []);
 
   const resumeJob = useCallback(async (hash: string) => {
     haptic(20);
-    await fetch('/api/stremio/downloads/resume', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ hash }) });
+    await fetch('/api/stremio/downloads/resume', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json', ...remoteAuthHeaders() }, body: JSON.stringify({ hash }) });
   }, []);
 
   const deleteJob = useCallback(async (hash: string) => {
     haptic([30, 20, 60]);
-    await fetch(`/api/stremio/downloads/${encodeURIComponent(hash)}`, { method: 'DELETE', credentials: 'include' });
+    await fetch(`/api/stremio/downloads/${encodeURIComponent(hash)}`, { method: 'DELETE', credentials: 'include', headers: remoteAuthHeaders() });
   }, []);
 
   const activeJobs = jobs.filter(j => j.status !== 'done' && j.status !== 'seeding');
