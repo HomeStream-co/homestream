@@ -43,13 +43,13 @@ export default function MoviesPage() {
         (m.plot ?? '').toLowerCase().includes(q) ||
         toActorsString(m.actors).toLowerCase().includes(q) ||
         (m.director ?? '').toLowerCase().includes(q) ||
-        m.genre.some(g => g.toLowerCase().includes(q))
+        (m.genre ?? []).some(g => g.toLowerCase().includes(q))
       );
     }
 
     // Genre
     if (selectedGenre !== 'All') {
-      items = items.filter(m => m.genre.some(g => g.toLowerCase().includes(selectedGenre.toLowerCase())));
+      items = items.filter(m => (m.genre ?? []).some(g => g.toLowerCase().includes(selectedGenre.toLowerCase())));
     }
 
     // Sort

@@ -333,11 +333,11 @@ export default function HomePage() {
         m.plot?.toLowerCase().includes(q) ||
         toActorsString(m.actors).toLowerCase().includes(q) ||
         m.director?.toLowerCase().includes(q) ||
-        m.genre.some(g => g.toLowerCase().includes(q))
+        (m.genre ?? []).some(g => g.toLowerCase().includes(q))
       );
     }
     if (genre !== 'All') {
-      items = items.filter(m => m.genre.some(g => g.toLowerCase().includes(genre.toLowerCase())));
+      items = items.filter(m => (m.genre ?? []).some(g => g.toLowerCase().includes(genre.toLowerCase())));
     }
     if (typeFilter !== 'all') {
       items = items.filter(m => m.type === typeFilter);
@@ -430,9 +430,9 @@ export default function HomePage() {
                 {featured!.title}
               </h1>
 
-              {featured!.genre.length > 0 && (
+              {(featured!.genre ?? []).length > 0 && (
                 <div className="flex items-center gap-2 mb-4 flex-wrap">
-                  {featured!.genre.slice(0, 4).map(g => (
+                  {(featured!.genre ?? []).slice(0, 4).map(g => (
                     <span key={g} className="px-2.5 py-1 rounded-full glass text-xs text-foreground/80 font-medium">
                       {g}
                     </span>

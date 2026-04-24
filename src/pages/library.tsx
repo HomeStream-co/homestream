@@ -858,7 +858,7 @@ export default function LibraryPage() {
                       )}
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold text-foreground">{u.result.title}</p>
-                        <p className="text-xs text-muted-foreground">{u.result.year} · {u.result.genre.slice(0, 2).join(', ')}</p>
+                        <p className="text-xs text-muted-foreground">{u.result.year} · {(u.result.genre ?? []).slice(0, 2).join(', ')}</p>
                         {u.result.imdbRating !== 'N/A' && (
                           <p className="text-xs text-yellow-400 flex items-center gap-0.5 mt-0.5">
                             <Star className="w-3 h-3 fill-yellow-400" /> {u.result.imdbRating}

@@ -231,7 +231,7 @@ function WatchlistCard({ item, removing, onPlay, onRemove }: WatchlistCardProps)
         <p className="text-sm font-medium text-foreground truncate">{item.title}</p>
         <div className="flex items-center justify-between mt-0.5">
           <p className="text-xs text-muted-foreground">{item.year}</p>
-          <p className="text-xs text-muted-foreground truncate ml-2">{item.genre.slice(0, 2).join(', ')}</p>
+          <p className="text-xs text-muted-foreground truncate ml-2">{(item.genre ?? []).slice(0, 2).join(', ')}</p>
         </div>
       </div>
     </motion.div>

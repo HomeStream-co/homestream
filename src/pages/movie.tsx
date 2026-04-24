@@ -104,12 +104,12 @@ export default function MoviePage() {
   // ── Similar titles from library ──
   const similarInLibrary = useMemo(() => {
     if (!item) return [];
-    const genres = new Set(item.genre.map(g => g.toLowerCase()));
+    const genres = new Set((item.genre ?? []).map(g => g.toLowerCase()));
     return library
       .filter(m =>
         m.id !== item.id &&
         isAllowed(m.rated) &&
-        m.genre.some(g => genres.has(g.toLowerCase()))
+        (m.genre ?? []).some(g => genres.has(g.toLowerCase()))
       )
       .sort((a, b) => (parseFloat(b.imdbRating) || 0) - (parseFloat(a.imdbRating) || 0))
       .slice(0, 12);
@@ -288,9 +288,9 @@ export default function MoviePage() {
                 </div>
 
                 {/* Genre pills */}
-                {item.genre.length > 0 && (
+                {(item.genre ?? []).length > 0 && (
                   <div className="flex flex-wrap gap-1.5 mb-6">
-                    {item.genre.map(g => (
+                    {(item.genre ?? []).map(g => (
                       <Link
                         key={g}
                         to={`/?q=${encodeURIComponent(g)}`}

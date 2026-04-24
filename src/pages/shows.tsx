@@ -48,12 +48,12 @@ export default function ShowsPage() {
         m.title.toLowerCase().includes(q) ||
         m.plot?.toLowerCase().includes(q) ||
         toActorsString(m.actors).toLowerCase().includes(q) ||
-        m.genre.some(g => g.toLowerCase().includes(q))
+        (m.genre ?? []).some(g => g.toLowerCase().includes(q))
       );
     }
 
     if (selectedGenre !== 'All') {
-      items = items.filter(m => m.genre.some(g => g.toLowerCase().includes(selectedGenre.toLowerCase())));
+      items = items.filter(m => (m.genre ?? []).some(g => g.toLowerCase().includes(selectedGenre.toLowerCase())));
     }
 
     switch (sortBy) {
