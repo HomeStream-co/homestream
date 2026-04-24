@@ -38,5 +38,6 @@ export default function handler(_req: Request, res: Response) {
     lanIPs[0] ||
     '127.0.0.1';
 
-  res.json({ hostname, lanIPs, primary, port: 3000 });
+  const port = parseInt(process.env.PORT ?? '3000', 10);
+  res.json({ hostname, lanIPs, primary, port });
 }

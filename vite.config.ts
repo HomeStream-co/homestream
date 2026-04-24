@@ -24,6 +24,26 @@ function serverBundlePlugin(): Plugin {
 			}
 			built = true;
 			console.log("Bundling server code with esbuild...");
+
+			// ── LAN bind fix ────────────────────────────────────────────────────────
+			// vite-plugin-api-routes compiles .api/server.js → dist/app.js via Vite
+			// SSR. That source file uses dotenv-local with envInitial fallback of
+			// "127.0.0.1" — dotenv-local NEVER reads process.env, so the SERVER_HOST
+			// env var injected by Electron's utilityProcess is completely ignored.
+			// We patch dist/app.js here (after SSR compile, before esbuild bundle)
+			// to replace the hardcoded default with process.env.SERVER_HOST||"0.0.0.0".
+			// This is the only reliable interception point.
+			const appJsSrc = fs0.readFileSync(appJsPath, "utf-8");
+			const patched = appJsSrc.replace(
+				/SERVER_HOST:\s*["']127\.0\.0\.1["']/g,
+				'SERVER_HOST: process.env.SERVER_HOST || "0.0.0.0"'
+			);
+			if (patched === appJsSrc) {
+				console.warn("[lan-bind-fix] WARNING: Could not find SERVER_HOST:\"127.0.0.1\" in dist/app.js — LAN binding may not work!");
+			} else {
+				fs0.writeFileSync(appJsPath, patched, "utf-8");
+				console.log("[lan-bind-fix] Patched dist/app.js: SERVER_HOST default → process.env.SERVER_HOST || \"0.0.0.0\"");
+			}
 			// Output as CJS (.cjs) — this is the definitive fix for the Windows
 			// launch crash chain:
 			//
@@ -53,28 +73,6 @@ function serverBundlePlugin(): Plugin {
 				},
 			};
 
-			// Fix LAN access: vite-plugin-api-routes uses dotenv-local which reads
-			// envInitial as a fallback but NEVER reads process.env. The plugin's
-			// server.js hardcodes SERVER_HOST default as "127.0.0.1" which blocks
-			// all LAN/phone access. This plugin rewrites that file at bundle time
-			// so the default becomes process.env.SERVER_HOST || "0.0.0.0".
-			const lanBindPlugin: esbuild.Plugin = {
-				name: "lan-bind-fix",
-				setup(build) {
-					build.onLoad({ filter: /vite-plugin-api-routes[/\\]\.api[/\\]server\.js$/ }, async (args) => {
-						const fs1 = await import("fs");
-						let src = fs1.readFileSync(args.path, "utf-8");
-						// Replace the hardcoded envInitial default so the server binds
-						// to all interfaces when SERVER_HOST is not set via .env file.
-						src = src.replace(
-							'SERVER_HOST: "127.0.0.1"',
-							'SERVER_HOST: process.env.SERVER_HOST || "0.0.0.0"'
-						);
-						return { contents: src, loader: "js" };
-					});
-				},
-			};
-
 			await esbuild.build({
 				entryPoints: [path.resolve(__dirname, "dist", "app.js")],
 				bundle: true,
@@ -88,7 +86,7 @@ function serverBundlePlugin(): Plugin {
 				// Electron app has zero external runtime dependencies.
 				packages: "bundle",
 				sourcemap: true,
-				plugins: [externalizePlugin, lanBindPlugin],
+				plugins: [externalizePlugin],
 				// Fix: server source files use import.meta.url for __dirname emulation
 				// and createRequire(import.meta.url). In CJS output, import.meta is
 				// undefined.
