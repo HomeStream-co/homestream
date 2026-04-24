@@ -28,17 +28,43 @@ export default function StepFinish({
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    fetch('/api/remote/qr?format=svg')
-      .then(r => { if (!r.ok) throw new Error(); return r.json(); })
-      .then((d: { url?: string; qr?: string; lanIP?: string; port?: string }) => {
-        if (d?.url && d?.qr) setQrData({ url: d.url, qr: d.qr, lanIP: d.lanIP, port: d.port });
-        else setQrError(true);
-      })
-      .catch(() => setQrError(true));
+    let cancelled = false;
+    let attempts = 0;
+    const MAX_ATTEMPTS = 4;
+    const RETRY_DELAY_MS = 1500;
+
+    function tryFetch() {
+      fetch('/api/remote/qr?format=svg')
+        .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
+        .then((d: { url?: string; qr?: string; lanIP?: string; port?: string }) => {
+          if (cancelled) return;
+          if (d?.url && d?.qr) setQrData({ url: d.url, qr: d.qr, lanIP: d.lanIP, port: d.port });
+          else setQrError(true);
+        })
+        .catch(() => {
+          if (cancelled) return;
+          attempts++;
+          if (attempts < MAX_ATTEMPTS) {
+            setTimeout(tryFetch, RETRY_DELAY_MS);
+          } else {
+            setQrError(true);
+          }
+        });
+    }
+
+    tryFetch();
+    return () => { cancelled = true; };
   }, []);
 
   const lanIP = qrData?.lanIP ?? window.location.hostname;
-  const isLocalhost = lanIP === 'localhost' || lanIP === '127.0.0.1' || lanIP === '::1';
+  // Hide the QR only if the server itself couldn't find a real LAN IP —
+  // i.e. the QR URL would point to localhost, which is useless on a phone.
+  // We do NOT hide it just because the browser is on localhost (Electron app).
+  const qrPointsToLocalhost =
+    !qrData ||
+    lanIP === 'localhost' ||
+    lanIP === '127.0.0.1' ||
+    lanIP === '::1';
   const remoteUrl = qrData?.url ?? `http://${lanIP}:${qrData?.port ?? '3000'}/remote`;
 
   function copyUrl() {
@@ -144,13 +170,13 @@ export default function StepFinish({
                 <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
               </div>
             )}
-            {qrData && !isLocalhost && (
+            {qrData && !qrPointsToLocalhost && (
               <div
                 className="w-24 h-24 rounded-lg overflow-hidden bg-white p-1.5 [&_svg]:w-full [&_svg]:h-full"
                 dangerouslySetInnerHTML={{ __html: qrData.qr }}
               />
             )}
-            {(qrError || isLocalhost) && (
+            {(qrError || qrPointsToLocalhost) && (
               <div className="w-24 h-24 rounded-lg bg-muted flex flex-col items-center justify-center gap-1 text-center px-2">
                 <QrCode className="w-6 h-6 text-muted-foreground/40" />
                 <p className="text-[9px] text-muted-foreground leading-tight">Open in Electron for QR</p>
@@ -160,11 +186,11 @@ export default function StepFinish({
           {/* Instructions */}
           <div className="flex-1 min-w-0 flex flex-col gap-2">
             <p className="text-xs text-muted-foreground leading-relaxed">
-              {isLocalhost
+              {qrPointsToLocalhost
                 ? 'Run HomeStream on your home server to get a scannable QR code for your phone.'
                 : 'Scan with your phone camera to open the remote control — no app needed.'}
             </p>
-            {!isLocalhost && qrData && (
+            {!qrPointsToLocalhost && qrData && (
               <button
                 onClick={copyUrl}
                 className="flex items-center gap-1.5 bg-muted hover:bg-muted/80 rounded-lg px-2.5 py-1.5 transition-colors group w-full"

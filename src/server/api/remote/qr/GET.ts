@@ -21,21 +21,44 @@ function getLanIP(): string {
   const interfaces = os.networkInterfaces();
   const candidates: string[] = [];
 
-  for (const iface of Object.values(interfaces)) {
+  for (const [name, iface] of Object.entries(interfaces)) {
     if (!iface) continue;
+    // Skip virtual/Docker/Hyper-V/VPN adapters by name on Windows
+    const nameLower = name.toLowerCase();
+    const isVirtual =
+      nameLower.includes('vethernet') ||
+      nameLower.includes('docker') ||
+      nameLower.includes('vmware') ||
+      nameLower.includes('virtualbox') ||
+      nameLower.includes('wsl') ||
+      nameLower.includes('loopback');
     for (const addr of iface) {
       if (addr.family === 'IPv4' && !addr.internal) {
-        candidates.push(addr.address);
+        candidates.push(isVirtual ? `__virtual__${addr.address}` : addr.address);
       }
     }
   }
 
-  // Prefer private LAN ranges in order of likelihood
+  const real = candidates.filter(ip => !ip.startsWith('__virtual__'));
+  const virtual = candidates
+    .filter(ip => ip.startsWith('__virtual__'))
+    .map(ip => ip.replace('__virtual__', ''));
+
+  // Prefer real physical adapters, then fall back to virtual ones
+  const pool = real.length > 0 ? real : virtual;
+
+  // Within the pool, prefer private LAN ranges in order of likelihood.
+  // 172.16–31.x.x is RFC-1918 private; 172.17.x.x is Docker bridge — skip it.
+  const is172Private = (ip: string) => {
+    const second = parseInt(ip.split('.')[1] ?? '0', 10);
+    return ip.startsWith('172.') && second >= 16 && second <= 31 && second !== 17;
+  };
+
   return (
-    candidates.find(ip => ip.startsWith('192.168.')) ||
-    candidates.find(ip => ip.startsWith('10.'))      ||
-    candidates.find(ip => ip.startsWith('172.'))     ||
-    candidates[0]                                    ||
+    pool.find(ip => ip.startsWith('192.168.')) ||
+    pool.find(ip => ip.startsWith('10.'))      ||
+    pool.find(ip => is172Private(ip))          ||
+    pool[0]                                    ||
     'localhost'
   );
 }
