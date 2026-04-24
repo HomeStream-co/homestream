@@ -900,13 +900,22 @@ export default function SamsungTvPage() {
                   <ChevronRight className="w-4 h-4" />
                 </button>
               ) : (
-                <button
-                  onClick={() => navigate('/')}
-                  className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-green-600 text-white text-sm font-medium hover:bg-green-700 transition-colors"
-                >
-                  <CheckCircle2 className="w-4 h-4" />
-                  Done — Go to HomeStream
-                </button>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => navigate('/tv')}
+                    className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
+                  >
+                    <Tv2 className="w-4 h-4" />
+                    Open TV Interface
+                  </button>
+                  <button
+                    onClick={() => navigate('/')}
+                    className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-green-600 text-white text-sm font-medium hover:bg-green-700 transition-colors"
+                  >
+                    <CheckCircle2 className="w-4 h-4" />
+                    Done — Go to HomeStream
+                  </button>
+                </div>
               )}
             </div>
           </main>

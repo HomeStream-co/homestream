@@ -27,6 +27,7 @@ import {
   Cast, Loader2, Tv2, Check, Copy, WifiOff,
   RefreshCw, X, Wifi, ChevronRight,
 } from 'lucide-react';
+import { useLanUrl } from '@/hooks/useLanUrl';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -40,8 +41,10 @@ interface DLNADevice {
 }
 
 interface CastButtonProps {
-  /** Full HTTP URL to the video stream, e.g. http://192.168.1.10:3000/api/stream/movie.mp4 */
+  /** Relative path to the direct stream, e.g. /api/stream/movie.mp4 */
   streamUrl: string;
+  /** Relative path to the HLS playlist, e.g. /api/hls/abc123/index.m3u8 (optional) */
+  hlsUrl?: string;
   /** Title shown on the TV's now-playing screen */
   title: string;
   /** Extra className for the trigger button */
@@ -49,14 +52,6 @@ interface CastButtonProps {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-function getLocalStreamUrl(path: string): string {
-  // Convert a relative /api/stream/... path to a full LAN URL
-  if (path.startsWith('http')) return path;
-  const { protocol, hostname, port } = window.location;
-  const p = port ? `:${port}` : '';
-  return `${protocol}//${hostname}${p}${path}`;
-}
 
 // ── Device row ────────────────────────────────────────────────────────────────
 
@@ -115,7 +110,7 @@ function DeviceRow({
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export default function CastButton({ streamUrl, title, className = '' }: CastButtonProps) {
+export default function CastButton({ streamUrl, hlsUrl, title, className = '' }: CastButtonProps) {
   const [open, setOpen] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [devices, setDevices] = useState<DLNADevice[]>([]);
@@ -125,6 +120,7 @@ export default function CastButton({ streamUrl, title, className = '' }: CastBut
   const [successId, setSuccessId] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
+  const { toLanUrl } = useLanUrl();
 
   // Close on outside click
   useEffect(() => {
@@ -166,7 +162,9 @@ export default function CastButton({ streamUrl, title, className = '' }: CastBut
     setCastingId(device.id);
     setSuccessId(null);
     try {
-      const fullUrl = getLocalStreamUrl(streamUrl);
+      // Prefer HLS for broader TV codec support; fall back to direct stream
+      const castPath = hlsUrl ?? streamUrl;
+      const fullUrl = toLanUrl(castPath);
       const res = await fetch('/api/cast/send', {
         method: 'POST',
         credentials: 'include',
@@ -191,7 +189,8 @@ export default function CastButton({ streamUrl, title, className = '' }: CastBut
 
   const copyUrl = async () => {
     try {
-      await navigator.clipboard.writeText(getLocalStreamUrl(streamUrl));
+      const castPath = hlsUrl ?? streamUrl;
+      await navigator.clipboard.writeText(toLanUrl(castPath));
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
@@ -350,7 +349,7 @@ export default function CastButton({ streamUrl, title, className = '' }: CastBut
             {/* Footer tip */}
             <div className="px-4 py-2.5 border-t border-border bg-muted/20">
               <p className="text-[10px] text-muted-foreground leading-snug">
-                Works with Samsung, LG, Sony, Vizio TVs and Kodi. TV must be on the same WiFi network.
+                Works with Samsung, LG, Sony, Vizio TVs and Kodi.{hlsUrl ? ' Sending HLS stream for maximum compatibility.' : ' TV must be on the same WiFi network.'}
               </p>
             </div>
           </motion.div>

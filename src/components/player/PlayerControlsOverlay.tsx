@@ -37,6 +37,8 @@ interface MediaItem {
   filename?: string;
   poster?: string;
   watchedSeconds?: number;
+  /** Set to true when the player is using HLS (transcoded) mode */
+  usingHls?: boolean;
 }
 
 interface Props {
@@ -479,7 +481,11 @@ export default function PlayerControlsOverlay({
             {/* DLNA Cast */}
             {item.filename && (
               <div className={`rounded transition-all ${tvRing('cast')}`}>
-                <CastButton streamUrl={`/api/stream/${item.filename}`} title={item.title} />
+                <CastButton
+                  streamUrl={`/api/stream/${item.filename}`}
+                  hlsUrl={item.usingHls ? `/api/hls/${item.id}/index.m3u8` : undefined}
+                  title={item.title}
+                />
               </div>
             )}
 

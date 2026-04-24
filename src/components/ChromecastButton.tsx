@@ -16,6 +16,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Tv2, Loader2, X, Play, Pause, Square, Volume2, VolumeX } from 'lucide-react';
+import { useLanUrl } from '@/hooks/useLanUrl';
 
 // ── Cast SDK type stubs ───────────────────────────────────────────────────────
 
@@ -182,6 +183,8 @@ export default function ChromecastButton({
   const onCastStateChangeRef = useRef(onCastStateChange);
   onCastStateChangeRef.current = onCastStateChange;
 
+  const { toLanUrl } = useLanUrl();
+
   // ── Load Cast SDK (once per page) ──
   useEffect(() => {
     if (document.getElementById('cast-sdk')) {
@@ -323,11 +326,13 @@ export default function ChromecastButton({
       const session = ctx.getCurrentSession();
       if (!session) { setCastState('available'); return; }
 
-      const mediaInfo = new window.chrome.cast.media.MediaInfo(streamUrl, 'video/mp4');
+      // Use LAN URL so the Chromecast (on the TV) can reach the server
+      const fullStreamUrl = toLanUrl(streamUrl);
+      const mediaInfo = new window.chrome.cast.media.MediaInfo(fullStreamUrl, 'video/mp4');
       const metadata = new window.chrome.cast.media.GenericMediaMetadata();
       metadata.metadataType = window.chrome.cast.media.MetadataType.GENERIC;
       metadata.title = title;
-      if (poster) metadata.images = [{ url: poster }];
+      if (poster) metadata.images = [{ url: toLanUrl(poster) }];
       mediaInfo.metadata = metadata;
 
       const request = new window.chrome.cast.media.LoadRequest(mediaInfo);
@@ -340,7 +345,7 @@ export default function ChromecastButton({
     } catch {
       setCastState('available');
     }
-  }, [streamUrl, title, poster, currentTime]);
+  }, [streamUrl, title, poster, currentTime, toLanUrl]);
 
   // Expose trigger to parent via ref callback
   useEffect(() => {

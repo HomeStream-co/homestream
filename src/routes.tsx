@@ -21,6 +21,7 @@ const HistoryPage = lazy(() => import('./pages/history'));
 const RemotePage = lazy(() => import('./pages/remote'));
 const StatsPage  = lazy(() => import('./pages/stats'));
 const SamsungTvPage = lazy(() => import('./pages/samsung-tv'));
+const TvPage = lazy(() => import('./pages/tv'));
 
 const NotFoundPage = lazy(() => import('./pages/_404'));
 
@@ -61,8 +62,9 @@ export const routes: RouteObject[] = [
   { path: '/remote', element: route(<RemotePage />, 'Remote') },
   { path: '/stats', element: route(<StatsPage />, 'Stats') },
   { path: '/samsung-tv', element: route(<SamsungTvPage />, 'Samsung TV') },
+  { path: '/tv', element: route(<TvPage />, 'TV Interface') },
   { path: '*', element: route(<NotFoundPage />, '404') },
 ];
 
-export type Path = '/' | '/movie/:id' | '/show/:id' | '/library' | '/watchlist' | '/player/:id' | '/profiles' | '/discover' | '/downloads' | '/history';
+export type Path = '/' | '/movie/:id' | '/show/:id' | '/library' | '/watchlist' | '/player/:id' | '/profiles' | '/discover' | '/downloads' | '/history' | '/tv';
 export type Params = Record<string, string | undefined>;

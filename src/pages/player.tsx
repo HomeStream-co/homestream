@@ -814,7 +814,7 @@ export default function PlayerPage() {
         <AnimatePresence>
           {ps.showControls && !ps.showEndOverlay && (
             <PlayerControlsOverlay
-              item={item}
+              item={{ ...item, usingHls: !!hlsUrl }}
               playing={ps.playing}
               duration={ps.duration}
               volume={ps.volume}
