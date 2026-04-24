@@ -178,6 +178,32 @@ export default function PlayerPage() {
     onCast:        () => castButtonRef.current?.(),
   });
 
+  // Throttle ref for onTimeUpdate remote broadcasts (wall-clock, not video-time)
+  const lastRemoteSendRef = useRef(0);
+
+  // Immediate remote state push — called on play/pause/seek/volume so the
+  // phone remote reflects changes instantly without waiting for the 2s throttle.
+  const sendRemoteStateNow = useCallback(() => {
+    const video = ps.videoRef.current;
+    if (!video || !id) return;
+    lastRemoteSendRef.current = Date.now();
+    sendState({
+      mediaId: id,
+      title: item?.title ?? '',
+      poster: item?.poster,
+      currentTime: video.currentTime,
+      duration: video.duration || 0,
+      paused: video.paused,
+      volume: video.volume,
+      speed: video.playbackRate,
+      hasNextEpisode: !!nextItem,
+      subtitleTracks: [{ index: 0, label: 'English', language: 'en' }, { index: 1, label: 'Español', language: 'es' }],
+      activeSubtitle: ps.ccLang === 'off' ? -1 : ps.ccLang === 'en' ? 0 : 1,
+      cast: ps.castInfo ?? undefined,
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, item, nextItem, ps.ccLang, ps.castInfo, sendState]);
+
   // ── Kids profile block — handled by RestrictedContentGuard wrapper ──────────
 
   // ── Reset on id change ────────────────────────────────────────────────────
@@ -504,6 +530,7 @@ export default function PlayerPage() {
     if (ps.videoRef.current) ps.videoRef.current.currentTime = t;
     // Also update the ref immediately so progress saves are accurate mid-seek
     ps.currentTimeRef.current = t;
+    sendRemoteStateNow();
   };
   const changeSpeed = (rate: number) => { if (ps.videoRef.current) ps.videoRef.current.playbackRate = rate; ps.setPlaybackRate(rate); ps.setShowSpeedMenu(false); };
 
@@ -566,8 +593,8 @@ export default function PlayerPage() {
           {...(!hlsUrl ? { src: `/api/stream/${item.filename}` } : {})}
           className="w-full h-full"
           preload="auto"
-          onPlay={() => ps.setPlaying(true)}
-          onPause={() => { ps.setPlaying(false); saveProgress(); }}
+          onPlay={() => { ps.setPlaying(true); sendRemoteStateNow(); }}
+          onPause={() => { ps.setPlaying(false); saveProgress(); sendRemoteStateNow(); }}
           onTimeUpdate={() => {
             const video = ps.videoRef.current;
             if (!video) return;
@@ -599,8 +626,11 @@ export default function PlayerPage() {
                 `${formatTime(video.currentTime)} / ${formatTime(dur)}`;
             }
 
-            // Remote state broadcast — throttled to every 2 seconds
-            if (Math.floor(video.currentTime) % 2 === 0) {
+            // Remote state broadcast — throttled to at most once per 2 seconds
+            // using a wall-clock ref so it never fires multiple times per second.
+            const now = Date.now();
+            if (now - lastRemoteSendRef.current >= 2000) {
+              lastRemoteSendRef.current = now;
               sendState({
                 mediaId: id ?? '',
                 title: item.title ?? '',
@@ -633,13 +663,15 @@ export default function PlayerPage() {
               clearTimeout(ps.resumeBannerTimer.current);
               ps.resumeBannerTimer.current = setTimeout(() => ps.setShowResumeBanner(false), 4000);
             }
+            // Push initial state to remote immediately so it shows title/duration
+            sendRemoteStateNow();
           }}
           onCanPlayThrough={() => ps.setVideoLoading(false)}
           onWaiting={() => ps.setVideoLoading(true)}
           onPlaying={() => ps.setVideoLoading(false)}
           onVolumeChange={() => {
             const video = ps.videoRef.current;
-            if (video) { ps.setVolume(video.volume); ps.setMuted(video.muted); }
+            if (video) { ps.setVolume(video.volume); ps.setMuted(video.muted); sendRemoteStateNow(); }
           }}
           onError={() => {
             const video = ps.videoRef.current;
