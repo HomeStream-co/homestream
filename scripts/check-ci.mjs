@@ -1,40 +1,66 @@
+import { createRequire } from 'module';
 import https from 'https';
-import { execSync } from 'child_process';
 
-const token = execSync(
-  `npx tsx -e "import { getSecret } from '#airo/secrets'; process.stdout.write(getSecret('GH_TOKEN') ?? '');"`,
-  { cwd: '/app' }
-).toString().trim();
+const req = createRequire(import.meta.url);
+const { getSecret } = req('#airo/secrets');
+const tok = getSecret('GH_TOKEN');
 
 function get(path) {
-  return new Promise((resolve, reject) => {
-    const options = {
-      hostname: 'api.github.com',
-      path,
-      headers: { Authorization: 'Bearer ' + token, 'User-Agent': 'homestream-ci', Accept: 'application/vnd.github.v3+json' },
+  return new Promise((res, rej) => {
+    const opts = {
+      hostname: 'api.github.com', path,
+      headers: { Authorization: 'token ' + tok, 'User-Agent': 'homestream-ci' }
     };
-    https.get(options, res => {
-      if (res.statusCode === 302) {
-        https.get(res.headers.location, res2 => {
-          let d = ''; res2.on('data', c => (d += c)); res2.on('end', () => resolve(d));
-        }).on('error', reject);
-        return;
-      }
-      let d = ''; res.on('data', c => (d += c)); res.on('end', () => resolve(d));
-    }).on('error', reject);
+    https.get(opts, r => {
+      let d = '';
+      r.on('data', c => d += c);
+      r.on('end', () => res(JSON.parse(d)));
+    }).on('error', rej);
   });
 }
 
-// Always fetch the latest E2E run
-const runs = JSON.parse(await get('/repos/trevorrossworn-code/homestream/actions/runs?per_page=6&branch=main'));
-const e2eRun = runs.workflow_runs.find(r => r.name === 'E2E Tests (Playwright)');
-const runId = e2eRun.id;
-console.log('Run ID:', runId, '| status:', e2eRun.status, '| conclusion:', e2eRun.conclusion);
-const jobs = JSON.parse(await get(`/repos/trevorrossworn-code/homestream/actions/runs/${runId}/jobs`));
-const job = jobs.jobs[0];
-console.log('Job:', job.name, '| ID:', job.id);
+function getLog(url) {
+  return new Promise((res) => {
+    const u = new URL(url);
+    const opts = {
+      hostname: u.hostname, path: u.pathname + u.search,
+      headers: { Authorization: 'token ' + tok, 'User-Agent': 'homestream-ci' }
+    };
+    https.get(opts, r => {
+      if (r.statusCode === 302 || r.statusCode === 301) {
+        // follow redirect
+        const u2 = new URL(r.headers.location);
+        https.get({ hostname: u2.hostname, path: u2.pathname + u2.search, headers: { 'User-Agent': 'homestream-ci' } }, r2 => {
+          let d = '';
+          r2.on('data', c => d += c);
+          r2.on('end', () => res(d));
+        }).on('error', () => res(''));
+      } else {
+        let d = '';
+        r.on('data', c => d += c);
+        r.on('end', () => res(d));
+      }
+    }).on('error', () => res(''));
+  });
+}
 
-const logs = await get(`/repos/trevorrossworn-code/homestream/actions/jobs/${job.id}/logs`);
-const lines = logs.split('\n');
-// Print ALL lines — don't truncate
-lines.forEach(l => console.log(l));
+const RUN_ID = '24869363139';
+
+const jobs = await get(`/repos/trevorrossworn-code/homestream/actions/runs/${RUN_ID}/jobs`);
+for (const j of jobs.jobs) {
+  console.log('\nJOB:', j.name, j.status, j.conclusion);
+  for (const s of j.steps) {
+    const icon = s.conclusion === 'failure' ? '❌' : s.conclusion === 'success' ? '✓' : '-';
+    console.log(' ', icon, s.number, s.name, s.conclusion ?? '');
+  }
+
+  // Get log for failed job
+  if (j.conclusion === 'failure') {
+    console.log('\n--- FETCHING LOG ---');
+    const log = await getLog(`https://api.github.com/repos/trevorrossworn-code/homestream/actions/jobs/${j.id}/logs`);
+    // Print last 150 lines
+    const lines = log.split('\n');
+    const tail = lines.slice(Math.max(0, lines.length - 150));
+    console.log(tail.join('\n'));
+  }
+}
