@@ -163,6 +163,10 @@ export default function RemotePage() {
   // Destroyed flag — set on unmount so onclose/onerror don't call setState
   // after the component has been removed from the tree.
   const destroyedRef = useRef(false);
+  // Exponential back-off state for reconnects (resets on successful open)
+  const retryCountRef = useRef(0);
+  const MAX_RETRY_DELAY_MS = 30_000;
+  const BASE_RETRY_DELAY_MS = 3_000;
 
   // Read ?tab= from URL for PWA shortcut deep-linking
   const initialTab = (new URLSearchParams(window.location.search).get('tab') ?? 'remote') as RemoteTab;
@@ -274,7 +278,10 @@ export default function RemotePage() {
     setStatus('connecting');
 
     ws.onopen = () => {
-      if (!destroyedRef.current) setStatus('no_screen');
+      if (!destroyedRef.current) {
+        retryCountRef.current = 0; // reset back-off on successful connection
+        setStatus('no_screen');
+      }
     };
 
     ws.onmessage = (e) => {
@@ -296,9 +303,12 @@ export default function RemotePage() {
       // prevents a ghost reconnect loop after the page is navigated away.
       if (destroyedRef.current) return;
       setStatus('disconnected');
+      // Exponential back-off: 3s → 6s → 12s → … → 30s cap
+      retryCountRef.current += 1;
+      const delay = Math.min(BASE_RETRY_DELAY_MS * 2 ** (retryCountRef.current - 1), MAX_RETRY_DELAY_MS);
       // Use connectRef so we always schedule the latest connect function,
       // not the stale closure captured when this ws instance was created.
-      reconnectRef.current = setTimeout(() => connectRef.current?.(), 3000);
+      reconnectRef.current = setTimeout(() => connectRef.current?.(), delay);
     };
 
     // onerror always fires before onclose on a network drop.
@@ -510,6 +520,7 @@ export default function RemotePage() {
                 serverUrl={qrData?.url}
                 onRetry={() => {
                   if (reconnectRef.current) clearTimeout(reconnectRef.current);
+                  retryCountRef.current = 0; // reset back-off on manual retry
                   connect();
                 }}
               />
