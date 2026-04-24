@@ -193,8 +193,8 @@ export default function HistoryPage() {
             <div className="space-y-2">
               <AnimatePresence>
                 {groupItems.map(item => {
-                  const isComplete = !!item.watchedAt || item.watchProgress === 0 && !!item.lastWatchedAt;
-                  const detailPath = item.type === 'show' ? `/show/${item.id}` : `/movie/${item.id}`;
+                  const isComplete = !!item.watchedAt || (item.watchProgress >= 95 && !!item.lastWatchedAt);
+                  const detailPath = item.type === 'series' ? `/show/${item.id}` : `/movie/${item.id}`;
 
                   return (
                     <motion.div

@@ -9,7 +9,7 @@ export interface StepStatus {
   mediaDir: 'idle' | 'saving' | 'done' | 'error';
   qbit: 'idle' | 'testing' | 'ok' | 'error' | 'skip';
   jellyfin: 'idle' | 'testing' | 'ok' | 'error' | 'skip';
-  apiKeys: 'idle' | 'saving' | 'done';
+  apiKeys: 'idle' | 'saving' | 'done' | 'error';
   complete: 'idle' | 'saving' | 'done' | 'error';
 }
 

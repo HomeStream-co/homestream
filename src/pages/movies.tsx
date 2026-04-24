@@ -40,9 +40,9 @@ export default function MoviesPage() {
       const q = query.toLowerCase();
       items = items.filter(m =>
         m.title.toLowerCase().includes(q) ||
-        m.plot.toLowerCase().includes(q) ||
+        (m.plot ?? '').toLowerCase().includes(q) ||
         toActorsString(m.actors).toLowerCase().includes(q) ||
-        m.director.toLowerCase().includes(q) ||
+        (m.director ?? '').toLowerCase().includes(q) ||
         m.genre.some(g => g.toLowerCase().includes(q))
       );
     }

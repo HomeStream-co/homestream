@@ -386,7 +386,7 @@ export default function TvPage() {
 
 function TvPageInner() {
   const navigate = useNavigate();
-  const { library } = useMedia();
+  const { library, watchlist: watchlistIds } = useMedia();
   const { activeProfile } = useProfile();
   const profileId = activeProfile?.id ?? 'adult';
 
@@ -431,8 +431,8 @@ function TvPageInner() {
   );
 
   const watchlist = useMemo(() =>
-    library.filter(m => (m.watchProgress ?? 0) < 95).slice(0, 20),
-    [library]
+    library.filter(m => watchlistIds.includes(m.id)),
+    [library, watchlistIds]
   );
 
   const topRated = useMemo(() =>

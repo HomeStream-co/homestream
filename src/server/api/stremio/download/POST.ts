@@ -1,6 +1,6 @@
 import type { Request, Response } from 'express';
 import { pickBestStream } from '../../../torrentManager.js';
-import { addMagnet, isReachable } from '../../../qbittorrentClient.js';
+import { addMagnet, testConnection } from '../../../qbittorrentClient.js';
 import { readConfig } from '../../../configStore.js';
 import { runPreDownloadScan } from '../../../security/threatScanner.js';
 import { connectForDownload, disconnectAfterDownload } from '../../../vpnService.js';
@@ -415,8 +415,12 @@ export default async function handler(req: Request, res: Response) {
     return;
   }
 
-  // Determine backend
-  const useQbit = await isReachable();
+  // Determine backend — use testConnection() to validate auth, not just reachability
+  const qbitResult = await testConnection();
+  const useQbit = qbitResult.ok;
+  if (!useQbit && qbitResult.error) {
+    console.warn(`[download] qBittorrent unavailable: ${qbitResult.error} — falling back to WebTorrent`);
+  }
   console.log(`[download] Backend: ${useQbit ? 'qBittorrent' : 'WebTorrent (fallback)'}`);
 
   // ── VPN: connect before download (download-only, never affects streaming) ──

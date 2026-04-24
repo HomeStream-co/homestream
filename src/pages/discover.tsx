@@ -544,7 +544,7 @@ function DownloadModal({ target, onClose }: { target: DownloadTarget; onClose: (
           type: target.type,
           quality: stream.name,
           poster: target.posterUrl,
-          streams: [{ infoHash: stream.url, magnet: `magnet:?xt=urn:btih:${stream.url}`, quality: stream.name, name: stream.name, size: '', seeds: '' }],
+          streams: [{ infoHash: stream.url, magnet: `magnet:?xt=urn:btih:${stream.url}`, quality: stream.name, name: stream.name, size: '', seeds: '', source: 'torrentio' }],
         }),
       });
 
@@ -568,7 +568,10 @@ function DownloadModal({ target, onClose }: { target: DownloadTarget; onClose: (
         return;
       }
 
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({})) as { error?: string; message?: string };
+        throw new Error(errData.message ?? errData.error ?? `Server error ${res.status}`);
+      }
 
       toast.success(`Download queued — ${target.title}`, {
         description: stream.name,
@@ -576,7 +579,7 @@ function DownloadModal({ target, onClose }: { target: DownloadTarget; onClose: (
       });
       onClose();
     } catch (err) {
-      toast.error(`Download failed: ${String(err)}`);
+      toast.error(`Download failed: ${err instanceof Error ? err.message : String(err)}`);
       setDownloading(null);
     }
   };

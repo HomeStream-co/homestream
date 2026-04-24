@@ -10,6 +10,7 @@ import {
   XCircle, Loader2, RefreshCw, Eye, EyeOff, SkipForward,
   Shield, AlertTriangle, Search,
 } from 'lucide-react';
+import { toast } from 'sonner';
 import type { SetupStepProps } from './types';
 
 interface NetworkInterface {
@@ -153,20 +154,24 @@ export default function StepOptional({
   const saveAndContinue = async () => {
     setStatus(s => ({ ...s, qbit: s.qbit === 'ok' ? 'ok' : 'idle' }));
     // Save whatever was entered (even if not tested — user can skip)
-    await fetch('/api/setup', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        action: 'save',
-        qbitUrl: form.qbitUrl,
-        qbitUsername: form.qbitUsername,
-        qbitPassword: form.qbitPassword,
-        jellyfinUrl: form.jellyfinUrl,
-        jellyfinApiKey: form.jellyfinApiKey,
-        prowlarrUrl: form.prowlarrUrl,
-        prowlarrApiKey: form.prowlarrApiKey,
-      }),
-    }).catch(() => {/* non-fatal */});
+    try {
+      await fetch('/api/setup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'save',
+          qbitUrl: form.qbitUrl,
+          qbitUsername: form.qbitUsername,
+          qbitPassword: form.qbitPassword,
+          jellyfinUrl: form.jellyfinUrl,
+          jellyfinApiKey: form.jellyfinApiKey,
+          prowlarrUrl: form.prowlarrUrl,
+          prowlarrApiKey: form.prowlarrApiKey,
+        }),
+      });
+    } catch {
+      toast.warning('Settings may not have saved — check your connection and try again.');
+    }
     onNext();
   };
 

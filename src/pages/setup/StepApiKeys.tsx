@@ -65,17 +65,21 @@ export default function StepApiKeys({
 
   const saveApiKeys = async () => {
     setStatus(s => ({ ...s, apiKeys: 'saving' }));
-    await apiPost('save', {
-      adminPassword: form.adminPassword,
-      omdbApiKey: form.omdbApiKey,
-      googleAiApiKey: form.googleAiApiKey,
-      tmdbApiKey: form.tmdbApiKey,
-      aiProvider: form.aiProvider,
-      ollamaUrl: form.ollamaUrl,
-      ollamaModel: form.ollamaModel,
-    });
-    setStatus(s => ({ ...s, apiKeys: 'done' }));
-    onNext();
+    try {
+      await apiPost('save', {
+        adminPassword: form.adminPassword,
+        omdbApiKey: form.omdbApiKey,
+        googleAiApiKey: form.googleAiApiKey,
+        tmdbApiKey: form.tmdbApiKey,
+        aiProvider: form.aiProvider,
+        ollamaUrl: form.ollamaUrl,
+        ollamaModel: form.ollamaModel,
+      });
+      setStatus(s => ({ ...s, apiKeys: 'done' }));
+      onNext();
+    } catch {
+      setStatus(s => ({ ...s, apiKeys: 'error' }));
+    }
   };
 
   const passwordMismatch = !!form.adminPassword && !!form.adminPasswordConfirm && form.adminPassword !== form.adminPasswordConfirm;
@@ -315,11 +319,16 @@ export default function StepApiKeys({
         <button onClick={onBack} className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-border text-muted-foreground hover:text-foreground text-sm transition-colors">
           <ChevronLeft className="w-4 h-4" />Back
         </button>
-        <button onClick={saveApiKeys} disabled={status.apiKeys === 'saving' || passwordMismatch}
-          className="flex-1 flex items-center justify-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground py-2.5 rounded-xl font-semibold text-sm transition-colors disabled:opacity-60 disabled:cursor-not-allowed">
-          {status.apiKeys === 'saving' && <Loader2 className="w-4 h-4 animate-spin" />}
-          Save &amp; Continue <ChevronRight className="w-4 h-4" />
-        </button>
+        <div className="flex-1 flex flex-col gap-1.5">
+          {status.apiKeys === 'error' && (
+            <p className="text-[11px] text-destructive text-center">Could not save settings — is the server running?</p>
+          )}
+          <button onClick={saveApiKeys} disabled={status.apiKeys === 'saving' || passwordMismatch}
+            className="w-full flex items-center justify-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground py-2.5 rounded-xl font-semibold text-sm transition-colors disabled:opacity-60 disabled:cursor-not-allowed">
+            {status.apiKeys === 'saving' && <Loader2 className="w-4 h-4 animate-spin" />}
+            Save &amp; Continue <ChevronRight className="w-4 h-4" />
+          </button>
+        </div>
       </div>
     </div>
   );

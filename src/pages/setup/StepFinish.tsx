@@ -34,7 +34,7 @@ export default function StepFinish({
     const RETRY_DELAY_MS = 1500;
 
     function tryFetch() {
-      fetch('/api/remote/qr?format=svg')
+      fetch('/api/remote/qr')
         .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
         .then((d: { url?: string; qr?: string; lanIP?: string; port?: string }) => {
           if (cancelled) return;
@@ -171,10 +171,9 @@ export default function StepFinish({
               </div>
             )}
             {qrData && !qrPointsToLocalhost && (
-              <div
-                className="w-24 h-24 rounded-lg overflow-hidden bg-white p-1.5 [&_svg]:w-full [&_svg]:h-full"
-                dangerouslySetInnerHTML={{ __html: qrData.qr }}
-              />
+              <div className="w-24 h-24 rounded-lg overflow-hidden bg-white p-1.5">
+                <img src={qrData.qr} alt="Remote QR code" className="w-full h-full object-contain" />
+              </div>
             )}
             {(qrError || qrPointsToLocalhost) && (
               <div className="w-24 h-24 rounded-lg bg-muted flex flex-col items-center justify-center gap-1 text-center px-2">

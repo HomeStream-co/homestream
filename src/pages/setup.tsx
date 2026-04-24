@@ -135,9 +135,11 @@ export default function SetupPage() {
   useEffect(() => {
     fetch('/api/setup').then(r => r.json()).then((data: { setupComplete?: boolean; config?: { tmdbApiKey?: string } }) => {
       if (data.setupComplete) navigate('/');
-      // Auto-populate TMDB key if the server already has it (env var or prior save)
-      if (data.config?.tmdbApiKey && !form.tmdbApiKey) {
-        setForm(f => ({ ...f, tmdbApiKey: data.config!.tmdbApiKey! }));
+      // Auto-populate TMDB key if the server already has it (env var or prior save),
+      // but only if the user hasn't already typed something (use functional update to
+      // read current state rather than the stale closure value).
+      if (data.config?.tmdbApiKey) {
+        setForm(f => f.tmdbApiKey ? f : { ...f, tmdbApiKey: data.config!.tmdbApiKey! });
       }
     }).catch(() => {});
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -243,7 +245,7 @@ export default function SetupPage() {
       <title>Setup — HomeStream</title>
 
       {/* HTTPS warning — TV browsers auto-upgrade http→https */}
-      {typeof window !== 'undefined' && window.location.protocol === 'https:' && window.location.hostname !== 'localhost' && (
+      {typeof window !== 'undefined' && window.location.protocol === 'https:' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1' && (
         <div className="w-full max-w-lg mb-4 bg-yellow-500/10 border border-yellow-500/40 rounded-xl px-4 py-3 text-center">
           <p className="text-sm font-semibold text-yellow-400">⚠️ Wrong protocol detected</p>
           <p className="text-xs text-muted-foreground mt-0.5">

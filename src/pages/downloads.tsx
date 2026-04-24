@@ -837,7 +837,12 @@ function MagnetInput({ onAdded }: { onAdded: () => void }) {
 export default function DownloadsPage() {
   // ── Download state via WebSocket push (replaces 2s poll) ──────────────────
   const socketState = useDownloadSocket();
-  const data: DownloadsResponse | null = socketState.qbitTorrents !== undefined || socketState.jobs !== undefined
+
+  // Manual refresh override — populated immediately after mutations so the UI
+  // doesn't wait up to 2s for the next WebSocket push.
+  const [manualData, setManualData] = useState<DownloadsResponse | null>(null);
+
+  const data: DownloadsResponse | null = manualData ?? (socketState.qbitTorrents !== undefined || socketState.jobs !== undefined
     ? {
         jobs: socketState.jobs as unknown as DownloadsResponse['jobs'],
         qbitTorrents: socketState.qbitTorrents as unknown as DownloadsResponse['qbitTorrents'],
@@ -845,7 +850,7 @@ export default function DownloadsPage() {
         backend: socketState.backend,
         qbitOnline: socketState.qbitOnline,
       }
-    : null;
+    : null);
   const loading = data === null;
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
@@ -856,13 +861,15 @@ export default function DownloadsPage() {
   }, [socketState]);
 
   // Manual refresh used after mutations (delete, pause, resume, etc.)
-  // The WebSocket will push the updated state within 2s anyway, but this
-  // gives immediate feedback after user actions.
+  // Fetches fresh state immediately rather than waiting for the next WS push.
   const fetchData = useCallback(async () => {
     try {
       const res = await fetch('/api/stremio/downloads', { credentials: 'include' });
       if (!res.ok) return;
-      // No-op — the WebSocket push will update state automatically
+      const json = await res.json() as DownloadsResponse;
+      setManualData(json);
+      // Clear the manual override after 5s so WS takes over again
+      setTimeout(() => setManualData(null), 5000);
     } catch { /* ignore */ }
   }, []);
   const [filter, setFilter] = useState<'all' | 'active' | 'done' | 'error'>('all');
