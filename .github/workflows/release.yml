@@ -126,3 +126,22 @@ jobs:
           path: dist-electron/*Portable*.exe
           retention-days: 14
           if-no-files-found: warn
+
+      # electron-builder sometimes leaves the release as a draft even with
+      # releaseType: release. Explicitly un-draft and mark as latest so
+      # electron-updater's latest.yml points at the correct release.
+      - name: Publish release (un-draft + mark latest)
+        if: success()
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: |
+          $tag = "${{ github.ref_name }}"
+          $headers = @{ Authorization = "token $env:GH_TOKEN"; Accept = "application/vnd.github+json"; "Content-Type" = "application/json" }
+          $uri = "https://api.github.com/repos/${{ github.repository }}/releases/tags/$tag"
+          $release = Invoke-RestMethod -Uri $uri -Headers $headers
+          $id = $release.id
+          Write-Host "Un-drafting release id=$id tag=$tag"
+          $body = '{"draft":false,"prerelease":false,"make_latest":"true"}'
+          Invoke-RestMethod -Method Patch -Uri "https://api.github.com/repos/${{ github.repository }}/releases/$id" -Headers $headers -Body $body
+          Write-Host "Release $tag is now published and marked as latest."
