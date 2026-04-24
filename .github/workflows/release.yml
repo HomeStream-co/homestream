@@ -1,28 +1,11 @@
 name: Release
 
-# Triggered by pushing a version tag: git tag v1.5.8 && git push origin v1.5.8
-#
-# Prerequisites (set in repo Settings → Secrets and variables → Actions):
-#   GH_TOKEN  — GitHub Personal Access Token with repo + write:packages scope
-#
-# Re-tag cycle (rebuild same version):
-#   git tag -d v1.5.8 && git push origin --delete v1.5.8
-#   git tag v1.5.8 && git push origin v1.5.8
-#
-# Artifacts uploaded:
-#   1. HomeStream-Setup-*.exe  — NSIS installer (for real installs / auto-updater)
-#   2. HomeStream-Portable-*.exe — portable single-file exe (for quick testing)
-#
-# The portable build finishes ~5 min faster than NSIS — grab it first for smoke tests.
-# IMPORTANT: Only the NSIS installer supports auto-updater. Never use portable for real installs.
-
 on:
   push:
     tags:
       - 'v*'
 
 jobs:
-  # ── Windows build & publish ─────────────────────────────────────────────────
   release-windows:
     name: Build & Publish Windows Installer
     runs-on: windows-latest
@@ -34,12 +17,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-          # Do NOT use actions/setup-node cache here — we manage it manually
-          # below with a Windows-specific key to avoid cross-OS cache poisoning.
 
-      # ── node_modules cache (Windows-specific key) ──────────────────────────
-      # Key includes runner.os so a Linux cache never restores on Windows.
-      # restore-keys intentionally omitted — partial cross-OS match would break native modules.
+      # Windows-specific cache key — never restores a Linux cache onto Windows
       - name: Cache node_modules
         id: cache-node-modules
         uses: actions/cache@v4
@@ -47,49 +26,21 @@ jobs:
           path: node_modules
           key: Windows-node22-modules-${{ hashFiles('package-lock.json') }}
 
-      # ── Install (only if cache missed) ────────────────────────────────────
-<<<<<<< HEAD
-      - name: Install dependencies
-        if: steps.cache-node-modules.outputs.cache-hit != 'true'
-        run: npm ci
-=======
-      # --ignore-scripts: skips native addon compilation (node-datachannel,
-      # bufferutil, etc.) — the server bundle is pre-compiled by esbuild so
-      # no native .node files are needed at package time.
-      # npm_config_optional=true: suppresses optional dep failures as a belt-and-suspenders.
+      # --ignore-scripts skips native addon compilation (node-datachannel etc.)
+      # The server bundle is pre-compiled by esbuild so no .node files are needed.
       - name: Install dependencies
         if: steps.cache-node-modules.outputs.cache-hit != 'true'
         run: npm ci --ignore-scripts
->>>>>>> 20260424023549-9h9yrecco0
         env:
           npm_config_optional: true
 
-      # ── Delete existing GitHub Release so electron-builder can recreate it ─
-<<<<<<< HEAD
-=======
-      # Uses PowerShell (native on windows-latest) to avoid python3/bash issues.
->>>>>>> 20260424023549-9h9yrecco0
+      # Delete any existing GitHub Release for this tag so electron-builder
+      # can create it fresh. Uses PowerShell — native on windows-latest.
       - name: Delete existing GitHub Release (if any)
         shell: pwsh
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: |
-<<<<<<< HEAD
-          TAG="${{ github.ref_name }}"
-          echo "Checking for existing release for tag: $TAG"
-          RESPONSE=$(curl -s -H "Authorization: token $GH_TOKEN" \
-            "https://api.github.com/repos/${{ github.repository }}/releases/tags/$TAG")
-          RELEASE_ID=$(echo "$RESPONSE" \
-            | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('id',''))" 2>/dev/null || true)
-          if [ -n "$RELEASE_ID" ] && [ "$RELEASE_ID" != "None" ] && [ "$RELEASE_ID" != "" ]; then
-            echo "Deleting existing release id=$RELEASE_ID for tag $TAG"
-            curl -s -X DELETE -H "Authorization: token $GH_TOKEN" \
-              "https://api.github.com/repos/${{ github.repository }}/releases/$RELEASE_ID"
-            echo "Deleted."
-          else
-            echo "No existing release found for $TAG — proceeding"
-          fi
-=======
           $tag = "${{ github.ref_name }}"
           $headers = @{ Authorization = "token $env:GH_TOKEN"; Accept = "application/vnd.github+json" }
           $uri = "https://api.github.com/repos/${{ github.repository }}/releases/tags/$tag"
@@ -102,73 +53,53 @@ jobs:
               Write-Host "Deleted."
             }
           } catch {
-            Write-Host "No existing release found for $tag (or delete failed — continuing anyway)"
+            Write-Host "No existing release found for $tag — proceeding"
           }
->>>>>>> 20260424023549-9h9yrecco0
 
-      # ── Build Vite + server bundle ─────────────────────────────────────────
       - name: Build app (Vite + server bundle)
         run: npm run build
         env:
           CI: true
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
 
-      # ── Verify build artifacts ─────────────────────────────────────────────
       - name: Verify build artifacts
         shell: pwsh
         run: |
-          Write-Host "=== dist/ top-level ==="
-          if (!(Test-Path "dist")) { Write-Error "ERROR: dist/ missing"; exit 1 }
-          Get-ChildItem dist | Format-Table Name, Length
-          Write-Host ""
-          Write-Host "=== dist/client/ ==="
-          if (!(Test-Path "dist/client")) { Write-Error "ERROR: dist/client/ missing"; exit 1 }
-          Get-ChildItem dist/client | Select-Object -First 15 | Format-Table Name
-          Write-Host ""
-          Write-Host "=== server bundle ==="
-          if (Test-Path "dist/server.bundle.cjs") {
-            $size = (Get-Item "dist/server.bundle.cjs").Length / 1MB
-            Write-Host ("✓ server.bundle.cjs present ({0:N1} MB)" -f $size)
-          } else {
-            Write-Error "ERROR: dist/server.bundle.cjs MISSING — build failed"
+          if (!(Test-Path "dist/server.bundle.cjs")) {
+            Write-Error "dist/server.bundle.cjs MISSING"
             exit 1
-<<<<<<< HEAD
-          fi
-=======
           }
->>>>>>> 20260424023549-9h9yrecco0
+          if (!(Test-Path "dist/client/index.html")) {
+            Write-Error "dist/client/index.html MISSING"
+            exit 1
+          }
+          $size = [math]::Round((Get-Item "dist/server.bundle.cjs").Length / 1MB, 1)
+          Write-Host "server.bundle.cjs: $size MB"
+          Write-Host "Build artifacts verified."
 
-      # ── Inject ghToken + repo coords into package.json before packaging ──
-      # --extraMetadata.X is not supported by this electron-builder version.
-      # Instead we patch package.json directly so updater.cjs can read
-      # pkg.build.ghToken / pkg.build.ghOwner / pkg.build.ghRepo at runtime.
+      # Patch package.json so updater.cjs can read pkg.build.ghToken at runtime.
+      # electron-builder --extraMetadata.X CLI flag is not supported in this version.
       - name: Inject build metadata into package.json
         shell: pwsh
         run: |
           $pkg = Get-Content package.json -Raw | ConvertFrom-Json
-          if (-not $pkg.build) { $pkg | Add-Member -NotePropertyName build -NotePropertyValue ([PSCustomObject]@{}) }
+          if (-not $pkg.PSObject.Properties['build']) {
+            $pkg | Add-Member -NotePropertyName build -NotePropertyValue ([PSCustomObject]@{})
+          }
           $pkg.build | Add-Member -NotePropertyName ghToken -NotePropertyValue "${{ secrets.GH_TOKEN }}" -Force
           $pkg.build | Add-Member -NotePropertyName ghOwner -NotePropertyValue "trevorrossworn-code" -Force
           $pkg.build | Add-Member -NotePropertyName ghRepo  -NotePropertyValue "homestream" -Force
           $pkg | ConvertTo-Json -Depth 10 | Set-Content package.json
-          Write-Host "✓ package.json patched with build metadata"
+          Write-Host "package.json patched with build metadata"
 
-      # ── Package: NSIS installer + publish to GitHub Release ───────────────
-      # This is the ONLY build that supports auto-updater.
-      # It publishes latest.yml + HomeStream-Setup-*.exe to the GitHub Release.
-      # electron-builder creates the release automatically via GH_TOKEN.
+      # NSIS installer — the only build that supports auto-updater.
+      # Publishes latest.yml + HomeStream-Setup-*.exe to the GitHub Release.
       - name: Package & publish NSIS installer
-        run: >
-          npx electron-builder
-          --win
-          --config electron/electron-builder.yml
-          --config.win.target=nsis
-          --publish always
+        run: npx electron-builder --win --config electron/electron-builder.yml --config.win.target=nsis --publish always
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
           DEBUG: electron-builder
 
-      # ── Upload NSIS installer as artifact (safety net if publish fails) ────
       - name: Upload NSIS installer artifact
         if: always()
         uses: actions/upload-artifact@v4
@@ -180,17 +111,10 @@ jobs:
           retention-days: 30
           if-no-files-found: warn
 
-      # ── Package: Portable (fast smoke-test — NO auto-updater support) ─────
-      # Built AFTER NSIS so the real installer is already published.
-      # Grab this from artifacts for quick "does it boot?" testing.
-      - name: Package portable .exe (smoke-test only)
+      # Portable — NO auto-updater support. For smoke testing only.
+      - name: Package portable .exe
         if: always()
-        run: >
-          npx electron-builder
-          --win
-          --config electron/electron-builder.yml
-          --config.win.target=portable
-          --publish never
+        run: npx electron-builder --win --config electron/electron-builder.yml --config.win.target=portable --publish never
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
 
