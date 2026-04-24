@@ -148,7 +148,15 @@ export default async function handler(req: Request, res: Response) {
 
   res.cookie('hs_session', token, {
     httpOnly: true,
-    sameSite: 'lax',
+    // 'lax' blocks cookies on cross-origin requests — which is exactly what
+    // happens when a phone on 192.168.x.x POSTs to the server at a different
+    // LAN IP. The browser treats different IPs as cross-site and won't send
+    // the cookie back on subsequent requests, breaking phone/TV login entirely.
+    // HomeStream is a local-network app served over plain HTTP — 'strict' is
+    // the right choice here: it allows the cookie on same-site navigations
+    // while still blocking CSRF from external sites. Since all clients access
+    // the same origin (IP:port), this works correctly for LAN access.
+    sameSite: 'strict',
     maxAge: SESSION_TTL_MS,
     path: '/',
   });
