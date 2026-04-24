@@ -220,7 +220,7 @@ export default function StremioPanel() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: loginEmail, password: loginPassword }),
       });
-      const data = await res.json() as { result?: { user?: { email: string; avatar?: string } }; error?: string };
+      const data = await res.json() as { result?: { user?: { email: string; avatar?: string } }; error?: string | { message?: string } };
       if (data.result?.user) {
         const acc: StremioAccount = { email: data.result.user.email, avatar: data.result.user.avatar };
         setAccount(acc);
@@ -230,7 +230,12 @@ export default function StremioPanel() {
         setView('search');
         toast.success(`Signed in as ${acc.email}`);
       } else {
-        setLoginError(String(data.error ?? 'Invalid email or password'));
+        // Normalise error — server may forward Stremio's object shape or a plain string
+        const raw = data.error;
+        const msg = typeof raw === 'object' && raw !== null
+          ? (raw.message ?? 'Invalid email or password')
+          : (raw ?? 'Invalid email or password');
+        setLoginError(msg);
       }
     } catch (err) {
       setLoginError(err instanceof Error ? err.message : 'Could not reach HomeStream server — is it running?');

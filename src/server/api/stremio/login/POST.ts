@@ -32,7 +32,8 @@ interface StremioLoginResponse {
       authKey?: string;
     };
   };
-  error?: string;
+  // Stremio API returns error as an object: { code, message, wrongPass?, wrongEmail? }
+  error?: string | { code?: number; message?: string; wrongPass?: boolean; wrongEmail?: boolean };
 }
 
 export default async function handler(req: Request, res: Response) {
@@ -57,10 +58,21 @@ export default async function handler(req: Request, res: Response) {
 
     const data = await upstream.json() as StremioLoginResponse;
 
+    // Normalise the error field — Stremio returns it as an object { code, message }
+    const errorMsg = typeof data.error === 'object' && data.error !== null
+      ? (data.error.message ?? 'Login failed')
+      : (data.error ?? undefined);
+
     if (!upstream.ok) {
       res.status(upstream.status).json({
-        error: data.error ?? `Stremio API returned HTTP ${upstream.status}`,
+        error: errorMsg ?? `Stremio API returned HTTP ${upstream.status}`,
       });
+      return;
+    }
+
+    // If the response body itself contains an error (HTTP 200 with error payload)
+    if (errorMsg && !data.result?.user) {
+      res.status(401).json({ error: errorMsg });
       return;
     }
 
