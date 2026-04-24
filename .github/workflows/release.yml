@@ -1,15 +1,19 @@
 name: Release
 
-# Triggered by pushing a version tag: git tag v1.5.2 && git push origin v1.5.2
+# Triggered by pushing a version tag: git tag v1.5.7 && git push origin v1.5.7
 #
 # Prerequisites (set in repo Settings → Secrets and variables → Actions):
 #   GH_TOKEN  — GitHub Personal Access Token with repo + write:packages scope
 #
 # Re-tag cycle (rebuild same version):
-#   git tag -d v1.5.2 && git push origin --delete v1.5.2
-#   git tag v1.5.2 && git push origin v1.5.2
+#   git tag -d v1.5.7 && git push origin --delete v1.5.7
+#   git tag v1.5.7 && git push origin v1.5.7
 #
-# Gate: the Windows installer is NOT published unless the E2E job passes first.
+# Artifacts uploaded:
+#   1. HomeStream-Setup-*.exe  — NSIS installer (for real installs / auto-updater)
+#   2. HomeStream-Portable-*.exe — portable single-file exe (for quick testing)
+#
+# The portable build finishes ~5 min faster than NSIS — grab it first for smoke tests.
 
 on:
   push:
@@ -22,7 +26,6 @@ jobs:
     name: Build & Publish Windows Installer
     runs-on: windows-latest
     timeout-minutes: 45
-    # E2E already runs on every push to main via e2e.yml — no need to re-run here
 
     steps:
       - uses: actions/checkout@v4
@@ -32,11 +35,23 @@ jobs:
           node-version: '22'
           cache: 'npm'
 
-      # ── Install ────────────────────────────────────────────────────────────
+      # ── Restore node_modules cache ─────────────────────────────────────────
+      # Caches the full node_modules dir keyed on package-lock.json hash.
+      # On a cache hit npm ci is skipped entirely, saving 3-5 min per run.
+      - name: Cache node_modules
+        id: cache-node-modules
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node22-modules-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node22-modules-
+
+      # ── Install (only if cache missed) ────────────────────────────────────
       - name: Install dependencies
+        if: steps.cache-node-modules.outputs.cache-hit != 'true'
         run: npm ci
         env:
-          # Suppress optional native rebuild failures (bufferutil, utf-8-validate)
           npm_config_optional: true
 
       # ── Delete existing release so electron-builder can create it fresh ───
@@ -49,7 +64,6 @@ jobs:
           echo "Checking for existing release for tag: $TAG"
           RESPONSE=$(curl -s -H "Authorization: token $GH_TOKEN" \
             "https://api.github.com/repos/${{ github.repository }}/releases/tags/$TAG")
-          echo "API response: $RESPONSE" | head -5
           RELEASE_ID=$(echo "$RESPONSE" \
             | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('id',''))" 2>/dev/null || true)
           if [ -n "$RELEASE_ID" ] && [ "$RELEASE_ID" != "None" ] && [ "$RELEASE_ID" != "" ]; then
@@ -86,34 +100,38 @@ jobs:
             echo "ERROR: dist/server.bundle.cjs MISSING — build failed"
             exit 1
           fi
-          echo ""
-          echo "=== sourcemap (optional) ==="
-          ls -lh dist/server.bundle.cjs.map 2>/dev/null && echo "✓ sourcemap present" || echo "(no sourcemap — OK)"
 
-      # ── Package & publish ──────────────────────────────────────────────────
-      - name: Package & publish Windows installer
-        # --publish always → creates the GitHub Release and uploads the .exe
-        # --extraMetadata.ghToken injects the token into package.json at build time
-        # so the packaged auto-updater can authenticate against the private repo.
-        # (electron-builder yml does NOT expand arbitrary ${ENV_VAR} — must use CLI)
+      # ── Package: Portable (fast — grab this first for smoke testing) ───────
+      # Portable builds in ~3 min vs ~8 min for NSIS.
+      # Does NOT support auto-updater — use NSIS installer for production.
+      - name: Package portable .exe (fast smoke-test build)
+        run: npx electron-builder --win --config electron/electron-builder.yml --config.win.target=portable --publish never --extraMetadata.ghToken=${{ secrets.GH_TOKEN }}
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+
+      - name: Upload portable artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: HomeStream-Portable-${{ github.ref_name }}
+          path: dist-electron/*Portable*.exe
+          retention-days: 14
+          if-no-files-found: warn
+
+      # ── Package: NSIS installer + publish to GitHub Release ───────────────
+      - name: Package & publish NSIS installer
         run: npx electron-builder --win --config electron/electron-builder.yml --config.win.target=nsis --publish always --extraMetadata.ghToken=${{ secrets.GH_TOKEN }}
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
           DEBUG: electron-builder
-          # Code signing — uncomment when WIN_CSC_LINK secret is added:
-          # WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
-          # WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
 
       # ── Safety-net artifact upload ─────────────────────────────────────────
-      # Uploads the .exe to Actions artifacts even if the GitHub Release
-      # publish step fails — so you can always download it manually.
-      - name: Upload installer artifact (safety net)
+      - name: Upload NSIS installer artifact (safety net)
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: HomeStream-Windows-Installer-${{ github.ref_name }}
           path: |
-            dist-electron/*.exe
+            dist-electron/*Setup*.exe
             dist-electron/*.zip
             dist-electron/*.yml
           retention-days: 30
