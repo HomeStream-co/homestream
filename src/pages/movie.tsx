@@ -293,7 +293,7 @@ export default function MoviePage() {
                     {item.genre.map(g => (
                       <Link
                         key={g}
-                        to={`/browse?q=${encodeURIComponent(g)}`}
+                        to={`/?q=${encodeURIComponent(g)}`}
                         className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-muted/60 text-muted-foreground hover:bg-primary/15 hover:text-primary transition-colors border border-border/50"
                       >
                         {g}
@@ -465,7 +465,7 @@ export default function MoviePage() {
                 {aiSimilar.map(title => (
                   <Link
                     key={title}
-                    to={`/browse?q=${encodeURIComponent(title)}`}
+                    to={`/?q=${encodeURIComponent(title)}`}
                     className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-card border border-border text-sm text-muted-foreground hover:text-foreground hover:border-primary/40 transition-colors"
                   >
                     {title}

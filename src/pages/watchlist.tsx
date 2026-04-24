@@ -125,7 +125,7 @@ export default function WatchlistPage() {
               Hover over any title and click the <span className="text-foreground">+</span> button to save it here for later.
             </p>
             <button
-              onClick={() => navigate('/browse')}
+              onClick={() => navigate('/')}
               className="bg-primary hover:bg-primary/80 text-white px-6 py-2.5 rounded-lg font-medium transition-colors"
             >
               Browse Library
