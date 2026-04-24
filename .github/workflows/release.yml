@@ -138,6 +138,21 @@ jobs:
           }
 >>>>>>> 20260424023549-9h9yrecco0
 
+      # ── Inject ghToken + repo coords into package.json before packaging ──
+      # --extraMetadata.X is not supported by this electron-builder version.
+      # Instead we patch package.json directly so updater.cjs can read
+      # pkg.build.ghToken / pkg.build.ghOwner / pkg.build.ghRepo at runtime.
+      - name: Inject build metadata into package.json
+        shell: pwsh
+        run: |
+          $pkg = Get-Content package.json -Raw | ConvertFrom-Json
+          if (-not $pkg.build) { $pkg | Add-Member -NotePropertyName build -NotePropertyValue ([PSCustomObject]@{}) }
+          $pkg.build | Add-Member -NotePropertyName ghToken -NotePropertyValue "${{ secrets.GH_TOKEN }}" -Force
+          $pkg.build | Add-Member -NotePropertyName ghOwner -NotePropertyValue "trevorrossworn-code" -Force
+          $pkg.build | Add-Member -NotePropertyName ghRepo  -NotePropertyValue "homestream" -Force
+          $pkg | ConvertTo-Json -Depth 10 | Set-Content package.json
+          Write-Host "✓ package.json patched with build metadata"
+
       # ── Package: NSIS installer + publish to GitHub Release ───────────────
       # This is the ONLY build that supports auto-updater.
       # It publishes latest.yml + HomeStream-Setup-*.exe to the GitHub Release.
@@ -149,7 +164,6 @@ jobs:
           --config electron/electron-builder.yml
           --config.win.target=nsis
           --publish always
-          --extraMetadata.ghToken=${{ secrets.GH_TOKEN }}
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
           DEBUG: electron-builder
@@ -177,7 +191,6 @@ jobs:
           --config electron/electron-builder.yml
           --config.win.target=portable
           --publish never
-          --extraMetadata.ghToken=${{ secrets.GH_TOKEN }}
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
 
