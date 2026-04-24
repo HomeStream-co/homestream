@@ -7,6 +7,7 @@ import { useState, useCallback, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Film, Search, Star, Tv, Tv2, SlidersHorizontal } from 'lucide-react';
 import type { LibraryItem } from './types';
+import { remoteAuthHeaders } from './types';
 
 function haptic(pattern: number | number[] = 30) {
   try { navigator.vibrate?.(pattern); } catch { /* ignore */ }

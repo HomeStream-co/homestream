@@ -50,8 +50,18 @@ export function requireAuth(req: Request, res: Response): boolean {
   // Open mode — no password set, all requests allowed
   if (!adminPassword) return true;
 
-  const token = req.cookies?.hs_session as string | undefined;
-  if (token && isValidSession(token)) return true;
+  // Cookie-based auth (desktop browser, same-origin)
+  const cookieToken = req.cookies?.hs_session as string | undefined;
+  if (cookieToken && isValidSession(cookieToken)) return true;
+
+  // Bearer token auth — phone/TV clients on LAN store the token in localStorage
+  // and send it as "Authorization: Bearer <token>" since they can't set cookies
+  // cross-origin. The token value is the same hs_session token issued at login.
+  const authHeader = req.headers.authorization ?? '';
+  if (authHeader.startsWith('Bearer ')) {
+    const bearerToken = authHeader.slice(7).trim();
+    if (bearerToken && isValidSession(bearerToken)) return true;
+  }
 
   res.status(401).json({ error: 'Unauthorized', message: 'Please log in to continue.' });
   return false;

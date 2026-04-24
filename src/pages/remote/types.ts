@@ -1,6 +1,21 @@
 /**
- * Shared types for the Remote page and its sub-tab components.
+ * Shared types and utilities for the Remote page and its sub-tab components.
  */
+
+/**
+ * Returns an Authorization header object for fetch calls made from the phone
+ * remote. The phone stores the session token in localStorage (it can't set
+ * httpOnly cookies cross-origin). The server's requireAuth middleware accepts
+ * both cookie and Bearer token.
+ */
+export function remoteAuthHeaders(): Record<string, string> {
+  try {
+    const token = localStorage.getItem('hs_token') ?? '';
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  } catch {
+    return {};
+  }
+}
 
 export type RemoteTab = 'remote' | 'browse' | 'search' | 'ai' | 'downloads';
 
