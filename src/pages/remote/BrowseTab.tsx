@@ -25,7 +25,7 @@ export default function BrowseTab({ send }: BrowseTabProps) {
   const [launching, setLaunching] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch('/api/media')
+    fetch('/api/media', { headers: remoteAuthHeaders() })
       .then(r => r.json())
       .then((data: LibraryItem[]) => { setLibrary(Array.isArray(data) ? data : []); setLoading(false); })
       .catch(() => setLoading(false));
