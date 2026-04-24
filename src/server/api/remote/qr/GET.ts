@@ -1,21 +1,25 @@
 /**
  * GET /api/remote/qr
  *
- * Returns a QR code encoding the /remote URL using the server's actual LAN IP
- * (from os.networkInterfaces), NOT the HTTP Host header. This means the QR
- * always points to the real local network address — e.g. http://192.168.1.50:3000/remote
- * — even when the app is accessed through a proxy, tunnel, or preview domain.
+ * Returns a QR code encoding the /remote URL.
  *
- * Open endpoint — no auth required. /remote itself is public, and the QR widget
- * needs to render on the TV home screen before the user logs in.
+ * URL preference order:
+ *   1. http://hs.local:<port>/remote  — mDNS hostname, works on all modern
+ *      devices (iOS, Android, macOS, Windows 10+) without typing an IP.
+ *   2. http://<LAN IP>:<port>/remote  — fallback for devices without mDNS
+ *      support (older Android, some smart TVs).
+ *
+ * Open endpoint — no auth required. /remote itself is public, and the QR
+ * widget needs to render on the TV home screen before the user logs in.
  *
  * Query params:
- *   ?format=svg  (default) — returns { url, qr: svgString }
- *   ?format=png            — returns { url, qr: base64DataUrl }
+ *   ?format=svg  (default) — returns { url, qr: svgString, lanIP, mdnsUrl, ipUrl }
+ *   ?format=png            — returns { url, qr: base64DataUrl, lanIP, mdnsUrl, ipUrl }
  */
 import type { Request, Response } from 'express';
 import QRCode from 'qrcode';
 import os from 'os';
+import { MDNS_LOCAL } from '../../../mdnsService.js';
 
 function getLanIP(): string {
   const interfaces = os.networkInterfaces();
@@ -67,7 +71,13 @@ export default async function handler(req: Request, res: Response) {
   try {
     const port = process.env.PORT ?? '3000';
     const lanIP = getLanIP();
-    const remoteUrl = `http://${lanIP}:${port}/remote`;
+
+    // Prefer hs.local — friendlier and works on all modern OS/devices.
+    // The QR code encodes the mDNS URL; the raw IP is included in the
+    // response so the UI can display it as a fallback hint.
+    const mdnsUrl   = `http://${MDNS_LOCAL}:${port}/remote`;
+    const ipUrl     = `http://${lanIP}:${port}/remote`;
+    const remoteUrl = mdnsUrl;
 
     const format = (req.query.format as string) ?? 'svg';
 
@@ -77,14 +87,14 @@ export default async function handler(req: Request, res: Response) {
         margin: 2,
         color: { dark: '#000000', light: '#ffffff' },
       });
-      res.json({ url: remoteUrl, qr: dataUrl, lanIP, port });
+      res.json({ url: remoteUrl, qr: dataUrl, lanIP, mdnsUrl, ipUrl, port });
     } else {
       const svg = await QRCode.toString(remoteUrl, {
         type: 'svg',
         margin: 2,
         color: { dark: '#000000', light: '#ffffff' },
       });
-      res.json({ url: remoteUrl, qr: svg, lanIP, port });
+      res.json({ url: remoteUrl, qr: svg, lanIP, mdnsUrl, ipUrl, port });
     }
   } catch (err) {
     res.status(500).json({ error: 'QR generation failed', message: String(err) });

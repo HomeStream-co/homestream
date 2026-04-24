@@ -159,8 +159,8 @@ https://${ip} {
   reverse_proxy localhost:${port}
 }
 
-# Optional: also serve on homestream.local if mDNS is working
-# https://homestream.local {
+# Optional: also serve on hs.local if mDNS is working
+# https://hs.local {
 #   reverse_proxy localhost:${port}
 # }`;
 

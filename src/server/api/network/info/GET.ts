@@ -13,6 +13,7 @@
  */
 import type { Request, Response } from 'express';
 import os from 'os';
+import { MDNS_LOCAL } from '../../../mdnsService.js';
 
 export default function handler(_req: Request, res: Response) {
   const hostname = os.hostname();
@@ -39,5 +40,5 @@ export default function handler(_req: Request, res: Response) {
     '127.0.0.1';
 
   const port = parseInt(process.env.PORT ?? '3000', 10);
-  res.json({ hostname, lanIPs, primary, port });
+  res.json({ hostname, lanIPs, primary, port, mdnsHostname: MDNS_LOCAL });
 }
