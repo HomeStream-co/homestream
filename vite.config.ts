@@ -34,15 +34,20 @@ function serverBundlePlugin(): Plugin {
 			// to replace the hardcoded default with process.env.SERVER_HOST||"0.0.0.0".
 			// This is the only reliable interception point.
 			const appJsSrc = fs0.readFileSync(appJsPath, "utf-8");
-			const patched = appJsSrc.replace(
-				/SERVER_HOST:\s*["']127\.0\.0\.1["']/g,
-				'SERVER_HOST: process.env.SERVER_HOST || "0.0.0.0"'
-			);
-			if (patched === appJsSrc) {
-				console.warn("[lan-bind-fix] WARNING: Could not find SERVER_HOST:\"127.0.0.1\" in dist/app.js — LAN binding may not work!");
+			// Already patched by prebuild step — idempotent, no-op
+			if (appJsSrc.includes('process.env.SERVER_HOST')) {
+				console.log("[lan-bind-fix] Already patched by prebuild — skipping dist/app.js patch.");
 			} else {
-				fs0.writeFileSync(appJsPath, patched, "utf-8");
-				console.log("[lan-bind-fix] Patched dist/app.js: SERVER_HOST default → process.env.SERVER_HOST || \"0.0.0.0\"");
+				const patched = appJsSrc.replace(
+					/SERVER_HOST:\s*["']127\.0\.0\.1["']/g,
+					'SERVER_HOST: process.env.SERVER_HOST || "0.0.0.0"'
+				);
+				if (patched === appJsSrc) {
+					console.warn("[lan-bind-fix] WARNING: Could not find SERVER_HOST:\"127.0.0.1\" in dist/app.js — LAN binding may not work!");
+				} else {
+					fs0.writeFileSync(appJsPath, patched, "utf-8");
+					console.log("[lan-bind-fix] Patched dist/app.js: SERVER_HOST default → process.env.SERVER_HOST || \"0.0.0.0\"");
+				}
 			}
 			// Output as CJS (.cjs) — this is the definitive fix for the Windows
 			// launch crash chain:
