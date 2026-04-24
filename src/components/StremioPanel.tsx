@@ -230,10 +230,10 @@ export default function StremioPanel() {
         setView('search');
         toast.success(`Signed in as ${acc.email}`);
       } else {
-        setLoginError(data.error ?? 'Invalid email or password');
+        setLoginError(String(data.error ?? 'Invalid email or password'));
       }
-    } catch {
-      setLoginError('Could not reach HomeStream server — is it running?');
+    } catch (err) {
+      setLoginError(err instanceof Error ? err.message : 'Could not reach HomeStream server — is it running?');
     } finally {
       setLoginLoading(false);
     }
@@ -514,9 +514,9 @@ export default function StremioPanel() {
                         {loginError && (
                           <div className="flex flex-col gap-1 bg-destructive/10 border border-destructive/30 rounded-lg p-3">
                             <div className="flex items-center gap-2 text-destructive text-xs font-medium">
-                              <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />{loginError}
+                              <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />{String(loginError)}
                             </div>
-                            {loginError.includes('reach') && (
+                            {String(loginError).includes('reach') && (
                               <p className="text-[10px] text-muted-foreground pl-5">
                                 Stremio login requires your HomeStream server to have internet access. You can still search and download without signing in.
                               </p>
