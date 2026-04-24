@@ -6,6 +6,18 @@
  *
  * Returns every piece of state and every ref the player needs, plus
  * derived helpers (showActionToast, resetControlsTimer).
+ *
+ * PERFORMANCE NOTE — currentTime / buffered are intentionally refs, not state.
+ * The video `timeupdate` event fires ~4× per second. Storing currentTime in
+ * React state causes the entire PlayerPage tree to re-render on every tick —
+ * that's 240+ re-renders per minute during normal playback. Instead:
+ *   - currentTimeRef / bufferedRef hold the raw values (always up-to-date)
+ *   - The seek bar and time display are updated via direct DOM mutation in
+ *     the onTimeUpdate handler (zero React overhead)
+ *   - React state (currentTime / buffered) is only updated when it actually
+ *     needs to trigger a re-render: progress saves, watch-complete checks,
+ *     skip-intro checks — all of which are now driven by refs + intervals
+ *     rather than by the state value changing.
  */
 
 import { useState, useRef, useCallback } from 'react';
@@ -65,14 +77,24 @@ export function usePlayerState() {
   const doubleTapTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const doubleTapCountRef = useRef<{ side: 'forward' | 'back'; count: number }>({ side: 'forward', count: 0 });
 
+  // currentTime and buffered are refs, NOT state — see file-level comment above.
+  // Components that need to display the current time read from these refs directly
+  // or receive DOM updates via the seek bar's value attribute.
+  const currentTimeRef = useRef(0);
+  const bufferedRef = useRef(0);
+  // Time display DOM node — updated directly to avoid React re-renders
+  const timeDisplayRef = useRef<HTMLSpanElement>(null);
+
   // ── Playback state ────────────────────────────────────────────────────────
   const [playing, setPlaying] = useState(false);
-  const [currentTime, setCurrentTime] = useState(0);
+  // currentTime is a ref (not state) — see file-level comment.
+  // duration is state because it only changes once (on loadedmetadata) and
+  // downstream effects legitimately need to re-run when it changes.
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(1);
   const [muted, setMuted] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
-  const [buffered, setBuffered] = useState(0);
+  // buffered is a ref (not state) — see file-level comment.
   const [playbackRate, setPlaybackRate] = useState(1);
   const [videoLoading, setVideoLoading] = useState(true);
   const [videoError, setVideoError] = useState<string | null>(null);
@@ -140,14 +162,14 @@ export function usePlayerState() {
     watchCompleteTriggered, fadeIntervalRef, resumeApplied, resumeBannerTimer,
     seekBarRef, thumbCanvasRef, thumbVideoRef, thumbVideoSrcRef,
     doubleTapTimerRef, doubleTapCountRef,
+    // currentTime / buffered as refs (no React re-renders on tick)
+    currentTimeRef, bufferedRef, timeDisplayRef,
     // Playback
     playing, setPlaying,
-    currentTime, setCurrentTime,
     duration, setDuration,
     volume, setVolume,
     muted, setMuted,
     fullscreen, setFullscreen,
-    buffered, setBuffered,
     playbackRate, setPlaybackRate,
     videoLoading, setVideoLoading,
     videoError, setVideoError,

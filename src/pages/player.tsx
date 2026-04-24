@@ -91,7 +91,7 @@ export default function PlayerPage() {
   }, []);
 
   // ── Derived: similar items ────────────────────────────────────────────────
-  const similarItems = item
+  const similarItems = useMemo(() => item
     ? library
         .filter(m => m.id !== item.id)
         .map(m => {
@@ -124,7 +124,7 @@ export default function PlayerPage() {
         .sort((a, b) => b.score - a.score)
         .slice(0, 8)
         .map(({ item: m }) => m)
-    : [];
+    : [], [item, library]);
 
   // ── Next item ─────────────────────────────────────────────────────────────
   const nextItem = (() => {
