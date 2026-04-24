@@ -38,7 +38,7 @@ function buildLibrarySummary(library: MediaItem[]): string {
     .map(m => {
       const rating = m.imdbRating !== 'N/A' ? `IMDb: ${m.imdbRating}/10` : 'Not rated';
       const progress = m.watchProgress > 0 ? ` [${Math.round(m.watchProgress)}% watched]` : '';
-      return `- "${m.title}" (${m.year}) | ${m.type === 'series' ? 'TV Show' : 'Movie'} | Genres: ${m.genre.join(', ')} | ${rating}${progress} | Director: ${m.director} | Cast: ${m.actors} | Plot: ${m.plot}`;
+      return `- "${m.title}" (${m.year}) | ${m.type === 'series' ? 'TV Show' : 'Movie'} | Genres: ${(m.genre ?? []).join(', ')} | ${rating}${progress} | Director: ${m.director} | Cast: ${m.actors} | Plot: ${m.plot}`;
     })
     .join('\n');
 }
@@ -152,7 +152,7 @@ function fallbackResponse(message: string, library: MediaItem[]): { reply: strin
   }
 
   const matches = matchedGenres.size > 0
-    ? library.filter(m => m.genre.some(g => matchedGenres.has(g)))
+    ? library.filter(m => (m.genre ?? []).some(g => matchedGenres.has(g)))
         .sort((a, b) => (parseFloat(b.imdbRating) || 0) - (parseFloat(a.imdbRating) || 0))
         .slice(0, 3)
     : [...library].sort((a, b) => (parseFloat(b.imdbRating) || 0) - (parseFloat(a.imdbRating) || 0)).slice(0, 3);

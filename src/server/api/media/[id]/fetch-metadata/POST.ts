@@ -59,7 +59,7 @@ export default async function handler(req: Request, res: Response) {
       year: omdb.Year || item.year,
       genre: omdb.Genre
         ? omdb.Genre.split(',').map((g: string) => g.trim())
-        : (item.genre.length && item.genre[0] !== 'Unknown' ? item.genre : ['Unknown']),
+        : ((item.genre ?? []).length && (item.genre ?? [])[0] !== 'Unknown' ? item.genre : ['Unknown']),
       plot: omdb.Plot && omdb.Plot !== 'N/A' ? omdb.Plot : item.plot,
       director: omdb.Director && omdb.Director !== 'N/A' ? omdb.Director : item.director,
       actors: omdb.Actors && omdb.Actors !== 'N/A' ? omdb.Actors : item.actors,

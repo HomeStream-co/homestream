@@ -96,7 +96,7 @@ export default function PlayerPage() {
         .filter(m => m.id !== item.id)
         .map(m => {
           let score = 0;
-          const sharedGenres = m.genre.filter((g: string) => item.genre.includes(g)).length;
+          const sharedGenres = (m.genre ?? []).filter((g: string) => (item.genre ?? []).includes(g)).length;
           score += sharedGenres * 3;
           if (m.director && item.director && m.director !== 'Unknown' && m.director === item.director) score += 4;
           const itemActors = toActorsArray(item.actors);
@@ -560,7 +560,7 @@ export default function PlayerPage() {
         </div>
         <div className="text-center max-w-sm">
           <h2 className="text-white text-xl font-heading mb-1">{item.title}</h2>
-          <p className="text-white/50 text-sm mb-6">{item.year}{item.genre[0] !== 'Unknown' ? ` · ${item.genre.slice(0, 2).join(', ')}` : ''}</p>
+          <p className="text-white/50 text-sm mb-6">{item.year}{(item.genre ?? [])[0] !== 'Unknown' ? ` · ${(item.genre ?? []).slice(0, 2).join(', ')}` : ''}</p>
           <div className="flex items-center justify-center gap-2 mb-3">
             <div className="flex gap-1">{[0, 1, 2].map(i => <div key={i} className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />)}</div>
             <span className="text-white/60 text-sm">Optimizing for playback…</span>

@@ -51,7 +51,7 @@ function buildEnrichmentPrompt(item: MediaItem): string {
 
 Title: "${item.title}" (${item.year})
 Type: ${item.type === 'series' ? 'TV Series' : 'Movie'}
-Genre: ${item.genre.join(', ')}
+Genre: ${(item.genre ?? []).join(', ')}
 Director: ${item.director}
 Cast: ${item.actors}
 IMDb Rating: ${item.imdbRating}
