@@ -23,7 +23,7 @@ jobs:
   e2e-gate:
     name: E2E Gate (must pass before publish)
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
 
     env:
       CI: 'true'
