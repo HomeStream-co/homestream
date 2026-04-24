@@ -30,11 +30,13 @@ vi.mock('../../server/authMiddleware.js', () => ({
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function makeReqRes(query: Record<string, string> = {}) {
-  const req = { query, cookies: {} } as unknown as Request;
+  const req = { query, cookies: {}, headers: {} } as unknown as Request;
   const data: { status?: number; json?: unknown } = {};
   const res = {
     status: vi.fn().mockReturnThis(),
-    json:   vi.fn((v: unknown) => { data.json = v; return res; }),
+    json:      vi.fn((v: unknown) => { data.json = v; return res; }),
+    setHeader: vi.fn().mockReturnThis(),
+    end:       vi.fn().mockReturnThis(),
   } as unknown as Response;
   return { req, res, data };
 }

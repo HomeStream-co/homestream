@@ -76,15 +76,22 @@ export function useRemoteControl(
     const tokenParam = cookieToken ? `&token=${encodeURIComponent(cookieToken)}` : '';
     const url = `${protocol}//${window.location.host}/ws/remote?role=screen&mediaId=${encodeURIComponent(mediaId)}${tokenParam}`;
 
-    let ws: WebSocket;
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
     let destroyed = false;
+    // Stable ref so onclose always calls the latest connect, not a stale closure
+    let connectFn: (() => void) | null = null;
 
     const connect = () => {
-      ws = new WebSocket(url);
+      if (destroyed) return;
+
+      // Clear any pending timer before opening a new socket
+      if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
+
+      const ws = new WebSocket(url);
       wsRef.current = ws;
 
       ws.onmessage = (e) => {
+        if (destroyed) return;
         try {
           const msg = JSON.parse(e.data) as { type: string; position?: number; level?: number; seconds?: number; rate?: number; track?: number; mediaId?: string };
           const h = handlersRef.current;
@@ -108,20 +115,34 @@ export function useRemoteControl(
 
       ws.onclose = () => {
         if (!destroyed) {
-          reconnectTimer = setTimeout(connect, 3000);
+          // Use connectFn ref so we always schedule the latest connect,
+          // not the stale closure captured when this ws instance was created.
+          reconnectTimer = setTimeout(() => connectFn?.(), 3000);
         }
       };
 
-      ws.onerror = () => { ws.close(); };
+      // onerror fires before onclose on network drop — close the socket so
+      // onclose handles the reconnect. Guard against double-close.
+      ws.onerror = () => {
+        if (ws.readyState !== WebSocket.CLOSED && ws.readyState !== WebSocket.CLOSING) {
+          ws.close();
+        }
+      };
     };
 
+    connectFn = connect;
     connect();
 
     return () => {
       destroyed = true;
       if (reconnectTimer) clearTimeout(reconnectTimer);
-      ws?.close();
-      wsRef.current = null;
+      if (wsRef.current) {
+        // Null out onclose before intentional close to prevent a reconnect
+        // attempt during teardown.
+        wsRef.current.onclose = null;
+        wsRef.current.close();
+        wsRef.current = null;
+      }
     };
   }, [mediaId]);
 

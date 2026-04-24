@@ -156,6 +156,13 @@ function VolumeFlash({ dir, pct }: { dir: 'up' | 'down'; pct: number }) {
 export default function RemotePage() {
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Stable ref to the connect function — avoids stale-closure in onclose/onerror
+  // handlers that are set up once per WebSocket instance but need to call the
+  // latest version of connect (which itself reads from stable refs, so this is safe).
+  const connectRef = useRef<(() => void) | null>(null);
+  // Destroyed flag — set on unmount so onclose/onerror don't call setState
+  // after the component has been removed from the tree.
+  const destroyedRef = useRef(false);
 
   // Read ?tab= from URL for PWA shortcut deep-linking
   const initialTab = (new URLSearchParams(window.location.search).get('tab') ?? 'remote') as RemoteTab;
@@ -243,6 +250,16 @@ export default function RemotePage() {
   // ── WebSocket ─────────────────────────────────────────────────────────────
 
   const connect = useCallback(() => {
+    // Don't reconnect if the component has been unmounted
+    if (destroyedRef.current) return;
+
+    // Clear any pending reconnect timer before opening a new socket —
+    // prevents stacked timers when onerror fires before onclose.
+    if (reconnectRef.current) {
+      clearTimeout(reconnectRef.current);
+      reconnectRef.current = null;
+    }
+
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     // Pass session token as query param — the /remote page may be accessed
     // from a phone on the same LAN where cookies aren't sent cross-origin.
@@ -256,9 +273,12 @@ export default function RemotePage() {
     wsRef.current = ws;
     setStatus('connecting');
 
-    ws.onopen = () => setStatus('no_screen');
+    ws.onopen = () => {
+      if (!destroyedRef.current) setStatus('no_screen');
+    };
 
     ws.onmessage = (e) => {
+      if (destroyedRef.current) return;
       try {
         const msg = JSON.parse(e.data) as { type: string } & Partial<PlayerState> & { count?: number };
         if (msg.type === 'state') {
@@ -272,16 +292,34 @@ export default function RemotePage() {
     };
 
     ws.onclose = () => {
+      // Suppress state updates after unmount — avoids React warning and
+      // prevents a ghost reconnect loop after the page is navigated away.
+      if (destroyedRef.current) return;
       setStatus('disconnected');
-      reconnectRef.current = setTimeout(connect, 3000);
+      // Use connectRef so we always schedule the latest connect function,
+      // not the stale closure captured when this ws instance was created.
+      reconnectRef.current = setTimeout(() => connectRef.current?.(), 3000);
     };
 
-    ws.onerror = () => ws.close();
+    // onerror always fires before onclose on a network drop.
+    // Calling ws.close() here triggers onclose which schedules the reconnect —
+    // we don't need to do anything else. Guard against double-close.
+    ws.onerror = () => {
+      if (ws.readyState !== WebSocket.CLOSED && ws.readyState !== WebSocket.CLOSING) {
+        ws.close();
+      }
+    };
   }, []);
 
+  // Keep connectRef in sync with the latest connect function
+  connectRef.current = connect;
+
   useEffect(() => {
+    destroyedRef.current = false;
     connect();
     return () => {
+      // Mark destroyed first so onclose/onerror handlers are suppressed
+      destroyedRef.current = true;
       if (reconnectRef.current) clearTimeout(reconnectRef.current);
       wsRef.current?.close();
     };
