@@ -2,8 +2,10 @@
  * Setup Step 8 — Finish
  * Config summary, existing media scan, and final launch button.
  */
+import { useEffect, useState } from 'react';
 import {
   CheckCircle2, ChevronLeft, Loader2, AlertCircle, ScanSearch, PackageOpen, Zap,
+  Smartphone, QrCode, Copy, Check,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
@@ -19,6 +21,32 @@ export default function StepFinish({
   importExisting, setImportExisting,
 }: SetupStepProps) {
   const navigate = useNavigate();
+
+  // ── QR code for phone remote ───────────────────────────────────────────────
+  const [qrData, setQrData] = useState<{ url: string; qr: string; lanIP?: string; port?: string } | null>(null);
+  const [qrError, setQrError] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    fetch('/api/remote/qr?format=svg')
+      .then(r => { if (!r.ok) throw new Error(); return r.json(); })
+      .then((d: { url?: string; qr?: string; lanIP?: string; port?: string }) => {
+        if (d?.url && d?.qr) setQrData({ url: d.url, qr: d.qr, lanIP: d.lanIP, port: d.port });
+        else setQrError(true);
+      })
+      .catch(() => setQrError(true));
+  }, []);
+
+  const lanIP = qrData?.lanIP ?? window.location.hostname;
+  const isLocalhost = lanIP === 'localhost' || lanIP === '127.0.0.1' || lanIP === '::1';
+  const remoteUrl = qrData?.url ?? `http://${lanIP}:${qrData?.port ?? '3000'}/remote`;
+
+  function copyUrl() {
+    navigator.clipboard.writeText(remoteUrl).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }).catch(() => {});
+  }
 
   const completeSetup = async () => {
     setStatus(s => ({ ...s, complete: 'saving' }));
@@ -99,6 +127,59 @@ export default function StepFinish({
             </span>
           </div>
         ))}
+      </div>
+
+      {/* ── Phone Remote QR ── */}
+      <div className="rounded-xl border border-border bg-muted/20 p-4">
+        <div className="flex items-center gap-2 mb-3">
+          <Smartphone className="w-4 h-4 text-primary flex-shrink-0" />
+          <p className="text-sm font-semibold text-foreground">Phone Remote</p>
+          <span className="ml-auto text-[10px] text-muted-foreground bg-muted px-2 py-0.5 rounded-full">Optional</span>
+        </div>
+        <div className="flex items-center gap-4">
+          {/* QR code */}
+          <div className="flex-shrink-0">
+            {!qrData && !qrError && (
+              <div className="w-24 h-24 rounded-lg bg-muted flex items-center justify-center">
+                <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+              </div>
+            )}
+            {qrData && !isLocalhost && (
+              <div
+                className="w-24 h-24 rounded-lg overflow-hidden bg-white p-1.5 [&_svg]:w-full [&_svg]:h-full"
+                dangerouslySetInnerHTML={{ __html: qrData.qr }}
+              />
+            )}
+            {(qrError || isLocalhost) && (
+              <div className="w-24 h-24 rounded-lg bg-muted flex flex-col items-center justify-center gap-1 text-center px-2">
+                <QrCode className="w-6 h-6 text-muted-foreground/40" />
+                <p className="text-[9px] text-muted-foreground leading-tight">Open in Electron for QR</p>
+              </div>
+            )}
+          </div>
+          {/* Instructions */}
+          <div className="flex-1 min-w-0 flex flex-col gap-2">
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              {isLocalhost
+                ? 'Run HomeStream on your home server to get a scannable QR code for your phone.'
+                : 'Scan with your phone camera to open the remote control — no app needed.'}
+            </p>
+            {!isLocalhost && qrData && (
+              <button
+                onClick={copyUrl}
+                className="flex items-center gap-1.5 bg-muted hover:bg-muted/80 rounded-lg px-2.5 py-1.5 transition-colors group w-full"
+              >
+                <code className="flex-1 text-[10px] text-muted-foreground truncate text-left font-mono">{remoteUrl}</code>
+                {copied
+                  ? <Check className="w-3 h-3 text-green-400 flex-shrink-0" />
+                  : <Copy className="w-3 h-3 text-muted-foreground flex-shrink-0 group-hover:text-foreground transition-colors" />}
+              </button>
+            )}
+            <p className="text-[10px] text-muted-foreground">
+              You can also find this QR code on the home screen after setup.
+            </p>
+          </div>
+        </div>
       </div>
 
       {/* Existing media scan panel */}
