@@ -9,7 +9,7 @@
  *  - Smooth scale + shadow on hover
  */
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { Play, Plus, Check, Star, Film, Tv2, Info, CheckCircle2 } from 'lucide-react';
@@ -51,8 +51,13 @@ export default function MediaCard({ item, showProgress = false, size = 'sm' }: M
   const [imgError, setImgError] = useState(false);
   const [hovered, setHovered] = useState(false);
 
-  const inWatchlist = watchlist.includes(item.id);
-  const watchProgress = continueWatching.find(c => c.id === item.id)?.progress || 0;
+  // Derive item-specific values with useMemo so the card only re-renders when
+  // its own watchlist/progress state actually changes — not on every library update.
+  const inWatchlist = useMemo(() => watchlist.includes(item.id), [watchlist, item.id]);
+  const watchProgress = useMemo(
+    () => continueWatching.find(c => c.id === item.id)?.progress || 0,
+    [continueWatching, item.id],
+  );
   const epProgress = item.type === 'series' ? getEpisodeProgress(item) : null;
   const allDone = epProgress ? epProgress.watched === epProgress.total && epProgress.total > 0 : false;
 

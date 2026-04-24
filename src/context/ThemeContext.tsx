@@ -17,7 +17,7 @@
  * lives in.
  */
 import {
-  createContext, useContext, useEffect, useState, useCallback,
+  createContext, useContext, useEffect, useState, useCallback, useMemo,
   type ReactNode,
 } from 'react';
 import { useProfile } from '@/context/ProfileContext';
@@ -454,10 +454,18 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const [sharedSettings, setSharedSettings] = useState<SharedSettings>(() => loadSharedSettings());
   const [playbackSettings, setPlaybackSettings] = useState<PlaybackSettings>(() => loadPlaybackSettings(profileId));
 
-  // Merge into a single settings object for consumers
-  const settings: AppSettings = { ...sharedSettings, ...playbackSettings };
+  // Memoize the merged settings object — without this, every ThemeContext render
+  // creates a new object reference, causing all useTheme() consumers to re-render
+  // even when nothing actually changed (e.g. during unrelated parent renders).
+  const settings: AppSettings = useMemo(
+    () => ({ ...sharedSettings, ...playbackSettings }),
+    [sharedSettings, playbackSettings],
+  );
 
-  const activeTheme = THEMES.find(t => t.id === sharedSettings.themeId) ?? THEMES[0];
+  const activeTheme = useMemo(
+    () => THEMES.find(t => t.id === sharedSettings.themeId) ?? THEMES[0],
+    [sharedSettings.themeId],
+  );
 
   // Apply CSS vars whenever theme changes
   useEffect(() => {
@@ -491,8 +499,13 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const contextValue = useMemo(
+    () => ({ settings, activeTheme, setTheme, updateSetting }),
+    [settings, activeTheme, setTheme, updateSetting],
+  );
+
   return (
-    <ThemeContext.Provider value={{ settings, activeTheme, setTheme, updateSetting }}>
+    <ThemeContext.Provider value={contextValue}>
       {children}
     </ThemeContext.Provider>
   );

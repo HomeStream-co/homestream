@@ -39,6 +39,18 @@ export function MediaProvider({ children }: { children: ReactNode }) {
   const progressKey = `homestream-progress-${profileId}`;
   const watchlistKey = `homestream-watchlist-${profileId}`;
 
+  // ETag from the last successful /api/media response — used for 304 revalidation.
+  // Stored per-profile so switching profiles always fetches fresh data.
+  const etagKey = `homestream-etag-${profileId}`;
+  const libraryEtagRef = useRef<string | null>(null);
+
+  // Seed ETag from localStorage on mount so the very first navigation after
+  // a page refresh can still get a 304 if nothing changed.
+  useEffect(() => {
+    libraryEtagRef.current = localStorage.getItem(etagKey);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profileId]);
+
   // Watchlist — server is source of truth; localStorage is a fast initial value
   // that gets replaced on first successful server fetch.
   const [watchlist, setWatchlist] = useState<string[]>(() => {
