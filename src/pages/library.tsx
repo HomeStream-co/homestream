@@ -500,7 +500,7 @@ export default function LibraryPage() {
               : u
           ));
         }
-      } catch { /* ignore parse errors */ }
+      } catch { /* non-fatal — ignore parse errors */ }
     };
 
     es.onerror = () => {
@@ -649,9 +649,8 @@ export default function LibraryPage() {
       try {
         await deleteMedia(id);
         deleted++;
-      } catch { /* continue */ }
+      } catch { /* non-fatal — individual delete failure, continue bulk loop */ }
     }
-    setBulkDeleting(false);
     setBulkDeleteConfirm(false);
     setSelectMode(false);
     setSelectedIds(new Set());
@@ -667,9 +666,8 @@ export default function LibraryPage() {
       try {
         const res = await fetch(`/api/enrich/${id}`, { method: 'POST' });
         if (res.ok) enriched++;
-      } catch { /* continue */ }
+      } catch { /* non-fatal — individual enrich failure, continue bulk loop */ }
     }
-    setBulkEnriching(false);
     setSelectMode(false);
     setSelectedIds(new Set());
     toast.success(`Enrichment started for ${enriched} item${enriched !== 1 ? 's' : ''}`);

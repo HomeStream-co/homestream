@@ -271,6 +271,7 @@ export async function getTransferInfo(): Promise<{
 
 /**
  * Check if qBittorrent is reachable (no auth needed).
+ * Used by GET /api/stats to report qBit connectivity status.
  */
 export async function isReachable(): Promise<boolean> {
   try {
@@ -279,7 +280,7 @@ export async function isReachable(): Promise<boolean> {
     });
     return res.status !== 0;
   } catch {
-    return false;
+    return false; // non-fatal — ignore
   }
 }
 
