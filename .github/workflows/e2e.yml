@@ -13,10 +13,16 @@ name: E2E Tests (Playwright)
 #                            when the repo secret is not configured.
 
 on:
-  push:
-    branches: [main]
+  # Run E2E on PRs to main (catches regressions before merge)
   pull_request:
     branches: [main]
+  # Allow manual trigger from the Actions tab for ad-hoc runs
+  workflow_dispatch:
+
+# Cancel stale E2E runs when new commits are pushed to the same PR
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   e2e:

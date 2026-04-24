@@ -14,8 +14,18 @@ name: CI
 on:
   push:
     branches: [main, develop, 'feature/**', 'fix/**']
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.github/RELEASE.md'
+      - 'CHANGELOG.md'
+      - 'INSTALL.md'
+      - 'README.md'
   pull_request:
     branches: [main, develop]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
 
 concurrency:
   group: ci-${{ github.ref }}

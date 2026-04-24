@@ -2,9 +2,10 @@
 // Publishes a draft GitHub release and marks it as latest.
 // Usage: node scripts/publish-release.mjs <release-id>
 
-const TOKEN = process.env.GH_TOKEN || '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';
-const REPO  = 'trevorrossworn-code/homestream';
-const ID    = process.argv[2] || '313059649'; // v1.6.0
+const TOKEN = process.env.GH_TOKEN;
+if (!TOKEN) { console.error('GH_TOKEN env var is required'); process.exit(1); }
+const REPO  = 'HomeStream-co/homestream';
+const ID    = process.argv[2]; // pass the release ID as first arg
 
 const body = [
   '## v1.6.0',
