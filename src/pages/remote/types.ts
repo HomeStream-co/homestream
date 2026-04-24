@@ -17,7 +17,7 @@ export function remoteAuthHeaders(): Record<string, string> {
   }
 }
 
-export type RemoteTab = 'remote' | 'browse' | 'search' | 'ai' | 'downloads';
+export type RemoteTab = 'remote' | 'browse' | 'search' | 'ai' | 'downloads' | 'cast';
 
 export interface LibraryItem {
   id: string;
