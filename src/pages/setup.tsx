@@ -20,7 +20,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
-import { CheckCircle2 } from 'lucide-react';
+import { CheckCircle2, Tv2 } from 'lucide-react';
 
 import type {
   FormData, StepStatus, KeyTestState, ScanState, ScannedFile,
@@ -242,12 +242,37 @@ export default function SetupPage() {
     <div className="min-h-dvh bg-background flex flex-col items-center justify-start p-4 py-8 overflow-y-auto">
       <title>Setup — HomeStream</title>
 
+      {/* HTTPS warning — TV browsers auto-upgrade http→https */}
+      {typeof window !== 'undefined' && window.location.protocol === 'https:' && window.location.hostname !== 'localhost' && (
+        <div className="w-full max-w-lg mb-4 bg-yellow-500/10 border border-yellow-500/40 rounded-xl px-4 py-3 text-center">
+          <p className="text-sm font-semibold text-yellow-400">⚠️ Wrong protocol detected</p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Use <strong className="text-foreground font-mono">http://</strong>{window.location.hostname}:3000 — not https
+          </p>
+        </div>
+      )}
+
       {/* Logo */}
       <div className="flex items-center gap-2.5 mb-8">
         <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center">
           <span className="text-primary-foreground font-bold text-lg">▶</span>
         </div>
         <span className="text-2xl font-heading font-bold text-foreground">HomeStream</span>
+      </div>
+
+      {/* TV shortcut banner — shown when accessed from a TV/non-setup device */}
+      <div className="w-full max-w-lg mb-4">
+        <button
+          onClick={() => navigate('/tv')}
+          className="w-full flex items-center gap-3 bg-primary/10 hover:bg-primary/20 border border-primary/30 rounded-xl px-4 py-3 transition-colors group"
+        >
+          <Tv2 className="w-5 h-5 text-primary flex-shrink-0" />
+          <div className="flex-1 text-left">
+            <p className="text-sm font-semibold text-primary">Opening on a TV?</p>
+            <p className="text-xs text-muted-foreground">Skip setup — go straight to the TV interface</p>
+          </div>
+          <span className="text-primary text-sm font-medium group-hover:translate-x-0.5 transition-transform">→</span>
+        </button>
       </div>
 
       {/* Step indicator */}

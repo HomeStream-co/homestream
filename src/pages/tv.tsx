@@ -482,6 +482,15 @@ export default function TvPage() {
 
   return (
     <div className="min-h-screen bg-black text-white overflow-x-hidden">
+      <title>HomeStream TV</title>
+
+      {/* HTTPS warning — Samsung browser auto-upgrades http→https which breaks WS */}
+      {typeof window !== 'undefined' && window.location.protocol === 'https:' && window.location.hostname !== 'localhost' && (
+        <div className="fixed top-0 left-0 right-0 z-50 bg-yellow-500 text-black text-center py-3 px-4 text-sm font-semibold">
+          ⚠️ You're on HTTPS — use <strong>http://</strong>{window.location.hostname}:{window.location.port || '3000'}/tv for full TV features
+        </div>
+      )}
+
       {/* ── Top bar ── */}
       <div className="flex items-center justify-between px-12 pt-8 pb-4">
         {/* Logo */}
