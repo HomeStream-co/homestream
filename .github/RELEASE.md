@@ -20,7 +20,7 @@ GitHub Actions then:
 
 The finished installer is available at:
 ```
-https://github.com/YOUR_ORG/homestream/releases/tag/v1.1.0
+https://github.com/HomeStream-co/homestream/releases/tag/v1.1.0
 ```
 
 ---
@@ -42,11 +42,9 @@ Go to your repo → **Settings → Secrets and variables → Actions → New rep
 
 | Secret name | Value | Why |
 |---|---|---|
-| `GH_TOKEN` | The token from step 1 | Authenticates electron-builder to create releases |
-| `GH_OWNER` | Your GitHub username or org (e.g. `john-doe`) | Baked into the .exe so the auto-updater knows where to check for updates |
-| `GH_REPO` | Your repo name (e.g. `homestream`) | Same — must match exactly |
+| `GH_TOKEN` | A GitHub Personal Access Token with `repo` scope | Authenticates electron-builder to create releases and the auto-updater to check for updates on the private repo |
 
-All three are required. The build will succeed without `GH_OWNER`/`GH_REPO` but the auto-updater inside the app will be silently disabled.
+`GH_OWNER` and `GH_REPO` are **not** needed as secrets — they are hardcoded in `electron/electron-builder.yml` and baked into the `.exe` at build time.
 
 ---
 
@@ -55,7 +53,7 @@ All three are required. The build will succeed without `GH_OWNER`/`GH_REPO` but 
 | File | Triggers on | What it does |
 |---|---|---|
 | `.github/workflows/release.yml` | Tag push `v*` | Builds `.exe`, creates GitHub Release, uploads installer |
-| `.github/workflows/build-check.yml` | Push to `main`/`develop`, PRs | Type-check + lint + build (no installer) |
+| `.github/workflows/build-check.yml` | Push to `v*` branches, PRs to `main` | Type-check + lint + build (no installer) |
 
 ---
 

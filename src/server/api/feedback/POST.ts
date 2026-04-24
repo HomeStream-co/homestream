@@ -20,7 +20,7 @@
 import type { Request, Response } from 'express';
 import { requireAuth } from '../../authMiddleware.js';
 
-const GH_OWNER = 'trevorrossworn-code';
+const GH_OWNER = 'HomeStream-co';
 const GH_REPO  = 'homestream';
 const GH_API   = 'https://api.github.com';
 
