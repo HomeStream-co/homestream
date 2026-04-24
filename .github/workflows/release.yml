@@ -26,11 +26,15 @@ jobs:
           path: node_modules
           key: Windows-node22-modules-${{ hashFiles('package-lock.json') }}
 
-      # --ignore-scripts skips native addon compilation (node-datachannel etc.)
-      # The server bundle is pre-compiled by esbuild so no .node files are needed.
+      # Do NOT use --ignore-scripts here — ffmpeg-static's postinstall script
+      # downloads the platform-specific FFmpeg binary (ffmpeg.exe on Windows).
+      # Without it, node_modules/ffmpeg-static/ffmpeg.exe is never created and
+      # the packaged app ships with no FFmpeg, breaking transcoding and HLS.
+      # npmRebuild: false in electron-builder.yml already prevents native addon
+      # recompilation, so --ignore-scripts is not needed for that purpose.
       - name: Install dependencies
         if: steps.cache-node-modules.outputs.cache-hit != 'true'
-        run: npm ci --ignore-scripts
+        run: npm ci
         env:
           npm_config_optional: true
 
@@ -75,6 +79,13 @@ jobs:
           }
           $size = [math]::Round((Get-Item "dist/server.bundle.cjs").Length / 1MB, 1)
           Write-Host "server.bundle.cjs: $size MB"
+          # Verify ffmpeg-static downloaded the Windows binary
+          if (Test-Path "node_modules/ffmpeg-static/ffmpeg.exe") {
+            $ffSize = [math]::Round((Get-Item "node_modules/ffmpeg-static/ffmpeg.exe").Length / 1MB, 1)
+            Write-Host "ffmpeg-static/ffmpeg.exe: $ffSize MB — OK"
+          } else {
+            Write-Warning "ffmpeg-static/ffmpeg.exe NOT FOUND — transcoding will be broken in packaged app"
+          }
           Write-Host "Build artifacts verified."
 
       # Patch package.json so updater.cjs can read pkg.build.ghToken at runtime.
