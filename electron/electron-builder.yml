@@ -44,6 +44,7 @@ publish:
   owner: trevorrossworn-code
   repo: homestream
   releaseType: release
+  draft: false
   # publishAutoUpdate: true is the default — electron-builder publishes latest.yml
   # alongside the installer. electron-updater reads latest.yml to check for updates.
 
