@@ -17,52 +17,12 @@ on:
       - 'v*'
 
 jobs:
-  # ── E2E gate ────────────────────────────────────────────────────────────────
-  # Runs Playwright on ubuntu (fast, cheap) before we spin up windows-latest.
-  # release-windows will not start if this job fails.
-  e2e-gate:
-    name: E2E Gate (must pass before publish)
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-
-    env:
-      CI: 'true'
-      NODE_ENV: test
-      SETUP_COMPLETE: 'true'
-      E2E_PASSWORD: ${{ secrets.E2E_PASSWORD || '' }}
-      E2E_BASE_URL: 'http://localhost:5173'
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Install Playwright browsers
-        run: npx playwright install chromium --with-deps
-
-      - name: Run E2E tests
-        run: npm run test:e2e
-
-      - name: Upload Playwright report
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: playwright-report-release-${{ github.ref_name }}
-          path: playwright-report/
-          retention-days: 14
-
   # ── Windows build & publish ─────────────────────────────────────────────────
   release-windows:
     name: Build & Publish Windows Installer
     runs-on: windows-latest
     timeout-minutes: 45
-    needs: e2e-gate   # ← hard gate: will not run if e2e-gate fails
+    # E2E already runs on every push to main via e2e.yml — no need to re-run here
 
     steps:
       - uses: actions/checkout@v4
