@@ -20,7 +20,7 @@
  *     rather than by the state value changing.
  */
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -141,6 +141,19 @@ export function usePlayerState() {
 
   // ── Cast ──────────────────────────────────────────────────────────────────
   const [castInfo, setCastInfo] = useState<CastInfo | null>(null);
+
+  // ── Unmount cleanup — clear all pending timers to prevent setState-after-unmount ──
+  useEffect(() => {
+    return () => {
+      clearTimeout(controlsTimerRef.current);
+      clearInterval(autoplayTimerRef.current);
+      clearInterval(fadeIntervalRef.current);
+      clearTimeout(resumeBannerTimer.current);
+      clearTimeout(actionToastTimer.current);
+      clearTimeout(doubleTapTimerRef.current);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ── Helpers ───────────────────────────────────────────────────────────────
 

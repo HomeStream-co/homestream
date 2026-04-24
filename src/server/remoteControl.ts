@@ -110,13 +110,15 @@ function send(ws: WebSocket, data: unknown) {
 
 function getScreensForMedia(mediaId: string): Client[] {
   return Array.from(clients.values()).filter(
-    c => c.role === 'screen' && (c.mediaId === mediaId || mediaId === '*')
+    // mediaId='*' from a remote means "control all screens"
+    c => c.role === 'screen' && (c.mediaId === mediaId || mediaId === '*' || c.mediaId === '*')
   );
 }
 
 function getRemotesForMedia(mediaId: string): Client[] {
   return Array.from(clients.values()).filter(
-    c => c.role === 'remote' && (c.mediaId === mediaId || c.mediaId === '*')
+    // Always include wildcard remotes ('*') + exact mediaId matches
+    c => c.role === 'remote' && (c.mediaId === mediaId || c.mediaId === '*' || mediaId === '*')
   );
 }
 
@@ -143,9 +145,23 @@ export function attachRemoteControl(server: Server): WebSocketServer {
 
     console.log(`[remote] ${role} connected — mediaId=${mediaId} total=${clients.size}`);
 
-    // Send current state to newly connected remote
+    // Send current state to newly connected remote.
+    // A remote connecting with mediaId='*' should receive the most recently
+    // active screen state (any mediaId), not just a literal '*' key lookup.
     if (role === 'remote') {
-      const state = latestState.get(mediaId) ?? latestState.get('*');
+      let state: PlayerState | undefined;
+      if (mediaId === '*') {
+        // Pick the most recently updated state across all screens
+        let newest = 0;
+        for (const [, s] of latestState) {
+          const ts = (s as PlayerState & { _ts?: number })._ts ?? 0;
+          if (ts > newest) { newest = ts; state = s; }
+        }
+        // Fallback: just grab the first entry if no timestamps present
+        if (!state) state = latestState.values().next().value;
+      } else {
+        state = latestState.get(mediaId) ?? latestState.get('*');
+      }
       if (state) send(ws, state);
 
       // Tell remote how many screens are active
@@ -174,7 +190,7 @@ export function attachRemoteControl(server: Server): WebSocketServer {
         } else if (c.role === 'screen') {
           // Screen → state update → cache + forward to remotes
           if (msg.type === 'state') {
-            const state = msg as unknown as PlayerState;
+            const state = { ...(msg as unknown as PlayerState), _ts: Date.now() };
             latestState.set(c.mediaId, state);
             for (const remote of getRemotesForMedia(c.mediaId)) {
               send(remote.ws, state);

@@ -161,5 +161,9 @@ export default async function handler(req: Request, res: Response) {
     path: '/',
   });
 
-  res.json({ ok: true });
+  // Also return the token in the response body so phone/TV clients on LAN
+  // can store it in localStorage and pass it as ?token= on WebSocket upgrades.
+  // httpOnly cookies are inaccessible to JS, so the phone remote can't read
+  // the cookie — the token param is the only way to authenticate WS on LAN.
+  res.json({ ok: true, token });
 }

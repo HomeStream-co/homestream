@@ -53,8 +53,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ password }),
       });
-      const data = await res.json() as { ok?: boolean; error?: string };
+      const data = await res.json() as { ok?: boolean; error?: string; token?: string };
       if (data.ok) {
+        // Store token in localStorage so phone/TV clients on LAN can pass it
+        // as ?token= on WebSocket upgrades (httpOnly cookie is unreadable by JS).
+        if (data.token) {
+          try { localStorage.setItem('hs_token', data.token); } catch { /* storage blocked */ }
+        }
         setAuthenticated(true);
         return { ok: true };
       }

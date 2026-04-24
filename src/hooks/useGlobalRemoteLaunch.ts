@@ -31,7 +31,9 @@ export function useGlobalRemoteLaunch() {
     const connect = () => {
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
       const cookieToken = document.cookie.match(/(?:^|;\s*)hs_session=([^;]+)/)?.[1] ?? '';
-      const tokenParam = cookieToken ? `&token=${encodeURIComponent(cookieToken)}` : '';
+      const lsToken = (() => { try { return localStorage.getItem('hs_token') ?? ''; } catch { return ''; } })();
+      const rawToken = cookieToken || lsToken;
+      const tokenParam = rawToken ? `&token=${encodeURIComponent(rawToken)}` : '';
       // Register as a wildcard screen so we receive launch commands for any mediaId
       const url = `${protocol}//${window.location.host}/ws/remote?role=screen&mediaId=*${tokenParam}`;
 

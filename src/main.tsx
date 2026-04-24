@@ -12,6 +12,23 @@ if (import.meta.env.MODE === 'development') {
   document.head.appendChild(meta);
 }
 
+// ── Service Worker — TMDB image cache ────────────────────────────────────────
+// Registers sw.js which caches /tmdb-images/* and /api/tmdb-proxy/* so posters
+// load instantly offline and don't re-download on every page visit.
+// Only registered in production (Electron + published build) to avoid
+// stale-cache confusion during development.
+if ('serviceWorker' in navigator && import.meta.env.PROD) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js', { scope: '/' })
+      .then(reg => {
+        console.log('[SW] Registered — scope:', reg.scope);
+        // Check for updates every hour
+        setInterval(() => reg.update(), 60 * 60 * 1000);
+      })
+      .catch(err => console.warn('[SW] Registration failed:', err));
+  });
+}
+
 // Support both client-side navigation and SSR hydration
 const rootElement = document.getElementById('app');
 if (!rootElement) throw new Error('Root element not found');

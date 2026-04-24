@@ -246,8 +246,11 @@ export default function RemotePage() {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     // Pass session token as query param — the /remote page may be accessed
     // from a phone on the same LAN where cookies aren't sent cross-origin.
+    // Priority: cookie (same-origin desktop) → localStorage (phone/TV on LAN).
     const cookieToken = document.cookie.match(/(?:^|;\s*)hs_session=([^;]+)/)?.[1] ?? '';
-    const tokenParam = cookieToken ? `&token=${encodeURIComponent(cookieToken)}` : '';
+    const lsToken = (() => { try { return localStorage.getItem('hs_token') ?? ''; } catch { return ''; } })();
+    const rawToken = cookieToken || lsToken;
+    const tokenParam = rawToken ? `&token=${encodeURIComponent(rawToken)}` : '';
     const url = `${protocol}//${window.location.host}/ws/remote?role=remote&mediaId=*${tokenParam}`;
     const ws = new WebSocket(url);
     wsRef.current = ws;
