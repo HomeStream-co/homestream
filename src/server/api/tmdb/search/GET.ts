@@ -8,8 +8,11 @@
  */
 import type { Request, Response } from 'express';
 import { readConfig } from '../../../configStore.js';
+import { requireAuth } from '../../../authMiddleware.js';
 
 export default async function handler(req: Request, res: Response) {
+  if (!requireAuth(req, res)) return;
+
   const q = (req.query.q as string ?? '').trim();
   const page = parseInt((req.query.page as string) ?? '1', 10) || 1;
 

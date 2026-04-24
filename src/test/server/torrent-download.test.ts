@@ -35,8 +35,9 @@ let mockStreams: Array<{
 // src/server/... which is what the handler under test imports.
 
 vi.mock('../../server/qbittorrentClient.js', () => ({
-  isReachable: () => Promise.resolve(mockQbitReachable),
-  addMagnet:   vi.fn().mockResolvedValue('aabbccdd1122334455667788990011223344556677'),
+  isReachable:     () => Promise.resolve(mockQbitReachable),
+  testConnection:  () => Promise.resolve(mockQbitReachable ? { ok: true } : { ok: false, error: 'Connection refused' }),
+  addMagnet:       vi.fn().mockResolvedValue('aabbccdd1122334455667788990011223344556677'),
 }));
 
 vi.mock('../../server/configStore.js', () => ({

@@ -367,6 +367,35 @@ These are manual steps, not grep checks. Run them in order before tagging:
 
 ---
 
+## 21 — Run the Full Test Suite
+
+The auth-audit test (`src/test/server/auth-audit.test.ts`) automatically walks
+every file in `src/server/api/` and fails if any endpoint is missing both
+`requireAuth` and `requireJellyfinAuth` and is not on the `OPEN_ENDPOINTS`
+allowlist. This catches unguarded endpoints that grep-based checks miss.
+
+```
+npm test
+```
+
+**Expected:** 0 failed test files. The two historically-failing files are:
+- `auth-audit.test.ts` — fails when a new endpoint is added without auth
+- `torrent-download.test.ts` — fails when the qBittorrent mock is out of sync
+  with the real `qbittorrentClient.js` exports
+
+**When auth-audit fails:**
+1. Open the failing endpoint file
+2. Add `import { requireAuth } from '../../authMiddleware.js';` (adjust depth)
+3. Add `if (!requireAuth(req, res)) return;` as the first line of the handler
+4. OR add the file to `OPEN_ENDPOINTS` in the test with a reason comment if
+   it is genuinely intentionally public
+
+**When torrent-download fails with "No X export is defined on the mock":**
+Update the `vi.mock('../../server/qbittorrentClient.js', ...)` factory in
+`torrent-download.test.ts` to include the missing export.
+
+---
+
 ## Fix Log Template
 
 When running the audit, report results in this format:
@@ -394,6 +423,7 @@ CHECK 17 — Bare localStorage outside try ....... ✅ PASS / ⚠️  FIXED
 CHECK 18 — setInterval without cleanup ......... ✅ PASS / ⚠️  FIXED
 CHECK 19 — Silent catch on user actions ........ ✅ PASS / ⚠️  FIXED
 CHECK 20 — Pre-push manual checklist ........... ✅ Done
+CHECK 21 — Full test suite (npm test) .......... ✅ 0 failed / ❌ N failed
 
 Ready to push: YES / NO
 ```

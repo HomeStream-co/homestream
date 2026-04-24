@@ -6,8 +6,10 @@
  */
 import type { Request, Response } from 'express';
 import { readConfig } from '../../../../configStore.js';
+import { requireAuth } from '../../../../authMiddleware.js';
 
 export default async function handler(req: Request, res: Response) {
+  if (!requireAuth(req, res)) return;
   const { id } = req.params;
   if (!id) return res.status(400).json({ error: 'id required' });
 
