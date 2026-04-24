@@ -59,6 +59,7 @@ export interface StreamResult {
 
 const TORRENTIO   = 'https://torrentio.strem.fun';
 const NYAA_API    = 'https://nyaa.si/api';
+const CINEMETA    = 'https://v3-cinemeta.strem.io';
 const TIMEOUT_MS  = 15_000;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -194,11 +195,31 @@ async function fetchNyaa(query: string): Promise<StreamResult[]> {
   }
 }
 
+// ── IMDB ID resolver ──────────────────────────────────────────────────────────
+
+/** Resolve an IMDB ID from a title via Cinemeta when the caller doesn't have one. */
+async function resolveImdbId(title: string, type: string): Promise<string | null> {
+  const t = type === 'series' ? 'series' : 'movie';
+  const url = `${CINEMETA}/catalog/${t}/top/search=${encodeURIComponent(title)}.json`;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  try {
+    const res = await fetch(url, { signal: controller.signal });
+    clearTimeout(timer);
+    if (!res.ok) return null;
+    const data = await res.json() as { metas?: { id: string }[] };
+    return data.metas?.[0]?.id ?? null;
+  } catch {
+    clearTimeout(timer);
+    return null;
+  }
+}
+
 // ── Handler ───────────────────────────────────────────────────────────────────
 
 export default async function handler(req: Request, res: Response) {
   if (!requireAuth(req, res)) return;
-  const { imdbId, type, season, episode, title } = req.body as {
+  const { imdbId: rawImdbId, type, season, episode, title } = req.body as {
     imdbId?: string;
     type?: string;
     season?: number;
@@ -206,9 +227,23 @@ export default async function handler(req: Request, res: Response) {
     title?: string;
   };
 
-  if (!imdbId || !type) {
-    res.status(400).json({ error: 'imdbId and type are required' });
+  if (!type) {
+    res.status(400).json({ error: 'type is required' });
     return;
+  }
+
+  // Resolve IMDB ID — either provided directly or looked up via Cinemeta
+  let imdbId = rawImdbId;
+  if (!imdbId) {
+    if (!title) {
+      res.status(400).json({ error: 'imdbId or title is required' });
+      return;
+    }
+    imdbId = (await resolveImdbId(title, type)) ?? undefined;
+    if (!imdbId) {
+      res.status(404).json({ error: 'Could not find title in Cinemeta — try a more specific title' });
+      return;
+    }
   }
 
   const config = readConfig();
@@ -248,6 +283,7 @@ export default async function handler(req: Request, res: Response) {
   merged.sort((a, b) => (parseInt(b.seeds) || 0) - (parseInt(a.seeds) || 0));
 
   res.json({
+    imdbId,
     streams: merged.slice(0, 40),
     sources: {
       torrentio: torrentioStreams.length,

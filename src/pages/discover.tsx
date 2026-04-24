@@ -491,34 +491,40 @@ function DownloadModal({ target, onClose }: { target: DownloadTarget; onClose: (
     setSearching(true);
     setError('');
     try {
-      // Step 1: resolve IMDB ID via Cinemeta
-      let imdbId = target.imdbId;
-      if (!imdbId) {
-        const metaRes = await fetch(
-          `https://v3-cinemeta.strem.io/catalog/${target.type}/top/search=${encodeURIComponent(target.title)}.json`
-        );
-        const metaData = await metaRes.json() as { metas?: { id: string; name: string }[] };
-        imdbId = metaData.metas?.[0]?.id;
-        if (!imdbId) throw new Error('Title not found in Cinemeta');
+      // Route through the backend proxy — avoids CORS and works in all environments.
+      // /api/stremio/stream handles Torrentio + Prowlarr + Nyaa server-side.
+      const res = await fetch('/api/stremio/stream', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          imdbId: target.imdbId ?? null,
+          title: target.title,
+          type: target.type,
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({})) as { error?: string; message?: string };
+        throw new Error(data.error ?? data.message ?? `Server error ${res.status}`);
       }
 
-      // Step 2: fetch streams from Torrentio
-      const streamRes = await fetch(
-        `https://torrentio.strem.fun/sort=seeders/stream/${target.type}/${imdbId}.json`
-      );
-      const streamData = await streamRes.json() as {
-        streams?: { name: string; title: string; infoHash: string }[]
-      };
-      const found = (streamData.streams ?? []).slice(0, 10).map(s => ({
+      const data = await res.json() as { streams?: { name: string; quality: string; size: string; seeds: string; magnet: string; infoHash: string; source: string }[]; imdbId?: string };
+      const resolvedImdbId = data.imdbId ?? target.imdbId ?? '';
+      const found = (data.streams ?? []).slice(0, 15).map(s => ({
         name: s.name,
-        title: s.title,
+        title: `${s.quality}${s.size ? ` · ${s.size}` : ''}${s.seeds ? ` · 👤 ${s.seeds}` : ''}`,
         url: s.infoHash,
-        imdbId: imdbId!,
+        imdbId: resolvedImdbId,
       }));
-      if (found.length === 0) throw new Error('No streams found — try a different title');
+      if (found.length === 0) throw new Error('No streams found — try a different title or check your Prowlarr config');
       setStreams(found);
     } catch (err) {
-      setError(String(err));
+      const msg = err instanceof Error ? err.message : String(err);
+      // "Failed to fetch" means the browser couldn't reach the server at all
+      setError(msg === 'Failed to fetch'
+        ? 'Could not reach the HomeStream server. Make sure the app is running.'
+        : msg);
     } finally {
       setSearching(false);
     }
@@ -804,7 +810,10 @@ export default function DiscoverPage() {
       if (!data.results || data.results.length === 0) throw new Error('No results found');
       setDirectResults(data.results);
     } catch (err) {
-      setDirectError(String(err));
+      const msg = err instanceof Error ? err.message : String(err);
+      setDirectError(msg === 'Failed to fetch'
+        ? 'Could not reach the HomeStream server. Make sure the app is running.'
+        : msg);
     } finally {
       setDirectLoading(false);
     }
