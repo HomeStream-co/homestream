@@ -18,7 +18,6 @@
  */
 
 import type { Request, Response } from 'express';
-import { getSecret } from '#airo/secrets';
 import { requireAuth } from '../../authMiddleware.js';
 
 const GH_OWNER = 'trevorrossworn-code';
@@ -64,7 +63,9 @@ export default async function handler(req: Request, res: Response) {
     return res.status(400).json({ ok: false, error: 'Description is required' });
   }
 
-  const ghToken = getSecret('GH_TOKEN');
+  // Read GH_TOKEN from environment — works in both Electron (process.env set by
+  // main.cjs from electron-store config) and cloud/dev (set via secrets manager).
+  const ghToken = process.env.GH_TOKEN;
   if (!ghToken) {
     return res.status(503).json({ ok: false, error: 'GitHub token not configured — feedback cannot be submitted' });
   }
