@@ -576,23 +576,24 @@ export default function PlayerPage() {
             // Write to refs only — DOM updates happen here, not via setState.
             ps.currentTimeRef.current = video.currentTime;
             const buf = video.buffered;
+            const dur = video.duration || 0;
             if (buf.length > 0) ps.bufferedRef.current = buf.end(buf.length - 1);
 
             // Update seek bar gradient + value directly (no React re-render)
             const seekBar = ps.seekBarRef.current;
-            const dur = video.duration || 0;
             if (seekBar && dur > 0) {
               const pct = (video.currentTime / dur) * 100;
               seekBar.value = String(video.currentTime);
               seekBar.style.background = `linear-gradient(to right, ${playerAccent} ${pct}%, rgba(255,255,255,0.2) 0%)`;
             }
 
-            // Update buffered bar directly
-            const bufferedBar = ps.bufferedRef.current;
-            // (buffered bar is a sibling div — updated via a data attribute read by CSS,
-            //  or we can update it via a ref; see PlayerSeekBar below)
+            // Update buffered bar width directly (no React re-render)
+            const bufferedBar = ps.bufferedBarRef.current;
+            if (bufferedBar && dur > 0) {
+              bufferedBar.style.width = `${(ps.bufferedRef.current / dur) * 100}%`;
+            }
 
-            // Update time display span directly
+            // Update time display span directly (no React re-render)
             if (ps.timeDisplayRef.current && dur > 0) {
               ps.timeDisplayRef.current.textContent =
                 `${formatTime(video.currentTime)} / ${formatTime(dur)}`;
@@ -783,12 +784,10 @@ export default function PlayerPage() {
             <PlayerControlsOverlay
               item={item}
               playing={ps.playing}
-              currentTime={ps.currentTime}
               duration={ps.duration}
               volume={ps.volume}
               muted={ps.muted}
               fullscreen={ps.fullscreen}
-              buffered={ps.buffered}
               playbackRate={ps.playbackRate}
               isPiP={ps.isPiP}
               showInfo={ps.showInfo}
@@ -805,6 +804,10 @@ export default function PlayerPage() {
               seekHover={ps.seekHover}
               seekBarRef={ps.seekBarRef}
               thumbCanvasRef={ps.thumbCanvasRef}
+              currentTimeRef={ps.currentTimeRef}
+              bufferedRef={ps.bufferedRef}
+              timeDisplayRef={ps.timeDisplayRef}
+              bufferedBarRef={ps.bufferedBarRef}
               castButtonRef={castButtonRef}
               videoRef={ps.videoRef}
               togglePlay={togglePlay}

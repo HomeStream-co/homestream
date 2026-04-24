@@ -84,6 +84,8 @@ export function usePlayerState() {
   const bufferedRef = useRef(0);
   // Time display DOM node — updated directly to avoid React re-renders
   const timeDisplayRef = useRef<HTMLSpanElement>(null);
+  // Buffered bar DOM node — width updated directly in onTimeUpdate
+  const bufferedBarRef = useRef<HTMLDivElement>(null);
 
   // ── Playback state ────────────────────────────────────────────────────────
   const [playing, setPlaying] = useState(false);
@@ -163,7 +165,7 @@ export function usePlayerState() {
     seekBarRef, thumbCanvasRef, thumbVideoRef, thumbVideoSrcRef,
     doubleTapTimerRef, doubleTapCountRef,
     // currentTime / buffered as refs (no React re-renders on tick)
-    currentTimeRef, bufferedRef, timeDisplayRef,
+    currentTimeRef, bufferedRef, timeDisplayRef, bufferedBarRef,
     // Playback
     playing, setPlaying,
     duration, setDuration,
