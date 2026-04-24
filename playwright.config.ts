@@ -51,8 +51,8 @@ export default defineConfig({
     video: 'on-first-retry',
 
     // Generous timeout for media-heavy pages
-    actionTimeout: 10_000,
-    navigationTimeout: 30_000,
+    actionTimeout: process.env.CI ? 5_000 : 10_000,
+    navigationTimeout: process.env.CI ? 15_000 : 30_000,
   },
 
   projects: [
@@ -76,8 +76,8 @@ export default defineConfig({
     stderr: 'pipe',
   },
 
-  // Global timeout per test
-  timeout: 60_000,
+  // Global timeout per test — tighter on CI
+  timeout: process.env.CI ? 30_000 : 60_000,
 
   // Output folder for test artifacts
   outputDir: 'playwright-results/',
