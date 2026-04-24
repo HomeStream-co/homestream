@@ -10,6 +10,7 @@ import { useMedia } from '@/context/MediaContext';
 import { useProfile, type Profile } from '@/context/ProfileContext';
 import SettingsPanel from '@/components/SettingsPanel';
 import StremioPanel from '@/components/StremioPanel';
+import InlineErrorBoundary from '@/components/InlineErrorBoundary';
 import SecurityPanel from '@/components/SecurityPanel';
 import PinLock from '@/components/PinLock';
 import NotificationBell from '@/components/NotificationBell';
@@ -283,7 +284,9 @@ export default function Header({ onChatOpen: _onChatOpen }: HeaderProps) {
               />
 
               {/* Stremio */}
-              <StremioPanel />
+              <InlineErrorBoundary label="StremioPanel">
+                <StremioPanel />
+              </InlineErrorBoundary>
 
               {/* ── Profile Switcher ── */}
               {activeProfile && (
