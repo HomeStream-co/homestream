@@ -93,7 +93,10 @@ jobs:
       # ── Package & publish ──────────────────────────────────────────────────
       - name: Package & publish Windows installer
         # --publish always → creates the GitHub Release and uploads the .exe
-        run: npx electron-builder --win --config electron/electron-builder.yml --config.win.target=nsis --publish always
+        # --extraMetadata.ghToken injects the token into package.json at build time
+        # so the packaged auto-updater can authenticate against the private repo.
+        # (electron-builder yml does NOT expand arbitrary ${ENV_VAR} — must use CLI)
+        run: npx electron-builder --win --config electron/electron-builder.yml --config.win.target=nsis --publish always --extraMetadata.ghToken=${{ secrets.GH_TOKEN }}
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
           DEBUG: electron-builder

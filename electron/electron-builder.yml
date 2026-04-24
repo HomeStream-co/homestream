@@ -32,11 +32,9 @@ npmRebuild: false
 extraMetadata:
   ghOwner: trevorrossworn-code
   ghRepo: homestream
-  # ghToken is baked in at CI build time (set from GH_TOKEN secret) so the
-  # packaged app can authenticate against the private GitHub repo to check for
-  # and download updates. Use a fine-grained PAT with read-only contents scope.
-  # electron-builder replaces ${GH_TOKEN} with the env var value at build time.
-  ghToken: ${GH_TOKEN}
+  # ghToken is injected at CI build time via --extraMetadata.ghToken on the
+  # electron-builder command line (yml does not expand arbitrary ${ENV_VAR}).
+  # See release.yml for how this is passed.
 
 # ── Auto-updater (electron-updater via GitHub Releases) ───────────────────────
 # GH_TOKEN must be set in repo Settings → Secrets → Actions.
