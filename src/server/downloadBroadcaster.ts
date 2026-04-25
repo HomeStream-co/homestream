@@ -28,6 +28,9 @@ import { getQbitJobs } from './api/stremio/download/POST.js';
 import type { QbitTorrent } from './qbittorrentClient.js';
 
 const PUSH_INTERVAL_MS = 2_000;
+// Keepalive: ping every 25 s, terminate if no pong received before next ping.
+// Mirrors the same strategy used in remoteControl.ts.
+const PING_INTERVAL_MS = 25_000;
 
 // ── Auth helper (mirrors remoteControl.ts) ────────────────────────────────────
 
@@ -79,6 +82,7 @@ async function fetchDownloadState(): Promise<object> {
 
 let _wss: WebSocketServer | null = null;
 let _timer: ReturnType<typeof setInterval> | null = null;
+let _pingTimer: ReturnType<typeof setInterval> | null = null;
 const _clients = new Set<WebSocket>();
 
 function startBroadcast() {
@@ -104,6 +108,28 @@ function stopBroadcast() {
   if (_timer) { clearInterval(_timer); _timer = null; }
 }
 
+function startPing() {
+  if (_pingTimer) return;
+  _pingTimer = setInterval(() => {
+    for (const ws of _clients) {
+      const alive = (ws as unknown as { isAlive?: boolean }).isAlive;
+      if (alive === false) {
+        // No pong since last ping — zombie connection, terminate it
+        _clients.delete(ws);
+        (ws as unknown as { terminate: () => void }).terminate();
+        continue;
+      }
+      (ws as unknown as { isAlive: boolean }).isAlive = false;
+      (ws as unknown as { ping: () => void }).ping();
+    }
+    if (_clients.size === 0) stopPing();
+  }, PING_INTERVAL_MS);
+}
+
+function stopPing() {
+  if (_pingTimer) { clearInterval(_pingTimer); _pingTimer = null; }
+}
+
 // ── Public API ────────────────────────────────────────────────────────────────
 
 export function attachDownloadBroadcaster(server: Server): void {
@@ -117,6 +143,10 @@ export function attachDownloadBroadcaster(server: Server): void {
       return;
     }
 
+    // Mark alive on connect; update on every pong response
+    (ws as unknown as { isAlive: boolean }).isAlive = true;
+    ws.on('pong', () => { (ws as unknown as { isAlive: boolean }).isAlive = true; });
+
     _clients.add(ws);
 
     // Send current state immediately so the UI doesn't wait 2s
@@ -125,17 +155,23 @@ export function attachDownloadBroadcaster(server: Server): void {
       ws.send(JSON.stringify(state));
     } catch { /* ignore */ }
 
-    // Start broadcast loop if not already running
+    // Start broadcast + keepalive loops if not already running
     startBroadcast();
+    startPing();
 
     ws.on('close', () => {
       _clients.delete(ws);
+      if (_clients.size === 0) { stopBroadcast(); stopPing(); }
     });
 
     ws.on('error', () => {
       _clients.delete(ws);
+      if (_clients.size === 0) { stopBroadcast(); stopPing(); }
     });
   });
+
+  // Clean up intervals on server close (test teardown / graceful shutdown)
+  _wss.on('close', () => { stopBroadcast(); stopPing(); });
 
   console.log('[downloads-ws] WebSocket broadcaster attached at /ws/downloads');
 }

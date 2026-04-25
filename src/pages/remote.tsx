@@ -458,7 +458,12 @@ function RemotePageInner() {
       const delay = Math.min(BASE_RETRY_DELAY_MS * 2 ** (retryCountRef.current - 1), MAX_RETRY_DELAY_MS);
       // Use connectRef so we always schedule the latest connect function,
       // not the stale closure captured when this ws instance was created.
-      reconnectRef.current = setTimeout(() => connectRef.current?.(), delay);
+      reconnectRef.current = setTimeout(() => {
+        // Flip to 'connecting' right as the retry fires so the UI reflects
+        // the attempt rather than staying stuck on 'disconnected'.
+        if (!destroyedRef.current) setStatus('connecting');
+        connectRef.current?.();
+      }, delay);
     };
 
     // onerror always fires before onclose on a network drop.

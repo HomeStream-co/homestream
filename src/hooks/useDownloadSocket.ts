@@ -8,7 +8,7 @@
  * Reconnect strategy:
  *   - Exponential back-off: 1s → 2s → 4s → 8s → 16s (cap 30s)
  *   - Resets to 1s on successful open
- *   - Stops retrying after 10 consecutive failures (server likely offline)
+ *   - Retries indefinitely — recovers automatically after server restarts
  *   - Cleans up on unmount
  *
  * Falls back gracefully: if the WS connection fails entirely the hook
@@ -46,7 +46,6 @@ const EMPTY_STATE: DownloadState = {
   qbitOnline: false,
 };
 
-const MAX_RETRIES = 10;
 const BASE_DELAY_MS = 1_000;
 const MAX_DELAY_MS = 30_000;
 
@@ -59,7 +58,6 @@ export function useDownloadSocket(): DownloadState {
 
   const connect = useCallback(() => {
     if (unmountedRef.current) return;
-    if (retryRef.current >= MAX_RETRIES) return;
 
     const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
     // Pass session token as query param so the phone remote (cross-origin LAN)
@@ -87,8 +85,8 @@ export function useDownloadSocket(): DownloadState {
 
     ws.onclose = () => {
       if (unmountedRef.current) return;
+      // Exponential back-off with no hard cap — always recovers after server restart.
       retryRef.current += 1;
-      if (retryRef.current >= MAX_RETRIES) return;
       const delay = Math.min(BASE_DELAY_MS * 2 ** (retryRef.current - 1), MAX_DELAY_MS);
       timerRef.current = setTimeout(connect, delay);
     };

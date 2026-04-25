@@ -78,6 +78,9 @@ export function useRemoteControl(
 
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
     let destroyed = false;
+    let retryCount = 0;
+    const BASE_DELAY_MS = 3_000;
+    const MAX_DELAY_MS = 30_000;
     // Stable ref so onclose always calls the latest connect, not a stale closure
     let connectFn: (() => void) | null = null;
 
@@ -89,6 +92,10 @@ export function useRemoteControl(
 
       const ws = new WebSocket(url);
       wsRef.current = ws;
+
+      ws.onopen = () => {
+        retryCount = 0; // reset back-off on successful connection
+      };
 
       ws.onmessage = (e) => {
         if (destroyed) return;
@@ -115,9 +122,12 @@ export function useRemoteControl(
 
       ws.onclose = () => {
         if (!destroyed) {
+          // Exponential back-off: 3s → 6s → 12s → … → 30s cap
+          retryCount += 1;
+          const delay = Math.min(BASE_DELAY_MS * 2 ** (retryCount - 1), MAX_DELAY_MS);
           // Use connectFn ref so we always schedule the latest connect,
           // not the stale closure captured when this ws instance was created.
-          reconnectTimer = setTimeout(() => connectFn?.(), 3000);
+          reconnectTimer = setTimeout(() => connectFn?.(), delay);
         }
       };
 
