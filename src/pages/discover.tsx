@@ -598,6 +598,11 @@ function DownloadModal({ target, onClose }: { target: DownloadTarget; onClose: (
 
       if (!res.ok) {
         const errData = await res.json().catch(() => ({})) as { error?: string; message?: string };
+        // 503 = no download backend — show a more actionable inline error
+        if (res.status === 503) {
+          const msg = errData.message ?? errData.error ?? 'qBittorrent is required for downloads in the desktop app.';
+          throw new Error(msg);
+        }
         throw new Error(errData.message ?? errData.error ?? `Server error ${res.status}`);
       }
 

@@ -32,7 +32,7 @@ export interface TMDBState {
 }
 
 // Bump SESSION_VERSION whenever the session shape changes to bust stale caches.
-const SESSION_VERSION = 2;
+const SESSION_VERSION = 3;
 const SESSION_KEY = 'homestream-tmdb-session';
 
 const GENRE_MAP: Record<string, number> = {
@@ -55,6 +55,8 @@ function loadSession() {
     const parsed = JSON.parse(raw);
     // Invalidate sessions from before trendingShows was added
     if ((parsed._v ?? 1) < SESSION_VERSION) return null;
+    // Invalidate empty caches — likely from a session before the TMDB key was configured
+    if (!parsed.upcoming?.length && !parsed.trending?.length) return null;
     return parsed;
   } catch { return null; }
 }

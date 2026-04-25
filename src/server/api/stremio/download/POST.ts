@@ -454,21 +454,22 @@ export default async function handler(req: Request, res: Response) {
   const qbitResult = await testConnection();
   const useQbit = qbitResult.ok;
   if (!useQbit) {
-    // Check if WebTorrent is available before committing to the fallback path.
-    // In production/Electron environments webtorrent may not be importable.
+    // Check if WebTorrent itself is importable — torrentManager.js always exists,
+    // but the 'webtorrent' package is externalized in the Electron build and may
+    // not be available. Test the actual package, not the wrapper module.
     let wtAvailable = false;
     try {
-      await import('../../../torrentManager.js');
+      await import('webtorrent');
       wtAvailable = true;
     } catch {
-      // non-fatal — ignore, handled below
+      // webtorrent not bundled — Electron/production environment
     }
     if (!wtAvailable) {
       res.status(503).json({
         error: 'No download backend available',
         message: qbitResult.error
-          ? `qBittorrent is offline (${qbitResult.error}) and the built-in downloader is not available in this environment. Please configure qBittorrent in Settings → Downloads.`
-          : 'No download backend is available. Please configure qBittorrent in Settings → Downloads.',
+          ? `qBittorrent is offline (${qbitResult.error}) and the built-in downloader is not available in this environment. Please start qBittorrent — it is required for downloads in the desktop app.`
+          : 'qBittorrent is required for downloads. Please start qBittorrent and ensure it is reachable at the configured URL in Settings → Downloads.',
       });
       return;
     }
