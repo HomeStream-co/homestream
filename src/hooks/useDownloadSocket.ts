@@ -62,7 +62,14 @@ export function useDownloadSocket(): DownloadState {
     if (retryRef.current >= MAX_RETRIES) return;
 
     const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const url = `${protocol}//${location.host}/ws/downloads`;
+    // Pass session token as query param so the phone remote (cross-origin LAN)
+    // can authenticate — the server's isAuthed() accepts ?token= as well as cookie.
+    // Priority: httpOnly cookie (same-origin desktop) → localStorage (phone/TV on LAN).
+    const cookieToken = document.cookie.match(/(?:^|;\s*)hs_session=([^;]+)/)?.[1] ?? '';
+    const lsToken = (() => { try { return localStorage.getItem('hs_token') ?? ''; } catch { return ''; } })();
+    const rawToken = cookieToken || lsToken;
+    const tokenParam = rawToken ? `?token=${encodeURIComponent(rawToken)}` : '';
+    const url = `${protocol}//${location.host}/ws/downloads${tokenParam}`;
 
     const ws = new WebSocket(url);
     wsRef.current = ws;

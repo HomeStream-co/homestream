@@ -49,7 +49,7 @@ export default function AITab({ send }: AITabProps) {
   const recognitionRef = useRef<SpeechRecognition | null>(null);
 
   useEffect(() => {
-    fetch('/api/media', { headers: remoteAuthHeaders() })
+    fetch('/api/media', { credentials: 'include', headers: remoteAuthHeaders() })
       .then(r => r.json())
       .then((data: LibraryItem[]) => setLibrary(Array.isArray(data) ? data : []))
       .catch(() => {}); // non-fatal — ignore
