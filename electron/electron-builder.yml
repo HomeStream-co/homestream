@@ -30,7 +30,7 @@ npmRebuild: false
 # ${productName}, etc.) — it does NOT expand arbitrary env vars in yml values.
 # Hardcode the repo coordinates here; they never change.
 extraMetadata:
-  ghOwner: HomeStream-co
+  ghOwner: trevorrossworn-code
   ghRepo: homestream
   # ghToken is injected at CI build time by the "Inject build metadata" step
   # in release.yml, which patches package.json directly via PowerShell before
@@ -42,7 +42,7 @@ extraMetadata:
 # owner/repo are hardcoded — electron-builder yml does not support ${ENV_VAR} expansion.
 publish:
   provider: github
-  owner: HomeStream-co
+  owner: trevorrossworn-code
   repo: homestream
   releaseType: release
   # publishAutoUpdate: true is the default — electron-builder publishes latest.yml
