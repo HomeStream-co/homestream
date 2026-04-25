@@ -21,10 +21,10 @@ import {
   Activity, Zap, Globe, MemoryStick, Clock, Terminal,
   RotateCcw, ShieldOff, Play,
 } from 'lucide-react';
-import { DevVersionTrigger } from './DevDrawer';
-// DevDrawer is lazy-loaded so Vite can tree-shake it from production bundles
-// when DEVELOPER_LOCK is not set. The runtime devLocked gate ensures it is
-// never rendered on family installs regardless.
+// DevVersionTrigger is a lightweight static import (no heavy deps).
+// DevDrawer is lazy-loaded separately so Vite can tree-shake it from
+// production bundles when DEVELOPER_LOCK is not set.
+import { DevVersionTrigger } from './DevVersionTrigger';
 const DevDrawer = React.lazy(() =>
   import('./DevDrawer').then(m => ({ default: m.DevDrawer }))
 );
