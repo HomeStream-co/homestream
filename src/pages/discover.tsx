@@ -526,24 +526,10 @@ function DownloadModal({ target, onClose }: { target: DownloadTarget; onClose: (
         title: `${s.quality}${s.size ? ` · ${s.size}` : ''}${s.seeds ? ` · 👤 ${s.seeds}` : ''}`,
         url: s.infoHash,
         imdbId: resolvedImdbId,
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
         // Preserve full stream data so the download call gets real magnet URIs + tracker list
 =======
->>>>>>> 20260425032449-9h9yrecco0
 =======
->>>>>>> 20260425032911-9h9yrecco0
-=======
-=======
-=======
->>>>>>> 0354655 (how hard would it be to add a download link the...)
-<<<<<<< HEAD
         // Preserve full stream data so the download call gets real magnet URIs + tracker list
-=======
->>>>>>> 20260425032449-9h9yrecco0
-<<<<<<< HEAD
->>>>>>> 23d2d65 (why not just pullup movies like regular stremio...)
 =======
 =======
 >>>>>>> 20260425032911-9h9yrecco0
@@ -567,37 +553,18 @@ function DownloadModal({ target, onClose }: { target: DownloadTarget; onClose: (
     }
   };
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
 =======
   // Auto-search as soon as the modal opens — no manual button click needed
   useEffect(() => { search(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
 =======
 =======
->>>>>>> 0354655 (how hard would it be to add a download link the...)
-<<<<<<< HEAD
->>>>>>> 20260425033526-9h9yrecco0
 =======
   // Auto-search as soon as the modal opens — no manual button click needed
   useEffect(() => { search(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
->>>>>>> 20260425032449-9h9yrecco0
-<<<<<<< HEAD
 =======
-<<<<<<< HEAD
->>>>>>> 23d2d65 (why not just pullup movies like regular stremio...)
 =======
->>>>>>> 20260425033526-9h9yrecco0
-=======
-  // Auto-search as soon as the modal opens — no manual button click needed
-  useEffect(() => { search(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
->>>>>>> 20260425032911-9h9yrecco0
-<<<<<<< HEAD
-=======
->>>>>>> 0354655 (how hard would it be to add a download link the...)
 >>>>>>> 20260425033526-9h9yrecco0
   const startDownload = async (stream: { name: string; title: string; url: string; imdbId: string; quality: string; size: string; seeds: string; magnet: string; source: string }) => {
     setDownloading(stream.url);
