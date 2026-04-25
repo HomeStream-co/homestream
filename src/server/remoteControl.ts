@@ -127,6 +127,32 @@ function getRemotesForMedia(mediaId: string): Client[] {
 export function attachRemoteControl(server: Server): WebSocketServer {
   const wss = new WebSocketServer({ server, path: '/ws/remote' });
 
+  // ── Server-side keepalive ping ─────────────────────────────────────────────
+  // Most routers and managed/corporate Wi-Fi networks kill idle TCP connections
+  // after 30–60 s. Without a heartbeat the phone remote shows "connection lost"
+  // in a loop even though the server is healthy.
+  // Strategy: ping every 25 s; if a client hasn't responded to the previous
+  // ping by the time the next one fires, terminate it (it's a zombie).
+  const PING_INTERVAL_MS = 25_000;
+
+  const pingInterval = setInterval(() => {
+    for (const [ws] of clients) {
+      const c = clients.get(ws);
+      if (!c) continue;
+      if ((ws as unknown as { isAlive?: boolean }).isAlive === false) {
+        // No pong received since last ping — connection is dead
+        console.log(`[remote] Terminating unresponsive ${c.role} client`);
+        (ws as unknown as { terminate: () => void }).terminate();
+        continue;
+      }
+      (ws as unknown as { isAlive: boolean }).isAlive = false;
+      (ws as unknown as { ping: () => void }).ping();
+    }
+  }, PING_INTERVAL_MS);
+
+  // Stop the interval when the server closes (clean shutdown / test teardown)
+  wss.on('close', () => clearInterval(pingInterval));
+
   wss.on('connection', (ws: WebSocket, req: IncomingMessage) => {
     // ── Auth check ────────────────────────────────────────────────────────────
     if (!isAuthorised(req)) {
@@ -142,6 +168,10 @@ export function attachRemoteControl(server: Server): WebSocketServer {
 
     const client: Client = { ws, role, mediaId, connectedAt: Date.now() };
     clients.set(ws, client);
+
+    // Mark alive on connect and on every pong response
+    (ws as unknown as { isAlive: boolean }).isAlive = true;
+    ws.on('pong', () => { (ws as unknown as { isAlive: boolean }).isAlive = true; });
 
     console.log(`[remote] ${role} connected — mediaId=${mediaId} total=${clients.size}`);
 

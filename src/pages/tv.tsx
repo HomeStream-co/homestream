@@ -26,7 +26,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Play, Search, X, Star, Clock, Tv2, Film,
-  Home, List, Bookmark, Filter,
+  Home, List, Bookmark, Filter, Smartphone, QrCode,
 } from 'lucide-react';
 import { useMedia } from '@/context/MediaContext';
 import { useProfile } from '@/context/ProfileContext';
@@ -561,6 +561,94 @@ function RowList({ rows, focusZone, focusedRow, focusedCol, profileId, onPlay }:
   );
 }
 
+// ── QR Remote Overlay ─────────────────────────────────────────────────────────
+// Shows on load for 45 s, then hides. A button in the top bar brings it back.
+
+const QR_AUTO_HIDE_MS = 45_000;
+
+interface QrData {
+  qr: string;   // SVG string
+  url: string;  // remote URL
+  lanIP: string;
+}
+
+function QrRemoteOverlay({
+  visible,
+  onClose,
+}: {
+  visible: boolean;
+  onClose: () => void;
+}) {
+  const [qrData, setQrData] = useState<QrData | null>(null);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    if (!visible || qrData) return;
+    fetch('/api/remote/qr?format=svg')
+      .then(r => r.json())
+      .then((d: { qr?: string; url?: string; lanIP?: string }) => {
+        if (d.qr && d.url) setQrData({ qr: d.qr, url: d.url, lanIP: d.lanIP ?? '' });
+        else setError(true);
+      })
+      .catch(() => setError(true));
+  }, [visible, qrData]);
+
+  return (
+    <AnimatePresence>
+      {visible && (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.92, y: 20 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.92, y: 20 }}
+          transition={{ duration: 0.25, ease: 'easeOut' as const }}
+          className="fixed bottom-24 right-10 z-50 bg-black/90 backdrop-blur-md border border-white/15 rounded-3xl p-6 shadow-2xl flex flex-col items-center gap-4 w-64"
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between w-full">
+            <div className="flex items-center gap-2">
+              <Smartphone className="w-4 h-4 text-primary" />
+              <span className="text-sm font-semibold text-white">Phone Remote</span>
+            </div>
+            <button
+              onClick={onClose}
+              className="w-7 h-7 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
+              aria-label="Close QR code"
+            >
+              <X className="w-3.5 h-3.5 text-white/70" />
+            </button>
+          </div>
+
+          {/* QR code */}
+          {error ? (
+            <div className="w-44 h-44 flex items-center justify-center text-white/30 text-xs text-center">
+              Could not generate QR code
+            </div>
+          ) : qrData ? (
+            <div
+              className="w-44 h-44 rounded-xl overflow-hidden bg-white p-2"
+              dangerouslySetInnerHTML={{ __html: qrData.qr }}
+            />
+          ) : (
+            <div className="w-44 h-44 rounded-xl bg-white/5 flex items-center justify-center">
+              <div className="w-6 h-6 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+            </div>
+          )}
+
+          {/* Instructions */}
+          <div className="text-center">
+            <p className="text-white/60 text-xs leading-relaxed">
+              Scan with your phone to use it as a remote control
+            </p>
+            {qrData?.lanIP && (
+              <p className="text-white/30 text-[10px] mt-1 font-mono">{qrData.url}</p>
+            )}
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+
 function TvPageInner() {
   const navigate = useNavigate();
   const { library, watchlist: watchlistIds } = useMedia();
@@ -572,6 +660,23 @@ function TvPageInner() {
   const [showSearch, setShowSearch] = useState(false);
   const [activeGenre, setActiveGenre] = useState('All');
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all');
+
+  // ── QR remote overlay ──
+  // Auto-shows for 45 s on load, then hides. Button in top bar brings it back.
+  const [showQr, setShowQr] = useState(true);
+  const qrTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    qrTimerRef.current = setTimeout(() => setShowQr(false), QR_AUTO_HIDE_MS);
+    return () => { if (qrTimerRef.current) clearTimeout(qrTimerRef.current); };
+  }, []);
+
+  function openQr() {
+    setShowQr(true);
+    // Reset the auto-hide timer each time it's manually opened
+    if (qrTimerRef.current) clearTimeout(qrTimerRef.current);
+    qrTimerRef.current = setTimeout(() => setShowQr(false), QR_AUTO_HIDE_MS);
+  }
 
   // ── D-pad focus state ──
   // focusZone: which horizontal band the cursor is in
@@ -962,6 +1067,18 @@ function TvPageInner() {
             <List className="w-4 h-4" />
             Desktop View
           </button>
+
+          {/* Phone remote QR button */}
+          <button
+            onClick={openQr}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-colors focus:outline-none focus:ring-4 focus:ring-white/40 ${
+              showQr ? 'bg-primary text-primary-foreground' : 'bg-white/10 hover:bg-white/20'
+            }`}
+            title="Phone Remote"
+          >
+            <QrCode className="w-4 h-4" />
+            Phone Remote
+          </button>
         </div>
       </div>
 
@@ -1044,6 +1161,9 @@ function TvPageInner() {
         </span>
         <span className="text-white/20 text-xs">HomeStream TV</span>
       </div>
+
+      {/* ── Phone Remote QR overlay ── */}
+      <QrRemoteOverlay visible={showQr} onClose={() => setShowQr(false)} />
     </div>
   );
 }
