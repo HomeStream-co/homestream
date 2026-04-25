@@ -988,7 +988,7 @@ export default function DebugPanel({ open, onClose }: DebugPanelProps) {
                     On a public/family install this element is completely absent. */}
                 {devLocked && (
                   <DevVersionTrigger
-                    version="1.1.0"
+                    version={__APP_VERSION__}
                     onUnlock={() => setDevDrawerOpen(v => !v)}
                   />
                 )}
