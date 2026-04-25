@@ -48,10 +48,14 @@ export interface AppConfig {
   // Prowlarr — self-hosted indexer aggregator (queries 500+ trackers)
   prowlarrUrl: string;        // e.g. http://localhost:9696
   prowlarrApiKey: string;     // Settings → General → API Key in Prowlarr UI
+  // Real-Debrid — premium link hoster used as preferred download backend
+  // When set, downloads go via RD (no qBittorrent or WebTorrent needed)
+  realDebridApiKey: string;
   // API key save timestamps (ISO strings) — used for lifespan countdown in Settings
   omdbApiKeySavedAt?: string;
   googleAiApiKeySavedAt?: string;
   tmdbApiKeySavedAt?: string;
+  realDebridApiKeySavedAt?: string;
 }
 
 const DEFAULTS: AppConfig = {
@@ -84,6 +88,7 @@ const DEFAULTS: AppConfig = {
   storageTvPct: 30,
   prowlarrUrl: process.env.PROWLARR_URL || 'http://localhost:9696',
   prowlarrApiKey: process.env.PROWLARR_API_KEY || '',
+  realDebridApiKey: process.env.REAL_DEBRID_API_KEY || '',
 };
 
 // ── Read (always immediate) ───────────────────────────────────────────────────

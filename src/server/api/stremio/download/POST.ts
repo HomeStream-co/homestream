@@ -1,4 +1,5 @@
 import type { Request, Response } from 'express';
+import path from 'path';
 import { pickBestStream } from '../../../torrentManager.js';
 import { addMagnet, testConnection } from '../../../qbittorrentClient.js';
 import { readConfig } from '../../../configStore.js';
@@ -7,6 +8,8 @@ import { connectForDownload, disconnectAfterDownload } from '../../../vpnService
 import type { VPNConfig } from '../../../vpnService.js';
 import { upsertJob, getAllPersistedJobs, findJobByInfoHash } from '../../../downloadJobStore.js';
 import { requireAuth } from '../../../authMiddleware.js';
+import { resolvemagnet, downloadUrl } from '../../../realDebridClient.js';
+import { addToLibrary } from '../../../libraryStore.js';
 
 const CINEMETA   = 'https://v3-cinemeta.strem.io';
 const TIMEOUT_MS = 15_000;
@@ -449,34 +452,37 @@ export default async function handler(req: Request, res: Response) {
   }
   const finalImdbId = resolvedImdbId;
 
-  // Determine backend — use testConnection() to validate auth, not just reachability
-  const qbitResult = await testConnection();
-  const useQbit = qbitResult.ok;
-  if (!useQbit) {
-    // Check if WebTorrent itself is importable — torrentManager.js always exists,
-    // but the 'webtorrent' package is externalized in the Electron build and may
-    // not be available. Test the actual package, not the wrapper module.
-    let wtAvailable = false;
-    try {
-      await import('webtorrent');
-      wtAvailable = true;
-    } catch {
-      // webtorrent not bundled — Electron/production environment
-    }
-    if (!wtAvailable) {
-      res.status(503).json({
-        error: 'No download backend available',
-        message: qbitResult.error
-          ? `qBittorrent is offline (${qbitResult.error}) and the built-in downloader is not available in this environment. Please start qBittorrent — it is required for downloads in the desktop app.`
-          : 'qBittorrent is required for downloads. Please start qBittorrent and ensure it is reachable at the configured URL in Settings → Downloads.',
-      });
-      return;
-    }
-    if (qbitResult.error) {
-      console.warn(`[download] qBittorrent unavailable: ${qbitResult.error} — falling back to WebTorrent`);
+  // ── Backend selection: RD > qBit > WebTorrent ─────────────────────────────
+  const cfg = readConfig();
+  const rdApiKey = cfg.realDebridApiKey?.trim();
+  const useRD = !!rdApiKey;
+
+  // Only check qBit / WebTorrent if RD is not configured
+  let useQbit = false;
+  let wtAvailable = false;
+  if (!useRD) {
+    const qbitResult = await testConnection();
+    useQbit = qbitResult.ok;
+    if (!useQbit) {
+      try { await import('webtorrent'); wtAvailable = true; } catch { /* not bundled */ }
+      if (!wtAvailable) {
+        res.status(503).json({
+          error: 'No download backend available',
+          message: qbitResult.error
+            ? `qBittorrent is offline (${qbitResult.error}) and the built-in downloader is not available. Configure Real-Debrid in Settings → Downloads for dependency-free downloads, or start qBittorrent.`
+            : 'No download backend available. Configure Real-Debrid in Settings → Downloads, or start qBittorrent.',
+          hint: 'real-debrid',
+        });
+        return;
+      }
+      if (qbitResult.error) {
+        console.warn(`[download] qBittorrent unavailable: ${qbitResult.error} — falling back to WebTorrent`);
+      }
     }
   }
-  console.log(`[download] Backend: ${useQbit ? 'qBittorrent' : 'WebTorrent (fallback)'}`);
+
+  const backendLabel = useRD ? 'Real-Debrid' : useQbit ? 'qBittorrent' : 'WebTorrent (fallback)';
+  console.log(`[download] Backend: ${backendLabel}`);
 
   // ── VPN: connect before download (download-only, never affects streaming) ──
   const fullConfig = readConfig() as unknown as Record<string, unknown>;

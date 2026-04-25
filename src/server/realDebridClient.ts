@@ -1,0 +1,241 @@
+/**
+ * realDebridClient — Real-Debrid API integration
+ *
+ * Real-Debrid is a premium link hoster that can unrestrict torrents and
+ * direct-download links. When an RD API key is configured, HomeStream uses
+ * it as the preferred download backend:
+ *
+ *   1. Add magnet → RD queues it on their servers (near-instant for cached)
+ *   2. Poll until "downloaded" status
+ *   3. Select the largest video file link
+ *   4. Stream/download that HTTPS link directly to the media folder
+ *
+ * No torrent client (qBittorrent / WebTorrent) is needed when RD is active.
+ *
+ * API docs: https://api.real-debrid.com/
+ */
+
+import fs from 'fs';
+import path from 'path';
+import https from 'https';
+import http from 'http';
+import { readConfig } from './configStore.js';
+
+const RD_BASE = 'https://api.real-debrid.com/rest/1.0';
+const TIMEOUT_MS = 20_000;
+
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+export interface RDUser {
+  id: number;
+  username: string;
+  email: string;
+  points: number;
+  locale: string;
+  avatar: string;
+  type: string;
+  premium: number;   // seconds of premium remaining
+  expiration: string;
+}
+
+interface RDAddMagnetResponse {
+  id: string;
+  uri: string;
+}
+
+interface RDTorrentInfo {
+  id: string;
+  filename: string;
+  hash: string;
+  bytes: number;
+  host: string;
+  split: number;
+  progress: number;       // 0–100
+  status: string;         // 'magnet_error' | 'magnet_conversion' | 'waiting_files_selection' |
+                          // 'queued' | 'downloading' | 'downloaded' | 'error' | 'virus' |
+                          // 'compressing' | 'uploading' | 'dead'
+  added: string;
+  files: Array<{ id: number; path: string; bytes: number; selected: number }>;
+  links: string[];        // unrestricted download links (populated when downloaded)
+}
+
+interface RDUnrestrictResponse {
+  id: string;
+  filename: string;
+  mimeType: string;
+  filesize: number;
+  link: string;
+  host: string;
+  download: string;       // the actual direct download URL
+}
+
+// ── Low-level fetch helper ────────────────────────────────────────────────────
+
+async function rdFetch<T>(
+  method: 'GET' | 'POST' | 'DELETE',
+  endpoint: string,
+  apiKey: string,
+  body?: Record<string, string>,
+): Promise<T> {
+  const url = `${RD_BASE}${endpoint}`;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${apiKey}`,
+    'User-Agent': 'HomeStream/1.6',
+  };
+
+  let bodyStr: string | undefined;
+  if (body) {
+    headers['Content-Type'] = 'application/x-www-form-urlencoded';
+    bodyStr = new URLSearchParams(body).toString();
+  }
+
+  try {
+    const res = await fetch(url, {
+      method,
+      headers,
+      body: bodyStr,
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      throw new Error(`RD API ${res.status}: ${text}`);
+    }
+    // DELETE returns empty body
+    if (method === 'DELETE') return {} as T;
+    return await res.json() as T;
+  } catch (err) {
+    clearTimeout(timer);
+    throw err;
+  }
+}
+
+// ── Public API ────────────────────────────────────────────────────────────────
+
+/** Verify the API key and return user info. Throws on invalid key. */
+export async function getUser(apiKey: string): Promise<RDUser> {
+  return rdFetch<RDUser>('GET', '/user', apiKey);
+}
+
+/** Returns true if an RD API key is configured and the account is reachable. */
+export async function isConfigured(): Promise<{ ok: boolean; error?: string; user?: RDUser }> {
+  const cfg = readConfig();
+  const key = cfg.realDebridApiKey?.trim();
+  if (!key) return { ok: false, error: 'No API key configured' };
+  try {
+    const user = await getUser(key);
+    return { ok: true, user };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+/**
+ * Add a magnet to Real-Debrid and wait for it to be ready.
+ * Returns the direct HTTPS download URL for the largest video file.
+ *
+ * @param magnet  - magnet URI
+ * @param onProgress - optional callback with 0–100 progress
+ */
+export async function resolvemagnet(
+  magnet: string,
+  apiKey: string,
+  onProgress?: (pct: number, status: string) => void,
+): Promise<string> {
+  // 1. Add magnet
+  const added = await rdFetch<RDAddMagnetResponse>('POST', '/torrents/addMagnet', apiKey, { magnet });
+  const torrentId = added.id;
+
+  // 2. Select all files (required after adding)
+  await rdFetch<unknown>('POST', `/torrents/selectFiles/${torrentId}`, apiKey, { files: 'all' });
+
+  // 3. Poll until downloaded (or error)
+  const MAX_WAIT_MS  = 30 * 60 * 1000; // 30 minutes
+  const POLL_INTERVAL = 5_000;           // 5 seconds
+  const start = Date.now();
+
+  while (Date.now() - start < MAX_WAIT_MS) {
+    const info = await rdFetch<RDTorrentInfo>('GET', `/torrents/info/${torrentId}`, apiKey);
+    onProgress?.(info.progress, info.status);
+
+    if (info.status === 'downloaded') {
+      // 4. Pick the largest video file link
+      const link = pickBestLink(info.links);
+      if (!link) throw new Error('RD: torrent downloaded but no links available');
+
+      // 5. Unrestrict the link to get a direct download URL
+      const unrestricted = await rdFetch<RDUnrestrictResponse>('POST', '/unrestrict/link', apiKey, { link });
+      return unrestricted.download;
+    }
+
+    if (['magnet_error', 'error', 'virus', 'dead'].includes(info.status)) {
+      // Clean up the failed torrent
+      await rdFetch<unknown>('DELETE', `/torrents/delete/${torrentId}`, apiKey).catch(() => {});
+      throw new Error(`RD: torrent failed with status "${info.status}"`);
+    }
+
+    await sleep(POLL_INTERVAL);
+  }
+
+  throw new Error('RD: timed out waiting for torrent to download (30 min limit)');
+}
+
+/**
+ * Download a direct HTTPS URL to a local file path, streaming to disk.
+ * Reports progress via onProgress(bytesDownloaded, totalBytes).
+ */
+export async function downloadUrl(
+  url: string,
+  destPath: string,
+  onProgress?: (downloaded: number, total: number) => void,
+): Promise<void> {
+  await fs.promises.mkdir(path.dirname(destPath), { recursive: true });
+
+  return new Promise((resolve, reject) => {
+    const protocol = url.startsWith('https') ? https : http;
+
+    const doRequest = (reqUrl: string) => {
+      protocol.get(reqUrl, (res) => {
+        // Follow redirects
+        if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+          doRequest(res.headers.location);
+          return;
+        }
+        if (res.statusCode && res.statusCode >= 400) {
+          reject(new Error(`HTTP ${res.statusCode} downloading file`));
+          return;
+        }
+
+        const total = parseInt(res.headers['content-length'] ?? '0', 10);
+        let downloaded = 0;
+        const out = fs.createWriteStream(destPath);
+
+        res.on('data', (chunk: Buffer) => {
+          downloaded += chunk.length;
+          onProgress?.(downloaded, total);
+        });
+
+        res.pipe(out);
+        out.on('finish', resolve);
+        out.on('error', reject);
+        res.on('error', reject);
+      }).on('error', reject);
+    };
+
+    doRequest(url);
+  });
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+/** Pick the first link (RD returns them in quality order, best first). */
+function pickBestLink(links: string[]): string | null {
+  return links[0] ?? null;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise(r => setTimeout(r, ms));
+}
