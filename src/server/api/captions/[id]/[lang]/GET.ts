@@ -1,7 +1,6 @@
 import type { Request, Response } from 'express';
 import fs from 'fs';
 import path from 'path';
-import { requireAuth } from '../../../../authMiddleware.js';
 
 /**
  * GET /api/captions/:id/:lang
@@ -13,14 +12,24 @@ import { requireAuth } from '../../../../authMiddleware.js';
  *
  * If no file exists, returns an empty (but valid) WebVTT document so the
  * browser <track> element doesn't throw a network error.
+ *
+ * NOTE: This endpoint is intentionally unauthenticated. Browser <track>
+ * elements cannot send credentials (cookies or Authorization headers), so
+ * requireAuth would always return 401 and subtitles would never load.
+ * The VTT files contain only subtitle text — no sensitive media data.
  */
 export default async function handler(req: Request, res: Response) {
-  if (!requireAuth(req, res)) return;
   const { id, lang } = req.params;
 
   // Validate lang to prevent path traversal
   if (!['en', 'es'].includes(lang)) {
     res.status(400).send('Unsupported language');
+    return;
+  }
+
+  // Validate id — alphanumeric + hyphens only
+  if (!/^[\w-]+$/.test(id)) {
+    res.status(400).send('Invalid id');
     return;
   }
 

@@ -8,7 +8,7 @@
  */
 
 import { useEffect, useCallback, useRef, useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { AnimatePresence, motion } from 'motion/react';
 import { Cpu, FastForward, Rewind, RotateCcw, SkipForward, X as XIcon } from 'lucide-react';
 import { toActorsArray } from '@/lib/utils';
@@ -49,6 +49,7 @@ const SKIP_INTRO_END = 240;
 export default function PlayerPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { library, updateProgress, triggerPostWatchRecommendation, continueWatching } = useMedia();
   const { activeProfile } = useProfile();
   const profileId = activeProfile?.id ?? 'adult';
@@ -60,7 +61,12 @@ export default function PlayerPage() {
   const ps = usePlayerState();
 
   // ── HLS setup (HEVC / H.265) ─────────────────────────────────────────────
-  const { hlsUrl, hlsCodec } = useHlsSetup(id, ps.videoRef);
+  const { hlsUrl, hlsCodec, probeError } = useHlsSetup(id, ps.videoRef);
+
+  // Surface fatal HLS errors into the player error overlay
+  useEffect(() => {
+    if (probeError) ps.setVideoError(probeError);
+  }, [probeError, ps]);
 
   // ── Transcode progress SSE ────────────────────────────────────────────────
   const transcodeJob = useTranscodeProgress(id);
@@ -174,7 +180,25 @@ export default function PlayerPage() {
       }
     },
     onSpeed:       (rate) => { if (ps.videoRef.current) { ps.videoRef.current.playbackRate = rate; ps.setPlaybackRate(rate); } },
-    onSubtitle:    (track) => { setCcLangRef.current?.(track === -1 ? 'off' : track === 0 ? 'en' : 'es'); },
+    onSubtitle:    (track) => {
+      const video = ps.videoRef.current;
+      if (track === -1) {
+        // Turn off all subtitles
+        setCcLangRef.current?.('off');
+        return;
+      }
+      // Try to match by textTrack index first (real track from video element)
+      if (video) {
+        const tracks = Array.from(video.textTracks);
+        const tt = tracks[track];
+        if (tt) {
+          const lang = tt.language as 'en' | 'es';
+          if (lang === 'en' || lang === 'es') { setCcLangRef.current?.(lang); return; }
+        }
+      }
+      // Fallback: index 0 → en, 1 → es (matches the two <track> elements in the player)
+      setCcLangRef.current?.(track === 0 ? 'en' : 'es');
+    },
     onCast:        () => castButtonRef.current?.(),
   });
 
@@ -456,11 +480,12 @@ export default function PlayerPage() {
     ps.doubleTapTimerRef.current = setTimeout(() => { ps.doubleTapCountRef.current = { side: 'forward', count: 0 }; ps.setSeekFlash(null); ps.setSeekFlashCount(0); }, 700);
   }, [ps]);
 
-  // ── Back navigation — goes to movie/show detail page, not always home ────
+  // ── Back navigation — respects ?from=tv, otherwise goes to detail page ────
   const backPath = useMemo(() => {
+    if (searchParams.get('from') === 'tv') return '/tv';
     if (!item) return '/';
     return item.type === 'series' ? `/show/${item.id}` : `/movie/${item.id}`;
-  }, [item]);
+  }, [item, searchParams]);
 
   // ── Keyboard shortcuts ────────────────────────────────────────────────────
   usePlayerKeyboard({
@@ -591,7 +616,7 @@ export default function PlayerPage() {
       >
         <video
           ref={ps.videoRef}
-          {...(!hlsUrl ? { src: `/api/stream/${item.filename}` } : {})}
+          {...(!hlsUrl ? { src: `/api/stream/${encodeURIComponent(item.filename ?? '')}` } : {})}
           className="w-full h-full"
           preload="auto"
           onPlay={() => { ps.setPlaying(true); sendRemoteStateNow(); }}
