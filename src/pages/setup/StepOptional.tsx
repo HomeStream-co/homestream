@@ -6,9 +6,9 @@
  */
 import { useState, useEffect } from 'react';
 import {
-  Wifi, Tv2, ChevronLeft, ChevronRight, CheckCircle2,
+  Tv2, ChevronLeft, ChevronRight, CheckCircle2,
   XCircle, Loader2, RefreshCw, Eye, EyeOff, SkipForward,
-  Shield, AlertTriangle, Search,
+  Shield, AlertTriangle, Search, Download, ExternalLink, Info,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import type { SetupStepProps } from './types';
@@ -201,23 +201,34 @@ export default function StepOptional({
       </button>
 
       {/* ── qBittorrent ── */}
-      <div className="rounded-xl border border-border bg-muted/20 p-4 flex flex-col gap-3">
+      <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 flex flex-col gap-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-blue-500/10 flex items-center justify-center">
-              <Wifi className="w-3.5 h-3.5 text-blue-400" />
+            <div className="w-7 h-7 rounded-lg bg-amber-500/15 flex items-center justify-center">
+              <Download className="w-3.5 h-3.5 text-amber-400" />
             </div>
             <div>
-              <p className="text-sm font-semibold text-foreground">qBittorrent</p>
-              <p className="text-[10px] text-muted-foreground">Enables in-app downloading</p>
+              <div className="flex items-center gap-1.5">
+                <p className="text-sm font-semibold text-foreground">qBittorrent</p>
+                <span className="text-[9px] bg-amber-500/20 text-amber-400 px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wide">Required for downloads</span>
+              </div>
+              <p className="text-[10px] text-muted-foreground">Must be open and running to download movies &amp; TV</p>
             </div>
           </div>
           <TestBadge state={qbitTest} version={qbitVersion} />
         </div>
 
+        {/* Reminder banner */}
+        <div className="flex items-start gap-2 p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20">
+          <AlertTriangle className="w-3.5 h-3.5 text-amber-400 mt-0.5 flex-shrink-0" />
+          <p className="text-[11px] text-amber-300 leading-snug">
+            <strong>qBittorrent must be open every time you want to download.</strong> You can minimize it to the system tray — it just can't be closed. If it's not running, downloads will fail.
+          </p>
+        </div>
+
         <div className="grid grid-cols-2 gap-2">
           <div className="col-span-2">
-            <label className="text-[10px] font-medium text-muted-foreground mb-1 block">URL</label>
+            <label className="text-[10px] font-medium text-muted-foreground mb-1 block">Web UI URL</label>
             <input type="text" value={form.qbitUrl} onChange={e => { set('qbitUrl', e.target.value); setQbitTest('idle'); }}
               placeholder="http://localhost:8080"
               className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary font-mono" />
@@ -240,13 +251,42 @@ export default function StepOptional({
             </div>
           </div>
         </div>
+
         <button onClick={testQbit} disabled={!form.qbitUrl || qbitTest === 'testing'}
           className="flex items-center justify-center gap-1.5 py-2 rounded-lg bg-muted hover:bg-muted/80 text-foreground text-xs font-medium transition-colors disabled:opacity-40">
           {qbitTest === 'testing' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
           Test Connection
         </button>
+
         {qbitTest === 'error' && testError && (
-          <p className="text-[11px] text-destructive">{testError}</p>
+          <div className="flex flex-col gap-1.5">
+            <p className="text-[11px] text-destructive">{testError}</p>
+            <div className="flex items-start gap-2 p-2.5 rounded-lg bg-muted/40 border border-border">
+              <Info className="w-3.5 h-3.5 text-muted-foreground mt-0.5 flex-shrink-0" />
+              <div className="text-[11px] text-muted-foreground leading-snug">
+                <p className="font-semibold text-foreground/70 mb-1">Troubleshooting:</p>
+                <ul className="flex flex-col gap-0.5 list-none">
+                  <li>• Is qBittorrent open? Check your taskbar / system tray</li>
+                  <li>• Is the Web UI enabled? Tools → Options → Web UI → Enable</li>
+                  <li>• Is the port correct? Default is <code className="bg-background/60 px-1 rounded">8080</code></li>
+                  <li>• Try opening <code className="bg-background/60 px-1 rounded">http://localhost:8080</code> in your browser</li>
+                </ul>
+                <a href="https://www.qbittorrent.org/download" target="_blank" rel="noopener noreferrer"
+                  className="mt-1.5 flex items-center gap-1 text-primary hover:underline">
+                  <ExternalLink className="w-3 h-3" />Not installed? Download qBittorrent
+                </a>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {qbitTest === 'ok' && (
+          <div className="flex items-center gap-2 p-2.5 rounded-lg bg-green-500/10 border border-green-500/20">
+            <CheckCircle2 className="w-3.5 h-3.5 text-green-400 flex-shrink-0" />
+            <p className="text-[11px] text-green-400">
+              Connected! Remember to keep qBittorrent open whenever you want to download.
+            </p>
+          </div>
         )}
       </div>
 

@@ -5,7 +5,7 @@
 import { useEffect, useState } from 'react';
 import {
   CheckCircle2, ChevronLeft, Loader2, AlertCircle, ScanSearch, PackageOpen, Zap,
-  Smartphone, QrCode, Copy, Check,
+  Smartphone, QrCode, Copy, Check, AlertTriangle, Download,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
@@ -26,6 +26,33 @@ export default function StepFinish({
   const [qrData, setQrData] = useState<{ url: string; qr: string; lanIP?: string; mdnsUrl?: string; ipUrl?: string; port?: string } | null>(null);
   const [qrError, setQrError] = useState(false);
   const [copied, setCopied] = useState(false);
+
+  // ── Live qBit health check ─────────────────────────────────────────────────
+  // Ping qBit right before launch so the user knows if it's closed.
+  const [qbitLive, setQbitLive] = useState<'checking' | 'ok' | 'down' | 'unconfigured'>('checking');
+
+  useEffect(() => {
+    // If qBit was never configured in the wizard, skip the check
+    if (!form.qbitUrl) { setQbitLive('unconfigured'); return; }
+
+    let cancelled = false;
+    fetch('/api/setup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'test_qbit',
+        qbitUrl: form.qbitUrl,
+        qbitUsername: form.qbitUsername,
+        qbitPassword: form.qbitPassword,
+      }),
+    })
+      .then(r => r.json())
+      .then((d: { ok: boolean }) => { if (!cancelled) setQbitLive(d.ok ? 'ok' : 'down'); })
+      .catch(() => { if (!cancelled) setQbitLive('down'); });
+
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -281,6 +308,38 @@ export default function StepFinish({
           <ChevronLeft className="w-4 h-4" />Back
         </button>
         <div className="flex-1 flex flex-col gap-1.5">
+
+          {/* Live qBit status — warn if it's not reachable right now */}
+          {qbitLive === 'checking' && (
+            <div className="flex items-center gap-2 text-[11px] text-muted-foreground px-1">
+              <Loader2 className="w-3 h-3 animate-spin flex-shrink-0" />
+              Checking qBittorrent is running…
+            </div>
+          )}
+          {qbitLive === 'ok' && (
+            <div className="flex items-center gap-2 text-[11px] text-green-400 px-1">
+              <CheckCircle2 className="w-3 h-3 flex-shrink-0" />
+              qBittorrent is running — downloads are ready
+            </div>
+          )}
+          {qbitLive === 'down' && (
+            <div className="flex items-start gap-2 p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/30">
+              <AlertTriangle className="w-3.5 h-3.5 text-amber-400 mt-0.5 flex-shrink-0" />
+              <div className="text-[11px] text-amber-300 leading-snug">
+                <p className="font-semibold mb-0.5">qBittorrent is not reachable right now</p>
+                <p>You can still launch HomeStream, but the Download button won't work until qBittorrent is open. Open it and keep it running in the background whenever you want to download.</p>
+              </div>
+            </div>
+          )}
+          {qbitLive === 'unconfigured' && (
+            <div className="flex items-start gap-2 p-2.5 rounded-lg bg-muted/40 border border-border">
+              <Download className="w-3.5 h-3.5 text-muted-foreground mt-0.5 flex-shrink-0" />
+              <p className="text-[11px] text-muted-foreground leading-snug">
+                qBittorrent not configured — you can add it later in Settings. Without it, downloading movies and TV shows won't work.
+              </p>
+            </div>
+          )}
+
           {status.complete === 'error' && (
             <p className="text-[11px] text-destructive text-center">Setup failed — check your settings and try again.</p>
           )}
