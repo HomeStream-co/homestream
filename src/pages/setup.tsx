@@ -142,8 +142,7 @@ export default function SetupPage() {
         setForm(f => f.tmdbApiKey ? f : { ...f, tmdbApiKey: data.config!.tmdbApiKey! });
       }
     }).catch(() => {});
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [navigate]);
+  }, [navigate]); // eslint-disable-line react-hooks/exhaustive-deps -- intentional: only re-run on navigate change
 
   // ── Fetch platform-aware default media directory from Electron ──
   useEffect(() => {

@@ -9,7 +9,6 @@ export default class CookieBannerErrorBoundary extends Component<
     this.state = { hasError: false };
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   static getDerivedStateFromError(_error: unknown): { hasError: boolean } {
     return { hasError: true };
   }

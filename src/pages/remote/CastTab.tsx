@@ -91,7 +91,7 @@ export default function CastTab({ playerState }: CastTabProps) {
   // Auto-scan on mount
   useEffect(() => {
     scan();
-  }, [scan]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [scan]);
 
   // ── Cast ──────────────────────────────────────────────────────────────────
 
