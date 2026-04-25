@@ -38,6 +38,22 @@ export interface RemoteHandlers {
    * show blank (0:00 / 0:00) until the next timeupdate event.
    */
   onOpen?: () => void;
+  // ── Cast session commands (Chromecast / DLNA) ──────────────────────────────
+  /** Phone remote toggled play/pause on the cast session */
+  onCastPlayPause?: () => void;
+  /** Phone remote stopped the cast session */
+  onCastStop?: () => void;
+  /** Phone remote seeked within the cast session */
+  onCastSeek?: (position: number) => void;
+  /** Phone remote changed cast volume (0–1) */
+  onCastVolume?: (level: number) => void;
+  /**
+   * Phone remote started a DLNA cast — screen should update castInfo so the
+   * cast session panel appears and the state is broadcast back to the phone.
+   */
+  onDlnaCastStarted?: (info: { deviceLocation: string; deviceName: string }) => void;
+  /** Phone remote stopped a DLNA cast */
+  onDlnaCastStopped?: () => void;
 }
 
 export interface PlayerStatePayload {
@@ -61,6 +77,8 @@ export interface PlayerStatePayload {
     duration: number;
     volume: number;
     muted: boolean;
+    /** UPnP device description URL — present for DLNA casts */
+    dlnaDeviceLocation?: string;
   };
 }
 
@@ -112,22 +130,30 @@ export function useRemoteControl(
       ws.onmessage = (e) => {
         if (destroyed) return;
         try {
-          const msg = JSON.parse(e.data) as { type: string; position?: number; level?: number; seconds?: number; rate?: number; track?: number; mediaId?: string };
+          const msg = JSON.parse(e.data) as { type: string; position?: number; level?: number; seconds?: number; rate?: number; track?: number; mediaId?: string; deviceLocation?: string; deviceName?: string };
           const h = handlersRef.current;
           switch (msg.type) {
-            case 'play':         h.onPlay?.(); break;
-            case 'pause':        h.onPause?.(); break;
-            case 'seek':         h.onSeek?.(msg.position ?? 0); break;
-            case 'volume':       h.onVolume?.(msg.level ?? 1); break;
-            case 'skip_forward': h.onSkipForward?.(msg.seconds ?? 10); break;
-            case 'skip_back':    h.onSkipBack?.(msg.seconds ?? 10); break;
-            case 'skip_intro':   h.onSkipIntro?.(); break;
-            case 'fullscreen':   h.onFullscreen?.(); break;
-            case 'next_episode': h.onNextEpisode?.(); break;
-            case 'speed':        h.onSpeed?.(msg.rate ?? 1); break;
-            case 'subtitle':     h.onSubtitle?.(msg.track ?? -1); break;
-            case 'cast':         h.onCast?.(); break;
-            case 'launch':       h.onLaunch?.(msg.mediaId ?? ''); break;
+            case 'play':              h.onPlay?.(); break;
+            case 'pause':             h.onPause?.(); break;
+            case 'seek':              h.onSeek?.(msg.position ?? 0); break;
+            case 'volume':            h.onVolume?.(msg.level ?? 1); break;
+            case 'skip_forward':      h.onSkipForward?.(msg.seconds ?? 10); break;
+            case 'skip_back':         h.onSkipBack?.(msg.seconds ?? 10); break;
+            case 'skip_intro':        h.onSkipIntro?.(); break;
+            case 'fullscreen':        h.onFullscreen?.(); break;
+            case 'next_episode':      h.onNextEpisode?.(); break;
+            case 'speed':             h.onSpeed?.(msg.rate ?? 1); break;
+            case 'subtitle':          h.onSubtitle?.(msg.track ?? -1); break;
+            case 'cast':              h.onCast?.(); break;
+            case 'launch':            h.onLaunch?.(msg.mediaId ?? ''); break;
+            // Cast session commands — forwarded from phone CastPanel
+            case 'cast_playpause':    h.onCastPlayPause?.(); break;
+            case 'cast_stop':         h.onCastStop?.(); break;
+            case 'cast_seek':         h.onCastSeek?.(msg.position ?? 0); break;
+            case 'cast_volume':       h.onCastVolume?.(msg.level ?? 1); break;
+            // DLNA cast lifecycle — phone notifies screen of DLNA session state
+            case 'dlna_cast_started': h.onDlnaCastStarted?.({ deviceLocation: msg.deviceLocation ?? '', deviceName: msg.deviceName ?? '' }); break;
+            case 'dlna_cast_stopped': h.onDlnaCastStopped?.(); break;
           }
         } catch { /* ignore */ }
       };

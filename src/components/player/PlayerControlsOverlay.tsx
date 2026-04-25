@@ -88,6 +88,13 @@ interface Props {
   bufferedBarRef: React.MutableRefObject<HTMLDivElement | null>;
   // Refs for cast
   castButtonRef: React.MutableRefObject<(() => void) | null>;
+  /** Imperative controls for an active Chromecast session (play/pause, stop, seek, volume) */
+  castControlRef: React.MutableRefObject<{
+    playPause: () => void;
+    stop: () => void;
+    seek: (position: number) => void;
+    setVolume: (level: number) => void;
+  } | null>;
   videoRef: React.RefObject<HTMLVideoElement | null>;
   // Callbacks
   togglePlay: () => void;
@@ -123,7 +130,7 @@ function PlayerControlsOverlayInner({
   showAudioMenu, ccLang, ccFontSize, ccBgOpacity, audioTracks,
   activeAudioTrack, tvFocus, playerAccent, seekHover, seekBarRef,
   thumbCanvasRef, currentTimeRef, bufferedRef: _bufferedRef, timeDisplayRef, bufferedBarRef,
-  castButtonRef, videoRef,
+  castButtonRef, castControlRef, videoRef,
   togglePlay, toggleMute, toggleFullscreen, togglePiP,
   handleSeek, handleVolumeChange, handleSeekHover, changeSpeed,
   setCcLang, setCcFontSize, setCcBgOpacity, setActiveAudioTrack,
@@ -491,6 +498,7 @@ function PlayerControlsOverlayInner({
                   poster={item.poster}
                   currentTime={currentTimeRef.current}
                   onTriggerRef={(fn) => { castButtonRef.current = fn; }}
+                  onControlRef={(ctrl) => { castControlRef.current = ctrl; }}
                   onCastStateChange={(info) => setCastInfo(info.active ? info : null)}
                 />
               </div>
@@ -508,8 +516,8 @@ function PlayerControlsOverlayInner({
 //
 // SKIPPED (always stable — same object reference across renders):
 //   Refs:      seekBarRef, thumbCanvasRef, currentTimeRef, bufferedRef,
-//              timeDisplayRef, bufferedBarRef, castButtonRef, videoRef,
-//              resumeBannerTimer
+//              timeDisplayRef, bufferedBarRef, castButtonRef, castControlRef,
+//              videoRef, resumeBannerTimer
 //   Callbacks: togglePlay, toggleMute, toggleFullscreen, togglePiP,
 //              handleSeek, handleVolumeChange, handleSeekHover, changeSpeed,
 //              fadeAndNavigate, showActionToast

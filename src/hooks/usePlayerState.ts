@@ -55,6 +55,12 @@ export interface CastInfo {
   duration: number;
   volume: number;
   muted: boolean;
+  /**
+   * UPnP device description URL — present for DLNA casts (Samsung/LG/Sony TVs).
+   * Absent for Chromecast sessions.  Used by the phone remote's CastPanel to
+   * call /api/cast/control directly for pause/resume/seek/stop.
+   */
+  dlnaDeviceLocation?: string;
 }
 
 // ── Hook ──────────────────────────────────────────────────────────────────────

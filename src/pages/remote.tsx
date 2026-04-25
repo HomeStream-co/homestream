@@ -1022,7 +1022,7 @@ function RemotePageInner() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0 }}
               >
-                <CastTab playerState={state} />
+                <CastTab playerState={state} send={send} />
               </motion.div>
             )}
           </AnimatePresence>
@@ -1439,6 +1439,24 @@ function CastPanel({
     ? ((cast.currentTime ?? 0) / (cast.duration ?? 1)) * 100
     : 0;
 
+  // ── DLNA direct control helper ────────────────────────────────────────────
+  // For DLNA casts (Samsung/LG TVs) the phone calls /api/cast/control directly
+  // in addition to the WS message (which handles Chromecast via the Cast SDK).
+  const dlnaControl = useCallback(async (
+    action: 'pause' | 'resume' | 'seek' | 'stop',
+    position?: number,
+  ) => {
+    if (!cast.dlnaDeviceLocation) return; // Chromecast path — WS handles it
+    try {
+      await fetch('/api/cast/control', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', ...remoteAuthHeaders() },
+        body: JSON.stringify({ deviceLocation: cast.dlnaDeviceLocation, action, position }),
+      });
+    } catch { /* non-fatal — TV may not support this command */ }
+  }, [cast.dlnaDeviceLocation]);
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 12, scale: 0.97 }}
@@ -1474,7 +1492,9 @@ function CastPanel({
             value={cast.currentTime ?? 0}
             onChange={e => {
               haptic(20);
-              send({ type: 'cast_seek', position: Number(e.target.value) });
+              const pos = Number(e.target.value);
+              send({ type: 'cast_seek', position: pos });
+              dlnaControl('seek', pos);
             }}
             className="w-full h-2 rounded-full accent-primary cursor-pointer"
             style={{
@@ -1491,7 +1511,11 @@ function CastPanel({
       {/* Playback controls */}
       <div className="flex items-center justify-center gap-4 mb-4">
         <button
-          onClick={() => { haptic(30); send({ type: 'cast_playpause' }); }}
+          onClick={() => {
+            haptic(30);
+            send({ type: 'cast_playpause' });
+            dlnaControl(cast.isPaused ? 'resume' : 'pause');
+          }}
           className="w-12 h-12 rounded-full bg-primary hover:bg-primary/90 active:scale-95 flex items-center justify-center shadow-md shadow-primary/30 transition-all"
         >
           {cast.isPaused
@@ -1500,7 +1524,11 @@ function CastPanel({
           }
         </button>
         <button
-          onClick={() => { haptic([30, 20, 30]); send({ type: 'cast_stop' }); }}
+          onClick={() => {
+            haptic([30, 20, 30]);
+            send({ type: 'cast_stop' });
+            dlnaControl('stop');
+          }}
           className="w-10 h-10 rounded-full bg-card border border-border hover:bg-destructive/10 hover:border-destructive/40 active:scale-95 flex items-center justify-center transition-all"
           title="Stop casting"
         >
@@ -1508,36 +1536,40 @@ function CastPanel({
         </button>
       </div>
 
-      {/* Volume */}
-      <div className="flex items-center gap-2">
-        <button
-          onClick={() => { haptic(20); send({ type: 'cast_volume', level: (cast.muted || (cast.volume ?? 1) === 0) ? 0.5 : 0 }); }}
-          className="text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
-        >
-          {(cast.muted || (cast.volume ?? 1) === 0)
-            ? <VolumeX className="w-4 h-4" />
-            : <Volume2 className="w-4 h-4" />
-          }
-        </button>
-        <input
-          type="range"
-          min={0}
-          max={1}
-          step={0.05}
-          value={cast.muted ? 0 : (cast.volume ?? 1)}
-          onChange={e => send({ type: 'cast_volume', level: Number(e.target.value) })}
-          className="flex-1 h-1.5 rounded-full accent-primary cursor-pointer"
-          style={{
-            background: `linear-gradient(to right, hsl(var(--primary)) ${(cast.muted ? 0 : (cast.volume ?? 1)) * 100}%, hsl(var(--muted)) ${(cast.muted ? 0 : (cast.volume ?? 1)) * 100}%)`,
-          }}
-        />
-        <span className="text-[10px] text-muted-foreground w-7 text-right font-mono flex-shrink-0">
-          {cast.muted ? '0%' : `${Math.round((cast.volume ?? 1) * 100)}%`}
-        </span>
-      </div>
+      {/* Volume — Chromecast only (DLNA volume is TV-side) */}
+      {!cast.dlnaDeviceLocation && (
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => { haptic(20); send({ type: 'cast_volume', level: (cast.muted || (cast.volume ?? 1) === 0) ? 0.5 : 0 }); }}
+            className="text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
+          >
+            {(cast.muted || (cast.volume ?? 1) === 0)
+              ? <VolumeX className="w-4 h-4" />
+              : <Volume2 className="w-4 h-4" />
+            }
+          </button>
+          <input
+            type="range"
+            min={0}
+            max={1}
+            step={0.05}
+            value={cast.muted ? 0 : (cast.volume ?? 1)}
+            onChange={e => send({ type: 'cast_volume', level: Number(e.target.value) })}
+            className="flex-1 h-1.5 rounded-full accent-primary cursor-pointer"
+            style={{
+              background: `linear-gradient(to right, hsl(var(--primary)) ${(cast.muted ? 0 : (cast.volume ?? 1)) * 100}%, hsl(var(--muted)) ${(cast.muted ? 0 : (cast.volume ?? 1)) * 100}%)`,
+            }}
+          />
+          <span className="text-[10px] text-muted-foreground w-7 text-right font-mono flex-shrink-0">
+            {cast.muted ? '0%' : `${Math.round((cast.volume ?? 1) * 100)}%`}
+          </span>
+        </div>
+      )}
 
       <p className="text-[10px] text-muted-foreground/50 text-center mt-3">
-        Volume controls your TV via HDMI-CEC
+        {cast.dlnaDeviceLocation
+          ? 'Controls sent directly to your TV via DLNA'
+          : 'Volume controls your TV via HDMI-CEC'}
       </p>
     </motion.div>
   );

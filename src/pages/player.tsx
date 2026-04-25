@@ -78,6 +78,12 @@ export default function PlayerPage() {
   // ── Remote control refs (needed before useRemoteControl) ─────────────────
   const setCcLangRef = useRef<((lang: 'off' | 'en' | 'es') => void) | null>(null);
   const castButtonRef = useRef<(() => void) | null>(null);
+  const castControlRef = useRef<{
+    playPause: () => void;
+    stop: () => void;
+    seek: (position: number) => void;
+    setVolume: (level: number) => void;
+  } | null>(null);
   // Stable ref to sendRemoteStateNow — updated after it's defined below.
   // Used by onOpen so the handler always calls the latest version.
   const sendRemoteStateNowRef = useRef<(() => void) | null>(null);
@@ -204,6 +210,25 @@ export default function PlayerPage() {
       setCcLangRef.current?.(track === 0 ? 'en' : 'es');
     },
     onCast:        () => castButtonRef.current?.(),
+    // Cast session commands — forwarded from phone CastPanel → Chromecast SDK
+    onCastPlayPause: () => castControlRef.current?.playPause(),
+    onCastStop:      () => castControlRef.current?.stop(),
+    onCastSeek:      (pos) => castControlRef.current?.seek(pos),
+    onCastVolume:    (lvl) => castControlRef.current?.setVolume(lvl),
+    // DLNA cast lifecycle — phone notifies screen so castInfo is set correctly
+    onDlnaCastStarted: ({ deviceLocation, deviceName }) => {
+      ps.setCastInfo({
+        active: true,
+        deviceName,
+        isPaused: false,
+        currentTime: ps.currentTimeRef.current,
+        duration: ps.duration,
+        volume: 1,
+        muted: false,
+        dlnaDeviceLocation: deviceLocation,
+      });
+    },
+    onDlnaCastStopped: () => ps.setCastInfo(null),
     // Push current state immediately when phone connects — prevents blank remote
     onOpen:        () => sendRemoteStateNowRef.current?.(),
   });
@@ -861,6 +886,7 @@ export default function PlayerPage() {
               timeDisplayRef={ps.timeDisplayRef}
               bufferedBarRef={ps.bufferedBarRef}
               castButtonRef={castButtonRef}
+              castControlRef={castControlRef}
               videoRef={ps.videoRef}
               togglePlay={togglePlay}
               toggleMute={toggleMute}

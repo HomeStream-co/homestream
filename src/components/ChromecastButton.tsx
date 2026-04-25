@@ -150,6 +150,16 @@ interface ChromecastButtonProps {
   className?: string;
   /** Called with a trigger function so parent can programmatically start casting */
   onTriggerRef?: (trigger: () => void) => void;
+  /**
+   * Called with an imperative control object so the parent (or phone remote)
+   * can control an active cast session without touching the UI.
+   */
+  onControlRef?: (ctrl: {
+    playPause: () => void;
+    stop: () => void;
+    seek: (position: number) => void;
+    setVolume: (level: number) => void;
+  }) => void;
   /** Called whenever cast state changes — gives parent live session info */
   onCastStateChange?: (info: {
     active: boolean;
@@ -166,7 +176,7 @@ type CastState = 'unavailable' | 'available' | 'connecting' | 'connected';
 
 export default function ChromecastButton({
   streamUrl, title, poster, currentTime = 0, className,
-  onTriggerRef, onCastStateChange,
+  onTriggerRef, onControlRef, onCastStateChange,
 }: ChromecastButtonProps) {
   const [castState, setCastState] = useState<CastState>('unavailable');
   const [sdkLoaded, setSdkLoaded] = useState(false);
@@ -351,6 +361,35 @@ export default function ChromecastButton({
   useEffect(() => {
     onTriggerRef?.(startCast);
   }, [onTriggerRef, startCast]);
+
+  // Expose imperative cast controls to parent (for phone remote cast_* commands)
+  useEffect(() => {
+    onControlRef?.({
+      playPause: () => controllerRef.current?.playOrPause(),
+      stop: () => { controllerRef.current?.stop(); setShowPanel(false); },
+      seek: (position: number) => {
+        if (!window.cast) return;
+        const session = window.cast.framework.CastContext.getInstance().getCurrentSession();
+        const mediaSession = session?.getMediaSession();
+        if (mediaSession) {
+          mediaSession.seek(
+            { currentTime: position, resumeState: 'PLAYBACK_START' },
+            () => {},
+            () => {},
+          );
+        }
+      },
+      setVolume: (level: number) => {
+        if (!window.cast) return;
+        const session = window.cast.framework.CastContext.getInstance().getCurrentSession();
+        if (session) session.setVolume({ level, muted: level === 0 }, () => {}, () => {});
+        setVolume(level);
+        setMuted(level === 0);
+      },
+    });
+  // onControlRef is a stable ref callback — intentionally not in deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onControlRef]);
 
   const togglePlayPause = useCallback(() => {
     controllerRef.current?.playOrPause();

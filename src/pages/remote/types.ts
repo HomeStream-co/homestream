@@ -44,6 +44,12 @@ export interface CastSessionInfo {
   duration?: number;
   volume?: number;
   muted?: boolean;
+  /**
+   * UPnP device description URL — present for DLNA casts (Samsung/LG/Sony TVs).
+   * Absent for Chromecast sessions (those are controlled via the Cast SDK on the
+   * player page, not via SOAP from the phone).
+   */
+  dlnaDeviceLocation?: string;
 }
 
 export interface PlayerState {

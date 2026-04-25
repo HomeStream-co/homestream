@@ -72,6 +72,7 @@ function baseProps() {
     timeDisplayRef: makeRef<HTMLSpanElement | null>(null),
     bufferedBarRef: makeRef<HTMLDivElement | null>(null),
     castButtonRef: makeRef<(() => void) | null>(null),
+    castControlRef: makeRef<{ playPause: () => void; stop: () => void; seek: (p: number) => void; setVolume: (l: number) => void } | null>(null),
     videoRef: makeRef<HTMLVideoElement | null>(null),
     resumeBannerTimer: makeRef<ReturnType<typeof setTimeout> | undefined>(undefined),
     // Callbacks — stable

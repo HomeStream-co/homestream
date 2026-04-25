@@ -50,9 +50,11 @@ function DeviceIcon({ type }: { type: string }) {
 interface CastTabProps {
   /** Current player state — used to know what's playing and build the stream URL */
   playerState: PlayerState | null;
+  /** WS send function — used to notify the screen of DLNA cast lifecycle events */
+  send: (cmd: Record<string, unknown>) => void;
 }
 
-export default function CastTab({ playerState }: CastTabProps) {
+export default function CastTab({ playerState, send }: CastTabProps) {
   const [devices, setDevices]       = useState<DLNADevice[]>([]);
   const [scanning, setScanning]     = useState(false);
   const [scanned, setScanned]       = useState(false);
@@ -125,6 +127,13 @@ export default function CastTab({ playerState }: CastTabProps) {
       }
       setSuccessId(device.id);
       setActiveDevice(device);
+      // Notify the player screen that a DLNA cast has started so it can update
+      // castInfo and broadcast the session state back to this phone remote.
+      send({
+        type: 'dlna_cast_started',
+        deviceLocation: device.location,
+        deviceName: device.name,
+      });
     } catch (err) {
       setCastError(String(err));
     } finally {
@@ -145,6 +154,8 @@ export default function CastTab({ playerState }: CastTabProps) {
         body: JSON.stringify({ deviceLocation: activeDevice.location }),
       });
     } catch { /* non-fatal — ignore */ }
+    // Notify the screen that the DLNA cast has stopped
+    send({ type: 'dlna_cast_stopped' });
     setSuccessId(null);
     setActiveDevice(null);
   };
