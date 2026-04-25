@@ -502,6 +502,8 @@ function DownloadModal({ target, onClose }: { target: DownloadTarget; onClose: (
     setSearching(true);
     setError('');
     try {
+      // Route through the backend proxy — avoids CORS and works in all environments.
+      // /api/stremio/stream handles Torrentio + Prowlarr + Nyaa server-side.
       const res = await fetch('/api/stremio/stream', {
         method: 'POST',
         credentials: 'include',
@@ -527,14 +529,6 @@ function DownloadModal({ target, onClose }: { target: DownloadTarget; onClose: (
         url: s.infoHash,
         imdbId: resolvedImdbId,
         // Preserve full stream data so the download call gets real magnet URIs + tracker list
-=======
-=======
-        // Preserve full stream data so the download call gets real magnet URIs + tracker list
-=======
-=======
->>>>>>> 20260425032911-9h9yrecco0
->>>>>>> 0354655 (how hard would it be to add a download link the...)
->>>>>>> 20260425033526-9h9yrecco0
         quality: s.quality,
         size: s.size,
         seeds: s.seeds,
@@ -545,6 +539,7 @@ function DownloadModal({ target, onClose }: { target: DownloadTarget; onClose: (
       setStreams(found);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
+      // "Failed to fetch" means the browser couldn't reach the server at all
       setError(msg === 'Failed to fetch'
         ? 'Could not reach the HomeStream server. Make sure the app is running.'
         : msg);
@@ -553,19 +548,6 @@ function DownloadModal({ target, onClose }: { target: DownloadTarget; onClose: (
     }
   };
 
-=======
-  // Auto-search as soon as the modal opens — no manual button click needed
-  useEffect(() => { search(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-=======
-=======
-=======
-  // Auto-search as soon as the modal opens — no manual button click needed
-  useEffect(() => { search(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-=======
-=======
->>>>>>> 20260425033526-9h9yrecco0
   const startDownload = async (stream: { name: string; title: string; url: string; imdbId: string; quality: string; size: string; seeds: string; magnet: string; source: string }) => {
     setDownloading(stream.url);
     try {
@@ -616,11 +598,6 @@ function DownloadModal({ target, onClose }: { target: DownloadTarget; onClose: (
 
       if (!res.ok) {
         const errData = await res.json().catch(() => ({})) as { error?: string; message?: string };
-        // 503 = no download backend — show a more actionable inline error
-        if (res.status === 503) {
-          const msg = errData.message ?? errData.error ?? 'qBittorrent is required for downloads in the desktop app.';
-          throw new Error(msg);
-        }
         throw new Error(errData.message ?? errData.error ?? `Server error ${res.status}`);
       }
 
@@ -663,21 +640,36 @@ function DownloadModal({ target, onClose }: { target: DownloadTarget; onClose: (
         </div>
 
         <div className="p-5">
-          {searching && (
-            <div className="flex flex-col items-center py-8 gap-3">
-              <Loader2 className="w-6 h-6 animate-spin text-primary" />
-              <p className="text-sm text-muted-foreground">Finding available torrents…</p>
+          {streams.length === 0 && !searching && !error && (
+            <div className="text-center py-4">
+              <p className="text-sm text-muted-foreground mb-4">
+                Search for available torrents to download to your HomeStream server.
+              </p>
+              <button
+                onClick={search}
+                className="flex items-center gap-2 bg-primary hover:bg-primary/80 text-primary-foreground px-5 py-2.5 rounded-lg font-semibold text-sm mx-auto transition-colors"
+              >
+                <Search className="w-4 h-4" />
+                Search Torrents
+              </button>
             </div>
           )}
 
-          {error && !searching && (
+          {searching && (
+            <div className="flex flex-col items-center py-6 gap-3">
+              <Loader2 className="w-6 h-6 animate-spin text-primary" />
+              <p className="text-sm text-muted-foreground">Searching for streams…</p>
+            </div>
+          )}
+
+          {error && (
             <div className="text-center py-4">
               <p className="text-sm text-red-400 mb-3">{error}</p>
-              <button onClick={search} className="text-xs text-primary hover:text-primary/80 underline underline-offset-2">Try again</button>
+              <button onClick={search} className="text-xs text-primary hover:text-primary/80">Try again</button>
             </div>
           )}
 
-          {streams.length > 0 && !searching && (
+          {streams.length > 0 && (
             <div className="space-y-2">
               <p className="text-xs text-muted-foreground mb-3">Select a quality to download:</p>
               {streams.map(s => (
@@ -783,12 +775,12 @@ function DirectSearchCard({
 // ── Streaming Services Tab ────────────────────────────────────────────────────
 
 const STREAMING_SERVICES = [
-  { id: 8,    name: 'Netflix',      color: '#E50914', textColor: '#fff', logo: 'https://image.tmdb.org/t/p/w92/t2yyOv40HZeVlLjYsCsPHnWLk4W.jpg' },
-  { id: 9,    name: 'Prime Video',  color: '#00A8E1', textColor: '#fff', logo: 'https://image.tmdb.org/t/p/w92/emthp39XA2YScoYL1p0sdbAH2WA.jpg' },
-  { id: 1899, name: 'Max',          color: '#002BE7', textColor: '#fff', logo: 'https://image.tmdb.org/t/p/w92/Ajqyt5aNxNx9pi2RvNFLHaLeSgx.jpg' },
-  { id: 337,  name: 'Disney+',      color: '#113CCF', textColor: '#fff', logo: 'https://image.tmdb.org/t/p/w92/7rwgEs15tFwyR9NPQ5vpzxTj19d.jpg' },
-  { id: 15,   name: 'Hulu',         color: '#1CE783', textColor: '#000', logo: 'https://image.tmdb.org/t/p/w92/zxrVdFjIjLqkfnwyghnfywTn3Lh.jpg' },
-  { id: 386,  name: 'Peacock',      color: '#000000', textColor: '#fff', logo: 'https://image.tmdb.org/t/p/w92/8VCV78prwd9QzZnEm0ReO6bERDa.jpg' },
+  { id: 8,    name: 'Netflix',      color: '#E50914', logo: 'https://image.tmdb.org/t/p/w92/t2yyOv40HZeVlLjYsCsPHnWLk4W.jpg' },
+  { id: 9,    name: 'Prime Video',  color: '#00A8E1', logo: 'https://image.tmdb.org/t/p/w92/emthp39XA2YScoYL1p0sdbAH2WA.jpg' },
+  { id: 1899, name: 'Max',          color: '#002BE7', logo: 'https://image.tmdb.org/t/p/w92/Ajqyt5aNxNx9pi2RvNFLHaLeSgx.jpg' },
+  { id: 337,  name: 'Disney+',      color: '#113CCF', logo: 'https://image.tmdb.org/t/p/w92/7rwgEs15tFwyR9NPQ5vpzxTj19d.jpg' },
+  { id: 15,   name: 'Hulu',         color: '#1CE783', logo: 'https://image.tmdb.org/t/p/w92/zxrVdFjIjLqkfnwyghnfywTn3Lh.jpg' },
+  { id: 386,  name: 'Peacock',      color: '#000000', logo: 'https://image.tmdb.org/t/p/w92/8VCV78prwd9QzZnEm0ReO6bERDa.jpg' },
 ] as const;
 
 type ServiceId = typeof STREAMING_SERVICES[number]['id'];
@@ -819,12 +811,7 @@ function StreamingTab({ onDownload, libraryTitles, watchlist, onAddToWatchlist, 
     setLoading(true);
     setError('');
     try {
-      const params = new URLSearchParams({
-        provider: String(providerId),
-        type,
-        page: String(pg),
-        sort,
-      });
+      const params = new URLSearchParams({ provider: String(providerId), type, page: String(pg), sort });
       const res = await fetch(`/api/tmdb/catalog?${params}`, { credentials: 'include' });
       if (!res.ok) throw new Error(`Server error ${res.status}`);
       const data = await res.json() as { results: CatalogMovie[]; totalPages: number; page: number };
@@ -838,17 +825,10 @@ function StreamingTab({ onDownload, libraryTitles, watchlist, onAddToWatchlist, 
   }, []);
 
   useEffect(() => {
-    if (selectedService) {
-      fetchCatalog(selectedService, mediaType, page, sortBy);
-    }
+    if (selectedService) fetchCatalog(selectedService, mediaType, page, sortBy);
   }, [selectedService, mediaType, page, sortBy, fetchCatalog]);
 
-  // Reset page when filters change
-  const handleServiceSelect = (id: ServiceId) => {
-    setSelectedService(id);
-    setPage(1);
-    setResults([]);
-  };
+  const handleServiceSelect = (id: ServiceId) => { setSelectedService(id); setPage(1); setResults([]); };
   const handleTypeChange = (t: 'movie' | 'tv') => { setMediaType(t); setPage(1); };
   const handleSortChange = (s: string) => { setSortBy(s); setPage(1); };
 
@@ -867,16 +847,8 @@ function StreamingTab({ onDownload, libraryTitles, watchlist, onAddToWatchlist, 
               whileTap={{ scale: 0.97 }}
               className="relative flex flex-col items-center justify-center gap-3 p-6 rounded-2xl border border-border hover:border-primary/40 bg-card transition-all group overflow-hidden"
             >
-              <div
-                className="absolute inset-0 opacity-0 group-hover:opacity-10 transition-opacity"
-                style={{ background: svc.color }}
-              />
-              <img
-                src={svc.logo}
-                alt={svc.name}
-                className="w-14 h-14 rounded-xl object-cover shadow-md"
-                onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
-              />
+              <div className="absolute inset-0 opacity-0 group-hover:opacity-10 transition-opacity" style={{ background: svc.color }} />
+              <img src={svc.logo} alt={svc.name} className="w-14 h-14 rounded-xl object-cover shadow-md" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
               <span className="text-sm font-semibold text-foreground">{svc.name}</span>
             </motion.button>
           ))}
@@ -887,51 +859,22 @@ function StreamingTab({ onDownload, libraryTitles, watchlist, onAddToWatchlist, 
 
   return (
     <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-      {/* Header row */}
       <div className="flex flex-wrap items-center gap-3 mb-6">
-        <button
-          onClick={() => { setSelectedService(null); setResults([]); }}
-          className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
-        >
-          <ChevronLeft className="w-4 h-4" />
-          All Services
+        <button onClick={() => { setSelectedService(null); setResults([]); }} className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
+          <ChevronLeft className="w-4 h-4" />All Services
         </button>
-
         <div className="flex items-center gap-2 ml-2">
-          <img
-            src={service?.logo}
-            alt={service?.name}
-            className="w-7 h-7 rounded-lg object-cover"
-            onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
-          />
+          <img src={service?.logo} alt={service?.name} className="w-7 h-7 rounded-lg object-cover" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
           <span className="text-base font-bold text-foreground">{service?.name}</span>
         </div>
-
         <div className="flex items-center gap-2 ml-auto flex-wrap">
-          {/* Movie / TV toggle */}
           <div className="flex rounded-lg border border-border overflow-hidden text-xs">
-            <button
-              onClick={() => handleTypeChange('movie')}
-              className={`px-3 py-1.5 font-medium transition-colors ${mediaType === 'movie' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
-            >
-              Movies
-            </button>
-            <button
-              onClick={() => handleTypeChange('tv')}
-              className={`px-3 py-1.5 font-medium transition-colors ${mediaType === 'tv' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
-            >
-              TV Shows
-            </button>
+            <button onClick={() => handleTypeChange('movie')} className={`px-3 py-1.5 font-medium transition-colors ${mediaType === 'movie' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}>Movies</button>
+            <button onClick={() => handleTypeChange('tv')} className={`px-3 py-1.5 font-medium transition-colors ${mediaType === 'tv' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}>TV Shows</button>
           </div>
-
-          {/* Sort */}
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <SlidersHorizontal className="w-3.5 h-3.5" />
-            <select
-              value={sortBy}
-              onChange={e => handleSortChange(e.target.value)}
-              className="bg-card border border-border rounded-lg px-2 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary/50"
-            >
+            <select value={sortBy} onChange={e => handleSortChange(e.target.value)} className="bg-card border border-border rounded-lg px-2 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary/50">
               <option value="popularity.desc">Most Popular</option>
               <option value="vote_average.desc">Top Rated</option>
               <option value="primary_release_date.desc">Newest First</option>
@@ -941,28 +884,16 @@ function StreamingTab({ onDownload, libraryTitles, watchlist, onAddToWatchlist, 
         </div>
       </div>
 
-      {/* Loading */}
-      {loading && (
-        <div className="flex items-center justify-center py-20">
-          <Loader2 className="w-6 h-6 animate-spin text-primary" />
-        </div>
-      )}
+      {loading && <div className="flex items-center justify-center py-20"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>}
 
-      {/* Error */}
       {error && !loading && (
         <div className="flex flex-col items-center py-12 gap-3">
           <AlertCircle className="w-8 h-8 text-red-400" />
           <p className="text-sm text-red-400">{error}</p>
-          <button
-            onClick={() => fetchCatalog(selectedService, mediaType, page, sortBy)}
-            className="text-xs text-primary hover:text-primary/80 underline"
-          >
-            Try again
-          </button>
+          <button onClick={() => fetchCatalog(selectedService, mediaType, page, sortBy)} className="text-xs text-primary hover:text-primary/80 underline">Try again</button>
         </div>
       )}
 
-      {/* Grid */}
       {!loading && !error && results.length > 0 && (
         <>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-4">
@@ -978,28 +909,14 @@ function StreamingTab({ onDownload, libraryTitles, watchlist, onAddToWatchlist, 
               />
             ))}
           </div>
-
-          {/* Pagination */}
           {totalPages > 1 && (
             <div className="flex items-center justify-center gap-3 mt-8">
-              <button
-                onClick={() => setPage(p => Math.max(1, p - 1))}
-                disabled={page === 1}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-lg border border-border text-sm text-muted-foreground hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-              >
-                <ChevronLeft className="w-4 h-4" />
-                Previous
+              <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="flex items-center gap-1.5 px-4 py-2 rounded-lg border border-border text-sm text-muted-foreground hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+                <ChevronLeft className="w-4 h-4" />Previous
               </button>
-              <span className="text-sm text-muted-foreground">
-                Page {page} of {totalPages}
-              </span>
-              <button
-                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                disabled={page === totalPages}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-lg border border-border text-sm text-muted-foreground hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-              >
-                Next
-                <ChevronRight className="w-4 h-4" />
+              <span className="text-sm text-muted-foreground">Page {page} of {totalPages}</span>
+              <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="flex items-center gap-1.5 px-4 py-2 rounded-lg border border-border text-sm text-muted-foreground hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+                Next<ChevronRight className="w-4 h-4" />
               </button>
             </div>
           )}
@@ -1058,7 +975,7 @@ export default function DiscoverPage() {
   const filteredPopularShows = useMemo(() => filterMovies(popularShows), [popularShows, filterMovies]);
 
   const handleTMDBDownload = useCallback((movie: TMDBMovie) => {
-    setDownloadTarget({ title: movie.title, posterUrl: movie.posterUrl, release_date: movie.release_date, type: 'movie', tmdbId: movie.id });
+    setDownloadTarget({ title: movie.title, posterUrl: movie.posterUrl, release_date: movie.release_date, type: 'movie' });
   }, []);
 
   const handleDirectDownload = useCallback((result: CinemetaResult) => {
@@ -1096,10 +1013,10 @@ export default function DiscoverPage() {
   };
 
   const TABS = [
-    { id: 'movies' as const,    label: 'Movies',           icon: Film },
-    { id: 'shows' as const,     label: 'TV Shows',         icon: Tv2 },
-    { id: 'streaming' as const, label: 'Streaming',        icon: MonitorPlay },
-    { id: 'genres' as const,    label: 'Browse by Genre',  icon: Layers },
+    { id: 'movies' as const,    label: 'Movies',            icon: Film },
+    { id: 'shows' as const,     label: 'TV Shows',          icon: Tv2 },
+    { id: 'streaming' as const, label: 'Streaming',         icon: MonitorPlay },
+    { id: 'genres' as const,    label: 'Browse by Genre',   icon: Layers },
     { id: 'search' as const,    label: 'Search & Download', icon: Clapperboard },
   ];
 
