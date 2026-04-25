@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import CastButton from '@/components/CastButton';
 import ChromecastButton from '@/components/ChromecastButton';
+import PlayerSeekBar from './PlayerSeekBar';
 import type { AudioTrack, CastInfo, CcLang, TvControl } from '@/hooks/usePlayerState';
 
 function formatTime(seconds: number): string {
@@ -203,39 +204,18 @@ export default function PlayerControlsOverlay({
       {/* ── Bottom controls ── */}
       <div className="bg-gradient-to-t from-black/80 to-transparent px-2 sm:px-4 pb-safe pb-4 pt-8">
         {/* Seek bar */}
-        <div className="relative mb-3">
-          {seekHover && (
-            <div
-              className="absolute bottom-full mb-3 pointer-events-none z-10"
-              style={{ left: Math.max(80, Math.min(seekHover.x, (seekBarRef.current?.offsetWidth ?? 400) - 80)), transform: 'translateX(-50%)' }}
-            >
-              <div className="bg-black/90 rounded-lg overflow-hidden border border-white/20 shadow-xl">
-                <img src={seekHover.dataUrl} alt="" className="w-40 h-[90px] object-cover block" />
-                <p className="text-white/70 text-[10px] text-center py-1 font-mono">{formatTime(seekHover.time)}</p>
-              </div>
-            </div>
-          )}
-          {/* Buffered bar — updated via ref in onTimeUpdate, no React re-render */}
-          <div
-            ref={bufferedBarRef}
-            className="absolute top-1/2 -translate-y-1/2 h-1 rounded-full opacity-40 pointer-events-none"
-            style={{ width: '0%', background: playerAccent }}
-          />
-          {/* Seek input — uncontrolled; value driven by onTimeUpdate DOM mutation */}
-          <input
-            ref={seekBarRef}
-            type="range"
-            min={0}
-            max={duration || 100}
-            defaultValue={0}
-            onChange={handleSeek}
-            onMouseMove={handleSeekHover}
-            onMouseLeave={() => setSeekHover(null)}
-            className={`w-full h-1 appearance-none bg-white/20 rounded-full cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary ${tvFocus === 'seek' ? 'ring-2 ring-white/60 ring-offset-1 ring-offset-transparent' : ''}`}
-            style={{ background: `linear-gradient(to right, ${playerAccent} 0%, rgba(255,255,255,0.2) 0%)` }}
-          />
-          <canvas ref={thumbCanvasRef} className="hidden" />
-        </div>
+        <PlayerSeekBar
+          duration={duration}
+          playerAccent={playerAccent}
+          tvFocused={tvFocus === 'seek'}
+          seekHover={seekHover}
+          seekBarRef={seekBarRef}
+          bufferedBarRef={bufferedBarRef}
+          thumbCanvasRef={thumbCanvasRef}
+          handleSeek={handleSeek}
+          handleSeekHover={handleSeekHover}
+          setSeekHover={setSeekHover}
+        />
 
         {/* Control row */}
         <div className="flex items-center justify-between gap-1">
