@@ -6,16 +6,19 @@
  *
  *  - Large cards (no hover-dependent UI)
  *  - Visible focus rings on every interactive element
- *  - Keyboard arrow-key navigation between rows and cards
+ *  - Keyboard arrow-key navigation between zones and cards
  *  - No tiny touch targets — everything is at least 48px
  *  - Minimal text, big posters, instant play on select
  *  - Search via on-screen keyboard (TV browser native)
  *
- * Navigation:
- *   ← → Arrow keys  — move between cards in a row
- *   ↑ ↓ Arrow keys  — move between rows
- *   Enter / OK      — play / open
- *   Backspace / Esc — go back / clear search
+ * Navigation zones (↑↓ moves between zones, ←→ moves within):
+ *   Zone 0 — Nav tab bar  (Home / Movies / Shows / My List)
+ *   Zone 1 — Type filter  (All / Movies / Shows) — home tab only
+ *   Zone 2 — Genre pills  (All / Action / Drama / …)
+ *   Zone 3 — Content rows (card grid)
+ *
+ *   Enter / OK      — activate focused element / play card
+ *   Backspace / Esc — go back to desktop view
  */
 
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
@@ -23,7 +26,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Play, Search, X, Star, Clock, Tv2, Film,
-  Home, List, Bookmark,
+  Home, List, Bookmark, Filter,
 } from 'lucide-react';
 import { useMedia } from '@/context/MediaContext';
 import { useProfile } from '@/context/ProfileContext';
@@ -284,18 +287,29 @@ function TvGenreFilter({
   genres,
   active,
   onChange,
+  focusedPill,
 }: {
   genres: string[];
   active: string;
   onChange: (g: string) => void;
+  /** Index into ['All', ...genres] that has D-pad focus; -1 = none */
+  focusedPill: number;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const allPills = ['All', ...genres];
 
   // Scroll the active pill into view whenever it changes
   useEffect(() => {
     const el = scrollRef.current?.querySelector<HTMLButtonElement>('[data-active="true"]');
     el?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
   }, [active]);
+
+  // Scroll the focused pill into view when D-pad moves within this row
+  useEffect(() => {
+    if (focusedPill < 0) return;
+    const btns = scrollRef.current?.querySelectorAll<HTMLButtonElement>('button');
+    btns?.[focusedPill]?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+  }, [focusedPill]);
 
   if (genres.length === 0) return null;
 
@@ -305,20 +319,72 @@ function TvGenreFilter({
       className="flex items-center gap-2 px-12 mb-6 overflow-x-auto scrollbar-none"
       style={{ scrollbarWidth: 'none' }}
     >
-      {['All', ...genres].map(g => (
-        <button
-          key={g}
-          data-active={active === g}
-          onClick={() => onChange(g)}
-          className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-all focus:outline-none focus:ring-4 focus:ring-white/40 ${
-            active === g
-              ? 'bg-primary text-primary-foreground'
-              : 'bg-white/10 text-white/70 hover:bg-white/20 hover:text-white'
-          }`}
-        >
-          {g}
-        </button>
-      ))}
+      {allPills.map((g, i) => {
+        const isFocused = focusedPill === i;
+        const isActive = active === g;
+        return (
+          <button
+            key={g}
+            data-active={isActive}
+            onClick={() => onChange(g)}
+            className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-all focus:outline-none ${
+              isFocused
+                ? 'ring-4 ring-white scale-105 ' + (isActive ? 'bg-primary text-primary-foreground' : 'bg-white/20 text-white')
+                : isActive
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-white/10 text-white/70 hover:bg-white/20 hover:text-white'
+            }`}
+          >
+            {g}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+
+// ── Type Filter Row (home tab only) ───────────────────────────────────────────
+
+type TypeFilter = 'all' | 'movie' | 'series';
+
+function TvTypeFilter({
+  active,
+  onChange,
+  focusedPill,
+}: {
+  active: TypeFilter;
+  onChange: (t: TypeFilter) => void;
+  focusedPill: number;
+}) {
+  const pills: { id: TypeFilter; label: string; icon: React.ReactNode }[] = [
+    { id: 'all',    label: 'All',    icon: <Filter className="w-3.5 h-3.5" /> },
+    { id: 'movie',  label: 'Movies', icon: <Film className="w-3.5 h-3.5" /> },
+    { id: 'series', label: 'Shows',  icon: <Tv2 className="w-3.5 h-3.5" /> },
+  ];
+
+  return (
+    <div className="flex items-center gap-2 px-12 mb-4">
+      {pills.map((p, i) => {
+        const isFocused = focusedPill === i;
+        const isActive = active === p.id;
+        return (
+          <button
+            key={p.id}
+            onClick={() => onChange(p.id)}
+            className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-medium transition-all focus:outline-none ${
+              isFocused
+                ? 'ring-4 ring-white scale-105 ' + (isActive ? 'bg-white text-black' : 'bg-white/20 text-white')
+                : isActive
+                  ? 'bg-white text-black'
+                  : 'bg-white/10 text-white/60 hover:bg-white/20 hover:text-white'
+            }`}
+          >
+            {p.icon}
+            {p.label}
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -327,7 +393,16 @@ function TvGenreFilter({
 
 type NavTab = 'home' | 'movies' | 'shows' | 'watchlist';
 
-function TvNav({ active, onChange }: { active: NavTab; onChange: (t: NavTab) => void }) {
+function TvNav({
+  active,
+  onChange,
+  focusedTab,
+}: {
+  active: NavTab;
+  onChange: (t: NavTab) => void;
+  /** Index of the D-pad focused tab; -1 = none */
+  focusedTab: number;
+}) {
   const tabs: { id: NavTab; label: string; icon: React.ReactNode }[] = [
     { id: 'home', label: 'Home', icon: <Home className="w-5 h-5" /> },
     { id: 'movies', label: 'Movies', icon: <Film className="w-5 h-5" /> },
@@ -337,20 +412,26 @@ function TvNav({ active, onChange }: { active: NavTab; onChange: (t: NavTab) => 
 
   return (
     <div className="flex items-center gap-2 px-12 mb-8">
-      {tabs.map(tab => (
-        <button
-          key={tab.id}
-          onClick={() => onChange(tab.id)}
-          className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm transition-all focus:outline-none focus:ring-4 focus:ring-white/40
-            ${active === tab.id
-              ? 'bg-white text-black'
-              : 'bg-white/10 text-white/70 hover:bg-white/20 hover:text-white'
+      {tabs.map((tab, i) => {
+        const isFocused = focusedTab === i;
+        const isActive = active === tab.id;
+        return (
+          <button
+            key={tab.id}
+            onClick={() => onChange(tab.id)}
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm transition-all focus:outline-none ${
+              isFocused
+                ? 'ring-4 ring-white scale-105 ' + (isActive ? 'bg-white text-black' : 'bg-white/20 text-white')
+                : isActive
+                  ? 'bg-white text-black'
+                  : 'bg-white/10 text-white/70 hover:bg-white/20 hover:text-white'
             }`}
-        >
-          {tab.icon}
-          {tab.label}
-        </button>
-      ))}
+          >
+            {tab.icon}
+            {tab.label}
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -444,6 +525,19 @@ function TvPageInner() {
   const [search, setSearch] = useState('');
   const [showSearch, setShowSearch] = useState(false);
   const [activeGenre, setActiveGenre] = useState('All');
+  const [typeFilter, setTypeFilter] = useState<TypeFilter>('all');
+
+  // ── D-pad focus state ──
+  // focusZone: which horizontal band the cursor is in
+  //   'nav'     — tab bar (Home / Movies / Shows / My List)
+  //   'type'    — type filter pills (All / Movies / Shows) — home tab only
+  //   'genre'   — genre pills
+  //   'content' — card rows
+  type FocusZone = 'nav' | 'type' | 'genre' | 'content';
+  const [focusZone, setFocusZone] = useState<FocusZone>('content');
+  const [focusedNavTab, setFocusedNavTab] = useState(0);   // index into navTabs
+  const [focusedTypePill, setFocusedTypePill] = useState(0); // index into type pills
+  const [focusedGenrePill, setFocusedGenrePill] = useState(0); // index into ['All', ...genres]
   const [focusedRow, setFocusedRow] = useState(0);
   const [focusedCol, setFocusedCol] = useState(0);
 
@@ -506,7 +600,7 @@ function TvPageInner() {
 
   // ── Rows for current tab ──
 
-  // Pool of items for the current tab (before genre filter) — used to derive genre list
+  // Pool of items for the current tab (before genre/type filter) — used to derive genre list
   const tabPool = useMemo((): MediaItem[] => {
     switch (tab) {
       case 'home':     return library;
@@ -534,16 +628,22 @@ function TvPageInner() {
     return items.filter(m => (m.genre ?? []).includes(activeGenre));
   }, [activeGenre]);
 
+  // Apply type filter to an item list (home tab only)
+  const applyType = useCallback((items: MediaItem[]) => {
+    if (typeFilter === 'all') return items;
+    return items.filter(m => m.type === typeFilter);
+  }, [typeFilter]);
+
   const rows = useMemo((): { label: string; items: MediaItem[] }[] => {
     if (showSearch) return [{ label: `Results for "${search}"`, items: searchResults }];
     switch (tab) {
       case 'home':
         return [
-          ...(continueWatching.length > 0 ? [{ label: 'Continue Watching', items: applyGenre(continueWatching) }] : []),
-          { label: 'Recently Added', items: applyGenre(recentlyAdded) },
-          { label: 'Top Rated', items: applyGenre(topRated) },
-          { label: 'Movies', items: applyGenre(movies.slice(0, 20)) },
-          { label: 'TV Shows', items: applyGenre(shows.slice(0, 20)) },
+          ...(continueWatching.length > 0 ? [{ label: 'Continue Watching', items: applyGenre(applyType(continueWatching)) }] : []),
+          { label: 'Recently Added', items: applyGenre(applyType(recentlyAdded)) },
+          { label: 'Top Rated', items: applyGenre(applyType(topRated)) },
+          ...(typeFilter === 'all' || typeFilter === 'movie' ? [{ label: 'Movies', items: applyGenre(movies.slice(0, 20)) }] : []),
+          ...(typeFilter === 'all' || typeFilter === 'series' ? [{ label: 'TV Shows', items: applyGenre(shows.slice(0, 20)) }] : []),
         ].filter(r => r.items.length > 0);
       case 'movies':
         return [{ label: activeGenre === 'All' ? 'All Movies' : `${activeGenre} Movies`, items: applyGenre(movies) }];
@@ -554,10 +654,31 @@ function TvPageInner() {
       default:
         return [];
     }
-  }, [tab, showSearch, search, searchResults, continueWatching, recentlyAdded, topRated, movies, shows, watchlist, applyGenre, activeGenre]);
+  }, [tab, showSearch, search, searchResults, continueWatching, recentlyAdded, topRated, movies, shows, watchlist, applyGenre, applyType, activeGenre, typeFilter]);
 
   // Hero item — first item from continue watching, else first recently added
   const heroItem = continueWatching[0] ?? recentlyAdded[0];
+
+  // Whether the type filter row is visible (home tab, no search)
+  const showTypeFilter = tab === 'home' && !showSearch;
+
+  // Nav tab order for D-pad
+  const navTabs: NavTab[] = ['home', 'movies', 'shows', 'watchlist'];
+
+  // Genre pills count (including 'All')
+  const genrePillCount = availableGenres.length + 1; // +1 for 'All'
+  const typePillCount = 3; // All / Movies / Shows
+
+  // ── Zone ordering — which zones are visible and in what vertical order ──
+  // Zones present: nav → (type if home) → (genre if pills exist) → content
+  const visibleZones = useMemo((): FocusZone[] => {
+    if (showSearch) return ['content'];
+    const z: FocusZone[] = ['nav'];
+    if (showTypeFilter) z.push('type');
+    if (genrePillCount > 1) z.push('genre');
+    z.push('content');
+    return z;
+  }, [showSearch, showTypeFilter, genrePillCount]);
 
   // ── D-pad keyboard navigation ──
 
@@ -567,40 +688,83 @@ function TvPageInner() {
       return;
     }
 
-    const currentRow = rows[focusedRow];
-    if (!currentRow) return;
+    const zoneIdx = visibleZones.indexOf(focusZone);
 
     switch (e.key) {
-      case 'ArrowRight':
+      // ── Vertical: move between zones ──
+      case 'ArrowDown': {
         e.preventDefault();
-        setFocusedCol(c => Math.min(c + 1, currentRow.items.length - 1));
-        break;
-      case 'ArrowLeft':
-        e.preventDefault();
-        setFocusedCol(c => Math.max(c - 1, 0));
-        break;
-      case 'ArrowDown':
-        e.preventDefault();
-        setFocusedRow(r => {
-          const next = Math.min(r + 1, rows.length - 1);
-          setFocusedCol(0);
-          return next;
-        });
-        break;
-      case 'ArrowUp':
-        e.preventDefault();
-        setFocusedRow(r => {
-          const next = Math.max(r - 1, 0);
-          setFocusedCol(0);
-          return next;
-        });
-        break;
-      case 'Enter': {
-        e.preventDefault();
-        const item = currentRow.items[focusedCol];
-        if (item) handlePlay(item);
+        const nextZone = visibleZones[Math.min(zoneIdx + 1, visibleZones.length - 1)];
+        setFocusZone(nextZone);
+        // Reset column when entering content zone
+        if (nextZone === 'content') setFocusedCol(0);
         break;
       }
+      case 'ArrowUp': {
+        e.preventDefault();
+        const prevZone = visibleZones[Math.max(zoneIdx - 1, 0)];
+        setFocusZone(prevZone);
+        if (prevZone === 'content') setFocusedCol(0);
+        break;
+      }
+
+      // ── Horizontal: move within zone ──
+      case 'ArrowRight': {
+        e.preventDefault();
+        if (focusZone === 'nav') {
+          setFocusedNavTab(i => Math.min(i + 1, navTabs.length - 1));
+        } else if (focusZone === 'type') {
+          setFocusedTypePill(i => Math.min(i + 1, typePillCount - 1));
+        } else if (focusZone === 'genre') {
+          setFocusedGenrePill(i => Math.min(i + 1, genrePillCount - 1));
+        } else {
+          // content zone
+          const currentRow = rows[focusedRow];
+          if (currentRow) setFocusedCol(c => Math.min(c + 1, currentRow.items.length - 1));
+        }
+        break;
+      }
+      case 'ArrowLeft': {
+        e.preventDefault();
+        if (focusZone === 'nav') {
+          setFocusedNavTab(i => Math.max(i - 1, 0));
+        } else if (focusZone === 'type') {
+          setFocusedTypePill(i => Math.max(i - 1, 0));
+        } else if (focusZone === 'genre') {
+          setFocusedGenrePill(i => Math.max(i - 1, 0));
+        } else {
+          setFocusedCol(c => Math.max(c - 1, 0));
+        }
+        break;
+      }
+
+      // ── Vertical within content zone: move between rows ──
+      // (handled separately so ArrowDown in content moves rows, not zones)
+      // We override the zone-switch above for content zone:
+      // Actually we need to handle row movement inside content separately.
+      // Re-handle: ArrowDown in content = next row (not next zone unless last row)
+
+      // ── Enter / OK: activate focused element ──
+      case 'Enter': {
+        e.preventDefault();
+        if (focusZone === 'nav') {
+          const newTab = navTabs[focusedNavTab];
+          if (newTab) setTab(newTab);
+        } else if (focusZone === 'type') {
+          const types: TypeFilter[] = ['all', 'movie', 'series'];
+          const t = types[focusedTypePill];
+          if (t) setTypeFilter(t);
+        } else if (focusZone === 'genre') {
+          const allPills = ['All', ...availableGenres];
+          const g = allPills[focusedGenrePill];
+          if (g) setActiveGenre(g);
+        } else {
+          const item = rows[focusedRow]?.items[focusedCol];
+          if (item) handlePlay(item);
+        }
+        break;
+      }
+
       case 'Backspace':
       case 'Escape':
         e.preventDefault();
@@ -608,23 +772,79 @@ function TvPageInner() {
         break;
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rows, focusedRow, focusedCol, showSearch, navigate]);
+  }, [rows, focusedRow, focusedCol, focusZone, focusedNavTab, focusedTypePill, focusedGenrePill, showSearch, navigate, visibleZones, navTabs, genrePillCount, typePillCount, availableGenres]);
+
+  // Override ArrowDown/Up inside content zone to move rows first, then exit zone
+  const handleKeyDownContent = useCallback((e: KeyboardEvent) => {
+    if (focusZone !== 'content') return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (focusedRow < rows.length - 1) {
+        setFocusedRow(r => r + 1);
+        setFocusedCol(0);
+      } else {
+        // Already at last row — stay (no zone below content)
+      }
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (focusedRow > 0) {
+        setFocusedRow(r => r - 1);
+        setFocusedCol(0);
+      } else {
+        // At first row — move up to previous zone
+        const zoneIdx = visibleZones.indexOf('content');
+        const prevZone = visibleZones[Math.max(zoneIdx - 1, 0)];
+        setFocusZone(prevZone);
+      }
+    }
+  }, [focusZone, focusedRow, rows.length, visibleZones]);
 
   useEffect(() => {
+    // Content-zone row navigation must fire before the general handler
+    // so we can stop propagation. Use capture phase for priority.
+    window.addEventListener('keydown', handleKeyDownContent, true);
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleKeyDown]);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDownContent, true);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [handleKeyDown, handleKeyDownContent]);
 
   // Reset focus when tab or search changes
   useEffect(() => {
     setFocusedRow(0);
     setFocusedCol(0);
+    setFocusZone('content');
   }, [tab, showSearch]);
 
   // Reset genre filter when tab changes
   useEffect(() => {
     setActiveGenre('All');
+    setFocusedGenrePill(0);
   }, [tab]);
+
+  // Reset type filter when tab changes away from home
+  useEffect(() => {
+    if (tab !== 'home') setTypeFilter('all');
+  }, [tab]);
+
+  // Keep focusedNavTab in sync with active tab
+  useEffect(() => {
+    setFocusedNavTab(navTabs.indexOf(tab));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab]);
+
+  // Keep focusedGenrePill in sync with activeGenre
+  useEffect(() => {
+    const idx = ['All', ...availableGenres].indexOf(activeGenre);
+    setFocusedGenrePill(idx >= 0 ? idx : 0);
+  }, [activeGenre, availableGenres]);
+
+  // Keep focusedTypePill in sync with typeFilter
+  useEffect(() => {
+    const types: TypeFilter[] = ['all', 'movie', 'series'];
+    setFocusedTypePill(types.indexOf(typeFilter));
+  }, [typeFilter]);
 
   const handlePlay = (item: MediaItem) => {
     navigate(`/player/${item.id}`);
@@ -700,7 +920,22 @@ function TvPageInner() {
       </div>
 
       {/* ── Nav tabs ── */}
-      {!showSearch && <TvNav active={tab} onChange={t => { setTab(t); }} />}
+      {!showSearch && (
+        <TvNav
+          active={tab}
+          onChange={t => { setTab(t); }}
+          focusedTab={focusZone === 'nav' ? focusedNavTab : -1}
+        />
+      )}
+
+      {/* ── Type filter (home tab only) ── */}
+      {showTypeFilter && (
+        <TvTypeFilter
+          active={typeFilter}
+          onChange={setTypeFilter}
+          focusedPill={focusZone === 'type' ? focusedTypePill : -1}
+        />
+      )}
 
       {/* ── Genre filter row ── */}
       {!showSearch && (
@@ -708,11 +943,12 @@ function TvPageInner() {
           genres={availableGenres}
           active={activeGenre}
           onChange={setActiveGenre}
+          focusedPill={focusZone === 'genre' ? focusedGenrePill : -1}
         />
       )}
 
-      {/* ── Hero (home tab only, no search, no genre filter active) ── */}
-      {tab === 'home' && !showSearch && activeGenre === 'All' && heroItem && (
+      {/* ── Hero (home tab only, no search, no genre/type filter active) ── */}
+      {tab === 'home' && !showSearch && activeGenre === 'All' && typeFilter === 'all' && heroItem && (
         <TvHero item={heroItem} onPlay={handlePlay} />
       )}
 
@@ -740,7 +976,7 @@ function TvPageInner() {
               key={row.label}
               label={row.label}
               items={row.items}
-              focusedRow={focusedRow === rowIdx}
+              focusedRow={focusZone === 'content' && focusedRow === rowIdx}
               focusedCol={focusedCol}
               profileId={profileId}
               onPlay={handlePlay}
@@ -752,16 +988,16 @@ function TvPageInner() {
       {/* ── D-pad hint (bottom) ── */}
       <div className="fixed bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-6 bg-black/80 backdrop-blur-sm border border-white/10 rounded-2xl px-6 py-3">
         <span className="text-white/40 text-xs flex items-center gap-1.5">
-          <kbd className="bg-white/10 rounded px-1.5 py-0.5 text-[10px] font-mono">↑↓←→</kbd>
+          <kbd className="bg-white/10 rounded px-1.5 py-0.5 text-[10px] font-mono">↑↓</kbd>
+          Zones
+        </span>
+        <span className="text-white/40 text-xs flex items-center gap-1.5">
+          <kbd className="bg-white/10 rounded px-1.5 py-0.5 text-[10px] font-mono">←→</kbd>
           Navigate
         </span>
         <span className="text-white/40 text-xs flex items-center gap-1.5">
           <kbd className="bg-white/10 rounded px-1.5 py-0.5 text-[10px] font-mono">OK</kbd>
-          Play
-        </span>
-        <span className="text-white/40 text-xs flex items-center gap-1.5">
-          <kbd className="bg-white/10 rounded px-1.5 py-0.5 text-[10px] font-mono">⌫</kbd>
-          Back
+          Select
         </span>
         <span className="text-white/20 text-xs">HomeStream TV</span>
       </div>
