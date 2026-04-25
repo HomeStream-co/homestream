@@ -186,10 +186,79 @@ function RemoteNotConnected({ serverIP }: { serverIP: string }) {
   );
 }
 
+// ── Remote login gate ─────────────────────────────────────────────────────────
+// Shown when the server has a password set and the phone has no stored token.
+// On success, stores the token in localStorage('hs_token') so the WebSocket
+// can pass it as ?token= on the upgrade request (cookies don't work cross-origin).
+
+function RemoteLoginGate({ onAuth }: { onAuth: () => void }) {
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password }),
+      });
+      const data = await res.json() as { ok?: boolean; token?: string; error?: string };
+      if (res.ok && data.ok && data.token) {
+        try { localStorage.setItem('hs_token', data.token); } catch { /* ignore */ }
+        onAuth();
+      } else {
+        setError(data.error ?? 'Incorrect password');
+      }
+    } catch {
+      setError('Could not reach server — check your connection');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="min-h-screen bg-zinc-950 text-white flex flex-col items-center justify-center gap-6 px-6">
+      <title>HomeStream Remote</title>
+      <div className="w-14 h-14 rounded-2xl bg-primary flex items-center justify-center">
+        <Play className="w-7 h-7 text-primary-foreground fill-primary-foreground ml-0.5" />
+      </div>
+      <div className="text-center">
+        <h1 className="text-2xl font-bold mb-1">HomeStream Remote</h1>
+        <p className="text-white/50 text-sm">Enter your HomeStream password to continue</p>
+      </div>
+      <form onSubmit={handleSubmit} className="w-full max-w-xs flex flex-col gap-3">
+        <input
+          type="password"
+          value={password}
+          onChange={e => setPassword(e.target.value)}
+          placeholder="Password"
+          autoFocus
+          className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-white/30 text-base focus:outline-none focus:border-primary"
+        />
+        {error && <p className="text-red-400 text-sm text-center">{error}</p>}
+        <button
+          type="submit"
+          disabled={loading || !password}
+          className="w-full bg-primary hover:bg-primary/90 disabled:opacity-50 text-primary-foreground font-bold py-3 rounded-xl text-base transition-colors"
+        >
+          {loading ? 'Connecting…' : 'Connect'}
+        </button>
+      </form>
+    </div>
+  );
+}
+
 export default function RemotePage() {
   // ── Server connection check ──────────────────────────────────────────────
   const [serverReady, setServerReady] = useState<boolean | null>(null);
   const [serverIP, setServerIP] = useState('');
+  // needsAuth: true = server has a password and we have no stored token
+  // null = still checking, false = open mode or already have a valid token
+  const [needsAuth, setNeedsAuth] = useState<boolean | null>(null);
 
   useEffect(() => {
     // Use /api/health — always unauthenticated, includes setupComplete flag.
@@ -197,8 +266,18 @@ export default function RemotePage() {
     // won't have, causing the false "not connected" error screen.
     fetch('/api/health')
       .then(r => r.json())
-      .then((d: { setupComplete?: boolean }) => setServerReady(!!d.setupComplete))
-      .catch(() => setServerReady(false));
+      .then((d: { setupComplete?: boolean; passwordSet?: boolean }) => {
+        setServerReady(!!d.setupComplete);
+        // If the server exposes passwordSet, use it to decide whether to show
+        // the login gate. Fall back to checking localStorage for a stored token.
+        const hasToken = (() => { try { return !!localStorage.getItem('hs_token'); } catch { return false; } })();
+        if (d.passwordSet && !hasToken) {
+          setNeedsAuth(true);
+        } else {
+          setNeedsAuth(false);
+        }
+      })
+      .catch(() => { setServerReady(false); setNeedsAuth(false); });
 
     fetch('/api/network/info')
       .then(r => r.json())
@@ -214,7 +293,7 @@ export default function RemotePage() {
       .catch(() => {}); // non-fatal — ignore
   }, []);
 
-  if (serverReady === null) {
+  if (serverReady === null || needsAuth === null) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
         <div className="w-8 h-8 border-2 border-white/20 border-t-white rounded-full animate-spin" />
@@ -223,6 +302,8 @@ export default function RemotePage() {
   }
 
   if (!serverReady) return <RemoteNotConnected serverIP={serverIP} />;
+
+  if (needsAuth) return <RemoteLoginGate onAuth={() => setNeedsAuth(false)} />;
 
   return <RemotePageInner />;
 }

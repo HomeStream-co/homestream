@@ -1,5 +1,5 @@
 import type { Request, Response } from 'express';
-import { isSetupComplete } from '../../configStore.js';
+import { isSetupComplete, readConfig } from '../../configStore.js';
 
 /**
  * GET /api/health
@@ -18,11 +18,16 @@ import { isSetupComplete } from '../../configStore.js';
 const APP_VERSION = (typeof __APP_VERSION__ !== 'undefined') ? __APP_VERSION__ : '0.0.0';
 
 export default function handler(_req: Request, res: Response) {
+  const cfg = readConfig();
   res.json({
     status: 'ok',
     app: 'HomeStream',
     version: APP_VERSION,
     setupComplete: isSetupComplete(),
+    // Tells the /remote page whether a password is required so it can show
+    // the login gate before attempting the WebSocket connection.
+    // Does NOT expose the password itself — just whether one is set.
+    passwordSet: !!(cfg.adminPassword),
     timestamp: new Date().toISOString(),
   });
 }
