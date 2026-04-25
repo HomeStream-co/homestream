@@ -125,10 +125,12 @@ const SECTIONS: { id: GuideSection; label: string; icon: React.ElementType; shor
 // ── Section content components ─────────────────────────────────────────────────
 
 function OverviewSection({ networkInfo, netLoading }: { networkInfo: NetworkInfo | null; netLoading: boolean }) {
-  const host = networkInfo?.mdnsHostname || networkInfo?.primary;
+  // Always prefer raw LAN IP — hs.local fails on Android and Samsung TVs
+  // that don't support mDNS .local resolution.
+  const host = networkInfo?.primary || networkInfo?.mdnsHostname;
   const url = host
     ? `http://${host}:${networkInfo!.port}`
-    : 'http://hs.local:3000';
+    : 'http://192.168.x.x:3000';
 
   return (
     <div className="space-y-6">
@@ -151,7 +153,7 @@ function OverviewSection({ networkInfo, netLoading }: { networkInfo: NetworkInfo
             'Samsung Smart TV (2016 or newer — Tizen OS)',
             'TV and HomeStream server on the same WiFi network',
             'HomeStream running and accessible from your PC',
-            'Your HomeStream address — hs.local (shown below)',
+            'Your HomeStream IP address (shown below) — type it into the TV browser',
           ].map((item, i) => (
             <li key={i} className="flex items-start gap-2.5 text-sm text-foreground/80">
               <Check className="w-4 h-4 text-green-400 mt-0.5 flex-shrink-0" />
@@ -178,9 +180,9 @@ function OverviewSection({ networkInfo, netLoading }: { networkInfo: NetworkInfo
               Type this address into your Samsung TV browser:
             </p>
             <CodeBlock code={url} />
-            {networkInfo && networkInfo.lanIPs.length > 0 && (
+            {networkInfo && networkInfo.lanIPs.length > 0 && networkInfo.mdnsHostname && (
               <p className="text-xs text-muted-foreground">
-                Fallback IP (if hs.local doesn't work): {networkInfo.primary}
+                iOS/macOS alternative: {networkInfo.mdnsHostname}:{networkInfo.port}
               </p>
             )}
           </>
@@ -310,10 +312,10 @@ function BrowserSection() {
 }
 
 function NavigateSection({ networkInfo, netLoading }: { networkInfo: NetworkInfo | null; netLoading: boolean }) {
-  const host = networkInfo?.mdnsHostname || networkInfo?.primary;
+  const host = networkInfo?.primary || networkInfo?.mdnsHostname;
   const url = host
     ? `http://${host}:${networkInfo!.port}`
-    : 'http://hs.local:3000';
+    : 'http://192.168.x.x:3000';
 
   return (
     <div className="space-y-6">
@@ -410,10 +412,10 @@ function NavigateSection({ networkInfo, netLoading }: { networkInfo: NetworkInfo
 }
 
 function BookmarkSection({ networkInfo }: { networkInfo: NetworkInfo | null }) {
-  const host = networkInfo?.mdnsHostname || networkInfo?.primary;
+  const host = networkInfo?.primary || networkInfo?.mdnsHostname;
   const url = host
     ? `http://${host}:${networkInfo!.port}`
-    : 'http://hs.local:3000';
+    : 'http://192.168.x.x:3000';
 
   return (
     <div className="space-y-6">
@@ -591,7 +593,7 @@ function RemoteSection() {
         </ul>
         <div className="pt-1 text-xs text-muted-foreground">
           Scan the QR code on the HomeStream home page, or open{' '}
-          <span className="text-primary font-mono">http://hs.local:3000/remote</span> on your phone.
+          <span className="text-primary font-mono">http://[your-server-ip]:3000/remote</span> on your phone.
         </div>
       </div>
 
@@ -619,11 +621,11 @@ function TipsSection() {
           problem: 'Page won\'t load / "Connection refused"',
           solutions: [
             'Make sure HomeStream is running on your PC (check the system tray icon)',
-            'Verify the address — try hs.local first, then the raw IP from Settings → Network',
+            'Verify the address — use the raw IP from Settings → Network (e.g. 192.168.1.x:3000)',
             'Confirm both TV and PC are on the same WiFi network (not guest vs. main)',
-            'Try pinging hs.local from another device on the network',
+            'Samsung TVs do NOT support mDNS — hs.local will not work, always use the IP address',
             'Check Windows Firewall — allow HomeStream through on port 3000',
-            'Norton VPN users: Norton\'s Smart Firewall can block LAN traffic when the VPN is active. Open Norton → Settings → Firewall → Traffic Rules and add an Allow rule for 192.168.0.0/24 (your local network). Your HomeStream address (hs.local) always resolves correctly on the LAN — only your public internet IP changes.',
+            'Norton VPN users: Norton\'s Smart Firewall can block LAN traffic when the VPN is active. Open Norton → Settings → Firewall → Traffic Rules and add an Allow rule for 192.168.0.0/24 (your local network).',
           ],
           severity: 'warning' as const,
         },
@@ -703,8 +705,6 @@ function TipsSection() {
         <p className="text-sm text-muted-foreground leading-relaxed">
           Norton's Smart Firewall can block local network (LAN) traffic when the VPN is active,
           preventing your TV from reaching HomeStream even though the server is running fine.
-          Your HomeStream address (<strong className="text-foreground">hs.local</strong>) always
-          resolves correctly on the LAN — only your public internet IP changes when Norton VPN is on.
           The fix is to whitelist your local network in Norton's firewall:
         </p>
         <ol className="space-y-2 text-sm text-foreground/80">
@@ -774,7 +774,7 @@ export default function SamsungTvPage() {
     fetch('/api/network/info')
       .then(r => r.ok ? r.json() as Promise<NetworkInfo> : Promise.reject())
       .then(info => setNetworkInfo(info))
-      .catch(() => setNetworkInfo({ hostname: 'homestream', lanIPs: [], primary: 'hs.local', port: 3000, mdnsHostname: 'hs.local' }))
+      .catch(() => setNetworkInfo({ hostname: 'homestream', lanIPs: [], primary: '', port: 3000, mdnsHostname: undefined }))
       .finally(() => setNetLoading(false));
   }, []);
 

@@ -471,12 +471,12 @@ function TvNotConnected({ serverIP }: { serverIP: string }) {
           </div>
         ) : (
           <div className="mt-4 bg-black/40 rounded-xl px-6 py-4 font-mono text-lg text-white/60 text-center">
-            http://hs.local:3000/tv
+            Check HomeStream → Settings → Network for your IP
           </div>
         )}
       </div>
       <p className="text-white/30 text-sm">
-        Find your server IP in HomeStream Settings → Network, or try <span className="font-mono text-white/50">http://hs.local:3000/tv</span> on iOS/macOS
+        Find your server IP in HomeStream Settings → Network (e.g. <span className="font-mono text-white/50">http://192.168.x.x:3000/tv</span>)
       </p>
     </div>
   );
