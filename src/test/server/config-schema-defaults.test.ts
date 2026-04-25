@@ -79,10 +79,11 @@ const REQUIRED_KEYS: Array<string> = [
   'realDebridApiKey',
 ];
 
-function assertAllRequiredFieldsDefined(config: Record<string, unknown>) {
+function assertAllRequiredFieldsDefined(config: unknown) {
+  const c = config as Record<string, unknown>;
   const missing: string[] = [];
   for (const key of REQUIRED_KEYS) {
-    if (config[key] === undefined) missing.push(key);
+    if (c[key] === undefined) missing.push(key);
   }
   if (missing.length > 0) {
     throw new Error(
@@ -103,15 +104,13 @@ describe('readConfig() — schema defaults smoke test', () => {
   it('returns all required fields when config file does not exist (first run)', async () => {
     mockDiskContent = null;
     const { readConfig } = await import('../../server/configStore.js');
-    const config = readConfig() as Record<string, unknown>;
-    assertAllRequiredFieldsDefined(config);
+    assertAllRequiredFieldsDefined(readConfig());
   });
 
   it('returns all required fields when config file is an empty object', async () => {
     mockDiskContent = '{}';
     const { readConfig } = await import('../../server/configStore.js');
-    const config = readConfig() as Record<string, unknown>;
-    assertAllRequiredFieldsDefined(config);
+    assertAllRequiredFieldsDefined(readConfig());
   });
 
   it('returns all required fields when config file has only v1 fields (upgrade path)', async () => {
@@ -126,8 +125,7 @@ describe('readConfig() — schema defaults smoke test', () => {
       qbitUrl: 'http://localhost:8080',
     });
     const { readConfig } = await import('../../server/configStore.js');
-    const config = readConfig() as Record<string, unknown>;
-    assertAllRequiredFieldsDefined(config);
+    assertAllRequiredFieldsDefined(readConfig());
   });
 
   it('returns all required fields when config file has unknown extra keys', async () => {
@@ -139,15 +137,13 @@ describe('readConfig() — schema defaults smoke test', () => {
       anotherNewField: 42,
     });
     const { readConfig } = await import('../../server/configStore.js');
-    const config = readConfig() as Record<string, unknown>;
-    assertAllRequiredFieldsDefined(config);
+    assertAllRequiredFieldsDefined(readConfig());
   });
 
   it('returns all required fields when config file is malformed JSON', async () => {
     mockDiskContent = '{ this is not valid json :::';
     const { readConfig } = await import('../../server/configStore.js');
-    const config = readConfig() as Record<string, unknown>;
-    assertAllRequiredFieldsDefined(config);
+    assertAllRequiredFieldsDefined(readConfig());
   });
 
   it('setupComplete defaults to false on a fresh install', async () => {

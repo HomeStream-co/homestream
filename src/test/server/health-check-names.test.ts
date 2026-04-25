@@ -24,7 +24,7 @@
  * drifting out of sync with the UI.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import type { Request, Response } from 'express';
 
 // ── The canonical list of subsystem names the Debug Panel expects ─────────────
