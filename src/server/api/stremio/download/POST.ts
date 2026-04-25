@@ -34,8 +34,9 @@ async function resolveImdbId(title: string, type: string): Promise<string | null
  * POST /api/stremio/download
  *
  * Routes magnet links to the best available download backend:
- *   1. qBittorrent (preferred) — full BitTorrent swarm, resume on restart
- *   2. WebTorrent (fallback)   — built-in, works without qBittorrent
+ *   1. Real-Debrid (preferred) — premium cached downloads, no torrent client needed
+ *   2. qBittorrent (fallback)  — full BitTorrent swarm, resume on restart
+ *   3. WebTorrent (last resort) — built-in, works without qBittorrent
  *
  * Stream sources (queried in parallel, same as /api/stremio/stream):
  *   1. Torrentio  — always queried (public, no config needed)
@@ -544,7 +545,9 @@ export default async function handler(req: Request, res: Response) {
           res.status(403).json({ error: 'Download blocked by security scan', reason: scan.reason, layer: scan.layer, details: scan.details, threatLevel: scan.threatLevel });
           return;
         }
-        const jobId = `rd-${best.infoHash}`;
+        // Use hash + timestamp so the same torrent can be re-queued after an error
+        // without colliding with the previous job record.
+        const jobId = `rd-${best.infoHash}-${Date.now()}`;
         const jobEntry = {
           jobId, infoHash: best.infoHash, title, quality: best.quality,
           type: 'movie' as const, status: 'downloading' as const,
@@ -630,7 +633,7 @@ export default async function handler(req: Request, res: Response) {
 
         if (useRD) {
           if (checkDuplicate(best.infoHash, epTitle)) { await releaseVPN(); return; }
-          const jobId = `rd-${best.infoHash}`;
+          const jobId = `rd-${best.infoHash}-${Date.now()}`;
           const jobEntry = {
             jobId, infoHash: best.infoHash, title: epTitle, quality: best.quality,
             type: 'series' as const, season, episode, status: 'downloading' as const,
@@ -727,7 +730,7 @@ export default async function handler(req: Request, res: Response) {
           }
 
           if (useRD) {
-            const jobId = `rd-${best.infoHash}`;
+            const jobId = `rd-${best.infoHash}-${Date.now()}`;
             const jobEntry = {
               jobId, infoHash: best.infoHash, title: epTitle, quality: best.quality,
               type: 'series' as const, season: s, episode: ep, status: 'downloading' as const,
@@ -738,6 +741,7 @@ export default async function handler(req: Request, res: Response) {
             // Fire-and-forget RD download
             const capturedEntry = { ...jobEntry };
             const capturedMagnet = best.magnet;
+            const capturedJobId = jobId;
             (async () => {
               try {
                 const cfg2 = readConfig();
@@ -745,8 +749,15 @@ export default async function handler(req: Request, res: Response) {
                 const ext = directUrl.split('?')[0].split('.').pop() ?? 'mkv';
                 const safeTitle = epTitle.replace(/[^a-zA-Z0-9 ._-]/g, '').trim();
                 const destDir = cfg2.downloadsDir || (cfg2.mediaDir ? `${cfg2.mediaDir}/downloads` : '/downloads');
-                await downloadUrl(directUrl, `${destDir}/${safeTitle}.${ext}`);
-                upsertJob({ ...capturedEntry, status: 'done' });
+                let lastProgressWrite = 0;
+                await downloadUrl(directUrl, `${destDir}/${safeTitle}.${ext}`, (dl, total) => {
+                  const now = Date.now();
+                  if (total > 0 && now - lastProgressWrite > 1000) {
+                    lastProgressWrite = now;
+                    updateJobProgress(capturedJobId, dl, total);
+                  }
+                });
+                upsertJob({ ...capturedEntry, status: 'done', progress: 100 });
               } catch (err) {
                 console.error(`[rd] ✗ ${epTitle}:`, err);
                 upsertJob({ ...capturedEntry, status: 'error' });

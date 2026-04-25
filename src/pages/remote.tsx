@@ -36,6 +36,7 @@ import CastTab from './remote/CastTab';
 // ── Types ─────────────────────────────────────────────────────────────────────
 // Re-exported from ./remote/types for use in sub-components
 import type { RemoteTab, CastSessionInfo, PlayerState, ConnStatus } from './remote/types';
+import { remoteAuthHeaders } from './remote/types';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -317,6 +318,17 @@ function RemotePageInner() {
   const MAX_RETRY_DELAY_MS = 30_000;
   const BASE_RETRY_DELAY_MS = 3_000;
 
+  // ── Authenticated fetch helper ────────────────────────────────────────────
+  // The phone remote uses Bearer token auth (stored in localStorage) because
+  // cookies are not sent cross-origin. All API calls must include this header.
+  const authFetch = useCallback((url: string, init: RequestInit = {}): Promise<Response> => {
+    const headers: Record<string, string> = {
+      ...(init.headers as Record<string, string> ?? {}),
+      ...remoteAuthHeaders(),
+    };
+    return fetch(url, { ...init, credentials: 'include', headers });
+  }, []);
+
   // Read ?tab= from URL for PWA shortcut deep-linking
   const initialTab = (new URLSearchParams(window.location.search).get('tab') ?? 'remote') as RemoteTab;
   const [activeTab, setActiveTab] = useState<RemoteTab>(initialTab);
@@ -338,17 +350,17 @@ function RemotePageInner() {
     let cancelled = false;
     async function poll() {
       try {
-        const r = await fetch('/api/stremio/downloads', { credentials: 'include' });
+        const r = await authFetch('/api/stremio/downloads');
         if (!r.ok || cancelled) return;
-        const data = await r.json() as { qbitTorrents?: { status: string }[]; jobs?: { status: string }[] };
-        const all = [...(data.qbitTorrents ?? []), ...(data.jobs ?? [])];
+        const data = await r.json() as { qbitTorrents?: { status: string }[]; jobs?: { status: string }[]; rdJobs?: { status: string }[] };
+        const all = [...(data.qbitTorrents ?? []), ...(data.jobs ?? []), ...(data.rdJobs ?? [])];
         if (!cancelled) setActiveDownloadCount(all.filter(j => j.status === 'downloading').length);
       } catch { /* ignore */ }
     }
     poll();
     const id = setInterval(poll, 5000);
     return () => { cancelled = true; clearInterval(id); };
-  }, []);
+  }, [authFetch]);
 
   // Seek / volume flash overlays
   const [seekFlash, setSeekFlash] = useState<{ dir: 'left' | 'right'; secs: number; key: number } | null>(null);
@@ -371,11 +383,11 @@ function RemotePageInner() {
   }, []);
 
   useEffect(() => {
-    fetch('/api/remote/qr')
+    authFetch('/api/remote/qr')
       .then(r => r.json())
       .then((d: { url: string; qr: string; mdnsUrl?: string; ipUrl?: string }) => setQrData(d))
       .catch(() => {}); // non-fatal — ignore
-  }, []);
+  }, [authFetch]);
 
   // Tick local time forward while playing
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);

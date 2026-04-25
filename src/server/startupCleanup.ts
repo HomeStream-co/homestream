@@ -286,6 +286,33 @@ export function runStartupCleanup(): void {
     }
   }).catch(() => { /* non-fatal — cache will self-correct on next probe() */ });
 
+  // ── Real-Debrid interrupted job cleanup ──────────────────────────────────────
+  // RD downloads run as fire-and-forget async tasks. If the server restarts
+  // while an RD download is in progress, the job stays stuck at
+  // status='queued' or status='downloading' forever — the background task
+  // that would have called upsertJob({status:'done'|'error'}) is gone.
+  //
+  // Fix: on boot, mark any RD job that is still queued/downloading as error
+  // so the Downloads page shows a "Retry" button instead of a stuck spinner.
+  import('./downloadJobStore.js').then(({ getAllPersistedJobs, upsertJob: upsertRdJob }) => {
+    const allJobs = getAllPersistedJobs();
+    const stuckRd = allJobs.filter(
+      j => j.backend === 'real-debrid' && (j.status === 'queued' || j.status === 'downloading')
+    );
+    if (stuckRd.length === 0) return;
+    console.log(`[startup] Found ${stuckRd.length} interrupted Real-Debrid job(s) — marking as error.`);
+    for (const job of stuckRd) {
+      upsertRdJob({
+        ...job,
+        status: 'error',
+        completedAt: new Date().toISOString(),
+      });
+      console.log(`[startup]   ✗ RD "${job.title}" — interrupted by server restart`);
+    }
+  }).catch(err => {
+    console.error('[startup] RD job cleanup failed:', err);
+  });
+
   const stuckTranscoding = library.filter(m => m.transcoding === true);
   const stuckEnriching   = library.filter(m => m.enriching === true);
 

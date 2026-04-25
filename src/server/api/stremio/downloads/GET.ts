@@ -2,6 +2,7 @@ import type { Request, Response } from 'express';
 import { getAllJobs } from '../../../torrentManager.js';
 import { getAllTorrents, getTransferInfo, isReachable } from '../../../qbittorrentClient.js';
 import { getQbitJobs } from '../download/POST.js';
+import { getAllPersistedJobs } from '../../../downloadJobStore.js';
 import { requireAuth } from '../../../authMiddleware.js';
 
 /**
@@ -19,17 +20,21 @@ export default async function handler(req: Request, res: Response) {
   if (!requireAuth(req, res)) return;
   const wtJobs = getAllJobs();
   const qbitJobMeta = getQbitJobs(); // metadata we stored when adding (title, poster, etc.)
+  // Real-Debrid jobs — always included so the Downloads page stays consistent
+  // whether it's reading from the WebSocket push or this REST fallback.
+  const rdJobs = getAllPersistedJobs().filter(j => j.backend === 'real-debrid');
 
   const qbitReachable = await isReachable();
 
   if (!qbitReachable) {
-    // qBit offline — return WebTorrent jobs only
+    // qBit offline — return WebTorrent + RD jobs
     return res.json({
       jobs: wtJobs,
       qbitTorrents: [],
       transferInfo: null,
       backend: 'webtorrent',
       qbitOnline: false,
+      rdJobs,
     });
   }
 
@@ -78,6 +83,7 @@ export default async function handler(req: Request, res: Response) {
       transferInfo,
       backend: 'qbittorrent',
       qbitOnline: true,
+      rdJobs,
     });
   } catch (err) {
     // qBit reachable but API call failed — return what we have
@@ -87,6 +93,7 @@ export default async function handler(req: Request, res: Response) {
       transferInfo: null,
       backend: 'qbittorrent',
       qbitOnline: false,
+      rdJobs,
       error: String(err),
     });
   }
