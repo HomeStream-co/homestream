@@ -8,6 +8,27 @@ import type { VPNConfig } from '../../../vpnService.js';
 import { upsertJob, getAllPersistedJobs, findJobByInfoHash } from '../../../downloadJobStore.js';
 import { requireAuth } from '../../../authMiddleware.js';
 
+const CINEMETA   = 'https://v3-cinemeta.strem.io';
+const TIMEOUT_MS = 15_000;
+
+/** Resolve an IMDB ID from a title via Cinemeta when the caller doesn't have one. */
+async function resolveImdbId(title: string, type: string): Promise<string | null> {
+  const t = type === 'series' ? 'series' : 'movie';
+  const url = `${CINEMETA}/catalog/${t}/top/search=${encodeURIComponent(title)}.json`;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  try {
+    const res = await fetch(url, { signal: controller.signal });
+    clearTimeout(timer);
+    if (!res.ok) return null;
+    const data = await res.json() as { metas?: { id: string }[] };
+    return data.metas?.[0]?.id ?? null;
+  } catch {
+    clearTimeout(timer);
+    return null;
+  }
+}
+
 /**
  * POST /api/stremio/download
  *
@@ -410,10 +431,24 @@ export default async function handler(req: Request, res: Response) {
     streams?: StreamResult[];
   };
 
-  if (!imdbId || !type || !title) {
-    res.status(400).json({ error: 'imdbId, type, and title are required' });
+  if (!type || !title) {
+    res.status(400).json({ error: 'type and title are required' });
     return;
   }
+
+  // Resolve IMDB ID — either provided directly or looked up via Cinemeta.
+  // TMDB cards don't carry an imdbId, so we fall back to a title search.
+  let resolvedImdbId = imdbId;
+  if (!resolvedImdbId) {
+    console.log(`[download] No imdbId provided for "${title}" — resolving via Cinemeta…`);
+    resolvedImdbId = (await resolveImdbId(title, type)) ?? undefined;
+    if (!resolvedImdbId) {
+      res.status(404).json({ error: `Could not find "${title}" in Cinemeta — try searching by exact title` });
+      return;
+    }
+    console.log(`[download] Resolved imdbId for "${title}": ${resolvedImdbId}`);
+  }
+  const finalImdbId = resolvedImdbId;
 
   // Determine backend — use testConnection() to validate auth, not just reachability
   const qbitResult = await testConnection();
@@ -486,7 +521,7 @@ export default async function handler(req: Request, res: Response) {
     if (type === 'movie') {
       let streams = preloadedStreams;
       if (!streams || streams.length === 0) {
-        streams = await fetchStreamsForEpisode(imdbId, 'movie', title);
+        streams = await fetchStreamsForEpisode(finalImdbId, 'movie', title);
       }
       const best = pickBestStream(streams ?? []);
       if (!best) {
@@ -511,7 +546,7 @@ export default async function handler(req: Request, res: Response) {
           });
           return;
         }
-        const job = await queueViaQbit({ infoHash: best.infoHash, magnet: best.magnet, quality: best.quality, type: 'movie', title, imdbId, poster });
+        const job = await queueViaQbit({ infoHash: best.infoHash, magnet: best.magnet, quality: best.quality, type: 'movie', title, imdbId: finalImdbId, poster });
         await releaseVPN();
         res.json({ queued: 1, jobs: [job], backend: 'qbittorrent', securityScan: scan, vpnUsed: vpnConnected });
       } else {
@@ -532,7 +567,7 @@ export default async function handler(req: Request, res: Response) {
         }
         // Fallback to WebTorrent
         const { queueDownload } = await import('../../../torrentManager.js');
-        const job = queueDownload({ infoHash: best.infoHash, magnet: best.magnet, quality: best.quality, type: 'movie', title, imdbId, poster, year });
+        const job = queueDownload({ infoHash: best.infoHash, magnet: best.magnet, quality: best.quality, type: 'movie', title, imdbId: finalImdbId, poster, year });
         await releaseVPN();
         res.json({ queued: 1, jobs: [job], backend: 'webtorrent', securityScan: scan, vpnUsed: vpnConnected });
       }
@@ -543,7 +578,7 @@ export default async function handler(req: Request, res: Response) {
       // just fetch + queue that one episode directly.
       if (season != null && episode != null) {
         const epTitle = `${title} S${String(season).padStart(2, '0')}E${String(episode).padStart(2, '0')}`;
-        const streams = await fetchStreamsForEpisode(imdbId, 'series', title, season, episode);
+        const streams = await fetchStreamsForEpisode(finalImdbId, 'series', title, season, episode);
         const best = pickBestStream(streams);
         if (!best) {
           await releaseVPN();
@@ -558,12 +593,12 @@ export default async function handler(req: Request, res: Response) {
         }
         if (useQbit) {
           if (checkDuplicate(best.infoHash, epTitle)) { await releaseVPN(); return; }
-          const job = await queueViaQbit({ infoHash: best.infoHash, magnet: best.magnet, quality: best.quality, title: epTitle, type: 'series', season, episode, imdbId, poster });
+          const job = await queueViaQbit({ infoHash: best.infoHash, magnet: best.magnet, quality: best.quality, title: epTitle, type: 'series', season, episode, imdbId: finalImdbId, poster });
           await releaseVPN();
           res.json({ queued: 1, jobs: [job], backend: 'qbittorrent', vpnUsed: vpnConnected });
         } else {
           const { queueDownload } = await import('../../../torrentManager.js');
-          const job = queueDownload({ infoHash: best.infoHash, magnet: best.magnet, quality: best.quality, title: epTitle, type: 'series', season, episode, imdbId, poster, year });
+          const job = queueDownload({ infoHash: best.infoHash, magnet: best.magnet, quality: best.quality, title: epTitle, type: 'series', season, episode, imdbId: finalImdbId, poster, year });
           await releaseVPN();
           res.json({ queued: 1, jobs: [job], backend: 'webtorrent', vpnUsed: vpnConnected });
         }
@@ -571,10 +606,6 @@ export default async function handler(req: Request, res: Response) {
       }
 
       // Series — probe each season dynamically to find real episode counts.
-      // We fetch episodes one-by-one and stop when Torrentio returns nothing,
-      // which is the natural signal that the season has ended. This avoids
-      // hammering Torrentio for episodes that don't exist (e.g. assuming every
-      // season has the same number of episodes).
       const seasonsToFetch: number[] = [];
       if (season != null) {
         seasonsToFetch.push(season);
@@ -582,14 +613,12 @@ export default async function handler(req: Request, res: Response) {
         for (let s = 1; s <= totalSeasons; s++) seasonsToFetch.push(s);
       }
 
-      // Max episodes we'll probe per season before giving up (safety cap)
       const MAX_EPISODES_PER_SEASON = 50;
 
       const episodeTasks: Array<{ season: number; episode: number }> = [];
       for (const s of seasonsToFetch) {
         for (let ep = 1; ep <= MAX_EPISODES_PER_SEASON; ep++) {
-          // Probe this episode — if Torrentio returns nothing, season is done
-          const probe = await fetchStreamsForEpisode(imdbId, 'series', title, s, ep);
+          const probe = await fetchStreamsForEpisode(finalImdbId, 'series', title, s, ep);
           if (probe.length === 0) {
             console.log(`[download] S${s} ends at E${ep - 1} (no streams found for E${ep})`);
             break;
@@ -605,7 +634,7 @@ export default async function handler(req: Request, res: Response) {
         const batch = episodeTasks.slice(i, i + BATCH);
         const batchResults = await Promise.all(
           batch.map(({ season: s, episode: ep }) =>
-            fetchStreamsForEpisode(imdbId, 'series', title, s, ep)
+            fetchStreamsForEpisode(finalImdbId, 'series', title, s, ep)
           )
         );
 
@@ -623,14 +652,13 @@ export default async function handler(req: Request, res: Response) {
             const scan = await runPreDownloadScan({ infoHash: best.infoHash, title: epTitle });
             if (!scan.allowed) {
               console.warn(`[security] Blocked episode ${epTitle}: ${scan.reason}`);
-              continue; // skip this episode, continue with others
+              continue;
             }
-            // Skip duplicates silently in batch mode
             if (findJobByInfoHash(best.infoHash)) {
               console.log(`[download] Skipping duplicate episode ${epTitle}`);
               continue;
             }
-            const job = await queueViaQbit({ infoHash: best.infoHash, magnet: best.magnet, quality: best.quality, title: epTitle, type: 'series', season: s, episode: ep, imdbId, poster });
+            const job = await queueViaQbit({ infoHash: best.infoHash, magnet: best.magnet, quality: best.quality, title: epTitle, type: 'series', season: s, episode: ep, imdbId: finalImdbId, poster });
             queuedJobs.push(job);
           } else {
             const scan = await runPreDownloadScan({ infoHash: best.infoHash, title: epTitle });
@@ -643,7 +671,7 @@ export default async function handler(req: Request, res: Response) {
               continue;
             }
             const { queueDownload } = await import('../../../torrentManager.js');
-            const job = queueDownload({ infoHash: best.infoHash, magnet: best.magnet, quality: best.quality, title: epTitle, type: 'series', season: s, episode: ep, imdbId, poster, year });
+            const job = queueDownload({ infoHash: best.infoHash, magnet: best.magnet, quality: best.quality, title: epTitle, type: 'series', season: s, episode: ep, imdbId: finalImdbId, poster, year });
             queuedJobs.push(job);
           }
         }

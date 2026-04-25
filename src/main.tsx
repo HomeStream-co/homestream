@@ -29,6 +29,31 @@ if ('serviceWorker' in navigator && import.meta.env.PROD) {
   });
 }
 
+// ── Chunk load error handler ──────────────────────────────────────────────────
+// When Vite builds a new version, chunk hashes change. If the Electron app
+// has an old version cached and tries to load a stale chunk URL it gets a
+// "Failed to fetch dynamically imported module" error. Catch it here and
+// force a full reload so the new chunks are picked up automatically.
+window.addEventListener('error', (event) => {
+  const msg = event.message ?? '';
+  if (msg.includes('Failed to fetch dynamically imported module') ||
+      msg.includes('Importing a module script failed')) {
+    console.warn('[HomeStream] Stale chunk detected — reloading to pick up new build…');
+    window.location.reload();
+  }
+});
+
+// Also catch unhandled promise rejections (dynamic import() failures surface here)
+window.addEventListener('unhandledrejection', (event) => {
+  const msg = String(event.reason?.message ?? event.reason ?? '');
+  if (msg.includes('Failed to fetch dynamically imported module') ||
+      msg.includes('Importing a module script failed')) {
+    console.warn('[HomeStream] Stale chunk (promise) detected — reloading…');
+    event.preventDefault();
+    window.location.reload();
+  }
+});
+
 // Support both client-side navigation and SSR hydration
 const rootElement = document.getElementById('app');
 if (!rootElement) throw new Error('Root element not found');
