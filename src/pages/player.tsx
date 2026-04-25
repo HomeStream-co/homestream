@@ -20,6 +20,7 @@ import { useTheme } from '@/context/ThemeContext';
 import { usePlayerState } from '@/hooks/usePlayerState';
 import { useHlsSetup } from '@/hooks/useHlsSetup';
 import { usePlayerKeyboard } from '@/hooks/usePlayerKeyboard';
+import { usePlayerTimeSync } from '@/hooks/usePlayerTimeSync';
 import { useRemoteControl } from '@/hooks/useRemoteControl';
 import { useTranscodeProgress } from '@/hooks/useTranscodeProgress';
 
@@ -235,6 +236,33 @@ export default function PlayerPage() {
 
   // Keep the ref in sync so onOpen always calls the latest sendRemoteStateNow
   useEffect(() => { sendRemoteStateNowRef.current = sendRemoteStateNow; }, [sendRemoteStateNow]);
+
+  // ── Time-sync hook — owns the onTimeUpdate hot-path ──────────────────────
+  // Returns a stable callback that does zero React setState on every tick.
+  const { onTimeUpdate } = usePlayerTimeSync({
+    videoRef: ps.videoRef,
+    currentTimeRef: ps.currentTimeRef,
+    bufferedRef: ps.bufferedRef,
+    seekBarRef: ps.seekBarRef,
+    bufferedBarRef: ps.bufferedBarRef,
+    timeDisplayRef: ps.timeDisplayRef,
+    playerAccent,
+    lastRemoteSendRef,
+    sendState,
+    getRemoteContext: useCallback(() => ({
+      mediaId: id ?? '',
+      title: item?.title ?? '',
+      poster: item?.poster,
+      hasNextEpisode: !!nextItem,
+      subtitleTracks: [
+        { index: 0, label: 'English', language: 'en' },
+        { index: 1, label: 'Español', language: 'es' },
+      ],
+      activeSubtitle: ps.ccLang === 'off' ? -1 : ps.ccLang === 'en' ? 0 : 1,
+      cast: ps.castInfo ?? undefined,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }), [id, item, nextItem, ps.ccLang, ps.castInfo]),
+  });
 
   // ── Kids profile block — handled by RestrictedContentGuard wrapper ──────────
 
@@ -636,58 +664,7 @@ export default function PlayerPage() {
               ps.setVideoLoading(false);
             }
           }}
-          onTimeUpdate={() => {
-            const video = ps.videoRef.current;
-            if (!video) return;
-
-            // ── Hot path: zero React state updates ──────────────────────────
-            // Write to refs only — DOM updates happen here, not via setState.
-            ps.currentTimeRef.current = video.currentTime;
-            const buf = video.buffered;
-            const dur = video.duration || 0;
-            if (buf.length > 0) ps.bufferedRef.current = buf.end(buf.length - 1);
-
-            // Update seek bar gradient + value directly (no React re-render)
-            const seekBar = ps.seekBarRef.current;
-            if (seekBar && dur > 0) {
-              const pct = (video.currentTime / dur) * 100;
-              seekBar.value = String(video.currentTime);
-              seekBar.style.background = `linear-gradient(to right, ${playerAccent} ${pct}%, rgba(255,255,255,0.2) 0%)`;
-            }
-
-            // Update buffered bar width directly (no React re-render)
-            const bufferedBar = ps.bufferedBarRef.current;
-            if (bufferedBar && dur > 0) {
-              bufferedBar.style.width = `${(ps.bufferedRef.current / dur) * 100}%`;
-            }
-
-            // Update time display span directly (no React re-render)
-            if (ps.timeDisplayRef.current && dur > 0) {
-              ps.timeDisplayRef.current.textContent =
-                `${formatTime(video.currentTime)} / ${formatTime(dur)}`;
-            }
-
-            // Remote state broadcast — throttled to at most once per 2 seconds
-            // using a wall-clock ref so it never fires multiple times per second.
-            const now = Date.now();
-            if (now - lastRemoteSendRef.current >= 2000) {
-              lastRemoteSendRef.current = now;
-              sendState({
-                mediaId: id ?? '',
-                title: item.title ?? '',
-                poster: item.poster,
-                currentTime: video.currentTime,
-                duration: dur,
-                paused: video.paused,
-                volume: video.volume,
-                speed: video.playbackRate,
-                hasNextEpisode: !!nextItem,
-                subtitleTracks: [{ index: 0, label: 'English', language: 'en' }, { index: 1, label: 'Español', language: 'es' }],
-                activeSubtitle: ps.ccLang === 'off' ? -1 : ps.ccLang === 'en' ? 0 : 1,
-                cast: ps.castInfo ?? undefined,
-              });
-            }
-          }}
+          onTimeUpdate={onTimeUpdate}
           onLoadedMetadata={() => {
             const video = ps.videoRef.current;
             if (!video) return;
