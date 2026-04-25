@@ -17,6 +17,7 @@ import { readLibrary } from '../../../libraryStore.js';
 import { isReachable as qbitReachable } from '../../../qbittorrentClient.js';
 import { getAllJobs, type TorrentJob } from '../../../torrentManager.js';
 import { requireAuth } from '../../../authMiddleware.js';
+import { isConfigured as rdConfigured } from '../../../realDebridClient.js';
 
 export type SubsystemStatus = 'ok' | 'warn' | 'error' | 'unknown';
 
@@ -79,13 +80,35 @@ async function checkConfig(): Promise<SubsystemCheck> {
 async function checkQbit(): Promise<SubsystemCheck> {
   try {
     const cfg = readConfig();
-    if (!cfg.qbitUrl) return { name: 'qBittorrent', status: 'unknown', message: 'Not configured' };
-
+    // If Real-Debrid is configured, qBit is optional — downgrade to info
+    const rdKey = cfg.realDebridApiKey?.trim();
+    if (!cfg.qbitUrl) {
+      if (rdKey) return { name: 'qBittorrent', status: 'unknown', message: 'Not configured (Real-Debrid active)' };
+      return { name: 'qBittorrent', status: 'unknown', message: 'Not configured' };
+    }
     const ok = await checkWithTimeout(() => qbitReachable(), 4000, false);
     if (ok) return { name: 'qBittorrent', status: 'ok', message: `Connected at ${cfg.qbitUrl}` };
+    if (rdKey) return { name: 'qBittorrent', status: 'warn', message: 'Unreachable — Real-Debrid active as primary backend', detail: cfg.qbitUrl };
     return { name: 'qBittorrent', status: 'warn', message: 'Unreachable — WebTorrent fallback active', detail: cfg.qbitUrl };
   } catch (err) {
     return { name: 'qBittorrent', status: 'error', message: 'Check failed', detail: String(err) };
+  }
+}
+
+async function checkRealDebrid(): Promise<SubsystemCheck> {
+  try {
+    const cfg = readConfig();
+    const key = cfg.realDebridApiKey?.trim();
+    if (!key) return { name: 'Real-Debrid', status: 'unknown', message: 'Not configured — optional premium download backend' };
+    const result = await checkWithTimeout(() => rdConfigured(), 6000, { ok: false, error: 'Timeout' });
+    if (result.ok && result.user) {
+      const premDays = Math.floor((result.user.premium ?? 0) / 86400);
+      const premStr = premDays > 0 ? `${premDays}d premium remaining` : 'Premium expired';
+      return { name: 'Real-Debrid', status: premDays > 0 ? 'ok' : 'warn', message: `Connected — ${result.user.username} — ${premStr}` };
+    }
+    return { name: 'Real-Debrid', status: 'error', message: result.error ?? 'Connection failed' };
+  } catch (err) {
+    return { name: 'Real-Debrid', status: 'error', message: 'Check failed', detail: String(err) };
   }
 }
 
@@ -231,10 +254,11 @@ async function checkFfmpeg(): Promise<SubsystemCheck> {
 
 export default async function handler(req: Request, res: Response) {
   if (!requireAuth(req, res)) return;
-  const [library, config, qbit, tmdb, ollama, torrentio, downloads, ffmpeg] = await Promise.all([
+  const [library, config, qbit, realDebrid, tmdb, ollama, torrentio, downloads, ffmpeg] = await Promise.all([
     checkLibrary(),
     checkConfig(),
     checkQbit(),
+    checkRealDebrid(),
     checkTMDB(),
     checkOllama(),
     checkTorrentio(),
@@ -242,7 +266,7 @@ export default async function handler(req: Request, res: Response) {
     checkFfmpeg(),
   ]);
 
-  const checks: SubsystemCheck[] = [library, config, qbit, tmdb, ollama, torrentio, downloads, ffmpeg];
+  const checks: SubsystemCheck[] = [library, config, qbit, realDebrid, tmdb, ollama, torrentio, downloads, ffmpeg];
 
   const overall: SubsystemStatus =
     checks.some(c => c.status === 'error') ? 'error' :

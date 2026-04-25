@@ -63,6 +63,8 @@ export default async function handler(req: Request, res: Response) {
           'vpnConfigContent', 'vpnUsername', 'vpnPassword', 'vpnAutoConnect',
           // Prowlarr
           'prowlarrUrl', 'prowlarrApiKey',
+          // Real-Debrid
+          'realDebridApiKey',
         ];
         const updates: Record<string, unknown> = {};
         for (const key of allowed) {

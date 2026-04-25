@@ -536,42 +536,69 @@ export default async function handler(req: Request, res: Response) {
         return;
       }
 
-      if (useQbit) {
-        // ── Duplicate check ───────────────────────────────────────────────────
+      if (useRD) {
+        // ── Real-Debrid path ────────────────────────────────────────────────
         if (checkDuplicate(best.infoHash, title)) { await releaseVPN(); return; }
-        // ── Security scan before queuing ──────────────────────────────────────
         const scan = await runPreDownloadScan({ infoHash: best.infoHash, title });
         if (!scan.allowed) {
           await releaseVPN();
-          res.status(403).json({
-            error: 'Download blocked by security scan',
-            reason: scan.reason,
-            layer: scan.layer,
-            details: scan.details,
-            threatLevel: scan.threatLevel,
-          });
+          res.status(403).json({ error: 'Download blocked by security scan', reason: scan.reason, layer: scan.layer, details: scan.details, threatLevel: scan.threatLevel });
+          return;
+        }
+        const jobId = `rd-${best.infoHash}`;
+        const jobEntry = {
+          jobId, infoHash: best.infoHash, title, quality: best.quality,
+          type: 'movie' as const, status: 'downloading' as const,
+          addedAt: new Date().toISOString(), poster, imdbId: finalImdbId, backend: 'real-debrid' as const,
+        };
+        upsertJob(jobEntry);
+        // Respond immediately — RD resolves in background
+        res.json({ queued: 1, jobs: [jobEntry], backend: 'real-debrid', securityScan: scan, vpnUsed: vpnConnected });
+        await releaseVPN();
+        // Background: resolve via RD and download to media folder
+        (async () => {
+          try {
+            const cfg2 = readConfig();
+            const directUrl = await resolvemagnet(best.magnet, rdApiKey!, (pct, status) => {
+              console.log(`[rd] ${title}: ${status} ${pct}%`);
+              upsertJob({ ...jobEntry, status: 'downloading' });
+            });
+            const ext = directUrl.split('?')[0].split('.').pop() ?? 'mkv';
+            const safeTitle = title.replace(/[^a-zA-Z0-9 ._-]/g, '').trim();
+            const destDir = cfg2.downloadsDir || (cfg2.mediaDir ? `${cfg2.mediaDir}/downloads` : '/downloads');
+            const destPath = `${destDir}/${safeTitle} [${best.quality}].${ext}`;
+            await downloadUrl(directUrl, destPath, (dl, total) => {
+              if (total > 0) console.log(`[rd] ${title}: ${Math.round((dl / total) * 100)}% downloaded`);
+            });
+            upsertJob({ ...jobEntry, status: 'done' });
+            console.log(`[rd] ✓ ${title} saved to ${destPath}`);
+          } catch (err) {
+            console.error(`[rd] ✗ ${title} failed:`, err);
+            upsertJob({ ...jobEntry, status: 'error' });
+          }
+        })();
+
+      } else if (useQbit) {
+        // ── qBittorrent path ────────────────────────────────────────────────
+        if (checkDuplicate(best.infoHash, title)) { await releaseVPN(); return; }
+        const scan = await runPreDownloadScan({ infoHash: best.infoHash, title });
+        if (!scan.allowed) {
+          await releaseVPN();
+          res.status(403).json({ error: 'Download blocked by security scan', reason: scan.reason, layer: scan.layer, details: scan.details, threatLevel: scan.threatLevel });
           return;
         }
         const job = await queueViaQbit({ infoHash: best.infoHash, magnet: best.magnet, quality: best.quality, type: 'movie', title, imdbId: finalImdbId, poster });
         await releaseVPN();
         res.json({ queued: 1, jobs: [job], backend: 'qbittorrent', securityScan: scan, vpnUsed: vpnConnected });
       } else {
-        // ── Duplicate check ───────────────────────────────────────────────────
+        // ── WebTorrent fallback ─────────────────────────────────────────────
         if (checkDuplicate(best.infoHash, title)) { await releaseVPN(); return; }
-        // ── Security scan before queuing ──────────────────────────────────────
         const scan = await runPreDownloadScan({ infoHash: best.infoHash, title });
         if (!scan.allowed) {
           await releaseVPN();
-          res.status(403).json({
-            error: 'Download blocked by security scan',
-            reason: scan.reason,
-            layer: scan.layer,
-            details: scan.details,
-            threatLevel: scan.threatLevel,
-          });
+          res.status(403).json({ error: 'Download blocked by security scan', reason: scan.reason, layer: scan.layer, details: scan.details, threatLevel: scan.threatLevel });
           return;
         }
-        // Fallback to WebTorrent
         const { queueDownload } = await import('../../../torrentManager.js');
         const job = queueDownload({ infoHash: best.infoHash, magnet: best.magnet, quality: best.quality, type: 'movie', title, imdbId: finalImdbId, poster, year });
         await releaseVPN();
@@ -580,8 +607,6 @@ export default async function handler(req: Request, res: Response) {
 
     } else {
       // ── Single episode fast path ─────────────────────────────────────────
-      // When both season AND episode are specified, skip the probe loop and
-      // just fetch + queue that one episode directly.
       if (season != null && episode != null) {
         const epTitle = `${title} S${String(season).padStart(2, '0')}E${String(episode).padStart(2, '0')}`;
         const streams = await fetchStreamsForEpisode(finalImdbId, 'series', title, season, episode);
@@ -597,7 +622,33 @@ export default async function handler(req: Request, res: Response) {
           res.status(403).json({ error: 'Download blocked by security scan', reason: scan.reason });
           return;
         }
-        if (useQbit) {
+
+        if (useRD) {
+          if (checkDuplicate(best.infoHash, epTitle)) { await releaseVPN(); return; }
+          const jobId = `rd-${best.infoHash}`;
+          const jobEntry = {
+            jobId, infoHash: best.infoHash, title: epTitle, quality: best.quality,
+            type: 'series' as const, season, episode, status: 'downloading' as const,
+            addedAt: new Date().toISOString(), poster, imdbId: finalImdbId, backend: 'real-debrid' as const,
+          };
+          upsertJob(jobEntry);
+          res.json({ queued: 1, jobs: [jobEntry], backend: 'real-debrid', vpnUsed: vpnConnected });
+          await releaseVPN();
+          (async () => {
+            try {
+              const cfg2 = readConfig();
+              const directUrl = await resolvemagnet(best.magnet, rdApiKey!);
+              const ext = directUrl.split('?')[0].split('.').pop() ?? 'mkv';
+              const safeTitle = epTitle.replace(/[^a-zA-Z0-9 ._-]/g, '').trim();
+              const destDir = cfg2.downloadsDir || (cfg2.mediaDir ? `${cfg2.mediaDir}/downloads` : '/downloads');
+              await downloadUrl(directUrl, `${destDir}/${safeTitle}.${ext}`);
+              upsertJob({ ...jobEntry, status: 'done' });
+            } catch (err) {
+              console.error(`[rd] ✗ ${epTitle}:`, err);
+              upsertJob({ ...jobEntry, status: 'error' });
+            }
+          })();
+        } else if (useQbit) {
           if (checkDuplicate(best.infoHash, epTitle)) { await releaseVPN(); return; }
           const job = await queueViaQbit({ infoHash: best.infoHash, magnet: best.magnet, quality: best.quality, title: epTitle, type: 'series', season, episode, imdbId: finalImdbId, poster });
           await releaseVPN();
@@ -611,7 +662,7 @@ export default async function handler(req: Request, res: Response) {
         return;
       }
 
-      // Series — probe each season dynamically to find real episode counts.
+      // ── Full series / full season path ───────────────────────────────────
       const seasonsToFetch: number[] = [];
       if (season != null) {
         seasonsToFetch.push(season);
@@ -620,7 +671,6 @@ export default async function handler(req: Request, res: Response) {
       }
 
       const MAX_EPISODES_PER_SEASON = 50;
-
       const episodeTasks: Array<{ season: number; episode: number }> = [];
       for (const s of seasonsToFetch) {
         for (let ep = 1; ep <= MAX_EPISODES_PER_SEASON; ep++) {
@@ -654,28 +704,46 @@ export default async function handler(req: Request, res: Response) {
 
           const epTitle = `${title} S${String(s).padStart(2, '0')}E${String(ep).padStart(2, '0')}`;
 
-          if (useQbit) {
-            const scan = await runPreDownloadScan({ infoHash: best.infoHash, title: epTitle });
-            if (!scan.allowed) {
-              console.warn(`[security] Blocked episode ${epTitle}: ${scan.reason}`);
-              continue;
-            }
-            if (findJobByInfoHash(best.infoHash)) {
-              console.log(`[download] Skipping duplicate episode ${epTitle}`);
-              continue;
-            }
+          const scan = await runPreDownloadScan({ infoHash: best.infoHash, title: epTitle });
+          if (!scan.allowed) {
+            console.warn(`[security] Blocked episode ${epTitle}: ${scan.reason}`);
+            continue;
+          }
+          if (findJobByInfoHash(best.infoHash)) {
+            console.log(`[download] Skipping duplicate episode ${epTitle}`);
+            continue;
+          }
+
+          if (useRD) {
+            const jobId = `rd-${best.infoHash}`;
+            const jobEntry = {
+              jobId, infoHash: best.infoHash, title: epTitle, quality: best.quality,
+              type: 'series' as const, season: s, episode: ep, status: 'downloading' as const,
+              addedAt: new Date().toISOString(), poster, imdbId: finalImdbId, backend: 'real-debrid' as const,
+            };
+            upsertJob(jobEntry);
+            queuedJobs.push(jobEntry);
+            // Fire-and-forget RD download
+            const capturedEntry = { ...jobEntry };
+            const capturedMagnet = best.magnet;
+            (async () => {
+              try {
+                const cfg2 = readConfig();
+                const directUrl = await resolvemagnet(capturedMagnet, rdApiKey!);
+                const ext = directUrl.split('?')[0].split('.').pop() ?? 'mkv';
+                const safeTitle = epTitle.replace(/[^a-zA-Z0-9 ._-]/g, '').trim();
+                const destDir = cfg2.downloadsDir || (cfg2.mediaDir ? `${cfg2.mediaDir}/downloads` : '/downloads');
+                await downloadUrl(directUrl, `${destDir}/${safeTitle}.${ext}`);
+                upsertJob({ ...capturedEntry, status: 'done' });
+              } catch (err) {
+                console.error(`[rd] ✗ ${epTitle}:`, err);
+                upsertJob({ ...capturedEntry, status: 'error' });
+              }
+            })();
+          } else if (useQbit) {
             const job = await queueViaQbit({ infoHash: best.infoHash, magnet: best.magnet, quality: best.quality, title: epTitle, type: 'series', season: s, episode: ep, imdbId: finalImdbId, poster });
             queuedJobs.push(job);
           } else {
-            const scan = await runPreDownloadScan({ infoHash: best.infoHash, title: epTitle });
-            if (!scan.allowed) {
-              console.warn(`[security] Blocked episode ${epTitle}: ${scan.reason}`);
-              continue;
-            }
-            if (findJobByInfoHash(best.infoHash)) {
-              console.log(`[download] Skipping duplicate episode ${epTitle}`);
-              continue;
-            }
             const { queueDownload } = await import('../../../torrentManager.js');
             const job = queueDownload({ infoHash: best.infoHash, magnet: best.magnet, quality: best.quality, title: epTitle, type: 'series', season: s, episode: ep, imdbId: finalImdbId, poster, year });
             queuedJobs.push(job);
@@ -694,16 +762,20 @@ export default async function handler(req: Request, res: Response) {
       }
 
       await releaseVPN();
-      res.json({ queued: queuedJobs.length, jobs: queuedJobs, backend: useQbit ? 'qbittorrent' : 'webtorrent', vpnUsed: vpnConnected });
+      res.json({
+        queued: queuedJobs.length,
+        jobs: queuedJobs,
+        backend: useRD ? 'real-debrid' : useQbit ? 'qbittorrent' : 'webtorrent',
+        vpnUsed: vpnConnected,
+      });
     }
   } catch (err) {
     await releaseVPN();
     const msg = err instanceof Error ? err.message : String(err);
-    // Surface WebTorrent-unavailable errors with a clear actionable message
     if (msg.includes('WebTorrent is not available')) {
       res.status(503).json({
         error: 'Built-in downloader unavailable',
-        message: 'qBittorrent is not running and the built-in downloader is not available in this environment. Please start qBittorrent or configure it in Settings → Downloads.',
+        message: 'qBittorrent is not running and the built-in downloader is not available in this environment. Configure Real-Debrid in Settings → Downloads, or start qBittorrent.',
       });
     } else {
       res.status(500).json({ error: 'Download queue failed', message: msg });
