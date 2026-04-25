@@ -117,10 +117,14 @@ const { default: downloadHandler } = await import('../../server/api/stremio/down
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 describe('POST /api/stremio/download — validation', () => {
-  it('rejects missing imdbId', async () => {
+  it('rejects unresolvable imdbId with 404', async () => {
+    // When imdbId is omitted the handler attempts Cinemeta resolution.
+    // If Cinemeta can't find the title it returns 404 (not 400) — this is
+    // intentional: the request was structurally valid, the title just doesn't
+    // exist in the catalog.
     const { req, res } = makeReqRes({ type: 'movie', title: 'Test' });
     await downloadHandler(req, res);
-    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.status).toHaveBeenCalledWith(404);
   });
 
   it('rejects missing type', async () => {

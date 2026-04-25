@@ -137,10 +137,12 @@ const { default: handler } = await import('../../server/api/stremio/download/POS
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 describe('POST /api/stremio/download — validation', () => {
-  it('returns 400 when imdbId is missing', async () => {
+  it('returns 404 when imdbId is missing and Cinemeta cannot resolve title', async () => {
+    // Handler intentionally tries Cinemeta when imdbId is absent.
+    // Cinemeta returns null in the test environment → 404, not 400.
     const { req, res } = makeReqRes({ type: 'movie', title: 'Inception' });
     await handler(req, res);
-    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.status).toHaveBeenCalledWith(404);
   });
 
   it('returns 400 when type is missing', async () => {
