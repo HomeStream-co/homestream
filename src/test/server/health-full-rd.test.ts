@@ -117,7 +117,7 @@ describe('GET /api/health/full — Real-Debrid subsystem', () => {
 
   it('status:unknown when RD not configured', async () => {
     const { req, res, captured } = makeReqRes();
-    await (fn as Function)(req, res);
+    await (fn as (req: unknown, res: unknown) => Promise<void>)(req, res);
     const check = findCheck(captured.json, 'Real-Debrid');
     expect(check?.status).toBe('unknown');
     expect(check?.message).toMatch(/optional/i);
@@ -131,7 +131,7 @@ describe('GET /api/health/full — Real-Debrid subsystem', () => {
     });
 
     const { req, res, captured } = makeReqRes();
-    await (fn as Function)(req, res);
+    await (fn as (req: unknown, res: unknown) => Promise<void>)(req, res);
     const check = findCheck(captured.json, 'Real-Debrid');
     expect(check?.status).toBe('ok');
     expect(check?.message).toContain('alice');
@@ -146,7 +146,7 @@ describe('GET /api/health/full — Real-Debrid subsystem', () => {
     });
 
     const { req, res, captured } = makeReqRes();
-    await (fn as Function)(req, res);
+    await (fn as (req: unknown, res: unknown) => Promise<void>)(req, res);
     const check = findCheck(captured.json, 'Real-Debrid');
     expect(check?.status).toBe('warn');
     expect(check?.message).toMatch(/expired/i);
@@ -157,7 +157,7 @@ describe('GET /api/health/full — Real-Debrid subsystem', () => {
     mockRdConfigured.mockResolvedValue({ ok: false, error: 'RD API 401: Unauthorized' });
 
     const { req, res, captured } = makeReqRes();
-    await (fn as Function)(req, res);
+    await (fn as (req: unknown, res: unknown) => Promise<void>)(req, res);
     const check = findCheck(captured.json, 'Real-Debrid');
     expect(check?.status).toBe('error');
   });
@@ -168,7 +168,7 @@ describe('GET /api/health/full — Real-Debrid subsystem', () => {
     mockRdConfigured.mockResolvedValue({ ok: false, error: 'Timeout' });
 
     const { req, res, captured } = makeReqRes();
-    await (fn as Function)(req, res);
+    await (fn as (req: unknown, res: unknown) => Promise<void>)(req, res);
     const check = findCheck(captured.json, 'Real-Debrid');
     expect(check?.status).toBe('error');
   });
@@ -184,7 +184,7 @@ describe('GET /api/health/full — qBit status when RD is active', () => {
     mockReadConfig.mockReturnValue(baseConfig({ realDebridApiKey: 'valid-key' }));
 
     const { req, res, captured } = makeReqRes();
-    await (fn as Function)(req, res);
+    await (fn as (req: unknown, res: unknown) => Promise<void>)(req, res);
     const check = findCheck(captured.json, 'qBittorrent');
     expect(check?.status).toBe('warn');
     expect(check?.message).toMatch(/real.debrid/i);
@@ -194,7 +194,7 @@ describe('GET /api/health/full — qBit status when RD is active', () => {
     mockReadConfig.mockReturnValue(baseConfig({ realDebridApiKey: '' }));
 
     const { req, res, captured } = makeReqRes();
-    await (fn as Function)(req, res);
+    await (fn as (req: unknown, res: unknown) => Promise<void>)(req, res);
     const check = findCheck(captured.json, 'qBittorrent');
     expect(check?.status).toBe('warn');
     expect(check?.message).toMatch(/webtorrent/i);
@@ -204,7 +204,7 @@ describe('GET /api/health/full — qBit status when RD is active', () => {
     mockReadConfig.mockReturnValue(baseConfig({ qbitUrl: '', realDebridApiKey: 'valid-key' }));
 
     const { req, res, captured } = makeReqRes();
-    await (fn as Function)(req, res);
+    await (fn as (req: unknown, res: unknown) => Promise<void>)(req, res);
     const check = findCheck(captured.json, 'qBittorrent');
     expect(check?.status).toBe('unknown');
     expect(check?.message).toMatch(/real.debrid/i);

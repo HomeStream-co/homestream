@@ -116,7 +116,7 @@ describe('Setup wizard — full 5-step flow', () => {
 
   it('completes the full wizard flow and writes setupComplete:true', async () => {
     const { default: handler } = await import('../../server/api/setup/POST.js');
-    const fn = handler as Function;
+    const fn = handler  as (req: unknown, res: unknown) => Promise<void>;
 
     // ── Step 1: Set admin password ────────────────────────────────────────────
     {
@@ -181,7 +181,7 @@ describe('Setup wizard — full 5-step flow', () => {
 
   it('each step preserves data written by previous steps', async () => {
     const { default: handler } = await import('../../server/api/setup/POST.js');
-    const fn = handler as Function;
+    const fn = handler  as (req: unknown, res: unknown) => Promise<void>;
 
     // Step 1 — password
     await fn(...Object.values(makeReqRes({ action: 'save', adminPassword: 'pass1' }, false)).slice(0, 2));
@@ -204,7 +204,7 @@ describe('Setup wizard — full 5-step flow', () => {
 
   it('setupComplete is false until the complete action is called', async () => {
     const { default: handler } = await import('../../server/api/setup/POST.js');
-    const fn = handler as Function;
+    const fn = handler  as (req: unknown, res: unknown) => Promise<void>;
 
     await fn(...Object.values(makeReqRes({ action: 'save', adminPassword: 'pass' }, false)).slice(0, 2));
     expect(diskConfig.setupComplete).toBeFalsy();
@@ -218,7 +218,7 @@ describe('Setup wizard — full 5-step flow', () => {
 
   it('adminPassword is never stored in plaintext', async () => {
     const { default: handler } = await import('../../server/api/setup/POST.js');
-    const fn = handler as Function;
+    const fn = handler  as (req: unknown, res: unknown) => Promise<void>;
 
     const plaintext = 'SuperSecret99!';
     await fn(...Object.values(makeReqRes({ action: 'save', adminPassword: plaintext }, false)).slice(0, 2));
@@ -229,7 +229,7 @@ describe('Setup wizard — full 5-step flow', () => {
 
   it('/api/health returns setupComplete:true after wizard completes', async () => {
     const { default: setupHandler } = await import('../../server/api/setup/POST.js');
-    const fn = setupHandler as Function;
+    const fn = setupHandler  as (req: unknown, res: unknown) => Promise<void>;
 
     // Run through the wizard
     await fn(...Object.values(makeReqRes({ action: 'save', adminPassword: 'pw' }, false)).slice(0, 2));
@@ -244,7 +244,7 @@ describe('Setup wizard — full 5-step flow', () => {
       status: vi.fn().mockReturnThis(),
     } as unknown as Response;
 
-    await (healthHandler as Function)(req, res);
+    await (healthHandler as (req: unknown, res: unknown) => Promise<void>)(req, res);
     expect(healthBody.setupComplete).toBe(true);
   });
 });

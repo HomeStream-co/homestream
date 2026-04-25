@@ -275,7 +275,7 @@ describe('remote.tsx WS — status transitions on reconnect', () => {
 
   it('sets status to disconnected immediately on close, then connecting when timer fires', () => {
     const statusHistory: string[] = [];
-    let destroyed = false;
+    const destroyed = false;
     let retryCount = 0;
     const BASE = 3_000;
     const MAX  = 30_000;

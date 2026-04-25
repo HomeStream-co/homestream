@@ -86,7 +86,7 @@ describe('GET /api/real-debrid/status', () => {
     const { req, res, json } = makeReqRes();
     // handler is exported as [requireAuth, handlerFn] — call the last element
     const fn = Array.isArray(handler) ? handler[handler.length - 1] : handler;
-    await (fn as Function)(req, res);
+    await (fn as (req: unknown, res: unknown) => Promise<void>)(req, res);
     expect(json).toHaveBeenCalledWith(expect.objectContaining({ ok: false, reason: 'no_key' }));
   });
 
@@ -99,7 +99,7 @@ describe('GET /api/real-debrid/status', () => {
     const { default: handler } = await import('../../server/api/real-debrid/status/GET.js');
     const { req, res, json } = makeReqRes();
     const fn = Array.isArray(handler) ? handler[handler.length - 1] : handler;
-    await (fn as Function)(req, res);
+    await (fn as (req: unknown, res: unknown) => Promise<void>)(req, res);
 
     expect(mockGetUser).not.toHaveBeenCalled();
     const call = json.mock.calls[0][0] as Record<string, unknown>;
@@ -123,7 +123,7 @@ describe('GET /api/real-debrid/status', () => {
     const { default: handler } = await import('../../server/api/real-debrid/status/GET.js');
     const { req, res, json } = makeReqRes();
     const fn = Array.isArray(handler) ? handler[handler.length - 1] : handler;
-    await (fn as Function)(req, res);
+    await (fn as (req: unknown, res: unknown) => Promise<void>)(req, res);
 
     expect(mockGetUser).toHaveBeenCalledWith('testkey');
     const call = json.mock.calls[0][0] as Record<string, unknown>;
@@ -144,7 +144,7 @@ describe('GET /api/real-debrid/status', () => {
     const { default: handler } = await import('../../server/api/real-debrid/status/GET.js');
     const { req, res, json } = makeReqRes();
     const fn = Array.isArray(handler) ? handler[handler.length - 1] : handler;
-    await (fn as Function)(req, res);
+    await (fn as (req: unknown, res: unknown) => Promise<void>)(req, res);
 
     expect(mockGetUser).toHaveBeenCalledWith('freshkey');
     const call = json.mock.calls[0][0] as Record<string, unknown>;
@@ -165,7 +165,7 @@ describe('GET /api/real-debrid/status', () => {
     const { default: handler } = await import('../../server/api/real-debrid/status/GET.js');
     const { req, res, json } = makeReqRes();
     const fn = Array.isArray(handler) ? handler[handler.length - 1] : handler;
-    await (fn as Function)(req, res);
+    await (fn as (req: unknown, res: unknown) => Promise<void>)(req, res);
 
     const call = json.mock.calls[0][0] as Record<string, unknown>;
     expect(call.ok).toBe(false);
@@ -192,7 +192,7 @@ describe('POST /api/setup — Real-Debrid actions', () => {
       action: 'test_real_debrid',
       realDebridApiKey: 'validkey',
     });
-    await (handler as Function)(req, res);
+    await (handler as (req: unknown, res: unknown) => Promise<void>)(req, res);
 
     const call = json.mock.calls[0][0] as Record<string, unknown>;
     expect(call.ok).toBe(true);
@@ -204,7 +204,7 @@ describe('POST /api/setup — Real-Debrid actions', () => {
 
     const { default: handler } = await import('../../server/api/setup/POST.js');
     const { req, res, json } = makeReqRes({ action: 'test_real_debrid' });
-    await (handler as Function)(req, res);
+    await (handler as (req: unknown, res: unknown) => Promise<void>)(req, res);
 
     const call = json.mock.calls[0][0] as Record<string, unknown>;
     expect(call.ok).toBe(false);
@@ -218,7 +218,7 @@ describe('POST /api/setup — Real-Debrid actions', () => {
     const { default: handler } = await import('../../server/api/setup/POST.js');
     // No realDebridApiKey in body — should use config key
     const { req, res } = makeReqRes({ action: 'test_real_debrid' });
-    await (handler as Function)(req, res);
+    await (handler as (req: unknown, res: unknown) => Promise<void>)(req, res);
 
     expect(mockGetUser).toHaveBeenCalledWith('configkey');
   });
@@ -236,7 +236,7 @@ describe('POST /api/setup — Real-Debrid actions', () => {
       action: 'save',
       realDebridApiKey: 'newkey',
     });
-    await (handler as Function)(req, res);
+    await (handler as (req: unknown, res: unknown) => Promise<void>)(req, res);
 
     const { writeConfig } = await import('../../server/configStore.js');
     const savedUpdates = (writeConfig as ReturnType<typeof vi.fn>).mock.calls.at(-1)?.[0] as Record<string, unknown>;
@@ -260,7 +260,7 @@ describe('POST /api/setup — Real-Debrid actions', () => {
       action: 'save',
       tmdbApiKey: 'newtmdbkey',   // unrelated save — should not bust RD cache
     });
-    await (handler as Function)(req, res);
+    await (handler as (req: unknown, res: unknown) => Promise<void>)(req, res);
 
     const { writeConfig } = await import('../../server/configStore.js');
     const savedUpdates = (writeConfig as ReturnType<typeof vi.fn>).mock.calls.at(-1)?.[0] as Record<string, unknown>;

@@ -127,7 +127,7 @@ describe('GET /api/health/full — check name contract', () => {
   it('returns exactly the expected set of subsystem names — no extras, no missing', async () => {
     const { default: handler } = await import('../../server/api/health/full/GET.js');
     const { req, res, getBody } = makeReqRes();
-    await (handler as Function)(req, res);
+    await (handler as (req: unknown, res: unknown) => Promise<void>)(req, res);
 
     const body = getBody();
     expect(body).toBeDefined();
@@ -162,7 +162,7 @@ describe('GET /api/health/full — check name contract', () => {
   it('every check has a non-empty name', async () => {
     const { default: handler } = await import('../../server/api/health/full/GET.js');
     const { req, res, getBody } = makeReqRes();
-    await (handler as Function)(req, res);
+    await (handler as (req: unknown, res: unknown) => Promise<void>)(req, res);
 
     for (const check of getBody().checks) {
       expect(check.name, 'check.name must not be empty').toBeTruthy();
@@ -172,7 +172,7 @@ describe('GET /api/health/full — check name contract', () => {
   it('every check has a valid status (ok | warn | error | unknown)', async () => {
     const { default: handler } = await import('../../server/api/health/full/GET.js');
     const { req, res, getBody } = makeReqRes();
-    await (handler as Function)(req, res);
+    await (handler as (req: unknown, res: unknown) => Promise<void>)(req, res);
 
     const VALID_STATUSES = new Set(['ok', 'warn', 'error', 'unknown']);
     for (const check of getBody().checks) {
@@ -186,7 +186,7 @@ describe('GET /api/health/full — check name contract', () => {
   it('every check has a non-empty message', async () => {
     const { default: handler } = await import('../../server/api/health/full/GET.js');
     const { req, res, getBody } = makeReqRes();
-    await (handler as Function)(req, res);
+    await (handler as (req: unknown, res: unknown) => Promise<void>)(req, res);
 
     for (const check of getBody().checks) {
       expect(
@@ -199,7 +199,7 @@ describe('GET /api/health/full — check name contract', () => {
   it('response includes overall status and timestamp', async () => {
     const { default: handler } = await import('../../server/api/health/full/GET.js');
     const { req, res, getBody } = makeReqRes();
-    await (handler as Function)(req, res);
+    await (handler as (req: unknown, res: unknown) => Promise<void>)(req, res);
 
     const body = getBody();
     expect(body.overall).toMatch(/^(ok|warn|error)$/);
@@ -210,7 +210,7 @@ describe('GET /api/health/full — check name contract', () => {
     // FFmpeg is mocked to fail (ENOENT) — so FFmpeg check will be error
     const { default: handler } = await import('../../server/api/health/full/GET.js');
     const { req, res, getBody } = makeReqRes();
-    await (handler as Function)(req, res);
+    await (handler as (req: unknown, res: unknown) => Promise<void>)(req, res);
 
     const body = getBody();
     const hasError = body.checks.some(c => c.status === 'error');

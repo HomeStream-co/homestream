@@ -194,7 +194,7 @@ describe('download job field completeness — all backends', () => {
         poster:  'https://image.tmdb.org/t/p/w500/poster.jpg',
       });
 
-      await (handler as Function)(req, res);
+      await (handler as (req: unknown, res: unknown) => Promise<void>)(req, res);
 
       // upsertJob is called at least once (immediately on job creation)
       expect(mockUpsertJob).toHaveBeenCalled();
@@ -218,7 +218,7 @@ describe('download job field completeness — all backends', () => {
         poster:  'https://image.tmdb.org/t/p/w500/poster.jpg',
       });
 
-      await (handler as Function)(req, res);
+      await (handler as (req: unknown, res: unknown) => Promise<void>)(req, res);
 
       expect(mockUpsertJob).toHaveBeenCalled();
       const firstCall = mockUpsertJob.mock.calls[0][0] as Record<string, unknown>;
@@ -236,7 +236,7 @@ describe('download job field completeness — all backends', () => {
         imdbId:  'tt0133093',
       });
 
-      await (handler as Function)(req, res);
+      await (handler as (req: unknown, res: unknown) => Promise<void>)(req, res);
 
       const firstCall = mockUpsertJob.mock.calls[0][0] as Record<string, unknown>;
       expect(firstCall.status).toBe('downloading');
@@ -251,7 +251,7 @@ describe('download job field completeness — all backends', () => {
         imdbId:  'tt0133093',
       });
 
-      await (handler as Function)(req, res);
+      await (handler as (req: unknown, res: unknown) => Promise<void>)(req, res);
 
       const firstCall = mockUpsertJob.mock.calls[0][0] as Record<string, unknown>;
       const ts = new Date(firstCall.addedAt as string).getTime();
@@ -279,7 +279,7 @@ describe('download job field completeness — all backends', () => {
         poster:  'https://image.tmdb.org/t/p/w500/poster.jpg',
       });
 
-      await (handler as Function)(req, res);
+      await (handler as (req: unknown, res: unknown) => Promise<void>)(req, res);
 
       expect(mockUpsertJob).toHaveBeenCalled();
       const firstCall = mockUpsertJob.mock.calls[0][0] as Record<string, unknown>;
