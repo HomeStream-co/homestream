@@ -179,7 +179,7 @@ export default function ShowPage() {
     if (!showImdbId) return;
     setCheckingNow(true);
     try {
-      await fetch(`/api/subscriptions/${showImdbId}/check`, { method: 'POST' });
+      await fetch(`/api/subscriptions/${showImdbId}/check`, { method: 'POST', credentials: 'include' });
     } finally {
       setCheckingNow(false);
     }
