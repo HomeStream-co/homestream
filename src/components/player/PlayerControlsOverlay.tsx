@@ -7,8 +7,21 @@
  *   - Bottom bar (seek bar + thumbnail, play/pause, ±10s, mute, volume,
  *     time, speed menu, audio menu, CC menu, fullscreen, PiP, shortcuts,
  *     Cast, Chromecast)
+ *
+ * PERFORMANCE
+ * -----------
+ * Wrapped in React.memo with a hand-written comparator that skips re-renders
+ * when only refs or stable callbacks change.  The comparator checks every
+ * prop that can legitimately change the rendered output; it ignores:
+ *   - All React refs (seekBarRef, bufferedBarRef, etc.) — same object always
+ *   - All stable callbacks (togglePlay, handleSeek, etc.) — from useCallback
+ *   - All React setState dispatchers — stable by contract
+ *
+ * This means the overlay only re-renders when something the user can actually
+ * SEE changes: playing state, menus, CC settings, volume, etc.
  */
 
+import { memo } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import {
   ArrowLeft, Play, Pause, Volume2, VolumeX, Maximize, Minimize,
@@ -104,7 +117,7 @@ interface Props {
   setCastInfo: (v: CastInfo | null) => void;
 }
 
-export default function PlayerControlsOverlay({
+function PlayerControlsOverlayInner({
   item, playing, duration, volume, muted, fullscreen,
   playbackRate, isPiP, showInfo, showSpeedMenu, showCcMenu,
   showAudioMenu, ccLang, ccFontSize, ccBgOpacity, audioTracks,
@@ -488,3 +501,68 @@ export default function PlayerControlsOverlay({
     </motion.div>
   );
 }
+
+// ── Memo comparator ───────────────────────────────────────────────────────────
+//
+// Only re-render when a prop that affects the rendered output changes.
+//
+// SKIPPED (always stable — same object reference across renders):
+//   Refs:      seekBarRef, thumbCanvasRef, currentTimeRef, bufferedRef,
+//              timeDisplayRef, bufferedBarRef, castButtonRef, videoRef,
+//              resumeBannerTimer
+//   Callbacks: togglePlay, toggleMute, toggleFullscreen, togglePiP,
+//              handleSeek, handleVolumeChange, handleSeekHover, changeSpeed,
+//              fadeAndNavigate, showActionToast
+//   Setters:   all set* dispatchers (stable by React contract)
+//
+// COMPARED (can change and affect visible output):
+//   item       — by id + usingHls (spread creates new object every render)
+//   playing, duration, volume, muted, fullscreen, playbackRate, isPiP
+//   showInfo, showSpeedMenu, showCcMenu, showAudioMenu
+//   ccLang, ccFontSize, ccBgOpacity
+//   audioTracks — by reference (only changes when tracks are fetched)
+//   activeAudioTrack, tvFocus, playerAccent, seekHover
+
+function arePropsEqual(prev: Props, next: Props): boolean {
+  // item — compare by identity fields only (spread creates new obj every render)
+  if (prev.item.id       !== next.item.id)       return false;
+  if (prev.item.usingHls !== next.item.usingHls) return false;
+
+  // Playback state
+  if (prev.playing      !== next.playing)      return false;
+  if (prev.duration     !== next.duration)     return false;
+  if (prev.volume       !== next.volume)       return false;
+  if (prev.muted        !== next.muted)        return false;
+  if (prev.fullscreen   !== next.fullscreen)   return false;
+  if (prev.playbackRate !== next.playbackRate) return false;
+  if (prev.isPiP        !== next.isPiP)        return false;
+
+  // UI menus / panels
+  if (prev.showInfo      !== next.showInfo)      return false;
+  if (prev.showSpeedMenu !== next.showSpeedMenu) return false;
+  if (prev.showCcMenu    !== next.showCcMenu)    return false;
+  if (prev.showAudioMenu !== next.showAudioMenu) return false;
+
+  // CC settings
+  if (prev.ccLang      !== next.ccLang)      return false;
+  if (prev.ccFontSize  !== next.ccFontSize)  return false;
+  if (prev.ccBgOpacity !== next.ccBgOpacity) return false;
+
+  // Audio tracks — reference equality (array only replaced on fetch)
+  if (prev.audioTracks      !== next.audioTracks)      return false;
+  if (prev.activeAudioTrack !== next.activeAudioTrack) return false;
+
+  // TV D-pad focus
+  if (prev.tvFocus !== next.tvFocus) return false;
+
+  // Accent colour (changes when theme switches)
+  if (prev.playerAccent !== next.playerAccent) return false;
+
+  // Seek hover thumbnail (null | object — compare by reference)
+  if (prev.seekHover !== next.seekHover) return false;
+
+  return true;
+}
+
+const PlayerControlsOverlay = memo(PlayerControlsOverlayInner, arePropsEqual);
+export default PlayerControlsOverlay;
