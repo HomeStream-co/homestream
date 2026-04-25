@@ -51,7 +51,7 @@ function OfflineMetadataNotice({ mediaId, currentTitle, onSaved }: OfflineMetada
   async function handleRetry() {
     setRetrying(true);
     try {
-      const res = await fetch(`/api/media/${mediaId}/fetch-metadata`, { method: 'POST' });
+      const res = await fetch(`/api/media/${mediaId}/fetch-metadata`, { method: 'POST', credentials: 'include' });
       const data = await res.json() as { success: boolean; item?: { title: string }; message?: string };
       if (data.success && data.item) {
         onSaved(data.item.title);
