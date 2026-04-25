@@ -53,7 +53,7 @@ export default function SearchTab({ send }: SearchTabProps) {
     fetch('/api/media', { headers: remoteAuthHeaders() })
       .then(r => r.json())
       .then((data: LibraryItem[]) => setAllItems(Array.isArray(data) ? data : []))
-      .catch(() => {});
+      .catch(() => {}); // non-fatal — ignore
     const SR = window.SpeechRecognition ?? window.webkitSpeechRecognition;
     setVoiceSupported(!!SR);
     setTimeout(() => inputRef.current?.focus(), 100);

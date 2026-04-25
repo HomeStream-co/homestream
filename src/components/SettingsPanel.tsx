@@ -251,7 +251,7 @@ export default function SettingsPanel({
           setAllocTv(data.storageAllocation.tvPct);
         }
       })
-      .catch(() => {})
+      .catch(() => {}) // non-fatal — ignore
       .finally(() => setStorageLoading(false));
   }, [open, storageStats]);
 
@@ -307,7 +307,7 @@ export default function SettingsPanel({
       .then((data: { overall?: 'ok' | 'warn' | 'error' }) => {
         setHealthStatus(data.overall ?? null);
       })
-      .catch(() => {});
+      .catch(() => {}); // non-fatal — ignore
   }, [open, healthStatus]);
 
   // ── VPN state ───────────────────────────────────────────────────────────────
@@ -329,13 +329,13 @@ export default function SettingsPanel({
         setVpnCurrentInterface(current);
         setVpnSelectedInterface(current ?? '');
       })
-      .catch(() => {});
+      .catch(() => {}); // non-fatal — ignore
     fetch('/api/vpn/interfaces', { credentials: 'include' })
       .then(r => r.json())
       .then((data: { interfaces: VpnInterface[] }) => {
         setVpnInterfaces((data.interfaces ?? []).filter(i => !i.internal && i.family === 'IPv4'));
       })
-      .catch(() => {});
+      .catch(() => {}); // non-fatal — ignore
   }, [open, vpnLoaded]);
 
   const handleVpnSelectInterface = useCallback((name: string) => {

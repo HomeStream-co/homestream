@@ -209,7 +209,7 @@ export default function RemotePage() {
           setServerIP(`http://${host}:${d.port ?? '3000'}/remote`);
         }
       })
-      .catch(() => {});
+      .catch(() => {}); // non-fatal — ignore
   }, []);
 
   if (serverReady === null) {
@@ -290,7 +290,7 @@ function RemotePageInner() {
     fetch('/api/remote/qr')
       .then(r => r.json())
       .then((d: { url: string; qr: string; mdnsUrl?: string; ipUrl?: string }) => setQrData(d))
-      .catch(() => {});
+      .catch(() => {}); // non-fatal — ignore
   }, []);
 
   // Tick local time forward while playing

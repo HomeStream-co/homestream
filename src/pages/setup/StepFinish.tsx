@@ -71,7 +71,7 @@ export default function StepFinish({
     navigator.clipboard.writeText(remoteUrl).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    }).catch(() => {});
+    }).catch(() => {}); // non-fatal — ignore
   }
 
   const completeSetup = async () => {

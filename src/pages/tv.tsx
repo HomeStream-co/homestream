@@ -418,7 +418,7 @@ export default function TvPage() {
           setServerIP(`http://${host}:${d.port ?? '3000'}/tv`);
         }
       })
-      .catch(() => {});
+      .catch(() => {}); // non-fatal — ignore
   }, []);
 
   if (serverReady === null) {

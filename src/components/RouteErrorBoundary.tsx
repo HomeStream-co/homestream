@@ -45,7 +45,7 @@ export default class RouteErrorBoundary extends React.Component<Props, State> {
         componentStack: info.componentStack,
         timestamp: new Date().toISOString(),
       }),
-    }).catch(() => {});
+    }).catch(() => {}); // non-fatal — ignore
   }
 
   render() {

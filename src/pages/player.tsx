@@ -224,7 +224,7 @@ export default function PlayerPage() {
     fetch(`/api/media/${id}/tracks`, { credentials: 'include' })
       .then(r => r.ok ? r.json() : [])
       .then((tracks: typeof ps.audioTracks) => { if (Array.isArray(tracks)) ps.setAudioTracks(tracks); })
-      .catch(() => {});
+      .catch(() => {}); // non-fatal — ignore
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
@@ -266,7 +266,7 @@ export default function PlayerPage() {
       if (id && video && video.duration > 0) {
         const payload = JSON.stringify({ progress: (video.currentTime / video.duration) * 100, currentTime: video.currentTime, duration: video.duration, profileId: profileIdRef.current });
         if (navigator.sendBeacon) navigator.sendBeacon(`/api/media/${id}/progress`, new Blob([payload], { type: 'application/json' }));
-        else fetch(`/api/media/${id}/progress`, { method: 'PATCH', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: payload, keepalive: true }).catch(() => {});
+        else fetch(`/api/media/${id}/progress`, { method: 'PATCH', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: payload, keepalive: true }).catch(() => {}); // non-fatal — ignore
       }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -721,7 +721,7 @@ export default function PlayerPage() {
               <h2 className="text-white text-lg font-semibold">Unable to Play</h2>
               <p className="text-white/60 text-sm max-w-sm leading-relaxed">{ps.videoError}</p>
               <div className="flex gap-3 mt-2">
-                <button onClick={() => { ps.setVideoError(null); ps.setVideoLoading(true); if (ps.videoRef.current) { ps.videoRef.current.load(); ps.videoRef.current.play().catch(() => {}); } }}
+                <button onClick={() => { ps.setVideoError(null); ps.setVideoLoading(true); if (ps.videoRef.current) { ps.videoRef.current.load(); ps.videoRef.current.play().catch(() => {}); /* non-fatal — ignore */ } }}
                   className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white text-sm rounded-lg transition-colors">Try Again</button>
                 <button onClick={() => navigate(-1)} className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white text-sm rounded-lg transition-colors">Go Back</button>
               </div>
