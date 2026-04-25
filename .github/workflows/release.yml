@@ -98,7 +98,7 @@ jobs:
             $pkg | Add-Member -NotePropertyName build -NotePropertyValue ([PSCustomObject]@{})
           }
           $pkg.build | Add-Member -NotePropertyName ghToken -NotePropertyValue "${{ secrets.GH_TOKEN }}" -Force
-          $pkg.build | Add-Member -NotePropertyName ghOwner -NotePropertyValue "trevorrossworn-code" -Force
+          $pkg.build | Add-Member -NotePropertyName ghOwner -NotePropertyValue "HomeStream-co" -Force
           $pkg.build | Add-Member -NotePropertyName ghRepo  -NotePropertyValue "homestream" -Force
           $pkg | ConvertTo-Json -Depth 10 | Set-Content package.json
           Write-Host "package.json patched with build metadata"
