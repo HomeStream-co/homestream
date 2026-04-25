@@ -22,9 +22,21 @@ import { createJob } from './transcodeStore.js';
 import { transcodeFile } from './transcodeWorker.js';
 import { fetchOMDB } from './mediaUtils.js';
 import { upsertJob, updateJobStatus, getAllPersistedJobs } from './downloadJobStore.js';
+import { readConfig } from './configStore.js';
 
-const UPLOADS_DIR = path.resolve('./uploads');
-if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+/** Returns the active downloads directory, preferring mediaDir/downloads from config. */
+function getDownloadsDir(): string {
+  const cfg = readConfig();
+  if (cfg.mediaDir) {
+    const dir = path.join(cfg.mediaDir, 'downloads');
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    return dir;
+  }
+  // Fallback: ./uploads (legacy, cloud/dev environment)
+  const fallback = path.resolve('./uploads');
+  if (!fs.existsSync(fallback)) fs.mkdirSync(fallback, { recursive: true });
+  return fallback;
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -188,7 +200,8 @@ export async function startTorrentDownload(params: {
     const client = new WebTorrentCtor();
 
     await new Promise<void>((resolve, reject) => {
-      const torrent = client.add(magnet, { path: UPLOADS_DIR });
+      const downloadsDir = getDownloadsDir();
+      const torrent = client.add(magnet, { path: downloadsDir });
 
       torrent.on('metadata', () => {
         console.log(`[torrent] Metadata received for "${title}" — ${torrent.files.length} file(s)`);
@@ -219,10 +232,10 @@ export async function startTorrentDownload(params: {
           return;
         }
 
-        const downloadedPath = path.join(UPLOADS_DIR, videoFile.path);
+        const downloadedPath = path.join(downloadsDir, videoFile.path);
         const safeName = `${Date.now()}-${videoFile.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
         const inputFilename = safeName;
-        const destPath = path.join(UPLOADS_DIR, inputFilename);
+        const destPath = path.join(downloadsDir, inputFilename);
 
         // Rename/move to uploads root with safe name
         try {
@@ -297,8 +310,8 @@ export async function startTorrentDownload(params: {
 
         // Kick off transcode
         try {
-          const result = await transcodeFile(mediaId, destPath, path.join(UPLOADS_DIR, outputFilename));
-          const finalPath = path.join(UPLOADS_DIR, result.outputFilename);
+          const result = await transcodeFile(mediaId, destPath, path.join(downloadsDir, outputFilename));
+          const finalPath = path.join(downloadsDir, result.outputFilename);
           await writeLibrary(lib => {
             const idx = lib.findIndex(m => (m as { id: string }).id === mediaId);
             if (idx !== -1) {

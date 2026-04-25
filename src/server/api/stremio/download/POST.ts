@@ -502,9 +502,10 @@ export default async function handler(req: Request, res: Response) {
 
   // ── Duplicate detection helper ─────────────────────────────────────────────
   // Returns true (and sends 409) if the infoHash is already active.
+  // Errored jobs are NOT considered duplicates — allow the user to retry them.
   const checkDuplicate = (infoHash: string, label: string): boolean => {
     const existing = findJobByInfoHash(infoHash);
-    if (existing) {
+    if (existing && existing.status !== 'error') {
       console.log(`[download] Duplicate detected for "${label}" — infoHash ${infoHash} already ${existing.status}`);
       res.status(409).json({
         error: 'duplicate',

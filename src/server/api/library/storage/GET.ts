@@ -14,7 +14,31 @@ import { readConfig } from '../../../configStore.js';
 import { requireAuth } from '../../../authMiddleware.js';
 
 function getDiskStats(dir: string): { free: number; total: number } | null {
-  // Sanitise dir to prevent shell injection
+  // Windows: use wmic to get disk free/total for the drive letter
+  if (process.platform === 'win32') {
+    try {
+      // Extract drive letter (e.g. "D:" from "D:\HomeStream")
+      const driveLetter = dir.match(/^([A-Za-z]:)/)?.[1];
+      if (!driveLetter) return null;
+      const out = execSync(
+        `wmic logicaldisk where "DeviceID='${driveLetter}'" get FreeSpace,Size /format:csv`,
+        { timeout: 5000 }
+      ).toString().trim();
+      // CSV output: Node,FreeSpace,Size  (first line is header, second is data)
+      const lines = out.split('\n').map(l => l.trim()).filter(Boolean);
+      const dataLine = lines.find(l => !l.startsWith('Node') && l.includes(','));
+      if (dataLine) {
+        const parts = dataLine.split(',');
+        // wmic csv: Node, FreeSpace, Size
+        const free  = parseInt(parts[1] ?? '0', 10);
+        const total = parseInt(parts[2] ?? '0', 10);
+        if (!isNaN(free) && !isNaN(total) && total > 0) return { free, total };
+      }
+    } catch { /* wmic unavailable */ }
+    return null;
+  }
+
+  // Linux / macOS: use df -k
   const safePath = dir.replace(/[`$\\|;&<>(){}!]/g, '');
   try {
     const out = execSync(`df -k "${safePath}" 2>/dev/null | tail -1`, { timeout: 3000 }).toString().trim();
