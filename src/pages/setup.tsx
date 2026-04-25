@@ -85,6 +85,7 @@ export default function SetupPage() {
     vpnKnownServers: '',
     prowlarrUrl: 'http://localhost:9696',
     prowlarrApiKey: '',
+    realDebridApiKey: '',
   });
 
   const set = (key: keyof FormData, value: unknown) =>
@@ -125,6 +126,8 @@ export default function SetupPage() {
   const [vpnTestMsg, setVpnTestMsg]       = useState('');
   const [prowlarrTest, setProwlarrTest]   = useState<KeyTestState>('idle');
   const [prowlarrTestMsg, setProwlarrTestMsg] = useState('');
+  const [rdTest, setRdTest]               = useState<KeyTestState>('idle');
+  const [rdTestMsg, setRdTestMsg]         = useState('');
 
   // Track whether the Electron platform defaults have been fetched.
   // StepMediaFolder disables its "Save & Continue" button until this resolves
@@ -239,6 +242,8 @@ export default function SetupPage() {
     vpnTestMsg, setVpnTestMsg,
     prowlarrTest, setProwlarrTest,
     prowlarrTestMsg, setProwlarrTestMsg,
+    rdTest, setRdTest,
+    rdTestMsg, setRdTestMsg,
     platformDefaultsReady,
     availableDrives,
   };

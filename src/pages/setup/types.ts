@@ -50,6 +50,8 @@ export interface FormData {
   // Prowlarr — self-hosted indexer aggregator
   prowlarrUrl: string;
   prowlarrApiKey: string;
+  // Real-Debrid — premium download backend
+  realDebridApiKey: string;
 }
 
 export type KeyTestState = 'idle' | 'testing' | 'ok' | 'error';
@@ -114,6 +116,10 @@ export interface SetupStepProps {
   setProwlarrTest: (v: KeyTestState) => void;
   prowlarrTestMsg: string;
   setProwlarrTestMsg: (v: string) => void;
+  rdTest: KeyTestState;
+  setRdTest: (v: KeyTestState) => void;
+  rdTestMsg: string;
+  setRdTestMsg: (v: string) => void;
   /** True once /api/electron has responded — prevents saving stale mediaDir on fast clicks */
   platformDefaultsReady: boolean;
   /** Available fixed drives on Windows (e.g. ["C:\\", "D:\\"]). Empty on macOS/Linux. */

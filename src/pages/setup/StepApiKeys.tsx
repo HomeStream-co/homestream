@@ -17,6 +17,7 @@ export default function StepApiKeys({
   omdbTest, setOmdbTest, omdbTestMsg, setOmdbTestMsg,
   googleAiTest, setGoogleAiTest, googleAiTestMsg, setGoogleAiTestMsg,
   ollamaTest, setOllamaTest, ollamaTestMsg, setOllamaTestMsg,
+  rdTest, setRdTest, rdTestMsg, setRdTestMsg,
 }: SetupStepProps) {
   // ── Key tests run server-side so they work offline-detection-aware
   // and avoid any browser CORS restrictions ──────────────────────────
@@ -47,6 +48,32 @@ export default function StepApiKeys({
   const testOmdbKey     = () => testKeyViaServer('omdb',     form.omdbApiKey,     setOmdbTest,     setOmdbTestMsg);
   const testGoogleAiKey = () => testKeyViaServer('googleai', form.googleAiApiKey, setGoogleAiTest, setGoogleAiTestMsg);
 
+  const testRdKey = async () => {
+    if (!form.realDebridApiKey.trim()) return;
+    setRdTest('testing'); setRdTestMsg('');
+    try {
+      const res = await fetch('/api/setup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'test_real_debrid', realDebridApiKey: form.realDebridApiKey.trim() }),
+      });
+      const data = await res.json() as { ok: boolean; user?: { username: string; premium: number }; error?: string };
+      if (data.ok && data.user) {
+        const days = Math.floor((data.user.premium ?? 0) / 86400);
+        setRdTest(days > 0 ? 'ok' : 'error');
+        setRdTestMsg(days > 0
+          ? `${data.user.username} — ${days} days of premium remaining`
+          : `${data.user.username} — Premium expired, please renew`);
+      } else {
+        setRdTest('error');
+        setRdTestMsg(data.error ?? 'Connection failed');
+      }
+    } catch {
+      setRdTest('error');
+      setRdTestMsg('Could not reach the HomeStream server — is it running?');
+    }
+  };
+
   const testOllamaConnection = async () => {
     if (!form.ollamaUrl.trim()) return;
     setOllamaTest('testing'); setOllamaTestMsg('');
@@ -71,6 +98,7 @@ export default function StepApiKeys({
         omdbApiKey: form.omdbApiKey,
         googleAiApiKey: form.googleAiApiKey,
         tmdbApiKey: form.tmdbApiKey,
+        realDebridApiKey: form.realDebridApiKey,
         aiProvider: form.aiProvider,
         ollamaUrl: form.ollamaUrl,
         ollamaModel: form.ollamaModel,
@@ -312,6 +340,55 @@ export default function StepApiKeys({
               </div>
             </div>
           )}
+        </div>
+        {/* Real-Debrid */}
+        <div className="p-4 rounded-xl border border-yellow-500/20 bg-yellow-500/5">
+          <div className="flex items-center justify-between mb-1">
+            <div className="flex items-center gap-2">
+              <Zap className="w-4 h-4 text-yellow-400" />
+              <p className="text-sm font-semibold text-foreground">Real-Debrid API Key</p>
+              <span className="text-[10px] bg-yellow-500/20 text-yellow-400 px-1.5 py-0.5 rounded font-medium">Optional</span>
+            </div>
+            <a href="https://real-debrid.com/apitoken" target="_blank" rel="noopener noreferrer" className="text-[10px] text-primary hover:underline flex items-center gap-0.5">Get key <ExternalLink className="w-2.5 h-2.5" /></a>
+          </div>
+          <p className="text-xs text-muted-foreground mb-2">
+            Premium download backend — resolves torrents server-side so you don't need qBittorrent.
+            If set, Real-Debrid is used for all downloads automatically.
+          </p>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={form.realDebridApiKey}
+              onChange={e => { set('realDebridApiKey', e.target.value); setRdTest('idle'); }}
+              placeholder="Paste your RD API token"
+              className="flex-1 bg-background border border-border rounded-lg px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary font-mono min-w-0"
+            />
+            <button
+              onClick={testRdKey}
+              disabled={!form.realDebridApiKey.trim() || rdTest === 'testing'}
+              className="flex items-center gap-1.5 px-3 py-2.5 rounded-lg bg-muted hover:bg-muted/80 text-foreground text-xs font-medium transition-colors disabled:opacity-40 flex-shrink-0"
+            >
+              {rdTest === 'testing' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />} Test
+            </button>
+          </div>
+          {rdTest === 'ok' && (
+            <div className="mt-2 flex items-center gap-1.5 text-[11px] text-green-400 bg-green-500/10 border border-green-500/20 rounded-lg px-2.5 py-1.5">
+              <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" />{rdTestMsg}
+            </div>
+          )}
+          {rdTest === 'error' && (
+            <div className="mt-2 flex items-center gap-1.5 text-[11px] text-destructive bg-destructive/10 border border-destructive/20 rounded-lg px-2.5 py-1.5">
+              <XCircle className="w-3.5 h-3.5 flex-shrink-0" />{rdTestMsg}
+            </div>
+          )}
+          <div className="mt-2 flex flex-col gap-1 text-[10px] text-muted-foreground">
+            <p className="font-medium text-foreground/70">How to get your key:</p>
+            <ol className="list-decimal list-inside space-y-0.5 ml-1">
+              <li>Go to <a href="https://real-debrid.com" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">real-debrid.com</a> and log in</li>
+              <li>Visit <a href="https://real-debrid.com/apitoken" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">real-debrid.com/apitoken</a></li>
+              <li>Copy the token and paste it above</li>
+            </ol>
+          </div>
         </div>
       </div>
 

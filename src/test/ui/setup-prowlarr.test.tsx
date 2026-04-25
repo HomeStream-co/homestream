@@ -64,6 +64,7 @@ function defaultForm(overrides: Partial<FormData> = {}): FormData {
     vpnKnownServers: '',
     prowlarrUrl: '',
     prowlarrApiKey: '',
+    realDebridApiKey: '',
     ...overrides,
   };
 }
@@ -130,6 +131,10 @@ function buildProps(overrides: Partial<SetupStepProps> = {}): SetupStepProps {
     setProwlarrTest: vi.fn(),
     prowlarrTestMsg: '',
     setProwlarrTestMsg: vi.fn(),
+    rdTest: 'idle',
+    setRdTest: vi.fn(),
+    rdTestMsg: '',
+    setRdTestMsg: vi.fn(),
     platformDefaultsReady: true,
     availableDrives: [],
     ...overrides,
