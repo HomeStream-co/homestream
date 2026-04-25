@@ -35,6 +35,29 @@ export default class AppErrorBoundary extends React.Component<Props, State> {
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     this.setState({ errorInfo });
 
+    // If this is a stale chunk error (Vite hash mismatch after auto-update),
+    // attempt a single auto-reload with the same loop guard used in main.tsx.
+    const msg = error.message ?? '';
+    const isChunkError = (
+      msg.includes('Failed to fetch dynamically imported module') ||
+      msg.includes('Importing a module script failed') ||
+      msg.includes('Unable to preload CSS for') ||
+      msg.includes('error loading dynamically imported module')
+    );
+    if (isChunkError) {
+      const CHUNK_RELOAD_KEY = 'hs_chunk_reload_at';
+      const CHUNK_RELOAD_COOLDOWN_MS = 10_000;
+      const now = Date.now();
+      const lastReload = parseInt(sessionStorage.getItem(CHUNK_RELOAD_KEY) ?? '0', 10);
+      if (now - lastReload >= CHUNK_RELOAD_COOLDOWN_MS) {
+        console.warn('[HomeStream] AppErrorBoundary: stale chunk — reloading…');
+        sessionStorage.setItem(CHUNK_RELOAD_KEY, String(now));
+        window.location.replace(window.location.href);
+        return; // don't log crash or show error screen — we're reloading
+      }
+      console.error('[HomeStream] AppErrorBoundary: chunk error persists after reload — showing crash screen.');
+    }
+
     // Post to the crash log API so it persists and shows in the Debug Panel
     fetch('/api/crash-log', {
       method: 'POST',
@@ -125,7 +148,10 @@ export default class AppErrorBoundary extends React.Component<Props, State> {
             </button>
 
             <button
-              onClick={() => window.location.reload()}
+              onClick={() => {
+                sessionStorage.removeItem('hs_chunk_reload_at');
+                window.location.replace(window.location.href);
+              }}
               className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl border border-border bg-card text-foreground font-medium text-sm hover:bg-muted transition-colors"
             >
               <RefreshCw className="w-4 h-4" />
