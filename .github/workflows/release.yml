@@ -150,10 +150,16 @@ jobs:
         run: |
           $tag = "${{ github.ref_name }}"
           $headers = @{ Authorization = "token $env:GH_TOKEN"; Accept = "application/vnd.github+json"; "Content-Type" = "application/json" }
-          $uri = "https://api.github.com/repos/${{ github.repository }}/releases/tags/$tag"
-          $release = Invoke-RestMethod -Uri $uri -Headers $headers
+          # /releases/tags/:tag only returns published releases — drafts are invisible there.
+          # Use the list endpoint instead and filter by tag_name so we find drafts too.
+          $releases = Invoke-RestMethod -Uri "https://api.github.com/repos/${{ github.repository }}/releases?per_page=20" -Headers $headers
+          $release = $releases | Where-Object { $_.tag_name -eq $tag } | Select-Object -First 1
+          if (-not $release) {
+            Write-Error "Could not find any release (draft or published) for tag $tag"
+            exit 1
+          }
           $id = $release.id
-          Write-Host "Un-drafting release id=$id tag=$tag"
+          Write-Host "Un-drafting release id=$id tag=$tag (was draft=$($release.draft))"
           $body = '{"draft":false,"prerelease":false,"make_latest":"true"}'
           Invoke-RestMethod -Method Patch -Uri "https://api.github.com/repos/${{ github.repository }}/releases/$id" -Headers $headers -Body $body
           Write-Host "Release $tag is now published and marked as latest."
