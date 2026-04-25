@@ -242,7 +242,7 @@ export default function SettingsPanel({
   useEffect(() => {
     if (!open || storageStats) return;
     setStorageLoading(true);
-    fetch('/api/library/storage')
+    fetch('/api/library/storage', { credentials: 'include' })
       .then(r => r.json())
       .then((data: StorageStats & { storageAllocation?: { moviesPct: number; tvPct: number } }) => {
         setStorageStats(data);
