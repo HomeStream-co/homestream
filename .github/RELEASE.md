@@ -2,13 +2,25 @@
 
 ## How releases work
 
-Pushing a version tag triggers the full Windows build automatically:
+Pushing a version tag triggers the full Windows build automatically.
+Use the `release.sh` script — it handles the version bump, commit, tag, and push in one step:
 
 ```bash
-# Bump version in package.json first
-npm version 1.1.0          # updates package.json + creates git tag v1.1.0
-git push origin main --tags # pushes commit + tag → triggers GitHub Actions
+# Patch release (1.6.4 → 1.6.5)
+./release.sh patch
+
+# Minor release (1.6.x → 1.7.0)
+./release.sh minor
+
+# Major release (1.x.x → 2.0.0)
+./release.sh major
 ```
+
+The script:
+1. Runs `npm version <patch|minor|major> --no-git-tag-version` to bump `package.json` only
+2. Commits the version bump: `chore: bump to vX.Y.Z`
+3. Creates an annotated git tag `vX.Y.Z`
+4. Pushes the commit and tag to `origin main`
 
 GitHub Actions then:
 1. Spins up a `windows-latest` runner
@@ -20,7 +32,7 @@ GitHub Actions then:
 
 The finished installer is available at:
 ```
-https://github.com/HomeStream-co/homestream/releases/tag/v1.1.0
+https://github.com/HomeStream-co/homestream/releases/tag/vX.Y.Z
 ```
 
 ---

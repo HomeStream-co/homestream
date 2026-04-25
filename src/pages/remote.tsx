@@ -552,7 +552,7 @@ function RemotePageInner() {
         /* ════════════════════════════════════════════════════════════════════
            PORTRAIT LAYOUT (default)
         ════════════════════════════════════════════════════════════════════ */
-        <div className="w-full max-w-sm mx-auto flex flex-col px-4 pt-5 pb-24" onClick={() => { if (showSubtitlePicker) setShowSubtitlePicker(false); if (showSpeedPicker) setShowSpeedPicker(false); }}
+        <div className="w-full max-w-sm mx-auto flex flex-col px-4 pt-5 pb-24" onClick={() => { if (showSubtitlePicker) setShowSubtitlePicker(false); if (showSpeedPicker) setShowSpeedPicker(false); }}>
 
           {/* Header bar */}
           <div className="flex items-center justify-between mb-5">
