@@ -39,6 +39,7 @@ export default class InlineErrorBoundary extends React.Component<Props, State> {
     // Post to crash log so it shows in the Debug Panel
     fetch('/api/crash-log', {
       method: 'POST',
+      credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         type: 'reactError',

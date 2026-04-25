@@ -35,6 +35,7 @@ export default class RouteErrorBoundary extends React.Component<Props, State> {
     // Report to crash log — best effort, don't throw if it fails
     fetch('/api/crash-log', {
       method: 'POST',
+      credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         type: 'route-render-error',

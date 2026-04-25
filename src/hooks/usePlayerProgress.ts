@@ -111,6 +111,7 @@ export function usePlayerProgress({
         } else {
           fetch(`/api/media/${id}/progress`, {
             method: 'PATCH',
+            credentials: 'include',
             headers: { 'Content-Type': 'application/json' },
             body: payload,
             keepalive: true,

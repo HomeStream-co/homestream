@@ -522,7 +522,7 @@ export default function GenreBrowser() {
     setLoading(true);
     setGenreData(null);
     try {
-      const res = await fetch(`/api/tmdb/genres?genreId=${genre.id}&mediaType=${type}`);
+      const res = await fetch(`/api/tmdb/genres?genreId=${genre.id}&mediaType=${type}`, { credentials: 'include' });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json() as GenreData;
       cache.current.set(genre.id, data);
