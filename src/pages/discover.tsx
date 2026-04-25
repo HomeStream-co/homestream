@@ -597,14 +597,14 @@ function DownloadModal({ target, onClose }: { target: DownloadTarget; onClose: (
       }
 
       if (res.status === 503) {
-        // No download backend — qBit offline and WebTorrent not available in Electron
+        // No download backend — qBit offline, WebTorrent not available, and no RD key configured
         toast.custom(() => (
           <div className="flex items-start gap-3 bg-card border border-red-500/30 rounded-xl px-4 py-3 shadow-xl max-w-sm">
             <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
             <div>
-              <p className="text-sm font-semibold text-foreground">qBittorrent required</p>
+              <p className="text-sm font-semibold text-foreground">No download backend available</p>
               <p className="text-xs text-muted-foreground mt-0.5 mb-2">
-                Downloads require qBittorrent to be running. Start it, then try again.
+                Downloads require qBittorrent or a Real-Debrid API key. Add one in Settings to enable downloads.
               </p>
               <a
                 href="https://www.qbittorrent.org/download"
