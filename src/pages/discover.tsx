@@ -502,8 +502,6 @@ function DownloadModal({ target, onClose }: { target: DownloadTarget; onClose: (
     setSearching(true);
     setError('');
     try {
-      // Route through the backend proxy — avoids CORS and works in all environments.
-      // /api/stremio/stream handles Torrentio + Prowlarr + Nyaa server-side.
       const res = await fetch('/api/stremio/stream', {
         method: 'POST',
         credentials: 'include',
@@ -528,7 +526,10 @@ function DownloadModal({ target, onClose }: { target: DownloadTarget; onClose: (
         title: `${s.quality}${s.size ? ` · ${s.size}` : ''}${s.seeds ? ` · 👤 ${s.seeds}` : ''}`,
         url: s.infoHash,
         imdbId: resolvedImdbId,
+<<<<<<< HEAD
         // Preserve full stream data so the download call gets real magnet URIs + tracker list
+=======
+>>>>>>> 20260425032449-9h9yrecco0
         quality: s.quality,
         size: s.size,
         seeds: s.seeds,
@@ -539,7 +540,6 @@ function DownloadModal({ target, onClose }: { target: DownloadTarget; onClose: (
       setStreams(found);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      // "Failed to fetch" means the browser couldn't reach the server at all
       setError(msg === 'Failed to fetch'
         ? 'Could not reach the HomeStream server. Make sure the app is running.'
         : msg);
@@ -548,6 +548,12 @@ function DownloadModal({ target, onClose }: { target: DownloadTarget; onClose: (
     }
   };
 
+<<<<<<< HEAD
+=======
+  // Auto-search as soon as the modal opens — no manual button click needed
+  useEffect(() => { search(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+>>>>>>> 20260425032449-9h9yrecco0
   const startDownload = async (stream: { name: string; title: string; url: string; imdbId: string; quality: string; size: string; seeds: string; magnet: string; source: string }) => {
     setDownloading(stream.url);
     try {
@@ -645,36 +651,21 @@ function DownloadModal({ target, onClose }: { target: DownloadTarget; onClose: (
         </div>
 
         <div className="p-5">
-          {streams.length === 0 && !searching && !error && (
-            <div className="text-center py-4">
-              <p className="text-sm text-muted-foreground mb-4">
-                Search for available torrents to download to your HomeStream server.
-              </p>
-              <button
-                onClick={search}
-                className="flex items-center gap-2 bg-primary hover:bg-primary/80 text-primary-foreground px-5 py-2.5 rounded-lg font-semibold text-sm mx-auto transition-colors"
-              >
-                <Search className="w-4 h-4" />
-                Search Torrents
-              </button>
-            </div>
-          )}
-
           {searching && (
-            <div className="flex flex-col items-center py-6 gap-3">
+            <div className="flex flex-col items-center py-8 gap-3">
               <Loader2 className="w-6 h-6 animate-spin text-primary" />
-              <p className="text-sm text-muted-foreground">Searching for streams…</p>
+              <p className="text-sm text-muted-foreground">Finding available torrents…</p>
             </div>
           )}
 
-          {error && (
+          {error && !searching && (
             <div className="text-center py-4">
               <p className="text-sm text-red-400 mb-3">{error}</p>
-              <button onClick={search} className="text-xs text-primary hover:text-primary/80">Try again</button>
+              <button onClick={search} className="text-xs text-primary hover:text-primary/80 underline underline-offset-2">Try again</button>
             </div>
           )}
 
-          {streams.length > 0 && (
+          {streams.length > 0 && !searching && (
             <div className="space-y-2">
               <p className="text-xs text-muted-foreground mb-3">Select a quality to download:</p>
               {streams.map(s => (
