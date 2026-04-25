@@ -93,7 +93,10 @@ export default function DownloadTab() {
     if (!q.trim()) { setResults([]); return; }
     setSearching(true);
     try {
-      const r = await fetch(`/api/tmdb/search?q=${encodeURIComponent(q)}&page=1`);
+      const r = await fetch(`/api/tmdb/search?q=${encodeURIComponent(q)}&page=1`, {
+        credentials: 'include',
+        headers: remoteAuthHeaders(),
+      });
       if (!r.ok) throw new Error('search failed');
       const data = await r.json() as { results?: TMDBSearchResult[] };
       setResults((data.results ?? []).filter(x => x.media_type === 'movie' || x.media_type === 'tv').slice(0, 12));
@@ -118,7 +121,10 @@ export default function DownloadTab() {
       const title = item.title ?? item.name ?? 'Unknown';
       const poster = item.poster_path ? `https://image.tmdb.org/t/p/w200${item.poster_path}` : undefined;
       const detailUrl = `/api/tmdb/${type === 'movie' ? 'movie' : 'tv'}/${item.id}`;
-      const detailRes = await fetch(detailUrl);
+      const detailRes = await fetch(detailUrl, {
+        credentials: 'include',
+        headers: remoteAuthHeaders(),
+      });
       let imdbId = item.imdb_id ?? '';
       if (detailRes.ok) {
         const detail = await detailRes.json() as { imdb_id?: string; external_ids?: { imdb_id?: string } };
