@@ -1068,7 +1068,7 @@ export default function DownloadsPage() {
     }
   };
 
-
+  const handleDelete = useCallback(async (hash: string, deleteFiles: boolean) => {
     try {
       const res = await fetch(`/api/stremio/downloads/${hash}?deleteFiles=${deleteFiles}`, { method: 'DELETE', credentials: 'include' });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
