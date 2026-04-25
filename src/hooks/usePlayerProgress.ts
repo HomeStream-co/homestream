@@ -143,8 +143,8 @@ export function usePlayerProgress({
       setAutoplayCountdown(prev => {
         if (prev <= 1) {
           clearInterval(autoplayTimerRef.current);
-          const dest = fromParam
-            ? `/player/${nextItemId}?from=${encodeURIComponent(fromParam)}`
+          const dest = _fromParam
+            ? `/player/${nextItemId}?from=${encodeURIComponent(_fromParam)}`
             : `/player/${nextItemId}`;
           navigate(dest);
           return 0;
@@ -153,8 +153,7 @@ export function usePlayerProgress({
       });
     }, 1000);
     return () => clearInterval(autoplayTimerRef.current);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showEndOverlay, autoplayCancelled, nextItemId, navigate, autoplayNext, autoplayTimerRef, setAutoplayCountdown]);
+  }, [showEndOverlay, autoplayCancelled, nextItemId, navigate, autoplayNext, autoplayTimerRef, setAutoplayCountdown, _fromParam]);
 
   // ── Skip Intro visibility + auto-skip ────────────────────────────────────
   const skipIntro = useCallback(() => {
