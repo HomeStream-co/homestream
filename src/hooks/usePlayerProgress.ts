@@ -115,7 +115,7 @@ export function usePlayerProgress({
             headers: { 'Content-Type': 'application/json' },
             body: payload,
             keepalive: true,
-          }).catch(() => {});
+          }).catch(() => {}); // non-fatal — ignore
         }
       }
     };

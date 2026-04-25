@@ -52,7 +52,7 @@ export default function AITab({ send }: AITabProps) {
     fetch('/api/media', { headers: remoteAuthHeaders() })
       .then(r => r.json())
       .then((data: LibraryItem[]) => setLibrary(Array.isArray(data) ? data : []))
-      .catch(() => {});
+      .catch(() => {}); // non-fatal — ignore
     const SR = window.SpeechRecognition ?? window.webkitSpeechRecognition;
     setVoiceSupported(!!SR);
   }, []);

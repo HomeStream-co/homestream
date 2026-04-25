@@ -95,14 +95,14 @@ function RemoteQRWidget() {
     navigator.clipboard.writeText(remoteUrl).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    }).catch(() => {});
+    }).catch(() => {}); // non-fatal — ignore
   }
 
   function copyIP() {
     navigator.clipboard.writeText(displayAddress).then(() => {
       setCopiedIP(true);
       setTimeout(() => setCopiedIP(false), 2000);
-    }).catch(() => {});
+    }).catch(() => {}); // non-fatal — ignore
   }
 
   useEffect(() => {

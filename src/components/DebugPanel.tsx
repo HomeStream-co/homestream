@@ -898,7 +898,7 @@ export default function DebugPanel({ open, onClose }: DebugPanelProps) {
       .then((data: { developerLock?: boolean } | null) => {
         if (data?.developerLock) setDevLocked(true);
       })
-      .catch(() => {});
+      .catch(() => {}); // non-fatal — ignore
   }, []);
 
   // ── Electron IPC: Ctrl+Shift+Alt+D shortcut ───────────────────────────────

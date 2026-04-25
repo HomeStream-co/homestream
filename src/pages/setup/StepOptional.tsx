@@ -45,7 +45,7 @@ export default function StepOptional({
     fetch('/api/vpn/interfaces')
       .then(r => r.json())
       .then((d: { interfaces: NetworkInterface[] }) => setInterfaces(d.interfaces.filter(i => !i.internal && i.family === 'IPv4')))
-      .catch(() => {})
+      .catch(() => {}) // non-fatal — ignore
       .finally(() => setIfaceLoading(false));
   }, []);
 

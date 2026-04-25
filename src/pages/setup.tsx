@@ -141,7 +141,7 @@ export default function SetupPage() {
       if (data.config?.tmdbApiKey) {
         setForm(f => f.tmdbApiKey ? f : { ...f, tmdbApiKey: data.config!.tmdbApiKey! });
       }
-    }).catch(() => {});
+    }).catch(() => {}); // non-fatal — ignore
   }, [navigate]);
 
   // ── Fetch platform-aware default media directory from Electron ──
