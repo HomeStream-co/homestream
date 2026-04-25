@@ -145,8 +145,8 @@ export default function SettingsPanel({
     omdb: false, googleAi: false, tmdb: false, realDebrid: false,
   });
   const [apiKeyTimestamps, setApiKeyTimestamps] = useState<{
-    omdb: string | null; googleAi: string | null; tmdb: string | null; realDebrid: string | null;
-  }>({ omdb: null, googleAi: null, tmdb: null, realDebrid: null });
+    omdb: string | null; googleAi: string | null; tmdb: string | null;
+  }>({ omdb: null, googleAi: null, tmdb: null });
 
   useEffect(() => {
     if (!open || apiKeysLoaded) return;
@@ -158,7 +158,6 @@ export default function SettingsPanel({
           omdbApiKeySavedAt?: string | null;
           googleAiApiKeySavedAt?: string | null;
           tmdbApiKeySavedAt?: string | null;
-          realDebridApiKeySavedAt?: string | null;
         }
       }) => {
         if (data.config) {
@@ -173,7 +172,6 @@ export default function SettingsPanel({
             omdb:        data.config.omdbApiKeySavedAt        ?? null,
             googleAi:    data.config.googleAiApiKeySavedAt    ?? null,
             tmdb:        data.config.tmdbApiKeySavedAt        ?? null,
-            realDebrid:  data.config.realDebridApiKeySavedAt  ?? null,
           });
           setApiKeysLoaded(true);
         }

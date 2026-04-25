@@ -1,5 +1,6 @@
 import { KeyRound, Loader2, CheckCircle2, Clock, AlertTriangle, RefreshCw, ExternalLink, Zap } from 'lucide-react';
 import { SectionHeader, ApiKeyField } from './shared';
+import { useState, useEffect } from 'react';
 
 export interface ApiKeysState {
   omdbApiKey: string;
@@ -19,7 +20,6 @@ interface ApiKeyTimestamps {
   omdb: string | null;
   googleAi: string | null;
   tmdb: string | null;
-  realDebrid: string | null;
 }
 
 interface SettingsApiKeysProps {
@@ -59,14 +59,6 @@ const KEY_META = {
     warnDays: 30,
     renewUrl: 'https://www.themoviedb.org/settings/api',
     renewLabel: 'themoviedb.org',
-  },
-  realDebrid: {
-    label: 'Real-Debrid',
-    // RD API tokens don't expire but rotate annually is good practice
-    lifespanDays: 365,
-    warnDays: 30,
-    renewUrl: 'https://real-debrid.com/apitoken',
-    renewLabel: 'real-debrid.com/apitoken',
   },
 } as const;
 
@@ -173,6 +165,119 @@ function KeyLifespanBadge({ savedAt, lifespanDays, warnDays, renewUrl, renewLabe
   );
 }
 
+// ── RealDebridPremiumBadge ────────────────────────────────────────────────────
+// Fetches live subscription data from /api/real-debrid/status.
+// The server caches the result and only re-fetches from RD after the expiry
+// passes — so this component never hammers the RD API.
+
+interface RDStatus {
+  ok: boolean;
+  cached?: boolean;
+  daysLeft?: number;
+  premiumExpiry?: string;
+  checkedAt?: string;
+  username?: string;
+  reason?: string;
+  error?: string;
+}
+
+function RealDebridPremiumBadge({ hasSavedKey }: { hasSavedKey: boolean }) {
+  const [status, setStatus] = useState<RDStatus | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!hasSavedKey) return;
+    setLoading(true);
+    fetch('/api/real-debrid/status', { credentials: 'include' })
+      .then(r => r.json())
+      .then((data: RDStatus) => setStatus(data))
+      .catch(() => setStatus({ ok: false, reason: 'fetch_failed' }))
+      .finally(() => setLoading(false));
+  }, [hasSavedKey]);
+
+  if (!hasSavedKey) return null;
+
+  if (loading) {
+    return (
+      <div className="mt-1.5 flex items-center gap-1.5 text-[10px] text-muted-foreground">
+        <Loader2 className="w-3 h-3 animate-spin" />
+        Checking Real-Debrid subscription…
+      </div>
+    );
+  }
+
+  if (!status || !status.ok) {
+    const msg = status?.reason === 'no_key'
+      ? 'No API key configured'
+      : (status?.error ?? 'Could not reach Real-Debrid');
+    return (
+      <div className="mt-1.5 rounded-lg border border-red-500/20 bg-red-500/5 px-2.5 py-2 flex items-center gap-1.5">
+        <AlertTriangle className="w-3 h-3 text-red-400 flex-shrink-0" />
+        <span className="text-[10px] text-red-400">{msg}</span>
+      </div>
+    );
+  }
+
+  const days      = status.daysLeft ?? 0;
+  const isExpired = days <= 0;
+  const isWarning = !isExpired && days <= 14;
+  const isHealthy = !isExpired && !isWarning;
+
+  const barPct      = isExpired ? 100 : Math.min(100, Math.max(2, ((180 - days) / 180) * 100));
+  const barColor    = isExpired ? 'bg-red-500' : isWarning ? 'bg-yellow-500' : 'bg-green-500';
+  const textColor   = isExpired ? 'text-red-400' : isWarning ? 'text-yellow-400' : 'text-green-400';
+  const borderColor = isExpired ? 'border-red-500/20' : isWarning ? 'border-yellow-500/20' : 'border-green-500/20';
+  const bgColor     = isExpired ? 'bg-red-500/5' : isWarning ? 'bg-yellow-500/5' : 'bg-green-500/5';
+
+  const expiryLabel = status.premiumExpiry
+    ? new Date(status.premiumExpiry).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+    : null;
+
+  return (
+    <div className={`mt-1.5 rounded-lg border ${borderColor} ${bgColor} px-2.5 py-2`}>
+      <div className="flex items-center justify-between gap-2 mb-1.5">
+        <div className="flex items-center gap-1.5">
+          {isHealthy
+            ? <CheckCircle2 className={`w-3 h-3 ${textColor} flex-shrink-0`} />
+            : <AlertTriangle className={`w-3 h-3 ${textColor} flex-shrink-0`} />
+          }
+          <span className={`text-[10px] font-medium ${textColor}`}>
+            {isExpired
+              ? 'Premium expired — renew at real-debrid.com'
+              : isWarning
+              ? `${days}d left — renew soon`
+              : `${days} days of premium remaining`}
+          </span>
+        </div>
+        <a
+          href="https://real-debrid.com/premium"
+          target="_blank"
+          rel="noopener noreferrer"
+          className={`flex items-center gap-1 text-[10px] ${isHealthy ? 'text-muted-foreground hover:text-foreground' : `font-semibold ${textColor}`} hover:underline flex-shrink-0 transition-colors`}
+        >
+          {(isExpired || isWarning) && <RefreshCw className="w-2.5 h-2.5" />}
+          {isExpired || isWarning ? 'Renew' : 'real-debrid.com'}
+          <ExternalLink className="w-2 h-2 opacity-60" />
+        </a>
+      </div>
+
+      {/* Progress bar — fills as days run out */}
+      <div className="h-1 rounded-full bg-white/8 overflow-hidden">
+        <div
+          className={`h-full rounded-full transition-all duration-500 ${barColor}`}
+          style={{ width: `${barPct}%` }}
+        />
+      </div>
+
+      <p className="text-[9px] text-muted-foreground mt-1">
+        {status.username && <span className="font-medium text-foreground/60">{status.username} · </span>}
+        {expiryLabel ? `Expires ${expiryLabel}` : ''}
+        {status.cached ? ' · cached' : ' · live from Real-Debrid'}
+      </p>
+    </div>
+  );
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function SettingsApiKeys({
@@ -263,10 +368,7 @@ export default function SettingsApiKeys({
             onTest={onTestRealDebrid}
             placeholder={apiKeysSavedState.realDebrid ? '(key saved — enter new to replace)' : 'Paste your RD API token'}
           />
-          <KeyLifespanBadge
-            savedAt={apiKeyTimestamps.realDebrid}
-            {...KEY_META.realDebrid}
-          />
+          <RealDebridPremiumBadge hasSavedKey={apiKeysSavedState.realDebrid} />
         </div>
 
         {/* ── Save button ── */}

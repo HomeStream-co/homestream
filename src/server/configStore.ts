@@ -51,6 +51,9 @@ export interface AppConfig {
   // Real-Debrid — premium link hoster used as preferred download backend
   // When set, downloads go via RD (no qBittorrent or WebTorrent needed)
   realDebridApiKey: string;
+  // Cached RD subscription data — fetched once, re-fetched only after expiry
+  realDebridPremiumExpiry?: string;    // ISO — when the RD subscription actually expires
+  realDebridPremiumCheckedAt?: string; // ISO — when we last fetched from RD API
   // API key save timestamps (ISO strings) — used for lifespan countdown in Settings
   omdbApiKeySavedAt?: string;
   googleAiApiKeySavedAt?: string;
