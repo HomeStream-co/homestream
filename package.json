@@ -3,6 +3,10 @@
   "version": "1.6.4",
   "description": "Self-hosted Netflix-style family media streaming app",
   "author": "HomeStream",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/HomeStream-co/homestream.git"
+  },
   "type": "module",
   "main": "electron/main.cjs",
   "imports": {
