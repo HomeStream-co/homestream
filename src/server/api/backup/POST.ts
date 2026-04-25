@@ -29,6 +29,7 @@ const PROFILES_PATH = dataPath('homestream-profiles.json');
 const REDACTED_CONFIG_FIELDS = new Set([
   'adminPassword', 'qbitPassword', 'omdbApiKey',
   'googleAiApiKey', 'tmdbApiKey', 'jellyfinApiKey',
+  'realDebridApiKey',
 ]);
 
 interface RestoreOptions {
