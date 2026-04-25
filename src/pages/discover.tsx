@@ -596,6 +596,31 @@ function DownloadModal({ target, onClose }: { target: DownloadTarget; onClose: (
         return;
       }
 
+      if (res.status === 503) {
+        // No download backend — qBit offline and WebTorrent not available in Electron
+        toast.custom(() => (
+          <div className="flex items-start gap-3 bg-card border border-red-500/30 rounded-xl px-4 py-3 shadow-xl max-w-sm">
+            <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-semibold text-foreground">qBittorrent required</p>
+              <p className="text-xs text-muted-foreground mt-0.5 mb-2">
+                Downloads require qBittorrent to be running. Start it, then try again.
+              </p>
+              <a
+                href="https://www.qbittorrent.org/download"
+                target="_blank"
+                rel="noreferrer"
+                className="text-xs text-primary underline"
+              >
+                Download qBittorrent →
+              </a>
+            </div>
+          </div>
+        ), { duration: 10000 });
+        setDownloading(null);
+        return;
+      }
+
       if (!res.ok) {
         const errData = await res.json().catch(() => ({})) as { error?: string; message?: string };
         throw new Error(errData.message ?? errData.error ?? `Server error ${res.status}`);
