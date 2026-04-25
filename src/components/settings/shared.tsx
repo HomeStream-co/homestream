@@ -7,7 +7,7 @@
 
 /* eslint-disable react-refresh/only-export-components */
 
-import { memo, useState } from 'react';
+import { memo, useState, type ReactNode } from 'react';
 import { motion } from 'motion/react';
 import {
   AlertTriangle, X, Eye, EyeOff,
@@ -157,9 +157,10 @@ export function ConfirmDialog({
 export type TestStatus = 'idle' | 'testing' | 'ok' | 'error';
 
 export function ApiKeyField({
-  label, description, value, onChange, onTest, placeholder, testLabel,
+  label, labelIcon, description, value, onChange, onTest, placeholder, testLabel,
 }: {
   label: string;
+  labelIcon?: ReactNode;
   description: string;
   value: string;
   onChange: (v: string) => void;
@@ -188,7 +189,9 @@ export function ApiKeyField({
 
   return (
     <div className="py-2.5">
-      <p className="text-sm text-foreground font-medium mb-0.5">{label}</p>
+      <p className="text-sm text-foreground font-medium mb-0.5 flex items-center gap-1.5">
+        {labelIcon}{label}
+      </p>
       <p className="text-[11px] text-muted-foreground mb-2 leading-snug">{description}</p>
       <div className="flex gap-1.5">
         <div className="relative flex-1">

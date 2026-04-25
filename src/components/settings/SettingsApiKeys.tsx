@@ -1,22 +1,25 @@
-import { KeyRound, Loader2, CheckCircle2, Clock, AlertTriangle, RefreshCw, ExternalLink } from 'lucide-react';
+import { KeyRound, Loader2, CheckCircle2, Clock, AlertTriangle, RefreshCw, ExternalLink, Zap } from 'lucide-react';
 import { SectionHeader, ApiKeyField } from './shared';
 
 export interface ApiKeysState {
   omdbApiKey: string;
   googleAiApiKey: string;
   tmdbApiKey: string;
+  realDebridApiKey: string;
 }
 
 export interface ApiKeysSavedState {
   omdb: boolean;
   googleAi: boolean;
   tmdb: boolean;
+  realDebrid: boolean;
 }
 
 interface ApiKeyTimestamps {
   omdb: string | null;
   googleAi: string | null;
   tmdb: string | null;
+  realDebrid: string | null;
 }
 
 interface SettingsApiKeysProps {
@@ -30,6 +33,7 @@ interface SettingsApiKeysProps {
   onTestOmdb: () => Promise<{ ok: boolean; message?: string }>;
   onTestTmdb: () => Promise<{ ok: boolean; message?: string }>;
   onTestGemini: () => Promise<{ ok: boolean; message?: string }>;
+  onTestRealDebrid: () => Promise<{ ok: boolean; message?: string }>;
 }
 
 // ── Key metadata ──────────────────────────────────────────────────────────────
@@ -37,7 +41,6 @@ interface SettingsApiKeysProps {
 const KEY_META = {
   omdb: {
     label: 'OMDB',
-    // OMDB free keys don't expire, but remind after 1 year to check usage
     lifespanDays: 365,
     warnDays: 30,
     renewUrl: 'https://www.omdbapi.com/apikey.aspx',
@@ -45,7 +48,6 @@ const KEY_META = {
   },
   googleAi: {
     label: 'Google Gemini',
-    // Google AI Studio keys don't expire but rotate every ~90 days is best practice
     lifespanDays: 90,
     warnDays: 14,
     renewUrl: 'https://aistudio.google.com/app/apikey',
@@ -53,20 +55,25 @@ const KEY_META = {
   },
   tmdb: {
     label: 'TMDB',
-    // TMDB keys don't expire — remind annually
     lifespanDays: 365,
     warnDays: 30,
     renewUrl: 'https://www.themoviedb.org/settings/api',
     renewLabel: 'themoviedb.org',
+  },
+  realDebrid: {
+    label: 'Real-Debrid',
+    // RD API tokens don't expire but rotate annually is good practice
+    lifespanDays: 365,
+    warnDays: 30,
+    renewUrl: 'https://real-debrid.com/apitoken',
+    renewLabel: 'real-debrid.com/apitoken',
   },
 } as const;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function daysSince(isoDate: string): number {
-  const saved = new Date(isoDate).getTime();
-  const now   = Date.now();
-  return Math.floor((now - saved) / (1000 * 60 * 60 * 24));
+  return Math.floor((Date.now() - new Date(isoDate).getTime()) / (1000 * 60 * 60 * 24));
 }
 
 function daysUntilExpiry(isoDate: string, lifespanDays: number): number {
@@ -105,20 +112,18 @@ function KeyLifespanBadge({ savedAt, lifespanDays, warnDays, renewUrl, renewLabe
   const isWarning = !isExpired && daysLeft <= warnDays;
   const isHealthy = !isExpired && !isWarning;
 
-  const barColor = isExpired ? 'bg-red-500' : isWarning ? 'bg-yellow-500' : 'bg-green-500';
-  const textColor = isExpired ? 'text-red-400' : isWarning ? 'text-yellow-400' : 'text-green-400';
+  const barColor    = isExpired ? 'bg-red-500'    : isWarning ? 'bg-yellow-500' : 'bg-green-500';
+  const textColor   = isExpired ? 'text-red-400'  : isWarning ? 'text-yellow-400' : 'text-green-400';
   const borderColor = isExpired ? 'border-red-500/20' : isWarning ? 'border-yellow-500/20' : 'border-green-500/20';
-  const bgColor = isExpired ? 'bg-red-500/5' : isWarning ? 'bg-yellow-500/5' : 'bg-green-500/5';
+  const bgColor     = isExpired ? 'bg-red-500/5'  : isWarning ? 'bg-yellow-500/5' : 'bg-green-500/5';
 
   return (
     <div className={`mt-1.5 rounded-lg border ${borderColor} ${bgColor} px-2.5 py-2`}>
       <div className="flex items-center justify-between gap-2 mb-1.5">
         <div className="flex items-center gap-1.5">
-          {isExpired
-            ? <AlertTriangle className={`w-3 h-3 ${textColor} flex-shrink-0`} />
-            : isWarning
-            ? <AlertTriangle className={`w-3 h-3 ${textColor} flex-shrink-0`} />
-            : <Clock className={`w-3 h-3 ${textColor} flex-shrink-0`} />
+          {isHealthy
+            ? <Clock className={`w-3 h-3 ${textColor} flex-shrink-0`} />
+            : <AlertTriangle className={`w-3 h-3 ${textColor} flex-shrink-0`} />
           }
           <span className={`text-[10px] font-medium ${textColor}`}>
             {isExpired
@@ -129,7 +134,6 @@ function KeyLifespanBadge({ savedAt, lifespanDays, warnDays, renewUrl, renewLabe
           </span>
         </div>
 
-        {/* Regeneration link */}
         {(isExpired || isWarning) && (
           <a
             href={renewUrl}
@@ -155,7 +159,6 @@ function KeyLifespanBadge({ savedAt, lifespanDays, warnDays, renewUrl, renewLabe
         )}
       </div>
 
-      {/* Progress bar */}
       <div className="h-1 rounded-full bg-white/8 overflow-hidden">
         <div
           className={`h-full rounded-full transition-all duration-500 ${barColor}`}
@@ -174,7 +177,7 @@ function KeyLifespanBadge({ savedAt, lifespanDays, warnDays, renewUrl, renewLabe
 
 export default function SettingsApiKeys({
   apiKeys, apiKeysSavedState, apiKeyTimestamps, apiKeysSaving, apiKeysSaved,
-  onChangeKey, onSave, onTestOmdb, onTestTmdb, onTestGemini,
+  onChangeKey, onSave, onTestOmdb, onTestTmdb, onTestGemini, onTestRealDebrid,
 }: SettingsApiKeysProps) {
   return (
     <div className="border-t border-border/50">
@@ -198,10 +201,7 @@ export default function SettingsApiKeys({
           />
           <KeyLifespanBadge
             savedAt={apiKeyTimestamps.omdb}
-            lifespanDays={KEY_META.omdb.lifespanDays}
-            warnDays={KEY_META.omdb.warnDays}
-            renewUrl={KEY_META.omdb.renewUrl}
-            renewLabel={KEY_META.omdb.renewLabel}
+            {...KEY_META.omdb}
           />
         </div>
 
@@ -222,10 +222,7 @@ export default function SettingsApiKeys({
           />
           <KeyLifespanBadge
             savedAt={apiKeyTimestamps.tmdb}
-            lifespanDays={KEY_META.tmdb.lifespanDays}
-            warnDays={KEY_META.tmdb.warnDays}
-            renewUrl={KEY_META.tmdb.renewUrl}
-            renewLabel={KEY_META.tmdb.renewLabel}
+            {...KEY_META.tmdb}
           />
         </div>
 
@@ -246,10 +243,29 @@ export default function SettingsApiKeys({
           />
           <KeyLifespanBadge
             savedAt={apiKeyTimestamps.googleAi}
-            lifespanDays={KEY_META.googleAi.lifespanDays}
-            warnDays={KEY_META.googleAi.warnDays}
-            renewUrl={KEY_META.googleAi.renewUrl}
-            renewLabel={KEY_META.googleAi.renewLabel}
+            {...KEY_META.googleAi}
+          />
+        </div>
+
+        {/* ── Real-Debrid ── */}
+        <div className="py-2">
+          {apiKeysSavedState.realDebrid && !apiKeys.realDebridApiKey && (
+            <div className="flex items-center gap-1.5 pb-1 text-[11px] text-green-400">
+              <CheckCircle2 className="w-3 h-3" /> Real-Debrid key saved — enter a new value to replace it
+            </div>
+          )}
+          <ApiKeyField
+            label="Real-Debrid"
+            labelIcon={<Zap className="w-3 h-3 text-yellow-400" />}
+            description="Premium download backend — resolves torrents server-side, no torrent client needed. Get key at real-debrid.com/apitoken"
+            value={apiKeys.realDebridApiKey}
+            onChange={v => onChangeKey('realDebridApiKey', v)}
+            onTest={onTestRealDebrid}
+            placeholder={apiKeysSavedState.realDebrid ? '(key saved — enter new to replace)' : 'Paste your RD API token'}
+          />
+          <KeyLifespanBadge
+            savedAt={apiKeyTimestamps.realDebrid}
+            {...KEY_META.realDebrid}
           />
         </div>
 

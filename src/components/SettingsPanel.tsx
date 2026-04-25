@@ -37,7 +37,6 @@ import SettingsVpn, { type VpnInterface } from './settings/SettingsVpn';
 import SettingsTools            from './settings/SettingsTools';
 import SettingsSession          from './settings/SettingsSession';
 import SettingsProwlarr         from './settings/SettingsProwlarr';
-import SettingsRealDebrid       from './settings/SettingsRealDebrid';
 
 // ── Props ─────────────────────────────────────────────────────────────────────
 
@@ -137,17 +136,17 @@ export default function SettingsPanel({
   // ── API Keys state ──────────────────────────────────────────────────────────
 
   const [apiKeys, setApiKeys] = useState<ApiKeysState>({
-    omdbApiKey: '', googleAiApiKey: '', tmdbApiKey: '',
+    omdbApiKey: '', googleAiApiKey: '', tmdbApiKey: '', realDebridApiKey: '',
   });
   const [apiKeysSaving, setApiKeysSaving]   = useState(false);
   const [apiKeysSaved, setApiKeysSaved]     = useState(false);
   const [apiKeysLoaded, setApiKeysLoaded]   = useState(false);
   const [apiKeysSavedState, setApiKeysSavedState] = useState<ApiKeysSavedState>({
-    omdb: false, googleAi: false, tmdb: false,
+    omdb: false, googleAi: false, tmdb: false, realDebrid: false,
   });
   const [apiKeyTimestamps, setApiKeyTimestamps] = useState<{
-    omdb: string | null; googleAi: string | null; tmdb: string | null;
-  }>({ omdb: null, googleAi: null, tmdb: null });
+    omdb: string | null; googleAi: string | null; tmdb: string | null; realDebrid: string | null;
+  }>({ omdb: null, googleAi: null, tmdb: null, realDebrid: null });
 
   useEffect(() => {
     if (!open || apiKeysLoaded) return;
@@ -155,23 +154,26 @@ export default function SettingsPanel({
       .then(r => r.json())
       .then((data: {
         config?: {
-          omdbApiKey?: string; googleAiApiKey?: string; tmdbApiKey?: string;
+          omdbApiKey?: string; googleAiApiKey?: string; tmdbApiKey?: string; realDebridApiKey?: string;
           omdbApiKeySavedAt?: string | null;
           googleAiApiKeySavedAt?: string | null;
           tmdbApiKeySavedAt?: string | null;
+          realDebridApiKeySavedAt?: string | null;
         }
       }) => {
         if (data.config) {
-          setApiKeys({ omdbApiKey: '', googleAiApiKey: '', tmdbApiKey: '' });
+          setApiKeys({ omdbApiKey: '', googleAiApiKey: '', tmdbApiKey: '', realDebridApiKey: '' });
           setApiKeysSavedState({
-            omdb: !!data.config.omdbApiKey,
-            googleAi: !!data.config.googleAiApiKey,
-            tmdb: !!data.config.tmdbApiKey,
+            omdb:        !!data.config.omdbApiKey,
+            googleAi:    !!data.config.googleAiApiKey,
+            tmdb:        !!data.config.tmdbApiKey,
+            realDebrid:  !!data.config.realDebridApiKey,
           });
           setApiKeyTimestamps({
-            omdb:     data.config.omdbApiKeySavedAt     ?? null,
-            googleAi: data.config.googleAiApiKeySavedAt ?? null,
-            tmdb:     data.config.tmdbApiKeySavedAt     ?? null,
+            omdb:        data.config.omdbApiKeySavedAt        ?? null,
+            googleAi:    data.config.googleAiApiKeySavedAt    ?? null,
+            tmdb:        data.config.tmdbApiKeySavedAt        ?? null,
+            realDebrid:  data.config.realDebridApiKeySavedAt  ?? null,
           });
           setApiKeysLoaded(true);
         }
@@ -228,6 +230,29 @@ export default function SettingsPanel({
     if (res.status === 400 || res.status === 403) return { ok: false, message: 'Invalid API key' };
     return { ok: false, message: `HTTP ${res.status}` };
   }, [apiKeys.googleAiApiKey]);
+
+  const testRealDebrid = useCallback(async () => {
+    try {
+      const res = await fetch('/api/setup', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'test_real_debrid',
+          realDebridApiKey: apiKeys.realDebridApiKey || undefined,
+        }),
+      });
+      const data = await res.json() as { ok: boolean; user?: { username: string; premium: number }; error?: string };
+      if (data.ok && data.user) {
+        const premDays = Math.floor((data.user.premium ?? 0) / 86400);
+        const premStr  = premDays > 0 ? `${premDays}d premium remaining` : 'Premium expired';
+        return { ok: premDays > 0, message: `${data.user.username} — ${premStr}` };
+      }
+      return { ok: false, message: data.error ?? 'Connection failed' };
+    } catch {
+      return { ok: false, message: 'Could not reach server' };
+    }
+  }, [apiKeys.realDebridApiKey]);
 
   // ── Storage state ───────────────────────────────────────────────────────────
 
@@ -444,7 +469,6 @@ export default function SettingsPanel({
                   onRefresh={handleTmdbRefresh}
                 />
                 <SettingsProwlarr onSaved={() => toast.success('Prowlarr settings saved')} />
-                <SettingsRealDebrid onSaved={() => toast.success('Real-Debrid settings saved')} />
                 <SettingsStorage
                   storageStats={storageStats}
                   storageLoading={storageLoading}
@@ -484,6 +508,7 @@ export default function SettingsPanel({
                   onTestOmdb={testOmdb}
                   onTestTmdb={testTmdb}
                   onTestGemini={testGemini}
+                  onTestRealDebrid={testRealDebrid}
                 />
                 <SettingsBackup />
                 <SettingsVpn
