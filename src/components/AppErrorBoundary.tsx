@@ -38,6 +38,7 @@ export default class AppErrorBoundary extends React.Component<Props, State> {
     // Post to the crash log API so it persists and shows in the Debug Panel
     fetch('/api/crash-log', {
       method: 'POST',
+      credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         type: 'reactError',

@@ -30,7 +30,7 @@ export default function SettingsProwlarr({ onSaved }: SettingsProwlarrProps) {
   // Load current config on mount
   useEffect(() => {
     if (loaded) return;
-    fetch('/api/setup')
+    fetch('/api/setup', { credentials: 'include' })
       .then(r => r.json())
       .then((data: { config?: { prowlarrUrl?: string; prowlarrApiKey?: string } }) => {
         if (data.config) {
@@ -56,6 +56,7 @@ export default function SettingsProwlarr({ onSaved }: SettingsProwlarrProps) {
     try {
       const res = await fetch('/api/setup', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'test_prowlarr', prowlarrUrl: url, prowlarrApiKey: key }),
       });
@@ -82,6 +83,7 @@ export default function SettingsProwlarr({ onSaved }: SettingsProwlarrProps) {
     try {
       await fetch('/api/setup', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'save',
@@ -107,6 +109,7 @@ export default function SettingsProwlarr({ onSaved }: SettingsProwlarrProps) {
     try {
       await fetch('/api/setup', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'save', prowlarrUrl: '', prowlarrApiKey: '' }),
       });

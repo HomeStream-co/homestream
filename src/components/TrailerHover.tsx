@@ -52,7 +52,7 @@ async function fetchTrailerKey(item: MediaItem): Promise<string | null> {
         type: item.type === 'series' ? 'series' : 'movie',
         ...(item.year ? { year: String(item.year) } : {}),
       });
-      const res = await fetch(`/api/tmdb/trailer?${params}`);
+      const res = await fetch(`/api/tmdb/trailer?${params}`, { credentials: 'include' });
       const data = await res.json() as { trailerKey?: string | null };
       const key = data.trailerKey ?? null;
       trailerCache.set(cacheKey, key);

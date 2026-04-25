@@ -26,7 +26,7 @@ export function useHlsSetup(
 
     let cancelled = false;
 
-    fetch(`/api/hls/${id}/probe`)
+    fetch(`/api/hls/${id}/probe`, { credentials: 'include' })
       .then(r => r.json())
       .then(async (data: { needsTranscode?: boolean; needsHls?: boolean; codec?: string; hlsUrl?: string }) => {
         // API returns `needsTranscode`; `needsHls` kept as fallback for older responses

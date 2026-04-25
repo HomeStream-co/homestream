@@ -81,7 +81,7 @@ export function useTMDB(libraryGenres: string[] = []) {
       if (forceRefresh) params.set('refresh', '1');
       if (genreIds.length > 0) params.set('genres', genreIds.join(','));
 
-      const res = await fetch(`/api/tmdb?${params.toString()}`);
+      const res = await fetch(`/api/tmdb?${params.toString()}`, { credentials: 'include' });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json() as Omit<TMDBData, 'loading' | 'error' | 'lastRefreshed'>;
 
