@@ -104,6 +104,11 @@ export default function ShowDownloadDialog({ open, onOpenChange, item, seasons }
             totalSeasons,
           }),
         });
+        if (res.status === 503) {
+          toast.error('qBittorrent required — start it then try again. Download at qbittorrent.org');
+          setDownloading(false);
+          return;
+        }
         if (!res.ok) {
           const errData = await res.json().catch(() => ({})) as { message?: string; error?: string };
           throw new Error(errData.message ?? errData.error ?? `Server error ${res.status}`);
@@ -125,6 +130,11 @@ export default function ShowDownloadDialog({ open, onOpenChange, item, seasons }
             totalSeasons,
           }),
         });
+        if (res.status === 503) {
+          toast.error('qBittorrent required — start it then try again. Download at qbittorrent.org');
+          setDownloading(false);
+          return;
+        }
         if (!res.ok) {
           const errData = await res.json().catch(() => ({})) as { message?: string; error?: string };
           throw new Error(errData.message ?? errData.error ?? `Server error ${res.status}`);
