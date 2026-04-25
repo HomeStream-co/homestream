@@ -18,7 +18,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
-  Download, WifiOff, Trash2, Pause, Play,
+  Download, Trash2, Pause, Play,
   CheckCircle2, AlertCircle, Clock, Loader2,
   Film, Tv2, ArrowDown, ArrowUp, Zap, HardDrive,
   RefreshCw, X, ChevronDown, ChevronUp, Activity,
@@ -166,74 +166,103 @@ const STATUS_CONFIG = {
   error:       { color: 'text-red-400',     bg: 'bg-red-400/10',    label: 'Error',       icon: AlertCircle },
 } as const;
 
-// ─── qBittorrent Status Banner ────────────────────────────────────────────────
-// Always visible — collapses to a slim pill when online, expands with
-// actionable instructions when offline.
+// ─── Backend Status Indicators ───────────────────────────────────────────────
+// Two compact labeled dots in the page header.
+//
+// qBittorrent dot:
+//   🟢 online + active/queued downloads present
+//   🟡 online but idle (connected, nothing downloading)
+//   🔴 offline / unreachable
+//   ⚪ loading
+//
+// Real-Debrid dot:
+//   🟢 premium, >30 days remaining
+//   🟡 premium, ≤30 days remaining (expiring soon)
+//   🔴 no key configured / expired / fetch failed
+//   ⚪ loading
 
-type QbitBannerState = 'loading' | 'online' | 'offline';
+type DotColor = 'loading' | 'green' | 'yellow' | 'red';
 
-function QbitStatusBanner({ state }: { state: QbitBannerState }) {
+interface RdStatus {
+  ok: boolean;
+  daysLeft?: number;
+  reason?: string;
+  username?: string;
+}
+
+// Dot colours → Tailwind classes
+const DOT_CLASSES: Record<DotColor, { dot: string; text: string; ring: string }> = {
+  loading: { dot: 'bg-muted-foreground/40',                    text: 'text-muted-foreground',  ring: '' },
+  green:   { dot: 'bg-green-400',                              text: 'text-green-400',          ring: 'shadow-[0_0_6px_2px_rgba(74,222,128,0.45)]' },
+  yellow:  { dot: 'bg-yellow-400',                             text: 'text-yellow-400',         ring: 'shadow-[0_0_6px_2px_rgba(250,204,21,0.45)]' },
+  red:     { dot: 'bg-red-500',                                text: 'text-red-400',            ring: 'shadow-[0_0_6px_2px_rgba(239,68,68,0.45)]' },
+};
+
+function StatusDot({
+  color,
+  label,
+  sublabel,
+  tooltip,
+}: {
+  color: DotColor;
+  label: string;
+  sublabel?: string;
+  tooltip: string;
+}) {
+  const cls = DOT_CLASSES[color];
+  return (
+    <div
+      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-muted/30 border border-border/60 cursor-default select-none"
+      title={tooltip}
+    >
+      <span
+        className={`w-2 h-2 rounded-full flex-shrink-0 ${cls.dot} ${color !== 'loading' ? cls.ring : ''} ${color === 'green' ? 'animate-pulse' : ''}`}
+      />
+      <span className={`text-xs font-semibold ${cls.text}`}>{label}</span>
+      {sublabel && (
+        <span className="text-[10px] text-muted-foreground hidden sm:inline">{sublabel}</span>
+      )}
+    </div>
+  );
+}
+
+// Collapsible qBit offline help — only shown when qBit is red
+function QbitOfflineHelp({ visible }: { visible: boolean }) {
   const [expanded, setExpanded] = useState(false);
 
-  // Auto-expand when going offline; auto-collapse when coming back online
   useEffect(() => {
-    if (state === 'offline') setExpanded(true);
-    if (state === 'online')  setExpanded(false);
-  }, [state]);
+    if (visible) setExpanded(true);
+    else         setExpanded(false);
+  }, [visible]);
 
-  if (state === 'loading') {
-    return (
-      <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-muted/40 border border-border text-xs text-muted-foreground mb-6">
-        <Loader2 className="w-3.5 h-3.5 animate-spin flex-shrink-0" />
-        Checking qBittorrent status…
-      </div>
-    );
-  }
+  if (!visible) return null;
 
-  if (state === 'online') {
-    return (
-      <motion.div
-        key="online"
-        initial={{ opacity: 0, y: -6 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="flex items-center gap-2 px-4 py-2 rounded-xl bg-green-500/8 border border-green-500/20 text-xs text-green-400 mb-6"
-      >
-        <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse flex-shrink-0" />
-        <Wifi className="w-3.5 h-3.5 flex-shrink-0" />
-        <span className="font-semibold">qBittorrent is running</span>
-        <span className="text-green-400/60 hidden sm:inline">— downloads are ready</span>
-      </motion.div>
-    );
-  }
-
-  // Offline state — persistent amber banner with expandable help
   return (
     <motion.div
-      key="offline"
-      initial={{ opacity: 0, y: -6 }}
+      key="qbit-offline"
+      initial={{ opacity: 0, y: -4 }}
       animate={{ opacity: 1, y: 0 }}
-      className="mb-6 rounded-xl border border-amber-500/30 bg-amber-500/8 overflow-hidden"
+      exit={{ opacity: 0, y: -4 }}
+      className="mb-6 rounded-xl border border-red-500/25 bg-red-500/6 overflow-hidden"
     >
-      {/* Header row — always visible */}
       <button
         onClick={() => setExpanded(v => !v)}
         className="w-full flex items-center gap-3 px-4 py-3 text-left"
       >
-        <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0" />
+        <AlertTriangle className="w-4 h-4 text-red-400 flex-shrink-0" />
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-amber-300">qBittorrent is not running</p>
-          <p className="text-xs text-amber-400/70 mt-0.5">
-            Downloads won't work until qBittorrent is open. Tap to {expanded ? 'hide' : 'see'} how to fix this.
+          <p className="text-sm font-semibold text-red-300">qBittorrent is not running</p>
+          <p className="text-xs text-red-400/70 mt-0.5">
+            Torrent downloads won't work until qBittorrent is open.{' '}
+            {expanded ? 'Tap to hide help.' : 'Tap to see how to fix this.'}
           </p>
         </div>
-        <WifiOff className="w-4 h-4 text-amber-400/60 flex-shrink-0" />
         {expanded
-          ? <ChevronUp className="w-4 h-4 text-amber-400/60 flex-shrink-0" />
-          : <ChevronDown className="w-4 h-4 text-amber-400/60 flex-shrink-0" />
+          ? <ChevronUp className="w-4 h-4 text-red-400/60 flex-shrink-0" />
+          : <ChevronDown className="w-4 h-4 text-red-400/60 flex-shrink-0" />
         }
       </button>
 
-      {/* Expandable instructions */}
       <AnimatePresence initial={false}>
         {expanded && (
           <motion.div
@@ -243,45 +272,43 @@ function QbitStatusBanner({ state }: { state: QbitBannerState }) {
             transition={{ duration: 0.2 }}
             className="overflow-hidden"
           >
-            <div className="px-4 pb-4 pt-1 border-t border-amber-500/20">
+            <div className="px-4 pb-4 pt-1 border-t border-red-500/15">
               <ol className="space-y-2 mt-3">
                 {[
                   { n: 1, text: 'Open qBittorrent on this computer — it must stay open while downloading' },
-                  { n: 2, text: 'Make sure Web UI is enabled: Tools → Preferences → Web UI → Enable the Web UI' },
-                  { n: 3, text: 'Confirm the port matches what you set in HomeStream Settings (default: 8080)' },
-                  { n: 4, text: 'Try opening http://localhost:8080 in your browser — if it loads, qBit is running' },
+                  { n: 2, text: 'Enable Web UI: Tools → Preferences → Web UI → check "Enable the Web UI"' },
+                  { n: 3, text: 'Confirm the port matches HomeStream Settings (default: 8080)' },
+                  { n: 4, text: 'Test by opening http://localhost:8080 in your browser — if it loads, qBit is running' },
                 ].map(({ n, text }) => (
-                  <li key={n} className="flex items-start gap-2.5 text-xs text-amber-300/90">
-                    <span className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-400 font-bold text-[10px] flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <li key={n} className="flex items-start gap-2.5 text-xs text-red-300/90">
+                    <span className="w-5 h-5 rounded-full bg-red-500/15 text-red-400 font-bold text-[10px] flex items-center justify-center flex-shrink-0 mt-0.5">
                       {n}
                     </span>
                     {text}
                   </li>
                 ))}
               </ol>
-
               <div className="flex items-center gap-3 mt-4 flex-wrap">
                 <a
                   href="https://www.qbittorrent.org/download"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-1.5 text-xs text-amber-400 hover:text-amber-300 transition-colors"
+                  className="flex items-center gap-1.5 text-xs text-red-400 hover:text-red-300 transition-colors"
                 >
                   <ExternalLink className="w-3 h-3" />
                   Download qBittorrent
                 </a>
-                <span className="text-amber-500/40">·</span>
+                <span className="text-red-500/30">·</span>
                 <a
                   href="/settings"
-                  className="flex items-center gap-1.5 text-xs text-amber-400 hover:text-amber-300 transition-colors"
+                  className="flex items-center gap-1.5 text-xs text-red-400 hover:text-red-300 transition-colors"
                 >
                   <ChevronRight className="w-3 h-3" />
                   Open Settings → Downloads
                 </a>
               </div>
-
-              <p className="text-[10px] text-amber-400/50 mt-3">
-                This page checks qBittorrent status every 2 seconds via WebSocket and will update automatically when it comes online.
+              <p className="text-[10px] text-red-400/40 mt-3">
+                Status updates automatically via WebSocket — no refresh needed.
               </p>
             </div>
           </motion.div>
@@ -289,6 +316,18 @@ function QbitStatusBanner({ state }: { state: QbitBannerState }) {
       </AnimatePresence>
     </motion.div>
   );
+}
+
+// Hook: fetch RD status once on mount
+function useRdStatus() {
+  const [rd, setRd] = useState<RdStatus | null>(null);
+  useEffect(() => {
+    fetch('/api/real-debrid/status', { credentials: 'include' })
+      .then(r => r.ok ? r.json() : Promise.reject(r.status))
+      .then((d: RdStatus) => setRd(d))
+      .catch(() => setRd({ ok: false, reason: 'fetch_failed' }));
+  }, []);
+  return rd;
 }
 
 // ─── Speed Sparkline ──────────────────────────────────────────────────────────
@@ -1311,8 +1350,66 @@ export default function DownloadsPage() {
 
   const tf = data?.transferInfo;
 
-  // Derive qBit banner state from live socket data
-  const qbitBannerState: QbitBannerState = loading ? 'loading' : data?.qbitOnline ? 'online' : 'offline';
+  // ── qBittorrent dot color ──────────────────────────────────────────────────
+  // 🟢 online + at least one active/queued torrent
+  // 🟡 online but idle (nothing downloading or queued)
+  // 🔴 offline / unreachable
+  // ⚪ still loading
+  const qbitDotColor: DotColor = loading
+    ? 'loading'
+    : !data?.qbitOnline
+      ? 'red'
+      : activeQbit.length > 0
+        ? 'green'
+        : 'yellow';
+
+  const qbitDotLabel = 'qBittorrent';
+  const qbitDotSublabel = qbitDotColor === 'green'
+    ? `${activeQbit.length} active`
+    : qbitDotColor === 'yellow'
+      ? 'idle'
+      : qbitDotColor === 'red'
+        ? 'offline'
+        : '';
+  const qbitDotTooltip = qbitDotColor === 'green'
+    ? `qBittorrent is running — ${activeQbit.length} active download${activeQbit.length !== 1 ? 's' : ''}`
+    : qbitDotColor === 'yellow'
+      ? 'qBittorrent is running but nothing is currently downloading'
+      : qbitDotColor === 'red'
+        ? 'qBittorrent is not running — torrent downloads unavailable'
+        : 'Checking qBittorrent…';
+
+  // ── Real-Debrid dot color ──────────────────────────────────────────────────
+  // 🟢 premium, >30 days left
+  // 🟡 premium, ≤30 days left (expiring soon)
+  // 🔴 no key / expired / fetch failed
+  // ⚪ still loading
+  const rdStatus = useRdStatus();
+  const rdDotColor: DotColor = rdStatus === null
+    ? 'loading'
+    : !rdStatus.ok
+      ? 'red'
+      : (rdStatus.daysLeft ?? 0) > 30
+        ? 'green'
+        : (rdStatus.daysLeft ?? 0) > 0
+          ? 'yellow'
+          : 'red';
+
+  const rdDotLabel = 'Real-Debrid';
+  const rdDotSublabel = rdDotColor === 'green'
+    ? `${rdStatus?.daysLeft}d left`
+    : rdDotColor === 'yellow'
+      ? `${rdStatus?.daysLeft}d left`
+      : rdDotColor === 'red'
+        ? rdStatus?.reason === 'no_key' ? 'not set up' : 'inactive'
+        : '';
+  const rdDotTooltip = rdDotColor === 'green'
+    ? `Real-Debrid premium — ${rdStatus?.daysLeft} days remaining${rdStatus?.username ? ` (${rdStatus.username})` : ''}`
+    : rdDotColor === 'yellow'
+      ? `Real-Debrid expiring soon — ${rdStatus?.daysLeft} days remaining`
+      : rdStatus?.reason === 'no_key'
+        ? 'Real-Debrid API key not configured — add it in Settings'
+        : 'Real-Debrid inactive or expired';
 
   return (
     <>
@@ -1346,6 +1443,19 @@ export default function DownloadsPage() {
               </div>
 
               <div className="flex items-center gap-2 flex-shrink-0">
+                {/* ── Backend status dots ── */}
+                <StatusDot
+                  color={qbitDotColor}
+                  label={qbitDotLabel}
+                  sublabel={qbitDotSublabel}
+                  tooltip={qbitDotTooltip}
+                />
+                <StatusDot
+                  color={rdDotColor}
+                  label={rdDotLabel}
+                  sublabel={rdDotSublabel}
+                  tooltip={rdDotTooltip}
+                />
                 <button
                   onClick={fetchData}
                   className="p-2 rounded-xl hover:bg-muted transition-colors text-muted-foreground hover:text-foreground border border-border"
@@ -1360,8 +1470,10 @@ export default function DownloadsPage() {
 
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
 
-          {/* ── qBittorrent Status Banner — always visible ── */}
-          <QbitStatusBanner state={qbitBannerState} />
+          {/* ── qBittorrent offline help — only shown when red ── */}
+          <AnimatePresence>
+            <QbitOfflineHelp visible={qbitDotColor === 'red'} />
+          </AnimatePresence>
 
           {/* ── VPN Panel ── */}
           <div className="mb-6">
