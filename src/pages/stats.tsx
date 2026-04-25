@@ -200,6 +200,7 @@ export default function StatsPage() {
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const speedPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const fetchStats = useCallback(async (silent = false) => {
     if (!silent) setRefreshing(true);
@@ -228,18 +229,45 @@ export default function StatsPage() {
     }
   }, []);
 
+  // Dedicated 3-second speed poll — only refreshes the downloadSpeed field
+  // so the live DL/UL numbers stay current without re-fetching the full stats payload.
+  const fetchSpeed = useCallback(async () => {
+    try {
+      const res = await fetch('/api/stremio/downloads', { credentials: 'include' });
+      if (!res.ok) return;
+      const json = await res.json() as {
+        transferInfo?: { dl_info_speed: number; up_info_speed: number; dl_info_data: number; up_info_data: number } | null;
+      };
+      if (json.transferInfo) {
+        setData(prev => prev ? {
+          ...prev,
+          downloadSpeed: {
+            dlspeed: json.transferInfo!.dl_info_speed,
+            upspeed: json.transferInfo!.up_info_speed,
+            dlTotal: json.transferInfo!.dl_info_data,
+            upTotal: json.transferInfo!.up_info_data,
+          },
+        } : prev);
+      }
+    } catch { /* non-fatal */ }
+  }, []);
+
   useEffect(() => {
     fetchStats();
     pollRef.current = setInterval(() => {
       if (!document.hidden) fetchStats(true);
     }, 10_000);
-    const onVisible = () => { if (!document.hidden) fetchStats(true); };
+    speedPollRef.current = setInterval(() => {
+      if (!document.hidden) fetchSpeed();
+    }, 3_000);
+    const onVisible = () => { if (!document.hidden) { fetchStats(true); fetchSpeed(); } };
     document.addEventListener('visibilitychange', onVisible);
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
+      if (speedPollRef.current) clearInterval(speedPollRef.current);
       document.removeEventListener('visibilitychange', onVisible);
     };
-  }, [fetchStats]);
+  }, [fetchStats, fetchSpeed]);
 
   if (loading) {
     return (

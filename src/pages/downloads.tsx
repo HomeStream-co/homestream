@@ -170,12 +170,12 @@ const STATUS_CONFIG = {
 const SPARK_SAMPLES = 30;
 
 function useSpeedHistory(speed: number, active: boolean) {
-  const histRef = useRef<number[]>(Array(SPARK_SAMPLES).fill(0));
+  const [history, setHistory] = useState<number[]>(() => Array(SPARK_SAMPLES).fill(0));
   useEffect(() => {
     if (!active) return;
-    histRef.current = [...histRef.current.slice(1), speed];
+    setHistory(prev => [...prev.slice(1), speed]);
   }, [speed, active]);
-  return histRef.current;
+  return history;
 }
 
 function SpeedSparkline({ speed, active }: { speed: number; active: boolean }) {
@@ -980,6 +980,12 @@ export default function DownloadsPage() {
   const [tvPct, setTvPct] = useState(30);
   const [savingAlloc, setSavingAlloc] = useState(false);
 
+  // Drive / media directory switcher
+  const [availableDrives, setAvailableDrives] = useState<string[]>([]);
+  const [showDrivePicker, setShowDrivePicker] = useState(false);
+  const [customDirInput, setCustomDirInput] = useState('');
+  const [switchingDrive, setSwitchingDrive] = useState(false);
+
   const fetchStorage = useCallback(async () => {
     try {
       const res = await fetch('/api/library/storage', { credentials: 'include' });
@@ -1018,6 +1024,16 @@ export default function DownloadsPage() {
 
   useEffect(() => {
     fetchStorage();
+    // Fetch available drives from Electron (Windows only — empty on other platforms)
+    fetch('/api/electron', { credentials: 'include' })
+      .then(r => r.json())
+      .then((d: { availableDrives?: string[] }) => {
+        if (Array.isArray(d.availableDrives) && d.availableDrives.length > 0) {
+          setAvailableDrives(d.availableDrives);
+        }
+      })
+      .catch(() => { /* non-fatal */ });
+
     const storageInterval = setInterval(() => {
       if (!document.hidden) fetchStorage();
     }, 15000);
@@ -1029,7 +1045,30 @@ export default function DownloadsPage() {
     };
   }, [fetchStorage]);
 
-  const handleDelete = useCallback(async (hash: string, deleteFiles: boolean) => {
+  const switchDrive = async (dir: string) => {
+    if (!dir.trim() || switchingDrive) return;
+    setSwitchingDrive(true);
+    try {
+      const res = await fetch('/api/library/storage/drive', {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mediaDir: dir.trim() }),
+      });
+      const json = await res.json() as { ok?: boolean; error?: string; mediaDir?: string };
+      if (!res.ok || !json.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
+      toast.success(`Media directory changed to ${json.mediaDir}`);
+      setShowDrivePicker(false);
+      setCustomDirInput('');
+      await fetchStorage();
+    } catch (err) {
+      toast.error(`Failed to switch drive: ${String(err)}`);
+    } finally {
+      setSwitchingDrive(false);
+    }
+  };
+
+
     try {
       const res = await fetch(`/api/stremio/downloads/${hash}?deleteFiles=${deleteFiles}`, { method: 'DELETE', credentials: 'include' });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -1220,7 +1259,7 @@ export default function DownloadsPage() {
               className="mb-6 bg-card border border-border rounded-2xl p-4"
             >
               <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <HardDrive className="w-4 h-4 text-primary" />
                   <span className="text-sm font-semibold text-foreground">Storage</span>
                   {storage.mediaDir && (
@@ -1228,6 +1267,13 @@ export default function DownloadsPage() {
                       {storage.mediaDir}
                     </span>
                   )}
+                  <button
+                    onClick={() => setShowDrivePicker(s => !s)}
+                    className="flex items-center gap-1 text-[10px] text-primary hover:text-primary/80 transition-colors px-2 py-0.5 rounded-full bg-primary/10 hover:bg-primary/20"
+                  >
+                    <RefreshCw className="w-2.5 h-2.5" />
+                    Change Drive
+                  </button>
                 </div>
                 <button
                   onClick={() => setShowStorageSettings(s => !s)}
@@ -1238,6 +1284,69 @@ export default function DownloadsPage() {
                   {showStorageSettings ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
                 </button>
               </div>
+
+              {/* ── Drive / directory picker ── */}
+              <AnimatePresence>
+                {showDrivePicker && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="overflow-hidden mb-4"
+                  >
+                    <div className="pt-3 pb-1 border-t border-border">
+                      <p className="text-xs text-muted-foreground mb-3 leading-relaxed">
+                        Select a drive or enter a custom path. HomeStream will create the <code className="font-mono text-[10px] bg-muted px-1 rounded">downloads/</code> and <code className="font-mono text-[10px] bg-muted px-1 rounded">library/</code> folders automatically. Existing files are <strong>not</strong> moved.
+                      </p>
+
+                      {/* Windows drive buttons */}
+                      {availableDrives.length > 0 && (
+                        <div className="flex flex-wrap gap-2 mb-3">
+                          {availableDrives.map(drive => {
+                            const isActive = storage.mediaDir?.startsWith(drive) ?? false;
+                            return (
+                              <button
+                                key={drive}
+                                onClick={() => switchDrive(drive + 'HomeStream')}
+                                disabled={switchingDrive || isActive}
+                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all ${
+                                  isActive
+                                    ? 'border-primary bg-primary/10 text-primary cursor-default'
+                                    : 'border-border hover:border-primary/50 hover:bg-primary/5 text-foreground disabled:opacity-50'
+                                }`}
+                              >
+                                <HardDrive className="w-3 h-3" />
+                                {drive}
+                                {isActive && <span className="text-[9px] text-primary ml-1">Active</span>}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      {/* Custom path input */}
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={customDirInput}
+                          onChange={e => setCustomDirInput(e.target.value)}
+                          onKeyDown={e => e.key === 'Enter' && switchDrive(customDirInput)}
+                          placeholder={storage.mediaDir ?? 'e.g. D:\\HomeStream or /mnt/media'}
+                          className="flex-1 text-xs bg-muted border border-border rounded-lg px-3 py-2 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary/50 font-mono"
+                        />
+                        <button
+                          onClick={() => switchDrive(customDirInput)}
+                          disabled={!customDirInput.trim() || switchingDrive}
+                          className="flex items-center gap-1.5 px-3 py-2 bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg text-xs font-semibold transition-colors disabled:opacity-50"
+                        >
+                          {switchingDrive ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                          Apply
+                        </button>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
               {(() => {
                 const total = storage.diskTotalBytes!;
@@ -1350,7 +1459,7 @@ export default function DownloadsPage() {
 
           {/* ── Steam-style Global Speed Bar ── */}
           <AnimatePresence>
-            {tf && data?.qbitOnline && <GlobalSpeedBar tf={tf} />}
+            {tf && (data?.qbitOnline || totalActive > 0) && <GlobalSpeedBar tf={tf} />}
           </AnimatePresence>
 
           {/* ── Download Stats Summary ── */}
@@ -1423,7 +1532,7 @@ export default function DownloadsPage() {
               </div>
               <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground bg-muted/30 rounded-xl px-4 py-2.5">
                 <Zap className="w-3.5 h-3.5 text-primary" />
-                Downloads route automatically through qBittorrent when available, with WebTorrent as fallback.
+                Downloads are routed through qBittorrent. Make sure qBittorrent is running and configured in Settings → Downloads.
               </div>
             </motion.div>
           ) : filteredQbit.length === 0 && filteredWt.length === 0 ? (
