@@ -37,6 +37,7 @@ import SettingsVpn, { type VpnInterface } from './settings/SettingsVpn';
 import SettingsTools            from './settings/SettingsTools';
 import SettingsSession          from './settings/SettingsSession';
 import SettingsProwlarr         from './settings/SettingsProwlarr';
+import SettingsRealDebrid       from './settings/SettingsRealDebrid';
 
 // ── Props ─────────────────────────────────────────────────────────────────────
 
@@ -443,6 +444,7 @@ export default function SettingsPanel({
                   onRefresh={handleTmdbRefresh}
                 />
                 <SettingsProwlarr onSaved={() => toast.success('Prowlarr settings saved')} />
+                <SettingsRealDebrid onSaved={() => toast.success('Real-Debrid settings saved')} />
                 <SettingsStorage
                   storageStats={storageStats}
                   storageLoading={storageLoading}

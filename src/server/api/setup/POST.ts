@@ -8,6 +8,7 @@ import { startWatcher, stopWatcher } from '../../folderWatcher.js';
 import { scanExistingMedia, importExistingMedia, type ScannedFile } from '../../existingMediaScanner.js';
 import { requireAuth } from '../../authMiddleware.js';
 import { isDeveloperLocked } from '../../ownershipSeed.js';
+import { getUser as getRDUser } from '../../realDebridClient.js';
 
 // In-memory store for scan results so import can reference them
 let lastScanFiles: ScannedFile[] = [];
@@ -113,9 +114,10 @@ export default async function handler(req: Request, res: Response) {
         // Stamp save timestamps for API keys so the Settings panel can show
         // a lifespan countdown and regeneration reminder.
         const now = new Date().toISOString();
-        if (fields.omdbApiKey)     updates.omdbApiKeySavedAt     = now;
-        if (fields.googleAiApiKey) updates.googleAiApiKeySavedAt = now;
-        if (fields.tmdbApiKey)     updates.tmdbApiKeySavedAt     = now;
+        if (fields.omdbApiKey)       updates.omdbApiKeySavedAt       = now;
+        if (fields.googleAiApiKey)   updates.googleAiApiKeySavedAt   = now;
+        if (fields.tmdbApiKey)       updates.tmdbApiKeySavedAt       = now;
+        if (fields.realDebridApiKey) updates.realDebridApiKeySavedAt = now;
 
         const config = writeConfig(updates);
         res.json({ ok: true, config });
@@ -138,6 +140,22 @@ export default async function handler(req: Request, res: Response) {
         const apiKey = fields.jellyfinApiKey || config.jellyfinApiKey;
         const result = await testJellyfin(url, apiKey);
         res.json(result);
+        break;
+      }
+
+      case 'test_real_debrid': {
+        const cfg = readConfig();
+        const key = (fields.realDebridApiKey || cfg.realDebridApiKey || '').trim();
+        if (!key) {
+          res.json({ ok: false, error: 'No Real-Debrid API key provided' });
+          return;
+        }
+        try {
+          const user = await getRDUser(key);
+          res.json({ ok: true, user });
+        } catch (err) {
+          res.json({ ok: false, error: err instanceof Error ? err.message : String(err) });
+        }
         break;
       }
 

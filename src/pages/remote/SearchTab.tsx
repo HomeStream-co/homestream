@@ -92,7 +92,7 @@ export default function SearchTab({ send }: SearchTabProps) {
       else setInterimText(interim);
     };
     recognition.onerror = () => { setListening(false); setInterimText(''); };
-    recognition.onend = () => { setListening(false); setInterimText(''); };
+    recognition.onend   = () => { setListening(false); setInterimText(''); };
     recognition.start();
   }, []);
 
@@ -101,6 +101,12 @@ export default function SearchTab({ send }: SearchTabProps) {
     setListening(false);
     setInterimText('');
   }, []);
+
+  /** Tap once to start, tap again to stop. */
+  const toggleVoice = useCallback(() => {
+    if (listening) stopVoice();
+    else startVoice();
+  }, [listening, startVoice, stopVoice]);
 
   const launch = useCallback((item: LibraryItem) => {
     haptic([30, 20, 30]);
@@ -133,16 +139,14 @@ export default function SearchTab({ send }: SearchTabProps) {
         </div>
         {voiceSupported && (
           <motion.button
-            onPointerDown={startVoice}
-            onPointerUp={stopVoice}
-            onPointerLeave={stopVoice}
+            onClick={toggleVoice}
             whileTap={{ scale: 0.9 }}
             className={`flex-shrink-0 w-12 h-12 rounded-xl flex items-center justify-center border transition-all ${
               listening
                 ? 'bg-red-500/20 border-red-500/50 text-red-400'
                 : 'bg-card border-border text-muted-foreground hover:text-foreground hover:border-primary/50'
             }`}
-            title="Hold to speak"
+            title={listening ? 'Tap to stop' : 'Tap to speak'}
           >
             <AnimatePresence mode="wait">
               {listening ? (
@@ -178,7 +182,7 @@ export default function SearchTab({ send }: SearchTabProps) {
               ))}
             </div>
             <p className="text-sm text-red-400 font-medium">
-              {interimText || 'Listening… say a movie or show name'}
+              {interimText || 'Listening… tap mic to stop'}
             </p>
           </motion.div>
         )}
@@ -186,7 +190,7 @@ export default function SearchTab({ send }: SearchTabProps) {
 
       {voiceSupported && !listening && !query && (
         <p className="text-xs text-muted-foreground text-center">
-          Hold the mic button and say a title, genre, or actor name
+          Tap the mic, say a title or genre, then tap again to stop
         </p>
       )}
 
