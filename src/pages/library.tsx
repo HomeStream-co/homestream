@@ -82,6 +82,7 @@ function OfflineMetadataNotice({ mediaId, currentTitle, onSaved }: OfflineMetada
       }
       await fetch(`/api/media/${mediaId}`, {
         method: 'PUT',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...body, needsMetadata: false }),
       });
@@ -416,7 +417,7 @@ export default function LibraryPage() {
       u.id === uiId ? { ...u, ccStatus: 'fetching' } : u
     ));
     try {
-      const res = await fetch(`/api/captions/${mediaId}/fetch`, { method: 'POST' });
+      const res = await fetch(`/api/captions/${mediaId}/fetch`, { method: 'POST', credentials: 'include' });
       const data = await res.json() as { success: boolean; langs?: Record<string, string> };
       setUploading(prev => prev.map(u =>
         u.id === uiId
@@ -427,6 +428,7 @@ export default function LibraryPage() {
         // Persist caption availability to the library item
         await fetch(`/api/media/${mediaId}`, {
           method: 'PUT',
+          credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ captions: data.langs }),
         });
@@ -664,7 +666,7 @@ export default function LibraryPage() {
     let enriched = 0;
     for (const id of ids) {
       try {
-        const res = await fetch(`/api/enrich/${id}`, { method: 'POST' });
+        const res = await fetch(`/api/enrich/${id}`, { method: 'POST', credentials: 'include' });
         if (res.ok) enriched++;
       } catch { /* non-fatal — individual enrich failure, continue bulk loop */ }
     }

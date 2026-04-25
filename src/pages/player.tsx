@@ -221,7 +221,7 @@ export default function PlayerPage() {
   // ── Fetch audio tracks ────────────────────────────────────────────────────
   useEffect(() => {
     if (!id) return;
-    fetch(`/api/media/${id}/tracks`)
+    fetch(`/api/media/${id}/tracks`, { credentials: 'include' })
       .then(r => r.ok ? r.json() : [])
       .then((tracks: typeof ps.audioTracks) => { if (Array.isArray(tracks)) ps.setAudioTracks(tracks); })
       .catch(() => {});
@@ -266,7 +266,7 @@ export default function PlayerPage() {
       if (id && video && video.duration > 0) {
         const payload = JSON.stringify({ progress: (video.currentTime / video.duration) * 100, currentTime: video.currentTime, duration: video.duration, profileId: profileIdRef.current });
         if (navigator.sendBeacon) navigator.sendBeacon(`/api/media/${id}/progress`, new Blob([payload], { type: 'application/json' }));
-        else fetch(`/api/media/${id}/progress`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: payload, keepalive: true }).catch(() => {});
+        else fetch(`/api/media/${id}/progress`, { method: 'PATCH', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: payload, keepalive: true }).catch(() => {});
       }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -498,7 +498,7 @@ export default function PlayerPage() {
     ps.setEnrichRunning(true);
     ps.setEnrichError(null);
     try {
-      const res = await fetch(`/api/enrich/${id}`, { method: 'POST', headers: { Accept: 'text/event-stream' } });
+      const res = await fetch(`/api/enrich/${id}`, { method: 'POST', credentials: 'include', headers: { Accept: 'text/event-stream' } });
       if (!res.ok) throw new Error(`Server returned ${res.status}`);
       if (res.body) { const reader = res.body.getReader(); while (true) { const { done } = await reader.read(); if (done) break; } }
     } catch (err) {
