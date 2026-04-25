@@ -5,7 +5,7 @@ import { readConfig } from '../../../configStore.js';
 import { runPreDownloadScan } from '../../../security/threatScanner.js';
 import { connectForDownload, disconnectAfterDownload } from '../../../vpnService.js';
 import type { VPNConfig } from '../../../vpnService.js';
-import { upsertJob, getAllPersistedJobs, findJobByInfoHash } from '../../../downloadJobStore.js';
+import { upsertJob, getAllPersistedJobs, findJobByInfoHash, updateJobProgress } from '../../../downloadJobStore.js';
 import { requireAuth } from '../../../authMiddleware.js';
 import { resolvemagnet, downloadUrl } from '../../../realDebridClient.js';
 
@@ -566,10 +566,16 @@ export default async function handler(req: Request, res: Response) {
             const safeTitle = title.replace(/[^a-zA-Z0-9 ._-]/g, '').trim();
             const destDir = cfg2.downloadsDir || (cfg2.mediaDir ? `${cfg2.mediaDir}/downloads` : '/downloads');
             const destPath = `${destDir}/${safeTitle} [${best.quality}].${ext}`;
+            // Throttle progress writes — at most once per second
+            let lastProgressWrite = 0;
             await downloadUrl(directUrl, destPath, (dl, total) => {
-              if (total > 0) console.log(`[rd] ${title}: ${Math.round((dl / total) * 100)}% downloaded`);
+              const now = Date.now();
+              if (total > 0 && now - lastProgressWrite > 1000) {
+                lastProgressWrite = now;
+                updateJobProgress(jobId, dl, total);
+              }
             });
-            upsertJob({ ...jobEntry, status: 'done' });
+            upsertJob({ ...jobEntry, status: 'done', progress: 100 });
             console.log(`[rd] ✓ ${title} saved to ${destPath}`);
           } catch (err) {
             console.error(`[rd] ✗ ${title} failed:`, err);
@@ -640,8 +646,15 @@ export default async function handler(req: Request, res: Response) {
               const ext = directUrl.split('?')[0].split('.').pop() ?? 'mkv';
               const safeTitle = epTitle.replace(/[^a-zA-Z0-9 ._-]/g, '').trim();
               const destDir = cfg2.downloadsDir || (cfg2.mediaDir ? `${cfg2.mediaDir}/downloads` : '/downloads');
-              await downloadUrl(directUrl, `${destDir}/${safeTitle}.${ext}`);
-              upsertJob({ ...jobEntry, status: 'done' });
+              let lastProgressWrite = 0;
+              await downloadUrl(directUrl, `${destDir}/${safeTitle}.${ext}`, (dl, total) => {
+                const now = Date.now();
+                if (total > 0 && now - lastProgressWrite > 1000) {
+                  lastProgressWrite = now;
+                  updateJobProgress(jobEntry.jobId, dl, total);
+                }
+              });
+              upsertJob({ ...jobEntry, status: 'done', progress: 100 });
             } catch (err) {
               console.error(`[rd] ✗ ${epTitle}:`, err);
               upsertJob({ ...jobEntry, status: 'error' });

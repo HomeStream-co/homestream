@@ -77,6 +77,9 @@ export default function PlayerPage() {
   // ── Remote control refs (needed before useRemoteControl) ─────────────────
   const setCcLangRef = useRef<((lang: 'off' | 'en' | 'es') => void) | null>(null);
   const castButtonRef = useRef<(() => void) | null>(null);
+  // Stable ref to sendRemoteStateNow — updated after it's defined below.
+  // Used by onOpen so the handler always calls the latest version.
+  const sendRemoteStateNowRef = useRef<(() => void) | null>(null);
   useEffect(() => { setCcLangRef.current = ps.setCcLang; }, [ps.setCcLang]);
 
   // ── Apply default volume + subtitle language from settings on mount ───────
@@ -200,6 +203,8 @@ export default function PlayerPage() {
       setCcLangRef.current?.(track === 0 ? 'en' : 'es');
     },
     onCast:        () => castButtonRef.current?.(),
+    // Push current state immediately when phone connects — prevents blank remote
+    onOpen:        () => sendRemoteStateNowRef.current?.(),
   });
 
   // Throttle ref for onTimeUpdate remote broadcasts (wall-clock, not video-time)
@@ -227,6 +232,9 @@ export default function PlayerPage() {
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, item, nextItem, ps.ccLang, ps.castInfo, sendState]);
+
+  // Keep the ref in sync so onOpen always calls the latest sendRemoteStateNow
+  useEffect(() => { sendRemoteStateNowRef.current = sendRemoteStateNow; }, [sendRemoteStateNow]);
 
   // ── Kids profile block — handled by RestrictedContentGuard wrapper ──────────
 

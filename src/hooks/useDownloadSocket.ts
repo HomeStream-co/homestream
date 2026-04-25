@@ -36,8 +36,30 @@ export interface DownloadState {
   transferInfo: unknown;
   backend: 'qbittorrent' | 'webtorrent';
   qbitOnline: boolean;
+  /** Real-Debrid jobs from downloadJobStore (persisted, with progress) */
+  rdJobs: RdJob[];
   /** True once the first WebSocket message has been received */
   connected: boolean;
+}
+
+export interface RdJob {
+  jobId: string;
+  infoHash: string;
+  title: string;
+  quality: string;
+  type: 'movie' | 'series';
+  season?: number;
+  episode?: number;
+  status: 'queued' | 'downloading' | 'done' | 'error';
+  addedAt: string;
+  completedAt?: string;
+  poster?: string;
+  imdbId: string;
+  backend: 'real-debrid';
+  /** 0–100 download progress */
+  progress?: number;
+  bytesDownloaded?: number;
+  bytesTotal?: number;
 }
 
 const EMPTY_STATE: DownloadState = {
@@ -46,6 +68,7 @@ const EMPTY_STATE: DownloadState = {
   transferInfo: null,
   backend: 'webtorrent',
   qbitOnline: false,
+  rdJobs: [],
   connected: false,
 };
 

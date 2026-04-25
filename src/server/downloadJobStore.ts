@@ -41,6 +41,12 @@ export interface PersistedJob {
   poster?: string;
   imdbId: string;
   backend: 'qbittorrent' | 'webtorrent' | 'real-debrid';
+  /** 0–100 download progress (Real-Debrid only — qBit/WT use live API data) */
+  progress?: number;
+  /** Bytes downloaded so far (Real-Debrid only) */
+  bytesDownloaded?: number;
+  /** Total bytes (Real-Debrid only) */
+  bytesTotal?: number;
 }
 
 // ── Write queue ───────────────────────────────────────────────────────────────
@@ -111,6 +117,28 @@ export function updateJobStatus(
     if (job) {
       job.status = status;
       if (completedAt) job.completedAt = completedAt;
+    }
+    return jobs;
+  });
+}
+
+/**
+ * Update byte-level download progress for a Real-Debrid job.
+ * Written to disk so the WS broadcaster can include it in the next push.
+ * Throttled by the caller — called at most once per second.
+ */
+export function updateJobProgress(
+  jobId: string,
+  bytesDownloaded: number,
+  bytesTotal: number,
+): void {
+  const progress = bytesTotal > 0 ? Math.round((bytesDownloaded / bytesTotal) * 100) : 0;
+  enqueueWrite(jobs => {
+    const job = jobs.find(j => j.jobId === jobId);
+    if (job) {
+      job.progress = progress;
+      job.bytesDownloaded = bytesDownloaded;
+      job.bytesTotal = bytesTotal;
     }
     return jobs;
   });

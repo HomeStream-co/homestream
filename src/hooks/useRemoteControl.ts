@@ -32,6 +32,12 @@ export interface RemoteHandlers {
   onCast?: () => void;
   /** Launch a specific media item — navigate to its player page */
   onLaunch?: (mediaId: string) => void;
+  /**
+   * Called immediately when the WebSocket connection opens.
+   * Use this to push current player state to the remote so it doesn't
+   * show blank (0:00 / 0:00) until the next timeupdate event.
+   */
+  onOpen?: () => void;
 }
 
 export interface PlayerStatePayload {
@@ -72,8 +78,11 @@ export function useRemoteControl(
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     // Pass session token as query param for environments where cookies
     // may not be forwarded (e.g. phone remote on LAN).
+    // Prefer cookie token; fall back to localStorage Bearer token (used by phone remote).
     const cookieToken = document.cookie.match(/(?:^|;\s*)hs_session=([^;]+)/)?.[1] ?? '';
-    const tokenParam = cookieToken ? `&token=${encodeURIComponent(cookieToken)}` : '';
+    const lsToken = typeof localStorage !== 'undefined' ? (localStorage.getItem('hs_token') ?? '') : '';
+    const token = cookieToken || lsToken;
+    const tokenParam = token ? `&token=${encodeURIComponent(token)}` : '';
     const url = `${protocol}//${window.location.host}/ws/remote?role=screen&mediaId=${encodeURIComponent(mediaId)}${tokenParam}`;
 
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
@@ -95,6 +104,9 @@ export function useRemoteControl(
 
       ws.onopen = () => {
         retryCount = 0; // reset back-off on successful connection
+        // Push current player state immediately so the phone remote doesn't
+        // show blank (0:00 / 0:00) until the next timeupdate event.
+        handlersRef.current.onOpen?.();
       };
 
       ws.onmessage = (e) => {

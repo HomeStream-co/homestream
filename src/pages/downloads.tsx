@@ -96,7 +96,27 @@ interface DownloadsResponse {
   transferInfo: TransferInfo | null;
   backend: 'qbittorrent' | 'webtorrent';
   qbitOnline: boolean;
+  rdJobs: RdJob[];
   error?: string;
+}
+
+interface RdJob {
+  jobId: string;
+  infoHash: string;
+  title: string;
+  quality: string;
+  type: 'movie' | 'series';
+  season?: number;
+  episode?: number;
+  status: 'queued' | 'downloading' | 'done' | 'error';
+  addedAt: string;
+  completedAt?: string;
+  poster?: string;
+  imdbId: string;
+  backend: 'real-debrid';
+  progress?: number;
+  bytesDownloaded?: number;
+  bytesTotal?: number;
 }
 
 interface StorageStats {
@@ -1015,6 +1035,7 @@ export default function DownloadsPage() {
         transferInfo: socketState.transferInfo as DownloadsResponse['transferInfo'],
         backend: socketState.backend,
         qbitOnline: socketState.qbitOnline,
+        rdJobs: (socketState.rdJobs ?? []) as RdJob[],
       }
     : null);
   const loading = data === null;
@@ -1324,30 +1345,41 @@ export default function DownloadsPage() {
   }, [fetchData]);
 
   // ── Filter logic ──
-  const qbitAll = data?.qbitTorrents ?? [];
-  const wtAll = data?.jobs ?? [];
+  const qbitAll: QbitTorrent[] = data?.qbitTorrents ?? [];
+  const wtAll: WtJob[] = data?.jobs ?? [];
+  const rdAll: RdJob[] = data?.rdJobs ?? [];
 
-  const filteredQbit = qbitAll.filter(t => {
+  const filteredQbit = qbitAll.filter((t: QbitTorrent) => {
     if (filter === 'active') return t.status === 'downloading' || t.status === 'queued' || t.status === 'stalled';
     if (filter === 'done') return t.status === 'done' || t.status === 'seeding';
     if (filter === 'error') return t.status === 'error' || t.status === 'paused';
     return true;
   });
 
-  const filteredWt = wtAll.filter(j => {
+  const filteredWt = wtAll.filter((j: WtJob) => {
     if (filter === 'active') return j.status === 'downloading' || j.status === 'queued' || j.status === 'transcoding';
     if (filter === 'done') return j.status === 'done';
     if (filter === 'error') return j.status === 'error';
     return true;
   });
 
-  const activeQbit = qbitAll.filter(t => t.status === 'downloading' || t.status === 'queued' || t.status === 'stalled');
-  const totalActive = activeQbit.length + wtAll.filter(j => j.status === 'downloading').length;
-  const totalDone = qbitAll.filter(t => t.status === 'done' || t.status === 'seeding').length
-    + wtAll.filter(j => j.status === 'done').length;
-  const totalError = qbitAll.filter(t => t.status === 'error').length
-    + wtAll.filter(j => j.status === 'error').length;
-  const totalAll = qbitAll.length + wtAll.length;
+  const filteredRd = rdAll.filter((j: RdJob) => {
+    if (filter === 'active') return j.status === 'downloading' || j.status === 'queued';
+    if (filter === 'done') return j.status === 'done';
+    if (filter === 'error') return j.status === 'error';
+    return true;
+  });
+
+  const activeQbit = qbitAll.filter((t: QbitTorrent) => t.status === 'downloading' || t.status === 'queued' || t.status === 'stalled');
+  const totalActive = activeQbit.length + wtAll.filter((j: WtJob) => j.status === 'downloading').length
+    + rdAll.filter((j: RdJob) => j.status === 'downloading').length;
+  const totalDone = qbitAll.filter((t: QbitTorrent) => t.status === 'done' || t.status === 'seeding').length
+    + wtAll.filter((j: WtJob) => j.status === 'done').length
+    + rdAll.filter((j: RdJob) => j.status === 'done').length;
+  const totalError = qbitAll.filter((t: QbitTorrent) => t.status === 'error').length
+    + wtAll.filter((j: WtJob) => j.status === 'error').length
+    + rdAll.filter((j: RdJob) => j.status === 'error').length;
+  const totalAll = qbitAll.length + wtAll.length + rdAll.length;
 
   const tf = data?.transferInfo;
 
@@ -1799,7 +1831,7 @@ export default function DownloadsPage() {
                 Downloads are routed through qBittorrent. Make sure qBittorrent is running and configured in Settings → Downloads.
               </div>
             </motion.div>
-          ) : filteredQbit.length === 0 && filteredWt.length === 0 ? (
+          ) : filteredQbit.length === 0 && filteredWt.length === 0 && filteredRd.length === 0 ? (
             <div className="text-center py-16 text-muted-foreground text-sm">
               No downloads match this filter.
             </div>
@@ -1831,9 +1863,64 @@ export default function DownloadsPage() {
                 </div>
               )}
 
+              {/* Real-Debrid section */}
+              {filteredRd.length > 0 && (
+                <div className={filteredQbit.length > 0 ? 'mt-2' : ''}>
+                  <div className="flex items-center gap-2 mb-2 px-1">
+                    <Zap className="w-3.5 h-3.5 text-yellow-400" />
+                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Real-Debrid Queue</span>
+                    <span className="text-xs text-muted-foreground">({filteredRd.length})</span>
+                  </div>
+                  <AnimatePresence mode="popLayout">
+                    {filteredRd.map((j: RdJob) => (
+                      <motion.div
+                        key={j.jobId}
+                        layout
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -8 }}
+                        className="flex items-center gap-3 p-3 rounded-xl border border-border bg-card mb-2"
+                      >
+                        {j.poster && (
+                          <img src={j.poster} alt="" className="w-10 h-14 object-cover rounded-lg flex-shrink-0" />
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-foreground truncate">{j.title}</p>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${
+                              j.status === 'done' ? 'bg-green-500/15 text-green-400' :
+                              j.status === 'error' ? 'bg-red-500/15 text-red-400' :
+                              j.status === 'downloading' ? 'bg-yellow-500/15 text-yellow-400' :
+                              'bg-muted text-muted-foreground'
+                            }`}>
+                              {j.status === 'downloading' && j.progress != null ? `${j.progress}%` : j.status}
+                            </span>
+                            <span className="text-xs text-muted-foreground">{j.quality}</span>
+                            <span className="text-xs text-yellow-500/70 font-medium">⚡ RD</span>
+                          </div>
+                          {j.status === 'downloading' && j.progress != null && (
+                            <div className="mt-1.5 h-1 bg-muted rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-yellow-400 rounded-full transition-all duration-500"
+                                style={{ width: `${j.progress}%` }}
+                              />
+                            </div>
+                          )}
+                          {j.status === 'downloading' && j.bytesDownloaded != null && j.bytesTotal != null && j.bytesTotal > 0 && (
+                            <p className="text-[10px] text-muted-foreground mt-0.5">
+                              {(j.bytesDownloaded / 1024 / 1024).toFixed(0)} MB / {(j.bytesTotal / 1024 / 1024).toFixed(0)} MB
+                            </p>
+                          )}
+                        </div>
+                      </motion.div>
+                    ))}
+                  </AnimatePresence>
+                </div>
+              )}
+
               {/* WebTorrent section */}
               {filteredWt.length > 0 && (
-                <div className={filteredQbit.length > 0 ? 'mt-2' : ''}>
+                <div className={(filteredQbit.length > 0 || filteredRd.length > 0) ? 'mt-2' : ''}>
                   <div className="flex items-center gap-2 mb-2 px-1">
                     <Activity className="w-3.5 h-3.5 text-purple-400" />
                     <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">WebTorrent Queue</span>

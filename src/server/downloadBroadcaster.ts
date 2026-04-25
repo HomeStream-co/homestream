@@ -25,6 +25,7 @@ import { isValidSession } from './sessionStore.js';
 import { getAllJobs } from './torrentManager.js';
 import { getAllTorrents, getTransferInfo, isReachable } from './qbittorrentClient.js';
 import { getQbitJobs } from './api/stremio/download/POST.js';
+import { getAllPersistedJobs } from './downloadJobStore.js';
 import type { QbitTorrent } from './qbittorrentClient.js';
 
 const PUSH_INTERVAL_MS = 2_000;
@@ -56,8 +57,11 @@ async function fetchDownloadState(): Promise<object> {
   const qbitJobMeta = getQbitJobs();
   const qbitOnline = await isReachable();
 
+  // Real-Debrid jobs — always included regardless of qBit status
+  const rdJobs = getAllPersistedJobs().filter(j => j.backend === 'real-debrid');
+
   if (!qbitOnline) {
-    return { jobs: wtJobs, qbitTorrents: [], transferInfo: null, backend: 'webtorrent', qbitOnline: false };
+    return { jobs: wtJobs, qbitTorrents: [], transferInfo: null, backend: 'webtorrent', qbitOnline: false, rdJobs };
   }
 
   try {
@@ -72,9 +76,9 @@ async function fetchDownloadState(): Promise<object> {
       return meta ? { ...t, title: meta.title, poster: meta.poster } : t;
     });
 
-    return { jobs: wtJobs, qbitTorrents: enriched, transferInfo, backend: 'qbittorrent', qbitOnline: true };
+    return { jobs: wtJobs, qbitTorrents: enriched, transferInfo, backend: 'qbittorrent', qbitOnline: true, rdJobs };
   } catch {
-    return { jobs: wtJobs, qbitTorrents: [], transferInfo: null, backend: 'webtorrent', qbitOnline: false };
+    return { jobs: wtJobs, qbitTorrents: [], transferInfo: null, backend: 'webtorrent', qbitOnline: false, rdJobs };
   }
 }
 
