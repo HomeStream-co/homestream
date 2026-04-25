@@ -67,8 +67,7 @@ export function MediaProvider({ children }: { children: ReactNode }) {
 
   // ── Fetch watchlist from server on mount / profile change ───────────────────
   useEffect(() => {
-    fetch(`/api/watchlist?profile=${encodeURIComponent(profileId)}`)
-      .then(r => r.ok ? r.json() as Promise<string[]> : Promise.reject())
+    fetch(`/api/watchlist?profile=${encodeURIComponent(profileId)}`, { credentials: 'include' })      .then(r => r.ok ? r.json() as Promise<string[]> : Promise.reject())
       .then(ids => {
         setWatchlist(ids);
         localStorage.setItem(watchlistKey, JSON.stringify(ids));
@@ -87,7 +86,7 @@ export function MediaProvider({ children }: { children: ReactNode }) {
       const cachedEtag = libraryEtagRef.current;
       if (cachedEtag) headers['If-None-Match'] = cachedEtag;
 
-      const res = await fetch(`/api/media?profile=${profileId}`, { headers });
+      const res = await fetch(`/api/media?profile=${profileId}`, { headers, credentials: 'include' });
 
       // 304 Not Modified — library hasn't changed; keep current state as-is.
       if (res.status === 304) {
@@ -160,7 +159,7 @@ export function MediaProvider({ children }: { children: ReactNode }) {
       return next;
     });
     // Persist to server
-    fetch(`/api/watchlist/${id}?profile=${encodeURIComponent(profileId)}`, { method: 'PUT' })
+    fetch(`/api/watchlist/${id}?profile=${encodeURIComponent(profileId)}`, { method: 'PUT', credentials: 'include' })
       .then(r => r.ok ? r.json() as Promise<{ watchlist: string[] }> : Promise.reject())
       .then(({ watchlist: serverList }) => {
         setWatchlist(serverList);
@@ -184,7 +183,7 @@ export function MediaProvider({ children }: { children: ReactNode }) {
       return next;
     });
     // Persist to server
-    fetch(`/api/watchlist/${id}?profile=${encodeURIComponent(profileId)}`, { method: 'DELETE' })
+    fetch(`/api/watchlist/${id}?profile=${encodeURIComponent(profileId)}`, { method: 'DELETE', credentials: 'include' })
       .then(r => r.ok ? r.json() as Promise<{ watchlist: string[] }> : Promise.reject())
       .then(({ watchlist: serverList }) => {
         setWatchlist(serverList);
@@ -222,6 +221,7 @@ export function MediaProvider({ children }: { children: ReactNode }) {
     // Persist to server — survives restarts, device switches
     fetch(`/api/media/${id}/progress`, {
       method: 'PATCH',
+      credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ progress, currentTime, duration, profileId }),
     }).catch(console.error);
@@ -236,7 +236,7 @@ export function MediaProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const deleteMedia = useCallback(async (id: string) => {
-    await fetch(`/api/media/${id}`, { method: 'DELETE' });
+    await fetch(`/api/media/${id}`, { method: 'DELETE', credentials: 'include' });
     setLibrary(prev => prev.filter(m => m.id !== id));
     // Also remove from watchlist if present
     removeFromWatchlist(id);
@@ -245,6 +245,7 @@ export function MediaProvider({ children }: { children: ReactNode }) {
   const updateMedia = useCallback(async (id: string, updates: Partial<MediaItem>) => {
     const res = await fetch(`/api/media/${id}`, {
       method: 'PUT',
+      credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(updates),
     });

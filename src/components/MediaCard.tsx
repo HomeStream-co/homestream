@@ -33,6 +33,7 @@ function prefetchVideo(filename: string) {
   prefetchedFiles.add(filename);
   fetch(`/api/stream/${filename}`, {
     headers: { Range: `bytes=0-${PREFETCH_BYTES - 1}` },
+    credentials: 'include',
     cache: 'default',
   }).catch(() => { prefetchedFiles.delete(filename); });
 }

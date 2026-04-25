@@ -705,7 +705,7 @@ function CrashLogTab() {
   const clearLog = async () => {
     setClearing(true);
     try {
-      await fetch('/api/crash-log?clear=1');
+      await fetch('/api/crash-log?clear=1', { credentials: 'include' });
       setEntries([]);
     } finally {
       setClearing(false);

@@ -44,7 +44,7 @@ export default function EpisodeTracker({ show, onUpdate }: EpisodeTrackerProps) 
     if (show.type !== 'series') return;
     try {
       setLoading(true);
-      const res = await fetch(`/api/media/${show.id}/episodes`);
+      const res = await fetch(`/api/media/${show.id}/episodes`, { credentials: 'include' });
       if (res.ok) {
         const data: Episode[] = await res.json();
         setEpisodes(data);
@@ -73,6 +73,7 @@ export default function EpisodeTracker({ show, onUpdate }: EpisodeTrackerProps) 
     try {
       const res = await fetch(`/api/media/${show.id}/episodes/${ep.id}`, {
         method: 'PATCH',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ watched: newWatched }),
       });
@@ -104,6 +105,7 @@ export default function EpisodeTracker({ show, onUpdate }: EpisodeTrackerProps) 
         updates.map(ep =>
           fetch(`/api/media/${show.id}/episodes/${ep.id}`, {
             method: 'PATCH',
+            credentials: 'include',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ watched }),
           })
@@ -126,6 +128,7 @@ export default function EpisodeTracker({ show, onUpdate }: EpisodeTrackerProps) 
     try {
       const res = await fetch(`/api/media/${show.id}/episodes`, {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newEps),
       });

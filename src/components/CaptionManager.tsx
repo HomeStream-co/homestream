@@ -83,7 +83,7 @@ export default function CaptionManager({ mediaId, title, captions, onUpdated }: 
     setFetchStatus('fetching');
     setFetchResult(null);
     try {
-      const res = await fetch(`/api/captions/${mediaId}/fetch`, { method: 'POST' });
+      const res = await fetch(`/api/captions/${mediaId}/fetch`, { method: 'POST', credentials: 'include' });
       const data = await res.json() as { success: boolean; langs?: Record<string, string>; message?: string };
       if (data.success) {
         setFetchStatus('done');
@@ -125,6 +125,7 @@ export default function CaptionManager({ mediaId, title, captions, onUpdated }: 
     try {
       const res = await fetch(`/api/captions/${mediaId}/upload`, {
         method: 'POST',
+        credentials: 'include',
         body: formData,
       });
       const data = await res.json() as { success: boolean; message?: string };
