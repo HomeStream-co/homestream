@@ -522,6 +522,43 @@ export default function TvPage() {
   return <TvPageInner />;
 }
 
+// ── RowList — stable per-row refs so TvRow can scroll itself into view ────────
+
+interface RowListProps {
+  rows: { label: string; items: MediaItem[] }[];
+  focusZone: string;
+  focusedRow: number;
+  focusedCol: number;
+  profileId: string;
+  onPlay: (item: MediaItem) => void;
+}
+
+function RowList({ rows, focusZone, focusedRow, focusedCol, profileId, onPlay }: RowListProps) {
+  // One stable ref per row — useRef array pattern
+  const rowRefs = useRef<React.RefObject<HTMLDivElement | null>[]>([]);
+  // Grow the array as rows are added; never shrink (stale refs are harmless)
+  while (rowRefs.current.length < rows.length) {
+    rowRefs.current.push({ current: null });
+  }
+
+  return (
+    <>
+      {rows.map((row, rowIdx) => (
+        <TvRow
+          key={row.label}
+          label={row.label}
+          items={row.items}
+          focusedRow={focusZone === 'content' && focusedRow === rowIdx}
+          focusedCol={focusedCol}
+          profileId={profileId}
+          onPlay={onPlay}
+          rowRef={rowRefs.current[rowIdx]}
+        />
+      ))}
+    </>
+  );
+}
+
 function TvPageInner() {
   const navigate = useNavigate();
   const { library, watchlist: watchlistIds } = useMedia();
@@ -978,17 +1015,14 @@ function TvPageInner() {
             )}
           </div>
         ) : (
-          rows.map((row, rowIdx) => (
-            <TvRow
-              key={row.label}
-              label={row.label}
-              items={row.items}
-              focusedRow={focusZone === 'content' && focusedRow === rowIdx}
-              focusedCol={focusedCol}
-              profileId={profileId}
-              onPlay={handlePlay}
-            />
-          ))
+          <RowList
+            rows={rows}
+            focusZone={focusZone}
+            focusedRow={focusedRow}
+            focusedCol={focusedCol}
+            profileId={profileId}
+            onPlay={handlePlay}
+          />
         )}
       </div>
 

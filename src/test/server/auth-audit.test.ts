@@ -99,6 +99,12 @@ const OPEN_ENDPOINTS = new Set([
   // browser CORS/mixed-content blocks. Returns only image bytes (no library
   // data, no secrets). Safe to expose publicly — requires a valid TMDB URL.
   'src/server/api/tmdb-proxy/GET.ts',
+
+  // Captions (VTT subtitles) — intentionally open because browser <track>
+  // elements cannot send credentials (cookies or Authorization headers).
+  // requireAuth would always return 401 and subtitles would silently fail.
+  // VTT files contain only subtitle text — no sensitive media data or paths.
+  'src/server/api/captions/[id]/[lang]/GET.ts',
 ]);
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

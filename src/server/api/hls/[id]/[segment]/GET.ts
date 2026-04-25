@@ -36,8 +36,9 @@ export default async function handler(req: Request, res: Response) {
 
   const { id, segment } = req.params;
 
-  // Validate segment name — only allow safe filenames like 0000.ts
-  if (!/^\d{4}\.ts$/.test(segment)) {
+  // Validate segment name — allow 4–6 digit segment filenames (e.g. 0000.ts … 999999.ts).
+  // FFmpeg uses %04d by default but overflows to 5+ digits for files longer than ~5.5 hours.
+  if (!/^\d{4,6}\.ts$/.test(segment)) {
     return res.status(400).json({ error: 'Invalid segment name' });
   }
 

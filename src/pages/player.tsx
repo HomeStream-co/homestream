@@ -50,7 +50,7 @@ export default function PlayerPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { library, updateProgress, triggerPostWatchRecommendation, continueWatching } = useMedia();
+  const fromParam = searchParams.get('from');  const { library, updateProgress, triggerPostWatchRecommendation, continueWatching } = useMedia();
   const { activeProfile } = useProfile();
   const profileId = activeProfile?.id ?? 'adult';
   const { settings: appSettings } = useTheme();
@@ -289,8 +289,8 @@ export default function PlayerPage() {
       const video = ps.videoRef.current;
       if (id && video && video.duration > 0) {
         const payload = JSON.stringify({ progress: (video.currentTime / video.duration) * 100, currentTime: video.currentTime, duration: video.duration, profileId: profileIdRef.current });
-        if (navigator.sendBeacon) navigator.sendBeacon(`/api/media/${id}/progress`, new Blob([payload], { type: 'application/json' }));
-        else fetch(`/api/media/${id}/progress`, { method: 'PATCH', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: payload, keepalive: true }).catch(() => {}); // non-fatal — ignore
+        // Use keepalive fetch — unlike sendBeacon, it sends cookies so requireAuth passes.
+        fetch(`/api/media/${id}/progress`, { method: 'PATCH', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: payload, keepalive: true }).catch(() => {}); // non-fatal — ignore
       }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -335,7 +335,7 @@ export default function PlayerPage() {
     if (!ps.showEndOverlay || ps.autoplayCancelled || !nextItem || !appSettings.autoplayNext) return;
     ps.autoplayTimerRef.current = setInterval(() => {
       ps.setAutoplayCountdown(prev => {
-        if (prev <= 1) { clearInterval(ps.autoplayTimerRef.current); navigate(`/player/${nextItem.id}`); return 0; }
+        if (prev <= 1) { clearInterval(ps.autoplayTimerRef.current); navigate(fromParam ? `/player/${nextItem.id}?from=${encodeURIComponent(fromParam)}` : `/player/${nextItem.id}`); return 0; }
         return prev - 1;
       });
     }, 1000);
@@ -482,10 +482,10 @@ export default function PlayerPage() {
 
   // ── Back navigation — respects ?from=tv, otherwise goes to detail page ────
   const backPath = useMemo(() => {
-    if (searchParams.get('from') === 'tv') return '/tv';
+    if (fromParam === 'tv') return '/tv';
     if (!item) return '/';
     return item.type === 'series' ? `/show/${item.id}` : `/movie/${item.id}`;
-  }, [item, searchParams]);
+  }, [item, fromParam]);
 
   // ── Keyboard shortcuts ────────────────────────────────────────────────────
   usePlayerKeyboard({
@@ -616,11 +616,18 @@ export default function PlayerPage() {
       >
         <video
           ref={ps.videoRef}
-          {...(!hlsUrl ? { src: `/api/stream/${encodeURIComponent(item.filename ?? '')}` } : {})}
+          {...(!hlsUrl ? { src: item.filename ? `/api/stream/${encodeURIComponent(item.filename)}` : undefined } : {})}
           className="w-full h-full"
           preload="auto"
           onPlay={() => { ps.setPlaying(true); sendRemoteStateNow(); }}
           onPause={() => { ps.setPlaying(false); saveProgress(); sendRemoteStateNow(); }}
+          onLoadStart={() => {
+            // Guard: if no filename and no HLS URL, surface a clear error immediately
+            if (!hlsUrl && !item.filename) {
+              ps.setVideoError('No playable file found for this item. Try re-adding it to the library.');
+              ps.setVideoLoading(false);
+            }
+          }}
           onTimeUpdate={() => {
             const video = ps.videoRef.current;
             if (!video) return;
@@ -706,7 +713,9 @@ export default function PlayerPage() {
               1: 'Playback aborted',
               2: 'Network error — check your connection to the HomeStream server',
               3: 'Decoding error — this file format may not be supported by your browser',
-              4: 'File not found or unsupported format',
+              4: item.filename
+                ? `File not found on server: ${item.filename}`
+                : 'No playable file found for this item. Try re-adding it to the library.',
             };
             ps.setVideoError(msgs[code ?? 4] ?? 'Unable to play this file');
             ps.setVideoLoading(false);
