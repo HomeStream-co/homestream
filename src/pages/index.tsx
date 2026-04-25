@@ -65,10 +65,9 @@ function RemoteQRWidget() {
   const [copied, setCopied] = useState(false);
   const [copiedIP, setCopiedIP] = useState(false);
 
-  // Prefer hs.local for display; fall back to raw IP
-  const displayAddress = data?.mdnsUrl
-    ? data.mdnsUrl.replace(/^https?:\/\//, '').replace(/\/remote$/, '')
-    : (data?.lanIP ?? window.location.hostname);
+  // QR now always encodes the raw IP — use that as the primary display address.
+  // hs.local is shown as a secondary "type it manually" hint (works on iOS/macOS).
+  const displayAddress = data?.lanIP ?? window.location.hostname;
   const port      = data?.port  ?? '3000';
   const remoteUrl = data?.url   ?? `http://${displayAddress}:${port}/remote`;
 
@@ -99,7 +98,8 @@ function RemoteQRWidget() {
   }
 
   function copyIP() {
-    navigator.clipboard.writeText(displayAddress).then(() => {
+    const toCopy = `${displayAddress}:${port}`;
+    navigator.clipboard.writeText(toCopy).then(() => {
       setCopiedIP(true);
       setTimeout(() => setCopiedIP(false), 2000);
     }).catch(() => {}); // non-fatal — ignore
@@ -179,13 +179,13 @@ function RemoteQRWidget() {
               </div>
             )}
 
-            {/* Address — hs.local preferred, big and easy to read */}
+            {/* Address — IP is primary (what the QR encodes), hs.local as manual hint */}
             {!loading && (
               <div className="w-full rounded-xl border border-border bg-muted/50 px-3 py-2.5">
-                <p className="text-[10px] text-muted-foreground mb-1 uppercase tracking-wider font-medium">Server address</p>
+                <p className="text-[10px] text-muted-foreground mb-1 uppercase tracking-wider font-medium">Server address (scan QR or type)</p>
                 <div className="flex items-center gap-2">
                   <code className={`flex-1 text-sm font-mono font-bold tracking-wide ${isLocalhost ? 'text-muted-foreground' : 'text-foreground'}`}>
-                    {isLocalhost ? 'Not on LAN' : displayAddress}
+                    {isLocalhost ? 'Not on LAN' : `${displayAddress}:${port}`}
                   </code>
                   {!isLocalhost && (
                     <button onClick={copyIP} title="Copy address" className="text-muted-foreground hover:text-foreground transition-colors flex-shrink-0">
@@ -193,11 +193,10 @@ function RemoteQRWidget() {
                     </button>
                   )}
                 </div>
-                <p className="text-[10px] text-muted-foreground mt-0.5">Port: {port}</p>
-                {/* Show raw IP as fallback hint if hs.local is primary */}
-                {!isLocalhost && data?.ipUrl && data.mdnsUrl && (
+                {/* hs.local as a secondary hint — works on iOS/macOS without typing the IP */}
+                {!isLocalhost && data?.mdnsUrl && (
                   <p className="text-[9px] text-muted-foreground/60 mt-1 font-mono">
-                    Fallback: {data.ipUrl.replace(/^https?:\/\//, '').replace(/\/remote$/, '')}
+                    Also try: {data.mdnsUrl.replace(/^https?:\/\//, '').replace(/\/remote$/, '')} (iOS/macOS only)
                   </p>
                 )}
               </div>

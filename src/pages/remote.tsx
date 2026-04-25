@@ -203,8 +203,9 @@ export default function RemotePage() {
     fetch('/api/network/info')
       .then(r => r.json())
       .then((d: { mdnsHostname?: string; primary?: string; lanIP?: string; port?: string | number }) => {
-        // Prefer hs.local — works on all modern devices without typing an IP
-        const host = d.mdnsHostname || d.primary || d.lanIP;
+        // Always use the raw LAN IP — hs.local fails on Android and causes
+        // SSL errors on devices that have cached an HSTS header.
+        const host = d.lanIP || d.primary || d.mdnsHostname;
         if (host && host !== 'localhost' && host !== '127.0.0.1') {
           setServerIP(`http://${host}:${d.port ?? '3000'}/remote`);
         }
@@ -1147,11 +1148,11 @@ function QrModal({ qrData, onClose }: { qrData: { url: string; qr: string; mdnsU
           : <Copy className="w-3.5 h-3.5 text-muted-foreground/50 group-hover:text-muted-foreground flex-shrink-0" />}
       </button>
 
-      {/* IP fallback hint — shown when hs.local is primary */}
-      {ipFallback && ipFallback !== qrData.url && (
+      {/* hs.local hint — secondary, iOS/macOS only */}
+      {qrData.mdnsUrl && qrData.mdnsUrl !== qrData.url && (
         <p className="mt-1.5 text-[9px] text-muted-foreground/50 font-mono text-center">
-          Fallback (if hs.local fails):{' '}
-          <span className="text-muted-foreground/70">{ipFallback}</span>
+          iOS/macOS only:{' '}
+          <span className="text-muted-foreground/70">{qrData.mdnsUrl}</span>
         </p>
       )}
 
@@ -1163,7 +1164,7 @@ function QrModal({ qrData, onClose }: { qrData: { url: string; qr: string; mdnsU
         <ul className="text-[10px] text-muted-foreground space-y-1 leading-relaxed">
           <li>• Your phone must be on the <strong className="text-foreground">same Wi-Fi</strong> as this computer</li>
           <li>• Mobile data / 4G / 5G will <strong className="text-foreground">not</strong> work — Wi-Fi only</li>
-          <li>• If <code className="text-foreground">hs.local</code> doesn't load, try the fallback IP address above</li>
+          <li>• QR encodes your LAN IP — works on Android, iOS, and every browser</li>
           <li>• Firewall blocking? Allow port <strong className="text-foreground">{port}</strong> in Windows Defender / your router</li>
         </ul>
       </div>

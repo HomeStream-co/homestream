@@ -72,12 +72,19 @@ export default async function handler(req: Request, res: Response) {
     const port = process.env.PORT ?? '3000';
     const lanIP = getLanIP();
 
-    // Prefer hs.local — friendlier and works on all modern OS/devices.
-    // The QR code encodes the mDNS URL; the raw IP is included in the
-    // response so the UI can display it as a fallback hint.
+    // Always encode the raw LAN IP in the QR code.
+    //
+    // Why NOT hs.local:
+    //   • Android Chrome blocks mDNS .local resolution entirely (security policy).
+    //   • iOS Safari works, but if the browser has ever seen an HSTS header it
+    //     forces HTTPS → SSL error on our plain-HTTP server → grey screen.
+    //   • The IP address works on every device, every OS, every browser.
+    //
+    // hs.local is still shown in the UI as a "type it manually" hint for
+    // users who prefer it (macOS/iOS where it reliably works).
     const mdnsUrl   = `http://${MDNS_LOCAL}:${port}/remote`;
     const ipUrl     = `http://${lanIP}:${port}/remote`;
-    const remoteUrl = mdnsUrl;
+    const remoteUrl = ipUrl;   // ← QR always uses the IP
 
     const format = (req.query.format as string) ?? 'svg';
 

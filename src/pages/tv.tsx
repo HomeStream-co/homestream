@@ -476,7 +476,7 @@ function TvNotConnected({ serverIP }: { serverIP: string }) {
         )}
       </div>
       <p className="text-white/30 text-sm">
-        Try <span className="font-mono text-white/50">http://hs.local:3000/tv</span> or find your server IP in HomeStream Settings → Network
+        Find your server IP in HomeStream Settings → Network, or try <span className="font-mono text-white/50">http://hs.local:3000/tv</span> on iOS/macOS
       </p>
     </div>
   );
@@ -500,8 +500,9 @@ export default function TvPage() {
     fetch('/api/network/info')
       .then(r => r.json())
       .then((d: { mdnsHostname?: string; primary?: string; lanIP?: string; port?: string | number }) => {
-        // Prefer hs.local — works on all modern devices without typing an IP
-        const host = d.mdnsHostname || d.primary || d.lanIP;
+        // Always prefer the raw LAN IP — hs.local fails on Android and causes
+        // SSL errors on devices that have seen an HSTS header before.
+        const host = d.lanIP || d.primary || d.mdnsHostname;
         if (host && host !== 'localhost' && host !== '127.0.0.1') {
           setServerIP(`http://${host}:${d.port ?? '3000'}/tv`);
         }
