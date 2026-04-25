@@ -24,15 +24,19 @@ import type { Request, Response } from 'express';
 let mockAuthed = true;
 let mockLibrary: Array<{ id: string; filename?: string; filePath?: string }> = [];
 
-// Controls what the fake HTTP device returns for each request type
 type DeviceResponse = { statusCode: number; body: string };
-let mockDescriptionResponse: DeviceResponse = {
+
+const AVT_DESCRIPTION: DeviceResponse = {
   statusCode: 200,
   body: `<serviceType>urn:schemas-upnp-org:service:AVTransport:1</serviceType>
          <controlURL>/AVTransport/control</controlURL>`,
 };
-let mockSetUriResponse: DeviceResponse  = { statusCode: 200, body: '' };
-let mockPlayResponse: DeviceResponse    = { statusCode: 200, body: '' };
+const OK_SOAP: DeviceResponse = { statusCode: 200, body: '' };
+const FAIL_SOAP: DeviceResponse = { statusCode: 500, body: 'Internal Server Error' };
+const NO_AVT_DESCRIPTION: DeviceResponse = {
+  statusCode: 200,
+  body: '<root><device><friendlyName>TV</friendlyName></device></root>',
+};
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
@@ -47,26 +51,18 @@ vi.mock('../../server/libraryStore.js', () => ({
   readLibrary: () => mockLibrary,
 }));
 
-// Mock http.request — intercept all outbound HTTP calls from the handler
+// Mock http.request — intercept all outbound HTTP calls from the handler.
+// We use a per-test response queue (mockHttpQueue) instead of a call counter
+// so tests that abort early (401, 400, 404, 422) don't leave the counter in
+// a wrong state for the next test.
+const mockHttpQueue: DeviceResponse[] = [];
+
 vi.mock('http', async (importOriginal) => {
   const actual = await importOriginal<typeof import('http')>();
 
-  let callCount = 0;
-
   const request = vi.fn((_options: unknown, callback: (res: unknown) => void) => {
-    callCount++;
-    const isFirst  = callCount === 1;   // device description fetch
-    const isSecond = callCount === 2;   // SetAVTransportURI
-    // third call = Play
-
-    const response = isFirst
-      ? mockDescriptionResponse
-      : isSecond
-        ? mockSetUriResponse
-        : mockPlayResponse;
-
-    // Reset counter after 3 calls (one full cast cycle)
-    if (callCount >= 3) callCount = 0;
+    // Pop the next response from the queue; fall back to a generic 200
+    const response: DeviceResponse = mockHttpQueue.shift() ?? { statusCode: 200, body: '' };
 
     const fakeRes = {
       statusCode: response.statusCode,
@@ -84,9 +80,6 @@ vi.mock('http', async (importOriginal) => {
       end:   vi.fn(),
     };
   });
-
-  // Reset call count between tests
-  (request as unknown as { _reset: () => void })._reset = () => { callCount = 0; };
 
   return { ...actual, default: { ...actual, request } };
 });
@@ -111,13 +104,8 @@ describe('POST /api/cast/send', () => {
   beforeEach(() => {
     mockAuthed = true;
     mockLibrary = [{ id: 'media-1', filename: 'inception.mp4' }];
-    mockDescriptionResponse = {
-      statusCode: 200,
-      body: `<serviceType>urn:schemas-upnp-org:service:AVTransport:1</serviceType>
-             <controlURL>/AVTransport/control</controlURL>`,
-    };
-    mockSetUriResponse = { statusCode: 200, body: '' };
-    mockPlayResponse   = { statusCode: 200, body: '' };
+    // Clear the queue before each test
+    mockHttpQueue.length = 0;
   });
 
   it('returns 401 when not authenticated', async () => {
@@ -150,7 +138,7 @@ describe('POST /api/cast/send', () => {
   });
 
   it('returns 422 when device does not expose AVTransport service', async () => {
-    mockDescriptionResponse = { statusCode: 200, body: '<root><device><friendlyName>TV</friendlyName></device></root>' };
+    mockHttpQueue.push(NO_AVT_DESCRIPTION);
     const { req, res } = makeReqRes({
       deviceLocation: 'http://192.168.1.5:1400/desc.xml',
       streamUrl: 'http://192.168.1.10:3000/api/stream/movie.mp4',
@@ -160,7 +148,7 @@ describe('POST /api/cast/send', () => {
   });
 
   it('returns 502 when SetAVTransportURI SOAP call fails', async () => {
-    mockSetUriResponse = { statusCode: 500, body: 'Internal Server Error' };
+    mockHttpQueue.push(AVT_DESCRIPTION, FAIL_SOAP);
     const { req, res } = makeReqRes({
       deviceLocation: 'http://192.168.1.5:1400/desc.xml',
       streamUrl: 'http://192.168.1.10:3000/api/stream/movie.mp4',
@@ -170,7 +158,7 @@ describe('POST /api/cast/send', () => {
   });
 
   it('returns 502 when Play SOAP call fails', async () => {
-    mockPlayResponse = { statusCode: 500, body: 'Internal Server Error' };
+    mockHttpQueue.push(AVT_DESCRIPTION, OK_SOAP, FAIL_SOAP);
     const { req, res } = makeReqRes({
       deviceLocation: 'http://192.168.1.5:1400/desc.xml',
       streamUrl: 'http://192.168.1.10:3000/api/stream/movie.mp4',
@@ -180,6 +168,7 @@ describe('POST /api/cast/send', () => {
   });
 
   it('returns ok:true on full success', async () => {
+    mockHttpQueue.push(AVT_DESCRIPTION, OK_SOAP, OK_SOAP);
     const { req, res, captured } = makeReqRes({
       deviceLocation: 'http://192.168.1.5:1400/desc.xml',
       streamUrl: 'http://192.168.1.10:3000/api/stream/movie.mp4',
@@ -191,6 +180,7 @@ describe('POST /api/cast/send', () => {
   });
 
   it('resolves HLS stream URL from mediaId via library lookup', async () => {
+    mockHttpQueue.push(AVT_DESCRIPTION, OK_SOAP, OK_SOAP);
     const { req, res } = makeReqRes({
       deviceLocation: 'http://192.168.1.5:1400/desc.xml',
       mediaId: 'media-1',

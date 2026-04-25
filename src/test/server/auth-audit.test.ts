@@ -138,7 +138,10 @@ describe('API auth audit', () => {
       const src = readFileSync(file, 'utf-8');
       const hasAuth =
         src.includes('requireAuth(') ||
-        src.includes('requireJellyfinAuth(');
+        src.includes('requireJellyfinAuth(') ||
+        // Array middleware pattern: export default [requireAuth, handler]
+        /export\s+default\s+\[requireAuth/.test(src) ||
+        /export\s+default\s+\[requireJellyfinAuth/.test(src);
 
       if (!hasAuth) {
         violations.push(rel);

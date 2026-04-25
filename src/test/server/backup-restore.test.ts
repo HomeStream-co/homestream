@@ -50,9 +50,9 @@ vi.mock('../../server/dataDir.js', () => ({
 
 vi.mock('fs', () => ({
   default: {
-    writeFileSync: (...args: unknown[]) => mockWriteFileSync(...args),
-    readFileSync:  (...args: unknown[]) => mockReadFileSync(...args),
-    existsSync:    (...args: unknown[]) => mockExistsSync(...args),
+    writeFileSync: (...args: Parameters<typeof mockWriteFileSync>) => mockWriteFileSync(...args),
+    readFileSync:  (...args: Parameters<typeof mockReadFileSync>)  => mockReadFileSync(...args),
+    existsSync:    (...args: Parameters<typeof mockExistsSync>)    => mockExistsSync(...args),
   },
 }));
 

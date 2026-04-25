@@ -334,7 +334,7 @@ describe('GET /api/health/full — response shape', () => {
   it('checks array has 8 entries', async () => {
     const res = makeRes();
     await handler(makeReq(), res as unknown as Response);
-    expect((res.body as { checks: unknown[] }).checks).toHaveLength(8);
+    expect((res.body as { checks: unknown[] }).checks).toHaveLength(9);
   });
 
   it('each check has { name, status, message }', async () => {

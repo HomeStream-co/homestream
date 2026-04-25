@@ -24,7 +24,6 @@ import type { Request, Response } from 'express';
 
 let mockRdApiKey = 'valid-rd-key';
 let mockQbitReachable = false;   // qBit is DOWN — should not matter when RD is set
-let mockScanAllowed = true;
 let mockDuplicateJob: Record<string, unknown> | undefined = undefined;
 
 const mockStreams = [
@@ -133,7 +132,7 @@ describe('POST /api/stremio/download — Real-Debrid backend', () => {
   beforeEach(() => {
     mockRdApiKey    = 'valid-rd-key';
     mockQbitReachable = false;
-    mockScanAllowed = true;
+
     mockDuplicateJob = undefined;
     mockUpsertJob.mockClear();
     mockResolvemagnet.mockClear();
