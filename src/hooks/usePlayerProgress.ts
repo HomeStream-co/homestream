@@ -19,6 +19,9 @@ interface UsePlayerProgressOptions {
   duration: number;
   playing: boolean;
   profileId: string;
+  /** Forwarded query param — e.g. "tv" when launched from /tv. Used so autoplay
+   *  preserves the ?from=tv param so the back button stays correct. */
+  fromParam?: string | null;
   videoRef: React.RefObject<HTMLVideoElement | null>;
   watchCompleteTriggered: React.MutableRefObject<boolean>;
   autoplayTimerRef: React.MutableRefObject<ReturnType<typeof setInterval> | undefined>;
@@ -45,6 +48,7 @@ export function usePlayerProgress({
   duration,
   playing,
   profileId,
+  fromParam: _fromParam,
   videoRef,
   watchCompleteTriggered,
   autoplayTimerRef,
@@ -105,18 +109,16 @@ export function usePlayerProgress({
         const dur = video.duration;
         const pct = (ct / dur) * 100;
         const payload = JSON.stringify({ progress: pct, currentTime: ct, duration: dur, profileId: profileIdRef.current });
-        if (navigator.sendBeacon) {
-          const blob = new Blob([payload], { type: 'application/json' });
-          navigator.sendBeacon(`/api/media/${id}/progress`, blob);
-        } else {
-          fetch(`/api/media/${id}/progress`, {
-            method: 'PATCH',
-            credentials: 'include',
-            headers: { 'Content-Type': 'application/json' },
-            body: payload,
-            keepalive: true,
-          }).catch(() => {}); // non-fatal — ignore
-        }
+        // Use fetch with keepalive — unlike sendBeacon, keepalive fetch sends
+        // cookies (credentials: 'include') so requireAuth passes correctly.
+        // sendBeacon cannot set headers or cookies and would always 401.
+        fetch(`/api/media/${id}/progress`, {
+          method: 'PATCH',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: payload,
+          keepalive: true,
+        }).catch(() => {}); // non-fatal — ignore
       }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -141,13 +143,17 @@ export function usePlayerProgress({
       setAutoplayCountdown(prev => {
         if (prev <= 1) {
           clearInterval(autoplayTimerRef.current);
-          navigate(`/player/${nextItemId}`);
+          const dest = fromParam
+            ? `/player/${nextItemId}?from=${encodeURIComponent(fromParam)}`
+            : `/player/${nextItemId}`;
+          navigate(dest);
           return 0;
         }
         return prev - 1;
       });
     }, 1000);
     return () => clearInterval(autoplayTimerRef.current);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showEndOverlay, autoplayCancelled, nextItemId, navigate, autoplayNext, autoplayTimerRef, setAutoplayCountdown]);
 
   // ── Skip Intro visibility + auto-skip ────────────────────────────────────
