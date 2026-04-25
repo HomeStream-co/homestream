@@ -24,7 +24,15 @@ import { fetchOMDB } from './mediaUtils.js';
 import { upsertJob, updateJobStatus, getAllPersistedJobs } from './downloadJobStore.js';
 import { readConfig } from './configStore.js';
 
+<<<<<<< HEAD
 /** Returns the active downloads directory, preferring mediaDir/downloads from config. */
+=======
+/**
+ * Returns the active downloads directory.
+ * Prefers <mediaDir>/downloads from config (the user's chosen drive).
+ * Falls back to ./uploads for dev / cloud environments.
+ */
+>>>>>>> 20260425045933-9h9yrecco0
 function getDownloadsDir(): string {
   const cfg = readConfig();
   if (cfg.mediaDir) {
@@ -32,7 +40,10 @@ function getDownloadsDir(): string {
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     return dir;
   }
+<<<<<<< HEAD
   // Fallback: ./uploads (legacy, cloud/dev environment)
+=======
+>>>>>>> 20260425045933-9h9yrecco0
   const fallback = path.resolve('./uploads');
   if (!fs.existsSync(fallback)) fs.mkdirSync(fallback, { recursive: true });
   return fallback;

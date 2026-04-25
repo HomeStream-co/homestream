@@ -14,22 +14,35 @@ import { readConfig } from '../../../configStore.js';
 import { requireAuth } from '../../../authMiddleware.js';
 
 function getDiskStats(dir: string): { free: number; total: number } | null {
+<<<<<<< HEAD
   // Windows: use wmic to get disk free/total for the drive letter
   if (process.platform === 'win32') {
     try {
       // Extract drive letter (e.g. "D:" from "D:\HomeStream")
+=======
+  // Windows: use wmic — df does not exist on Windows
+  if (process.platform === 'win32') {
+    try {
+>>>>>>> 20260425045933-9h9yrecco0
       const driveLetter = dir.match(/^([A-Za-z]:)/)?.[1];
       if (!driveLetter) return null;
       const out = execSync(
         `wmic logicaldisk where "DeviceID='${driveLetter}'" get FreeSpace,Size /format:csv`,
         { timeout: 5000 }
       ).toString().trim();
+<<<<<<< HEAD
       // CSV output: Node,FreeSpace,Size  (first line is header, second is data)
+=======
+      // CSV: Node,FreeSpace,Size  (first line header, second line data)
+>>>>>>> 20260425045933-9h9yrecco0
       const lines = out.split('\n').map(l => l.trim()).filter(Boolean);
       const dataLine = lines.find(l => !l.startsWith('Node') && l.includes(','));
       if (dataLine) {
         const parts = dataLine.split(',');
+<<<<<<< HEAD
         // wmic csv: Node, FreeSpace, Size
+=======
+>>>>>>> 20260425045933-9h9yrecco0
         const free  = parseInt(parts[1] ?? '0', 10);
         const total = parseInt(parts[2] ?? '0', 10);
         if (!isNaN(free) && !isNaN(total) && total > 0) return { free, total };

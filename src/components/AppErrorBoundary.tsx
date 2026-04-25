@@ -35,8 +35,13 @@ export default class AppErrorBoundary extends React.Component<Props, State> {
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     this.setState({ errorInfo });
 
+<<<<<<< HEAD
     // If this is a stale chunk error (Vite hash mismatch after auto-update),
     // attempt a single auto-reload with the same loop guard used in main.tsx.
+=======
+    // If this is a stale chunk error after an auto-update, attempt one auto-reload.
+    // Uses the same sessionStorage guard as main.tsx to prevent infinite loops.
+>>>>>>> 20260425045933-9h9yrecco0
     const msg = error.message ?? '';
     const isChunkError = (
       msg.includes('Failed to fetch dynamically imported module') ||
@@ -53,12 +58,20 @@ export default class AppErrorBoundary extends React.Component<Props, State> {
         console.warn('[HomeStream] AppErrorBoundary: stale chunk — reloading…');
         sessionStorage.setItem(CHUNK_RELOAD_KEY, String(now));
         window.location.replace(window.location.href);
+<<<<<<< HEAD
         return; // don't log crash or show error screen — we're reloading
+=======
+        return; // reloading — don't log crash or show error screen
+>>>>>>> 20260425045933-9h9yrecco0
       }
       console.error('[HomeStream] AppErrorBoundary: chunk error persists after reload — showing crash screen.');
     }
 
+<<<<<<< HEAD
     // Post to the crash log API so it persists and shows in the Debug Panel
+=======
+    // Log to crash API so it appears in the Debug Panel
+>>>>>>> 20260425045933-9h9yrecco0
     fetch('/api/crash-log', {
       method: 'POST',
       credentials: 'include',
@@ -69,7 +82,7 @@ export default class AppErrorBoundary extends React.Component<Props, State> {
         stack: error.stack,
         context: `React component tree\n${errorInfo.componentStack ?? ''}`,
       }),
-    }).catch(() => { /* non-fatal — don't throw from error boundary */ });
+    }).catch(() => { /* non-fatal */ });
   }
 
   buildReport(): string {
