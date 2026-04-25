@@ -34,7 +34,6 @@ if ('serviceWorker' in navigator && import.meta.env.PROD) {
 // has an old version cached and tries to load a stale chunk URL it gets a
 // "Failed to fetch dynamically imported module" error.
 //
-<<<<<<< HEAD
 // Strategy:
 //  1. On first detection, set a sessionStorage flag + timestamp and reload.
 //  2. If we reload and the error fires again within 10s, it's a genuine loop
@@ -43,15 +42,6 @@ if ('serviceWorker' in navigator && import.meta.env.PROD) {
 
 const CHUNK_RELOAD_KEY = 'hs_chunk_reload_at';
 const CHUNK_RELOAD_COOLDOWN_MS = 10_000; // 10 seconds
-=======
-// Guard strategy:
-//   1. First detection → record timestamp in sessionStorage, reload via replace().
-//   2. Same error within 10s → cache is genuinely stuck, stop looping.
-//      AppErrorBoundary will show the crash screen with a manual Reload button.
-
-const CHUNK_RELOAD_KEY = 'hs_chunk_reload_at';
-const CHUNK_RELOAD_COOLDOWN_MS = 10_000;
->>>>>>> 20260425045933-9h9yrecco0
 
 function isChunkError(msg: string): boolean {
   return (
@@ -65,8 +55,6 @@ function isChunkError(msg: string): boolean {
 function handleChunkError(source: string): void {
   const now = Date.now();
   const lastReload = parseInt(sessionStorage.getItem(CHUNK_RELOAD_KEY) ?? '0', 10);
-<<<<<<< HEAD
-
   if (now - lastReload < CHUNK_RELOAD_COOLDOWN_MS) {
     // Already reloaded recently and still erroring — cache is genuinely stuck.
     // Clear the flag and give up so we don't loop. The error boundary will show
@@ -79,21 +67,6 @@ function handleChunkError(source: string): void {
   console.warn(`[HomeStream] ${source}: stale chunk detected — reloading to pick up new build…`);
   sessionStorage.setItem(CHUNK_RELOAD_KEY, String(now));
   // Use replace so the back button doesn't loop
-  window.location.replace(window.location.href);
-}
-
-window.addEventListener('error', (event) => {
-  if (isChunkError(event.message ?? '')) {
-    handleChunkError('window.error');
-=======
-  if (now - lastReload < CHUNK_RELOAD_COOLDOWN_MS) {
-    console.error(`[HomeStream] ${source}: chunk error persists after reload — stopping to prevent loop.`);
-    sessionStorage.removeItem(CHUNK_RELOAD_KEY);
-    return;
->>>>>>> 20260425045933-9h9yrecco0
-  }
-  console.warn(`[HomeStream] ${source}: stale chunk — reloading to pick up new build…`);
-  sessionStorage.setItem(CHUNK_RELOAD_KEY, String(now));
   window.location.replace(window.location.href);
 }
 

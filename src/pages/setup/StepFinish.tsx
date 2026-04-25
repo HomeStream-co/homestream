@@ -56,16 +56,17 @@ export default function StepFinish({
     return () => { cancelled = true; };
   }, []);
 
-  // The QR URL now points to hs.local — check the raw lanIP to decide if we're
-  // actually on a real LAN (hs.local is always a valid address, but if the
-  // server only found 127.0.0.1 it means there's no real network interface).
+  // QR always encodes the raw LAN IP (never hs.local).
+  // Check lanIP to decide if we're on a real LAN — if the server only found
+  // 127.0.0.1 it means there's no real network interface and the QR is useless.
   const lanIP = qrData?.lanIP ?? window.location.hostname;
   const qrPointsToLocalhost =
     !qrData ||
     lanIP === 'localhost' ||
     lanIP === '127.0.0.1' ||
     lanIP === '::1';
-  const remoteUrl = qrData?.url ?? `http://hs.local:${qrData?.port ?? '3000'}/remote`;
+  // url is always the raw IP URL; fall back to window.location if qrData not yet loaded
+  const remoteUrl = qrData?.url ?? `http://${window.location.hostname}:${qrData?.port ?? '3000'}/remote`;
 
   function copyUrl() {
     navigator.clipboard.writeText(remoteUrl).then(() => {
@@ -171,9 +172,10 @@ export default function StepFinish({
               </div>
             )}
             {qrData && !qrPointsToLocalhost && (
-              <div className="w-24 h-24 rounded-lg overflow-hidden bg-white p-1.5">
-                <img src={qrData.qr} alt="Remote QR code" className="w-full h-full object-contain" />
-              </div>
+              <div
+                className="w-24 h-24 rounded-lg overflow-hidden bg-white p-1.5 [&_svg]:w-full [&_svg]:h-full"
+                dangerouslySetInnerHTML={{ __html: qrData.qr }}
+              />
             )}
             {(qrError || qrPointsToLocalhost) && (
               <div className="w-24 h-24 rounded-lg bg-muted flex flex-col items-center justify-center gap-1 text-center px-2">

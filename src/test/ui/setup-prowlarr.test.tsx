@@ -131,6 +131,7 @@ function buildProps(overrides: Partial<SetupStepProps> = {}): SetupStepProps {
     prowlarrTestMsg: '',
     setProwlarrTestMsg: vi.fn(),
     platformDefaultsReady: true,
+    availableDrives: [],
     ...overrides,
   };
 }

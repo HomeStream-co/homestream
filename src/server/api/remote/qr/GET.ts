@@ -1,20 +1,30 @@
 /**
  * GET /api/remote/qr
  *
- * Returns a QR code encoding the /remote URL.
+ * Returns a QR code encoding the /remote URL using the raw LAN IP.
  *
- * URL preference order:
- *   1. http://hs.local:<port>/remote  — mDNS hostname, works on all modern
- *      devices (iOS, Android, macOS, Windows 10+) without typing an IP.
- *   2. http://<LAN IP>:<port>/remote  — fallback for devices without mDNS
- *      support (older Android, some smart TVs).
+ * Why raw IP (not hs.local):
+ *   • Android Chrome blocks mDNS .local resolution entirely (security policy).
+ *   • iOS Safari works with hs.local, but if the browser has ever seen an HSTS
+ *     header it forces HTTPS → SSL error on our plain-HTTP server → grey screen.
+ *   • The raw IP works on every device, every OS, every browser.
+ *   • hs.local is returned as `mdnsUrl` for display as a secondary hint only
+ *     (iOS/macOS users who prefer to type it manually).
  *
  * Open endpoint — no auth required. /remote itself is public, and the QR
  * widget needs to render on the TV home screen before the user logs in.
  *
  * Query params:
- *   ?format=svg  (default) — returns { url, qr: svgString, lanIP, mdnsUrl, ipUrl }
- *   ?format=png            — returns { url, qr: base64DataUrl, lanIP, mdnsUrl, ipUrl }
+ *   ?format=svg  (default) — returns { url, qr: svgString, lanIP, mdnsUrl, ipUrl, port }
+ *   ?format=png            — returns { url, qr: base64DataUrl, lanIP, mdnsUrl, ipUrl, port }
+ *
+ * Response fields:
+ *   url      — the URL encoded in the QR (always the raw LAN IP URL)
+ *   qr       — SVG string or PNG base64 data URL
+ *   lanIP    — raw LAN IP address (e.g. "192.168.1.42")
+ *   mdnsUrl  — hs.local URL for display as secondary hint (iOS/macOS only)
+ *   ipUrl    — same as url; kept for backwards compat with older UI consumers
+ *   port     — port number as string
  */
 import type { Request, Response } from 'express';
 import QRCode from 'qrcode';

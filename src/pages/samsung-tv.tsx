@@ -125,9 +125,11 @@ const SECTIONS: { id: GuideSection; label: string; icon: React.ElementType; shor
 // ── Section content components ─────────────────────────────────────────────────
 
 function OverviewSection({ networkInfo, netLoading }: { networkInfo: NetworkInfo | null; netLoading: boolean }) {
-  // Always prefer raw LAN IP — hs.local fails on Android and Samsung TVs
-  // that don't support mDNS .local resolution.
-  const host = networkInfo?.primary || networkInfo?.mdnsHostname;
+  // Samsung TVs do NOT support mDNS — always use the raw LAN IP, never hs.local.
+  // primary is always a real IP from /api/network/info; mdnsHostname is never used here.
+  const host = networkInfo?.primary && networkInfo.primary !== '127.0.0.1' && networkInfo.primary !== 'localhost'
+    ? networkInfo.primary
+    : null;
   const url = host
     ? `http://${host}:${networkInfo!.port}`
     : 'http://192.168.x.x:3000';
@@ -180,9 +182,9 @@ function OverviewSection({ networkInfo, netLoading }: { networkInfo: NetworkInfo
               Type this address into your Samsung TV browser:
             </p>
             <CodeBlock code={url} />
-            {networkInfo && networkInfo.lanIPs.length > 0 && networkInfo.mdnsHostname && (
+            {networkInfo && networkInfo.lanIPs.length > 0 && networkInfo.mdnsHostname && host && (
               <p className="text-xs text-muted-foreground">
-                iOS/macOS alternative: {networkInfo.mdnsHostname}:{networkInfo.port}
+                On your PC or iPhone/Mac you can also use: <span className="font-mono">{networkInfo.mdnsHostname}:{networkInfo.port}</span> — <strong>do not use this on the TV</strong>, Samsung TVs don&apos;t support mDNS.
               </p>
             )}
           </>
@@ -312,7 +314,10 @@ function BrowserSection() {
 }
 
 function NavigateSection({ networkInfo, netLoading }: { networkInfo: NetworkInfo | null; netLoading: boolean }) {
-  const host = networkInfo?.primary || networkInfo?.mdnsHostname;
+  // Samsung TVs do NOT support mDNS — always use the raw LAN IP, never hs.local.
+  const host = networkInfo?.primary && networkInfo.primary !== '127.0.0.1' && networkInfo.primary !== 'localhost'
+    ? networkInfo.primary
+    : null;
   const url = host
     ? `http://${host}:${networkInfo!.port}`
     : 'http://192.168.x.x:3000';
@@ -412,7 +417,10 @@ function NavigateSection({ networkInfo, netLoading }: { networkInfo: NetworkInfo
 }
 
 function BookmarkSection({ networkInfo }: { networkInfo: NetworkInfo | null }) {
-  const host = networkInfo?.primary || networkInfo?.mdnsHostname;
+  // Samsung TVs do NOT support mDNS — always use the raw LAN IP, never hs.local.
+  const host = networkInfo?.primary && networkInfo.primary !== '127.0.0.1' && networkInfo.primary !== 'localhost'
+    ? networkInfo.primary
+    : null;
   const url = host
     ? `http://${host}:${networkInfo!.port}`
     : 'http://192.168.x.x:3000';

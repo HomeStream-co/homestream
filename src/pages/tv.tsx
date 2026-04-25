@@ -499,10 +499,11 @@ export default function TvPage() {
 
     fetch('/api/network/info')
       .then(r => r.json())
-      .then((d: { mdnsHostname?: string; primary?: string; lanIP?: string; port?: string | number }) => {
+      .then((d: { primary?: string; port?: string | number }) => {
         // Always prefer the raw LAN IP — hs.local fails on Android and causes
         // SSL errors on devices that have seen an HSTS header before.
-        const host = d.lanIP || d.primary || d.mdnsHostname;
+        // /api/network/info returns `primary` as the best LAN IP.
+        const host = d.primary;
         if (host && host !== 'localhost' && host !== '127.0.0.1') {
           setServerIP(`http://${host}:${d.port ?? '3000'}/tv`);
         }

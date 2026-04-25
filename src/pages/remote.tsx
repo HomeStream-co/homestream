@@ -202,10 +202,11 @@ export default function RemotePage() {
 
     fetch('/api/network/info')
       .then(r => r.json())
-      .then((d: { mdnsHostname?: string; primary?: string; lanIP?: string; port?: string | number }) => {
+      .then((d: { mdnsHostname?: string; primary?: string; port?: string | number }) => {
         // Always use the raw LAN IP — hs.local fails on Android and causes
         // SSL errors on devices that have cached an HSTS header.
-        const host = d.lanIP || d.primary || d.mdnsHostname;
+        // /api/network/info returns `primary` as the best LAN IP.
+        const host = d.primary;
         if (host && host !== 'localhost' && host !== '127.0.0.1') {
           setServerIP(`http://${host}:${d.port ?? '3000'}/remote`);
         }
@@ -1104,10 +1105,8 @@ function QrModal({ qrData, onClose }: { qrData: { url: string; qr: string; mdnsU
     });
   };
 
-  // Safely extract port from the URL (works for both hs.local and IP URLs)
+  // Extract port from the URL for the firewall hint in the troubleshooting section
   const port = (() => { try { return new URL(qrData.url).port || '3000'; } catch { return '3000'; } })();
-  // Raw IP fallback URL for display (strip /remote suffix for readability)
-  const ipFallback = qrData.ipUrl ?? null;
 
   return (
     <motion.div
