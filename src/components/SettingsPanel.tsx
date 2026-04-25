@@ -1,25 +1,14 @@
 /**
  * SettingsPanel — cog-wheel dropdown in the header.
  *
- * This file is the orchestrator: it owns all state and data-fetching, then
- * passes props down to the per-section components in ./settings/.
- *
- * Sections (in render order):
- *  1. Appearance        — SettingsAppearance
- *  2. Playback          — SettingsPlayback
- *  3. Library           — SettingsLibrary
- *  4. Discover          — SettingsDiscover
- *  5. Storage & Library — SettingsStorage
- *  6. Parental Controls — SettingsParentalControls
- *  7. API Keys          — SettingsApiKeys
- *  8. Backup & Restore  — SettingsBackup
- *  9. VPN Kill-Switch   — SettingsVpn
- * 10. Tools             — SettingsTools
- * 11. Session           — SettingsSession
+ * Tabbed layout (3 tabs, no long scroll):
+ *   Quick        — Appearance · Playback · Library toggles
+ *   Integrations — API Keys · Prowlarr · VPN Kill-Switch
+ *   Advanced     — Storage · Parental Controls · Backup · Tools · Session
  */
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Settings } from 'lucide-react';
+import { Settings, Zap, Plug, SlidersHorizontal } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTheme } from '@/context/ThemeContext';
 import { useProfile } from '@/context/ProfileContext';
@@ -391,6 +380,16 @@ export default function SettingsPanel({
     }
   }, [vpnSelectedInterface]);
 
+  // ── Tab state ────────────────────────────────────────────────────────────────
+
+  const [activeTab, setActiveTab] = useState<'quick' | 'integrations' | 'advanced'>('quick');
+
+  const TABS = [
+    { id: 'quick',        label: 'Quick',        icon: Zap },
+    { id: 'integrations', label: 'Integrations', icon: Plug },
+    { id: 'advanced',     label: 'Advanced',     icon: SlidersHorizontal },
+  ] as const;
+
   // ── Render ──────────────────────────────────────────────────────────────────
 
   return (
@@ -436,7 +435,7 @@ export default function SettingsPanel({
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: -6 }}
               transition={{ duration: 0.15 }}
-              className="absolute right-0 top-full mt-2 w-80 bg-card border border-border rounded-2xl shadow-2xl overflow-hidden z-50"
+              className="absolute right-0 top-full mt-2 w-96 bg-card border border-border rounded-2xl shadow-2xl overflow-hidden z-50"
             >
               {/* Header */}
               <div className="flex items-center justify-between px-4 py-3 border-b border-border">
@@ -456,76 +455,139 @@ export default function SettingsPanel({
                 </span>
               </div>
 
-              <div className="max-h-[calc(100vh-120px)] overflow-y-auto">
-                <SettingsAppearance />
-                <SettingsPlayback />
-                <SettingsLibrary />
-                <SettingsDiscover
-                  tmdbRefreshing={tmdbRefreshing}
-                  tmdbLastRefreshed={tmdbLastRefreshed}
-                  tmdbStale={tmdbStale}
-                  onRefresh={handleTmdbRefresh}
-                />
-                <SettingsProwlarr onSaved={() => toast.success('Prowlarr settings saved')} />
-                <SettingsStorage
-                  storageStats={storageStats}
-                  storageLoading={storageLoading}
-                  scanning={scanning}
-                  scanResult={scanResult}
-                  allocMovies={allocMovies}
-                  allocTv={allocTv}
-                  allocSaving={allocSaving}
-                  allocSaved={allocSaved}
-                  onScanLibrary={handleScanLibrary}
-                  onSetAllocMovies={setAllocMovies}
-                  onSetAllocTv={setAllocTv}
-                  onSaveAllocation={saveAllocation}
-                />
-                {!activeProfile?.restricted && (
-                <SettingsParentalControls
-                  onClose={handleClose}
-                  onOpenConfirm={openConfirm}
-                  pinMode={pinMode}
-                  pinInput={pinInput}
-                  pinConfirm={pinConfirm}
-                  pinError={pinError}
-                  onSetPinMode={setPinMode}
-                  onSetPinInput={setPinInput}
-                  onSetPinConfirm={setPinConfirm}
-                  onSetPinError={setPinError}
-                />
-                )}
-                <SettingsApiKeys
-                  apiKeys={apiKeys}
-                  apiKeysSavedState={apiKeysSavedState}
-                  apiKeyTimestamps={apiKeyTimestamps}
-                  apiKeysSaving={apiKeysSaving}
-                  apiKeysSaved={apiKeysSaved}
-                  onChangeKey={handleChangeKey}
-                  onSave={saveApiKeys}
-                  onTestOmdb={testOmdb}
-                  onTestTmdb={testTmdb}
-                  onTestGemini={testGemini}
-                  onTestRealDebrid={testRealDebrid}
-                />
-                <SettingsBackup />
-                <SettingsVpn
-                  vpnInterfaces={vpnInterfaces}
-                  vpnCurrentInterface={vpnCurrentInterface}
-                  vpnSelectedInterface={vpnSelectedInterface}
-                  vpnBindState={vpnBindState}
-                  vpnBindMsg={vpnBindMsg}
-                  onSelectInterface={handleVpnSelectInterface}
-                  onBind={handleVpnBind}
-                />
-                <SettingsTools
-                  onClose={handleClose}
-                  onOpenSecurity={onOpenSecurity}
-                  onOpenDebug={onOpenDebug}
-                  onClearHealth={() => setHealthStatus(null)}
-                  healthStatus={healthStatus}
-                />
-                <SettingsSession onOpenConfirm={openConfirm} />
+              {/* Tab bar */}
+              <div className="flex border-b border-border bg-muted/30">
+                {TABS.map(tab => {
+                  const Icon = tab.icon;
+                  const active = activeTab === tab.id;
+                  return (
+                    <button
+                      key={tab.id}
+                      onClick={() => setActiveTab(tab.id)}
+                      className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-semibold transition-colors relative ${
+                        active
+                          ? 'text-primary'
+                          : 'text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      <Icon className="w-3.5 h-3.5" />
+                      {tab.label}
+                      {active && (
+                        <motion.div
+                          layoutId="settings-tab-indicator"
+                          className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-full"
+                        />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Tab content */}
+              <div className="max-h-[calc(100vh-160px)] overflow-y-auto">
+                <AnimatePresence mode="wait">
+                  {activeTab === 'quick' && (
+                    <motion.div
+                      key="quick"
+                      initial={{ opacity: 0, x: -8 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: 8 }}
+                      transition={{ duration: 0.12 }}
+                    >
+                      <SettingsAppearance />
+                      <SettingsPlayback />
+                      <SettingsLibrary />
+                      <SettingsDiscover
+                        tmdbRefreshing={tmdbRefreshing}
+                        tmdbLastRefreshed={tmdbLastRefreshed}
+                        tmdbStale={tmdbStale}
+                        onRefresh={handleTmdbRefresh}
+                      />
+                    </motion.div>
+                  )}
+
+                  {activeTab === 'integrations' && (
+                    <motion.div
+                      key="integrations"
+                      initial={{ opacity: 0, x: -8 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: 8 }}
+                      transition={{ duration: 0.12 }}
+                    >
+                      <SettingsApiKeys
+                        apiKeys={apiKeys}
+                        apiKeysSavedState={apiKeysSavedState}
+                        apiKeyTimestamps={apiKeyTimestamps}
+                        apiKeysSaving={apiKeysSaving}
+                        apiKeysSaved={apiKeysSaved}
+                        onChangeKey={handleChangeKey}
+                        onSave={saveApiKeys}
+                        onTestOmdb={testOmdb}
+                        onTestTmdb={testTmdb}
+                        onTestGemini={testGemini}
+                        onTestRealDebrid={testRealDebrid}
+                      />
+                      <SettingsProwlarr onSaved={() => toast.success('Prowlarr settings saved')} />
+                      <SettingsVpn
+                        vpnInterfaces={vpnInterfaces}
+                        vpnCurrentInterface={vpnCurrentInterface}
+                        vpnSelectedInterface={vpnSelectedInterface}
+                        vpnBindState={vpnBindState}
+                        vpnBindMsg={vpnBindMsg}
+                        onSelectInterface={handleVpnSelectInterface}
+                        onBind={handleVpnBind}
+                      />
+                    </motion.div>
+                  )}
+
+                  {activeTab === 'advanced' && (
+                    <motion.div
+                      key="advanced"
+                      initial={{ opacity: 0, x: -8 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: 8 }}
+                      transition={{ duration: 0.12 }}
+                    >
+                      <SettingsStorage
+                        storageStats={storageStats}
+                        storageLoading={storageLoading}
+                        scanning={scanning}
+                        scanResult={scanResult}
+                        allocMovies={allocMovies}
+                        allocTv={allocTv}
+                        allocSaving={allocSaving}
+                        allocSaved={allocSaved}
+                        onScanLibrary={handleScanLibrary}
+                        onSetAllocMovies={setAllocMovies}
+                        onSetAllocTv={setAllocTv}
+                        onSaveAllocation={saveAllocation}
+                      />
+                      {!activeProfile?.restricted && (
+                        <SettingsParentalControls
+                          onClose={handleClose}
+                          onOpenConfirm={openConfirm}
+                          pinMode={pinMode}
+                          pinInput={pinInput}
+                          pinConfirm={pinConfirm}
+                          pinError={pinError}
+                          onSetPinMode={setPinMode}
+                          onSetPinInput={setPinInput}
+                          onSetPinConfirm={setPinConfirm}
+                          onSetPinError={setPinError}
+                        />
+                      )}
+                      <SettingsBackup />
+                      <SettingsTools
+                        onClose={handleClose}
+                        onOpenSecurity={onOpenSecurity}
+                        onOpenDebug={onOpenDebug}
+                        onClearHealth={() => setHealthStatus(null)}
+                        healthStatus={healthStatus}
+                      />
+                      <SettingsSession onOpenConfirm={openConfirm} />
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
             </motion.div>
           )}

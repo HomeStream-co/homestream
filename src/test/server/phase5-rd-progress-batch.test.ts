@@ -56,7 +56,7 @@ vi.mock('../../server/qbittorrentClient.js', () => ({
 
 vi.mock('../../server/realDebridClient.js', () => ({
   resolvemagnet: vi.fn().mockResolvedValue('https://rd.example.com/file.mkv'),
-  downloadUrl:   (...args: unknown[]) => mockDownloadUrl(...args),
+  downloadUrl:   (...args: Parameters<typeof mockDownloadUrl>) => mockDownloadUrl(...args),
   getUser:       vi.fn(),
   isConfigured:  vi.fn(),
 }));
