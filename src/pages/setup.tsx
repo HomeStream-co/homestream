@@ -39,7 +39,7 @@ import StepFinish      from './setup/StepFinish';
 const STEPS = [
   { id: 'sysreqs',  label: 'Requirements' },
   { id: 'media',    label: 'Media Folder' },
-  { id: 'optional', label: 'Optional Services' },
+  { id: 'optional', label: 'TV & Services' },
   { id: 'apikeys',  label: 'API Keys' },
   { id: 'finish',   label: 'Finish' },
 ];
