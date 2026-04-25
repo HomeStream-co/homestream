@@ -18,13 +18,14 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
-  Download, Wifi, WifiOff, Trash2, Pause, Play,
+  Download, WifiOff, Trash2, Pause, Play,
   CheckCircle2, AlertCircle, Clock, Loader2,
   Film, Tv2, ArrowDown, ArrowUp, Zap, HardDrive,
   RefreshCw, X, ChevronDown, ChevronUp, Activity,
   Settings2, Save, BarChart3, Layers,
   Bell, BellOff, Calendar, RotateCcw, TrendingUp,
   ChevronsUp, ChevronsDown, Link2, Send, CalendarClock,
+  Wifi, AlertTriangle, ExternalLink, ChevronRight,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import VPNPanel from '@/components/VPNPanel';
@@ -164,6 +165,131 @@ const STATUS_CONFIG = {
   stalled:     { color: 'text-orange-400',  bg: 'bg-orange-400/10', label: 'Stalled',     icon: AlertCircle },
   error:       { color: 'text-red-400',     bg: 'bg-red-400/10',    label: 'Error',       icon: AlertCircle },
 } as const;
+
+// ─── qBittorrent Status Banner ────────────────────────────────────────────────
+// Always visible — collapses to a slim pill when online, expands with
+// actionable instructions when offline.
+
+type QbitBannerState = 'loading' | 'online' | 'offline';
+
+function QbitStatusBanner({ state }: { state: QbitBannerState }) {
+  const [expanded, setExpanded] = useState(false);
+
+  // Auto-expand when going offline; auto-collapse when coming back online
+  useEffect(() => {
+    if (state === 'offline') setExpanded(true);
+    if (state === 'online')  setExpanded(false);
+  }, [state]);
+
+  if (state === 'loading') {
+    return (
+      <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-muted/40 border border-border text-xs text-muted-foreground mb-6">
+        <Loader2 className="w-3.5 h-3.5 animate-spin flex-shrink-0" />
+        Checking qBittorrent status…
+      </div>
+    );
+  }
+
+  if (state === 'online') {
+    return (
+      <motion.div
+        key="online"
+        initial={{ opacity: 0, y: -6 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex items-center gap-2 px-4 py-2 rounded-xl bg-green-500/8 border border-green-500/20 text-xs text-green-400 mb-6"
+      >
+        <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse flex-shrink-0" />
+        <Wifi className="w-3.5 h-3.5 flex-shrink-0" />
+        <span className="font-semibold">qBittorrent is running</span>
+        <span className="text-green-400/60 hidden sm:inline">— downloads are ready</span>
+      </motion.div>
+    );
+  }
+
+  // Offline state — persistent amber banner with expandable help
+  return (
+    <motion.div
+      key="offline"
+      initial={{ opacity: 0, y: -6 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="mb-6 rounded-xl border border-amber-500/30 bg-amber-500/8 overflow-hidden"
+    >
+      {/* Header row — always visible */}
+      <button
+        onClick={() => setExpanded(v => !v)}
+        className="w-full flex items-center gap-3 px-4 py-3 text-left"
+      >
+        <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0" />
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-amber-300">qBittorrent is not running</p>
+          <p className="text-xs text-amber-400/70 mt-0.5">
+            Downloads won't work until qBittorrent is open. Tap to {expanded ? 'hide' : 'see'} how to fix this.
+          </p>
+        </div>
+        <WifiOff className="w-4 h-4 text-amber-400/60 flex-shrink-0" />
+        {expanded
+          ? <ChevronUp className="w-4 h-4 text-amber-400/60 flex-shrink-0" />
+          : <ChevronDown className="w-4 h-4 text-amber-400/60 flex-shrink-0" />
+        }
+      </button>
+
+      {/* Expandable instructions */}
+      <AnimatePresence initial={false}>
+        {expanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden"
+          >
+            <div className="px-4 pb-4 pt-1 border-t border-amber-500/20">
+              <ol className="space-y-2 mt-3">
+                {[
+                  { n: 1, text: 'Open qBittorrent on this computer — it must stay open while downloading' },
+                  { n: 2, text: 'Make sure Web UI is enabled: Tools → Preferences → Web UI → Enable the Web UI' },
+                  { n: 3, text: 'Confirm the port matches what you set in HomeStream Settings (default: 8080)' },
+                  { n: 4, text: 'Try opening http://localhost:8080 in your browser — if it loads, qBit is running' },
+                ].map(({ n, text }) => (
+                  <li key={n} className="flex items-start gap-2.5 text-xs text-amber-300/90">
+                    <span className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-400 font-bold text-[10px] flex items-center justify-center flex-shrink-0 mt-0.5">
+                      {n}
+                    </span>
+                    {text}
+                  </li>
+                ))}
+              </ol>
+
+              <div className="flex items-center gap-3 mt-4 flex-wrap">
+                <a
+                  href="https://www.qbittorrent.org/download"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 text-xs text-amber-400 hover:text-amber-300 transition-colors"
+                >
+                  <ExternalLink className="w-3 h-3" />
+                  Download qBittorrent
+                </a>
+                <span className="text-amber-500/40">·</span>
+                <a
+                  href="/settings"
+                  className="flex items-center gap-1.5 text-xs text-amber-400 hover:text-amber-300 transition-colors"
+                >
+                  <ChevronRight className="w-3 h-3" />
+                  Open Settings → Downloads
+                </a>
+              </div>
+
+              <p className="text-[10px] text-amber-400/50 mt-3">
+                This page checks qBittorrent status every 2 seconds via WebSocket and will update automatically when it comes online.
+              </p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
+  );
+}
 
 // ─── Speed Sparkline ──────────────────────────────────────────────────────────
 
@@ -1185,6 +1311,9 @@ export default function DownloadsPage() {
 
   const tf = data?.transferInfo;
 
+  // Derive qBit banner state from live socket data
+  const qbitBannerState: QbitBannerState = loading ? 'loading' : data?.qbitOnline ? 'online' : 'offline';
+
   return (
     <>
       <title>Downloads — HomeStream</title>
@@ -1217,18 +1346,6 @@ export default function DownloadsPage() {
               </div>
 
               <div className="flex items-center gap-2 flex-shrink-0">
-                {data && (
-                  <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border ${
-                    data.qbitOnline
-                      ? 'bg-green-500/10 border-green-500/20 text-green-400'
-                      : 'bg-muted border-border text-muted-foreground'
-                  }`}>
-                    {data.qbitOnline
-                      ? <><Wifi className="w-3 h-3" />qBittorrent</>
-                      : <><WifiOff className="w-3 h-3" />WebTorrent</>
-                    }
-                  </div>
-                )}
                 <button
                   onClick={fetchData}
                   className="p-2 rounded-xl hover:bg-muted transition-colors text-muted-foreground hover:text-foreground border border-border"
@@ -1242,6 +1359,9 @@ export default function DownloadsPage() {
         </div>
 
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+
+          {/* ── qBittorrent Status Banner — always visible ── */}
+          <QbitStatusBanner state={qbitBannerState} />
 
           {/* ── VPN Panel ── */}
           <div className="mb-6">
@@ -1544,13 +1664,11 @@ export default function DownloadsPage() {
               {/* qBittorrent section */}
               {filteredQbit.length > 0 && (
                 <div>
-                  {data?.qbitOnline && (
-                    <div className="flex items-center gap-2 mb-2 px-1">
-                      <Wifi className="w-3.5 h-3.5 text-green-400" />
-                      <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">qBittorrent Queue</span>
-                      <span className="text-xs text-muted-foreground">({filteredQbit.length})</span>
-                    </div>
-                  )}
+                  <div className="flex items-center gap-2 mb-2 px-1">
+                    <Wifi className="w-3.5 h-3.5 text-green-400" />
+                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">qBittorrent Queue</span>
+                    <span className="text-xs text-muted-foreground">({filteredQbit.length})</span>
+                  </div>
                   <AnimatePresence mode="popLayout">
                     {filteredQbit.map((t, i) => (
                       <QbitRow
