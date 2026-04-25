@@ -184,17 +184,17 @@ describe('Setup wizard — full 5-step flow', () => {
     const fn = handler  as (req: unknown, res: unknown) => Promise<void>;
 
     // Step 1 — password
-    await fn(...Object.values(makeReqRes({ action: 'save', adminPassword: 'pass1' }, false)).slice(0, 2));
+    { const { req, res } = makeReqRes({ action: 'save', adminPassword: 'pass1' }, false); await fn(req, res); }
 
     // Step 2 — mediaDir
-    await fn(...Object.values(makeReqRes({ action: 'save', mediaDir: '/mnt/data' }, false)).slice(0, 2));
+    { const { req, res } = makeReqRes({ action: 'save', mediaDir: '/mnt/data' }, false); await fn(req, res); }
 
     // After step 2, the password written in step 1 must still be present
     expect(diskConfig.adminPassword).toBeTruthy();
     expect(diskConfig.mediaDir).toBe('/mnt/data');
 
     // Step 3 — API keys
-    await fn(...Object.values(makeReqRes({ action: 'save', tmdbApiKey: 'tmdb-123' }, false)).slice(0, 2));
+    { const { req, res } = makeReqRes({ action: 'save', tmdbApiKey: 'tmdb-123' }, false); await fn(req, res); }
 
     // After step 3, mediaDir and password must still be present
     expect(diskConfig.adminPassword).toBeTruthy();
@@ -206,13 +206,13 @@ describe('Setup wizard — full 5-step flow', () => {
     const { default: handler } = await import('../../server/api/setup/POST.js');
     const fn = handler  as (req: unknown, res: unknown) => Promise<void>;
 
-    await fn(...Object.values(makeReqRes({ action: 'save', adminPassword: 'pass' }, false)).slice(0, 2));
+    { const { req, res } = makeReqRes({ action: 'save', adminPassword: 'pass' }, false); await fn(req, res); }
     expect(diskConfig.setupComplete).toBeFalsy();
 
-    await fn(...Object.values(makeReqRes({ action: 'save', mediaDir: '/mnt/media' }, false)).slice(0, 2));
+    { const { req, res } = makeReqRes({ action: 'save', mediaDir: '/mnt/media' }, false); await fn(req, res); }
     expect(diskConfig.setupComplete).toBeFalsy();
 
-    await fn(...Object.values(makeReqRes({ action: 'complete' }, false)).slice(0, 2));
+    { const { req, res } = makeReqRes({ action: 'complete' }, false); await fn(req, res); }
     expect(diskConfig.setupComplete).toBe(true);
   });
 
@@ -221,7 +221,7 @@ describe('Setup wizard — full 5-step flow', () => {
     const fn = handler  as (req: unknown, res: unknown) => Promise<void>;
 
     const plaintext = 'SuperSecret99!';
-    await fn(...Object.values(makeReqRes({ action: 'save', adminPassword: plaintext }, false)).slice(0, 2));
+    { const { req, res } = makeReqRes({ action: 'save', adminPassword: plaintext }, false); await fn(req, res); }
 
     expect(diskConfig.adminPassword).not.toBe(plaintext);
     expect(diskConfig.adminPassword).toBeTruthy();
@@ -232,8 +232,8 @@ describe('Setup wizard — full 5-step flow', () => {
     const fn = setupHandler  as (req: unknown, res: unknown) => Promise<void>;
 
     // Run through the wizard
-    await fn(...Object.values(makeReqRes({ action: 'save', adminPassword: 'pw' }, false)).slice(0, 2));
-    await fn(...Object.values(makeReqRes({ action: 'complete' }, false)).slice(0, 2));
+    { const { req, res } = makeReqRes({ action: 'save', adminPassword: 'pw' }, false); await fn(req, res); }
+    { const { req, res } = makeReqRes({ action: 'complete' }, false); await fn(req, res); }
 
     // Now check /api/health
     const { default: healthHandler } = await import('../../server/api/health/GET.js');
