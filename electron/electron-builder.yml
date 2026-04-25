@@ -32,9 +32,10 @@ npmRebuild: false
 extraMetadata:
   ghOwner: HomeStream-co
   ghRepo: homestream
-  # ghToken is injected at CI build time via --extraMetadata.ghToken on the
-  # electron-builder command line (yml does not expand arbitrary ${ENV_VAR}).
-  # See release.yml for how this is passed.
+  # ghToken is injected at CI build time by the "Inject build metadata" step
+  # in release.yml, which patches package.json directly via PowerShell before
+  # electron-builder runs. This is necessary because electron-builder yml does
+  # not support arbitrary ${ENV_VAR} expansion in extraMetadata values.
 
 # ── Auto-updater (electron-updater via GitHub Releases) ───────────────────────
 # GH_TOKEN must be set in repo Settings → Secrets → Actions.
