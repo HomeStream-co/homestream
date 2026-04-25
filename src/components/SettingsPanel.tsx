@@ -26,6 +26,7 @@ import SettingsVpn, { type VpnInterface } from './settings/SettingsVpn';
 import SettingsTools            from './settings/SettingsTools';
 import SettingsSession          from './settings/SettingsSession';
 import SettingsProwlarr         from './settings/SettingsProwlarr';
+import UpdateBanner             from './UpdateBanner';
 
 // ── Props ─────────────────────────────────────────────────────────────────────
 
@@ -577,6 +578,10 @@ export default function SettingsPanel({
                         />
                       )}
                       <SettingsBackup />
+                      {/* Update banner — compact pill, only visible in Electron */}
+                      <div className="px-4 pb-1">
+                        <UpdateBanner compact />
+                      </div>
                       <SettingsTools
                         onClose={handleClose}
                         onOpenSecurity={onOpenSecurity}

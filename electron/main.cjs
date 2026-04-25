@@ -1018,7 +1018,8 @@ const CONTROL_PANEL_HTML = `<!DOCTYPE html>
   let qrLoaded = false;
 
   // Store the real version so the badge can restore it after "Checking…"
-  window._appVersion = '${app.getVersion()}';
+  // The outer template literal interpolates app.getVersion() at window-creation time.
+  window._appVersion = '${app.getVersion()}' || document.getElementById('version-badge')?.textContent?.replace(/^v/, '') || '';
 
   function openBrowser()  { window.electronAPI?.openBrowser(); }
   function openSetup()    { window.electronAPI?.openBrowserPage('/setup'); }
@@ -1157,9 +1158,15 @@ const CONTROL_PANEL_HTML = `<!DOCTYPE html>
       btn.textContent = 'Checking…';
       setTimeout(() => { btn.disabled = false; btn.textContent = 'Check for Updates'; }, 6_000);
     }
-    // Show a brief "checking" indicator on the version badge
+    // Show a brief "checking" indicator on the version badge, then restore.
+    // Capture the current text BEFORE overwriting so we always restore correctly
+    // even if window._appVersion is somehow empty.
     const badge = document.getElementById('version-badge');
-    if (badge) { badge.textContent = 'Checking…'; setTimeout(() => { badge.textContent = 'v' + (window._appVersion || '?'); }, 4000); }
+    if (badge) {
+      const prev = badge.textContent || ('v' + (window._appVersion || ''));
+      badge.textContent = 'Checking…';
+      setTimeout(() => { badge.textContent = prev || ('v' + window._appVersion) || 'v?'; }, 4000);
+    }
   }
 
   function handleUpdateStatus(data) {

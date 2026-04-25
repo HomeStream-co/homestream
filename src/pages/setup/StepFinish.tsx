@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import type { SetupStepProps } from './types';
 import { apiPost } from './types';
+import UpdateBanner from '@/components/UpdateBanner';
 
 export default function StepFinish({
   form, status, setStatus, onBack,
@@ -157,6 +158,9 @@ export default function StepFinish({
         <h2 className="text-2xl font-heading font-bold text-foreground">You&apos;re all set!</h2>
         <p className="text-muted-foreground mt-2 text-sm">Here&apos;s your HomeStream configuration summary.</p>
       </div>
+
+      {/* Update banner — only visible in Electron when an update is available */}
+      <UpdateBanner />
 
       {/* Config summary */}
       <div className="flex flex-col gap-1.5 text-sm">
