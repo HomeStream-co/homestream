@@ -116,6 +116,8 @@ export interface SetupStepProps {
   setProwlarrTestMsg: (v: string) => void;
   /** True once /api/electron has responded — prevents saving stale mediaDir on fast clicks */
   platformDefaultsReady: boolean;
+  /** Available fixed drives on Windows (e.g. ["C:\\", "D:\\"]). Empty on macOS/Linux. */
+  availableDrives: string[];
 }
 
 /** Helper used by all steps */

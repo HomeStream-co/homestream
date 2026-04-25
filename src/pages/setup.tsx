@@ -130,6 +130,8 @@ export default function SetupPage() {
   // StepMediaFolder disables its "Save & Continue" button until this resolves
   // so the user can't accidentally save the hardcoded fallback path.
   const [platformDefaultsReady, setPlatformDefaultsReady] = useState(false);
+  // Available fixed drives on Windows (e.g. ["C:\\", "D:\\"]). Empty on macOS/Linux.
+  const [availableDrives, setAvailableDrives] = useState<string[]>([]);
 
   // ── Redirect if already set up ──
   useEffect(() => {
@@ -148,9 +150,12 @@ export default function SetupPage() {
   useEffect(() => {
     fetch('/api/electron')
       .then(r => r.json())
-      .then((data: { defaultMediaDir?: string }) => {
+      .then((data: { defaultMediaDir?: string; availableDrives?: string[] }) => {
         if (data.defaultMediaDir) {
           setForm(f => ({ ...f, mediaDir: data.defaultMediaDir! }));
+        }
+        if (data.availableDrives?.length) {
+          setAvailableDrives(data.availableDrives);
         }
       })
       .catch(() => {/* non-fatal — keep the optimistic default */})
@@ -235,6 +240,7 @@ export default function SetupPage() {
     prowlarrTest, setProwlarrTest,
     prowlarrTestMsg, setProwlarrTestMsg,
     platformDefaultsReady,
+    availableDrives,
   };
 
   const currentStep = STEPS[step];

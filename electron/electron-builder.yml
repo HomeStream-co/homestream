@@ -111,6 +111,22 @@ win:
   #   runs normally and patches the HomeStream icon into the .exe.
   icon: electron/assets/icon.png
 
+# ── NSIS installer options ────────────────────────────────────────────────────
+# oneClick: false  → shows the full NSIS wizard (Welcome → License → Directory
+#                    → Install → Finish) instead of silently installing to C:.
+# allowToChangeInstallationDirectory: true → the "Choose Install Location" page
+#   lets users pick any drive/folder (e.g. D:\HomeStream) instead of being
+#   forced to C:\Users\<user>\AppData\Local\Programs\HomeStream.
+# perMachine: false → installs per-user (no UAC elevation required).
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  perMachine: false
+  deleteAppDataOnUninstall: false
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: HomeStream
+
 # ── macOS ─────────────────────────────────────────────────────────────────────
 mac:
   target:

@@ -233,6 +233,27 @@ async function startServer() {
       // media directory for the user's OS (Windows vs macOS vs Linux).
       HOMESTREAM_PLATFORM: process.platform,
       HOMESTREAM_DEFAULT_MEDIA_DIR: (() => {
+        // On Windows, prefer the largest non-system drive (D:, E:, etc.) for
+        // media storage — users with a dedicated media drive expect this.
+        // Fall back to the user's Videos folder on C: if no secondary drive exists.
+        if (process.platform === 'win32') {
+          try {
+            const { execSync } = require('child_process');
+            // Query all fixed drives via WMIC — returns lines like "D:\", "E:\"
+            const out = execSync(
+              'wmic logicaldisk where "DriveType=3" get DeviceID /value',
+              { encoding: 'utf8', timeout: 3000 }
+            );
+            const drives = out.match(/[A-Z]:/g) ?? [];
+            // Filter out C: (system drive), pick the first secondary drive
+            const secondary = drives.find(d => d.toUpperCase() !== 'C:');
+            if (secondary) {
+              return path.join(secondary + '\\', 'HomeStream');
+            }
+          } catch {
+            // WMIC failed — fall through to Videos default
+          }
+        }
         const videos = app.getPath('videos');
         return path.join(videos, 'HomeStream');
       })(),
