@@ -235,6 +235,7 @@ function QbitOfflineHelp({ visible }: { visible: boolean }) {
     else         setExpanded(false);
   }, [visible]);
 
+  // NOTE: hooks above must run unconditionally — early return is AFTER all hooks
   if (!visible) return null;
 
   return (
@@ -1007,7 +1008,7 @@ export default function DownloadsPage() {
   // doesn't wait up to 2s for the next WebSocket push.
   const [manualData, setManualData] = useState<DownloadsResponse | null>(null);
 
-  const data: DownloadsResponse | null = manualData ?? (socketState.qbitTorrents !== undefined || socketState.jobs !== undefined
+  const data: DownloadsResponse | null = manualData ?? (socketState.connected
     ? {
         jobs: socketState.jobs as unknown as DownloadsResponse['jobs'],
         qbitTorrents: socketState.qbitTorrents as unknown as DownloadsResponse['qbitTorrents'],
@@ -1473,6 +1474,37 @@ export default function DownloadsPage() {
           {/* ── qBittorrent offline help — only shown when red ── */}
           <AnimatePresence>
             <QbitOfflineHelp visible={qbitDotColor === 'red'} />
+          </AnimatePresence>
+
+          {/* ── Real-Debrid expiry warning — only shown when ≤7 days left ── */}
+          <AnimatePresence>
+            {rdStatus?.ok && (rdStatus.daysLeft ?? 0) <= 7 && (rdStatus.daysLeft ?? 0) > 0 && (
+              <motion.div
+                key="rd-expiry"
+                initial={{ opacity: 0, y: -4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -4 }}
+                className="mb-6 flex items-start gap-3 px-4 py-3 rounded-xl border border-yellow-500/30 bg-yellow-500/8"
+              >
+                <AlertTriangle className="w-4 h-4 text-yellow-400 flex-shrink-0 mt-0.5" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-yellow-300">
+                    Real-Debrid expires in {rdStatus.daysLeft} day{rdStatus.daysLeft !== 1 ? 's' : ''}
+                  </p>
+                  <p className="text-xs text-yellow-400/70 mt-0.5">
+                    Renew your subscription to keep downloading at full speed.{' '}
+                    <a
+                      href="https://real-debrid.com/premium"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="underline hover:text-yellow-300 transition-colors"
+                    >
+                      Renew now →
+                    </a>
+                  </p>
+                </div>
+              </motion.div>
+            )}
           </AnimatePresence>
 
           {/* ── VPN Panel ── */}

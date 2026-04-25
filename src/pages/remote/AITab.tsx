@@ -126,6 +126,18 @@ export default function AITab({ send }: AITabProps) {
     recognition.start();
   }, [sendMessage]);
 
+  const stopVoice = useCallback(() => {
+    recognitionRef.current?.stop();
+    recognitionRef.current = null;
+    setListening(false);
+  }, []);
+
+  /** Tap once to start, tap again to stop — mirrors SearchTab behaviour */
+  const toggleVoice = useCallback(() => {
+    if (listening) stopVoice();
+    else startVoice();
+  }, [listening, startVoice, stopVoice]);
+
   const launch = useCallback((item: LibraryItem) => {
     haptic([30, 20, 30]);
     setLaunching(item.id);
@@ -222,35 +234,71 @@ export default function AITab({ send }: AITabProps) {
         <div ref={bottomRef} />
       </div>
 
-      <div className="flex items-center gap-2 pt-3 border-t border-border">
-        <div className="relative flex-1">
-          <input
-            ref={inputRef}
-            type="text"
-            placeholder="Ask anything about your library…"
-            value={input}
-            onChange={e => setInput(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(input); } }}
-            className="w-full bg-card border border-border rounded-xl px-3.5 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 pr-10"
-          />
-        </div>
-        {voiceSupported && (
+      <div className="pt-3 border-t border-border flex flex-col gap-2">
+        <AnimatePresence>
+          {listening && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className="flex items-center gap-3 bg-red-500/10 border border-red-500/20 rounded-xl px-3 py-2.5"
+            >
+              <div className="flex gap-1 items-end h-4">
+                {[0, 1, 2, 3].map(i => (
+                  <motion.div
+                    key={i}
+                    className="w-1 bg-red-400 rounded-full"
+                    animate={{ height: ['3px', '14px', '3px'] }}
+                    transition={{ duration: 0.6, delay: i * 0.1, repeat: Infinity }}
+                  />
+                ))}
+              </div>
+              <p className="text-xs text-red-400 font-medium">Listening… tap mic to stop</p>
+            </motion.div>
+          )}
+        </AnimatePresence>
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1">
+            <input
+              ref={inputRef}
+              type="text"
+              placeholder="Ask anything about your library…"
+              value={input}
+              onChange={e => setInput(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(input); } }}
+              className="w-full bg-card border border-border rounded-xl px-3.5 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 pr-10"
+            />
+          </div>
+          {voiceSupported && (
+            <motion.button
+              onClick={toggleVoice}
+              whileTap={{ scale: 0.9 }}
+              className={`w-10 h-10 rounded-xl flex items-center justify-center border flex-shrink-0 transition-all ${
+                listening ? 'bg-red-500/20 border-red-500/50 text-red-400' : 'bg-card border-border text-muted-foreground hover:text-foreground'
+              }`}
+              title={listening ? 'Tap to stop' : 'Tap to speak'}
+            >
+              <AnimatePresence mode="wait">
+                {listening ? (
+                  <motion.div key="on" initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }}>
+                    <Mic className="w-4 h-4 animate-pulse" />
+                  </motion.div>
+                ) : (
+                  <motion.div key="off" initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }}>
+                    <Mic className="w-4 h-4" />
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </motion.button>
+          )}
           <button
-            onPointerDown={startVoice}
-            className={`w-10 h-10 rounded-xl flex items-center justify-center border flex-shrink-0 transition-all ${
-              listening ? 'bg-red-500/20 border-red-500/50 text-red-400' : 'bg-card border-border text-muted-foreground hover:text-foreground'
-            }`}
+            onClick={() => sendMessage(input)}
+            disabled={!input.trim() || loading}
+            className="w-10 h-10 rounded-xl flex items-center justify-center bg-primary text-primary-foreground flex-shrink-0 disabled:opacity-40 transition-opacity"
           >
-            <Mic className={`w-4 h-4 ${listening ? 'animate-pulse' : ''}`} />
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
           </button>
-        )}
-        <button
-          onClick={() => sendMessage(input)}
-          disabled={!input.trim() || loading}
-          className="w-10 h-10 rounded-xl flex items-center justify-center bg-primary text-primary-foreground flex-shrink-0 disabled:opacity-40 transition-opacity"
-        >
-          {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-        </button>
+        </div>
       </div>
     </div>
   );

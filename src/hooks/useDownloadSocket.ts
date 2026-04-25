@@ -36,6 +36,8 @@ export interface DownloadState {
   transferInfo: unknown;
   backend: 'qbittorrent' | 'webtorrent';
   qbitOnline: boolean;
+  /** True once the first WebSocket message has been received */
+  connected: boolean;
 }
 
 const EMPTY_STATE: DownloadState = {
@@ -44,6 +46,7 @@ const EMPTY_STATE: DownloadState = {
   transferInfo: null,
   backend: 'webtorrent',
   qbitOnline: false,
+  connected: false,
 };
 
 const BASE_DELAY_MS = 1_000;
@@ -79,7 +82,7 @@ export function useDownloadSocket(): DownloadState {
     ws.onmessage = (event: MessageEvent) => {
       try {
         const data = JSON.parse(event.data as string) as DownloadState;
-        setState(data);
+        setState({ ...data, connected: true });
       } catch { /* ignore malformed frames */ }
     };
 
