@@ -247,6 +247,7 @@ function RemotePageInner() {
   const [screenCount, setScreenCount] = useState(0);
   const [isLandscape, setIsLandscape] = useState(false);
   const [showCastPanel, setShowCastPanel] = useState(false);
+  const [showSubtitlePicker, setShowSubtitlePicker] = useState(false);
 
   // Download badge count (polled independently so tab bar stays live)
   const [activeDownloadCount, setActiveDownloadCount] = useState(0);
@@ -413,8 +414,15 @@ function RemotePageInner() {
     send(cmd);
   }, [send]);
 
-  // ── Subtitle cycle ────────────────────────────────────────────────────────
+  // ── Subtitle track selector ───────────────────────────────────────────────
 
+  const selectSubtitle = useCallback((trackIndex: number) => {
+    haptic(40);
+    send({ type: 'subtitle', track: trackIndex });
+    setShowSubtitlePicker(false);
+  }, [send]);
+
+  /** Legacy cycle — kept for landscape pill bar */
   const cycleSubtitle = useCallback(() => {
     if (!state) return;
     haptic(40);
@@ -544,7 +552,7 @@ function RemotePageInner() {
         /* ════════════════════════════════════════════════════════════════════
            PORTRAIT LAYOUT (default)
         ════════════════════════════════════════════════════════════════════ */
-        <div className="w-full max-w-sm mx-auto flex flex-col px-4 pt-5 pb-24">
+        <div className="w-full max-w-sm mx-auto flex flex-col px-4 pt-5 pb-24" onClick={() => { if (showSubtitlePicker) setShowSubtitlePicker(false); if (showSpeedPicker) setShowSpeedPicker(false); }}
 
           {/* Header bar */}
           <div className="flex items-center justify-between mb-5">
@@ -725,24 +733,66 @@ function RemotePageInner() {
                   </motion.button>
 
                   {/* Subtitles */}
-                  <motion.button
-                    whileTap={{ scale: 0.92 }}
-                    onClick={hasSubtitles ? cycleSubtitle : undefined}
-                    className={`flex flex-col items-center gap-1.5 border rounded-2xl py-3 px-1 transition-colors ${
-                      subtitleActive
-                        ? 'bg-primary/15 border-primary/40'
-                        : hasSubtitles
-                          ? 'bg-card border-border active:bg-muted'
-                          : 'bg-card/40 border-border/40 opacity-40 cursor-not-allowed'
-                    }`}
-                  >
-                    <Subtitles className={`w-5 h-5 ${subtitleActive ? 'text-primary' : 'text-foreground'}`} />
-                    <span className={`text-[10px] font-medium leading-tight text-center ${subtitleActive ? 'text-primary' : 'text-muted-foreground'}`}>
-                      {subtitleActive
-                        ? (state.subtitleTracks?.find(t => t.index === state.activeSubtitle)?.label ?? 'CC On')
-                        : 'CC'}
-                    </span>
-                  </motion.button>
+                  <div className="relative">
+                    <motion.button
+                      whileTap={{ scale: 0.92 }}
+                      onClick={hasSubtitles ? () => { haptic(20); setShowSubtitlePicker(v => !v); } : undefined}
+                      className={`flex flex-col items-center gap-1.5 border rounded-2xl py-3 px-1 transition-colors ${
+                        subtitleActive
+                          ? 'bg-primary/15 border-primary/40'
+                          : hasSubtitles
+                            ? 'bg-card border-border active:bg-muted'
+                            : 'bg-card/40 border-border/40 opacity-40 cursor-not-allowed'
+                      }`}
+                    >
+                      <Subtitles className={`w-5 h-5 ${subtitleActive ? 'text-primary' : 'text-foreground'}`} />
+                      <span className={`text-[10px] font-medium leading-tight text-center ${subtitleActive ? 'text-primary' : 'text-muted-foreground'}`}>
+                        {subtitleActive
+                          ? (state.subtitleTracks?.find(t => t.index === state.activeSubtitle)?.label ?? 'CC On')
+                          : 'CC'}
+                      </span>
+                    </motion.button>
+
+                    {/* Subtitle track picker sheet */}
+                    <AnimatePresence>
+                      {showSubtitlePicker && hasSubtitles && (
+                        <motion.div
+                          initial={{ opacity: 0, y: 6, scale: 0.95 }}
+                          animate={{ opacity: 1, y: 0, scale: 1 }}
+                          exit={{ opacity: 0, y: 6, scale: 0.95 }}
+                          className="absolute bottom-full right-0 mb-2 bg-card border border-border rounded-2xl shadow-xl overflow-hidden z-20 min-w-[9rem]"
+                        >
+                          {/* Off option */}
+                          <button
+                            onClick={() => selectSubtitle(-1)}
+                            className={`w-full px-4 py-2.5 text-sm text-left transition-colors flex items-center gap-2 ${
+                              (state.activeSubtitle ?? -1) === -1
+                                ? 'bg-primary/20 text-primary font-semibold'
+                                : 'text-foreground hover:bg-muted'
+                            }`}
+                          >
+                            <X className="w-3.5 h-3.5 flex-shrink-0" />
+                            Off
+                          </button>
+                          {/* Track options */}
+                          {(state.subtitleTracks ?? []).map(track => (
+                            <button
+                              key={track.index}
+                              onClick={() => selectSubtitle(track.index)}
+                              className={`w-full px-4 py-2.5 text-sm text-left transition-colors flex items-center gap-2 ${
+                                state.activeSubtitle === track.index
+                                  ? 'bg-primary/20 text-primary font-semibold'
+                                  : 'text-foreground hover:bg-muted'
+                              }`}
+                            >
+                              <Subtitles className="w-3.5 h-3.5 flex-shrink-0" />
+                              {track.label || track.language || `Track ${track.index + 1}`}
+                            </button>
+                          ))}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
 
                   {/* Speed */}
                   <div className="relative">
