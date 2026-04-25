@@ -86,7 +86,6 @@ interface NyaaItem {
 
 const TORRENTIO  = 'https://torrentio.strem.fun';
 const NYAA_API   = 'https://nyaa.si/api';
-const TIMEOUT_MS = 15_000;
 
 // ── 5-minute in-memory stream cache (avoids duplicate fetches) ────────────────
 interface CacheEntry { streams: StreamResult[]; expiresAt: number }
