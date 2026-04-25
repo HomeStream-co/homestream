@@ -17,17 +17,22 @@ export function useHlsSetup(
 ) {
   const [hlsUrl, setHlsUrl] = useState<string | null>(null);
   const [hlsCodec, setHlsCodec] = useState<string | null>(null);
+  const [probeError, setProbeError] = useState<string | null>(null);
   const hlsInstanceRef = useRef<import('hls.js').default | null>(null);
 
   useEffect(() => {
     if (!id) return;
     setHlsUrl(null);
     setHlsCodec(null);
+    setProbeError(null);
 
     let cancelled = false;
 
     fetch(`/api/hls/${id}/probe`, { credentials: 'include' })
-      .then(r => r.json())
+      .then(r => {
+        if (!r.ok) throw new Error(`Probe returned HTTP ${r.status}`);
+        return r.json();
+      })
       .then(async (data: { needsTranscode?: boolean; needsHls?: boolean; codec?: string; hlsUrl?: string }) => {
         // API returns `needsTranscode`; `needsHls` kept as fallback for older responses
         const shouldUseHls = data.needsTranscode ?? data.needsHls;
@@ -49,13 +54,26 @@ export function useHlsSetup(
           if (video) {
             hls.loadSource(url);
             hls.attachMedia(video);
+            // Surface HLS fatal errors to the player
+            hls.on(Hls.Events.ERROR, (_evt, data) => {
+              if (data.fatal) {
+                setProbeError(`HLS error: ${data.details ?? 'unknown'}`);
+              }
+            });
           }
         } else if (videoRef.current?.canPlayType('application/vnd.apple.mpegurl')) {
           // Safari native HLS
           videoRef.current.src = url;
+        } else {
+          setProbeError('HLS playback is not supported in this browser');
         }
       })
-      .catch(() => { /* non-fatal — fall back to direct stream */ });
+      .catch((err: unknown) => {
+        if (!cancelled) {
+          // Log for debugging but don't surface to user — direct stream will be used
+          console.warn('[useHlsSetup] probe failed, falling back to direct stream:', String(err));
+        }
+      });
 
     return () => {
       cancelled = true;
@@ -67,5 +85,5 @@ export function useHlsSetup(
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
-  return { hlsUrl, hlsCodec, hlsInstanceRef };
+  return { hlsUrl, hlsCodec, hlsInstanceRef, probeError };
 }

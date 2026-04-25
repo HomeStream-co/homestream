@@ -172,12 +172,19 @@ function TvRow({ label, items, focusedRow, focusedCol, profileId, onPlay, rowRef
   const scrollRef = useRef<HTMLDivElement>(null);
   const focusedCardRef = useRef<HTMLButtonElement | null>(null);
 
-  // Scroll focused card into view
+  // Scroll focused card into view within the row
   useEffect(() => {
     if (focusedRow && focusedCardRef.current) {
       focusedCardRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
     }
   }, [focusedRow, focusedCol]);
+
+  // Scroll the row itself into view when it receives D-pad focus
+  useEffect(() => {
+    if (focusedRow && rowRef?.current) {
+      rowRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }, [focusedRow, rowRef]);
 
   if (items.length === 0) return null;
 
@@ -847,7 +854,7 @@ function TvPageInner() {
   }, [typeFilter]);
 
   const handlePlay = (item: MediaItem) => {
-    navigate(`/player/${item.id}`);
+    navigate(`/player/${item.id}?from=tv`);
   };
 
   const handleSearchToggle = () => {
