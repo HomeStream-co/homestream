@@ -117,7 +117,13 @@ export default async function handler(req: Request, res: Response) {
         if (fields.omdbApiKey)       updates.omdbApiKeySavedAt       = now;
         if (fields.googleAiApiKey)   updates.googleAiApiKeySavedAt   = now;
         if (fields.tmdbApiKey)       updates.tmdbApiKeySavedAt       = now;
-        if (fields.realDebridApiKey) updates.realDebridApiKeySavedAt = now;
+        if (fields.realDebridApiKey) {
+          updates.realDebridApiKeySavedAt = now;
+          // Bust the cached premium expiry — it belongs to the old key.
+          // The next call to /api/real-debrid/status will re-fetch live.
+          updates.realDebridPremiumExpiry    = undefined;
+          updates.realDebridPremiumCheckedAt = undefined;
+        }
 
         const config = writeConfig(updates);
         res.json({ ok: true, config });
