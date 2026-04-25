@@ -9,7 +9,6 @@ import type { VPNConfig } from '../../../vpnService.js';
 import { upsertJob, getAllPersistedJobs, findJobByInfoHash } from '../../../downloadJobStore.js';
 import { requireAuth } from '../../../authMiddleware.js';
 import { resolvemagnet, downloadUrl } from '../../../realDebridClient.js';
-import { addToLibrary } from '../../../libraryStore.js';
 
 const CINEMETA   = 'https://v3-cinemeta.strem.io';
 const TIMEOUT_MS = 15_000;
