@@ -4,6 +4,7 @@
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
   "version": "1.6.6",
 =======
   "version": "1.6.7",
@@ -17,6 +18,9 @@
 =======
   "version": "1.6.7",
 >>>>>>> 20260425032449-9h9yrecco0
+=======
+  "version": "1.6.7",
+>>>>>>> 20260425032911-9h9yrecco0
   "description": "Self-hosted Netflix-style family media streaming app",
   "author": "HomeStream",
   "repository": {
