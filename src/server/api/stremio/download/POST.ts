@@ -1,5 +1,4 @@
 import type { Request, Response } from 'express';
-import path from 'path';
 import { pickBestStream } from '../../../torrentManager.js';
 import { addMagnet, testConnection } from '../../../qbittorrentClient.js';
 import { readConfig } from '../../../configStore.js';

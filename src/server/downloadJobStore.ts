@@ -40,7 +40,7 @@ export interface PersistedJob {
   completedAt?: string;
   poster?: string;
   imdbId: string;
-  backend: 'qbittorrent' | 'webtorrent';
+  backend: 'qbittorrent' | 'webtorrent' | 'real-debrid';
 }
 
 // ── Write queue ───────────────────────────────────────────────────────────────
