@@ -483,7 +483,18 @@ interface DownloadTarget {
 
 function DownloadModal({ target, onClose }: { target: DownloadTarget; onClose: () => void }) {
   const [searching, setSearching] = useState(false);
-  const [streams, setStreams] = useState<{ name: string; title: string; url: string; imdbId: string }[]>([]);
+  // Full stream data preserved so the download call can send real magnet URIs with trackers
+  const [streams, setStreams] = useState<{
+    name: string;
+    title: string;
+    url: string;
+    imdbId: string;
+    quality: string;
+    size: string;
+    seeds: string;
+    magnet: string;
+    source: string;
+  }[]>([]);
   const [error, setError] = useState('');
   const [downloading, setDownloading] = useState<string | null>(null);
 
@@ -513,9 +524,16 @@ function DownloadModal({ target, onClose }: { target: DownloadTarget; onClose: (
       const resolvedImdbId = data.imdbId ?? target.imdbId ?? '';
       const found = (data.streams ?? []).slice(0, 15).map(s => ({
         name: s.name,
+        // Human-readable label shown in the picker
         title: `${s.quality}${s.size ? ` · ${s.size}` : ''}${s.seeds ? ` · 👤 ${s.seeds}` : ''}`,
         url: s.infoHash,
         imdbId: resolvedImdbId,
+        // Preserve full stream data so the download call gets real magnet URIs + tracker list
+        quality: s.quality,
+        size: s.size,
+        seeds: s.seeds,
+        magnet: s.magnet,
+        source: s.source,
       }));
       if (found.length === 0) throw new Error('No streams found — try a different title or check your Prowlarr config');
       setStreams(found);
@@ -530,7 +548,7 @@ function DownloadModal({ target, onClose }: { target: DownloadTarget; onClose: (
     }
   };
 
-  const startDownload = async (stream: { name: string; title: string; url: string; imdbId: string }) => {
+  const startDownload = async (stream: { name: string; title: string; url: string; imdbId: string; quality: string; size: string; seeds: string; magnet: string; source: string }) => {
     setDownloading(stream.url);
     try {
       const res = await fetch('/api/stremio/download', {
@@ -542,9 +560,19 @@ function DownloadModal({ target, onClose }: { target: DownloadTarget; onClose: (
           infoHash: stream.url,
           title: target.title,
           type: target.type,
-          quality: stream.name,
+          quality: stream.quality,
           poster: target.posterUrl,
-          streams: [{ infoHash: stream.url, magnet: `magnet:?xt=urn:btih:${stream.url}`, quality: stream.name, name: stream.name, size: '', seeds: '', source: 'torrentio' }],
+          // Pass the full stream object so the server uses the real magnet URI
+          // (with tracker announce URLs) instead of reconstructing a bare magnet.
+          streams: [{
+            infoHash: stream.url,
+            magnet: stream.magnet || `magnet:?xt=urn:btih:${stream.url}`,
+            quality: stream.quality,
+            name: stream.name,
+            size: stream.size,
+            seeds: stream.seeds,
+            source: (stream.source as 'torrentio' | 'prowlarr' | 'nyaa') ?? 'torrentio',
+          }],
         }),
       });
 
