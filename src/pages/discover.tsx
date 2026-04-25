@@ -806,6 +806,7 @@ export default function DiscoverPage() {
     try {
       const res = await fetch('/api/stremio/search', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query: directQuery.trim(), type: directType }),
       });
