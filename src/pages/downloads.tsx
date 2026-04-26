@@ -1918,6 +1918,17 @@ export default function DownloadsPage() {
                             </p>
                           )}
                         </div>
+                        {/* Retry button — only shown for error jobs */}
+                        {j.status === 'error' && (
+                          <button
+                            onClick={() => handleRetry(j.jobId)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 text-blue-400 text-xs font-semibold transition-colors flex-shrink-0"
+                            title="Retry via Real-Debrid"
+                          >
+                            <RotateCcw className="w-3.5 h-3.5" />
+                            Retry
+                          </button>
+                        )}
                       </motion.div>
                     ))}
                   </AnimatePresence>

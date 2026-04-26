@@ -105,6 +105,19 @@ const OPEN_ENDPOINTS = new Set([
   // requireAuth would always return 401 and subtitles would silently fail.
   // VTT files contain only subtitle text — no sensitive media data or paths.
   'src/server/api/captions/[id]/[lang]/GET.ts',
+
+  // Auto-updater bridge — these four endpoints form the HTTP loopback bridge
+  // between the Electron main process and the Express server child process.
+  // They are protected by IP allowlist (reject all non-127.0.0.1 requests)
+  // rather than session auth because:
+  //   1. The Electron main process has no session cookie.
+  //   2. The loopback-only restriction is equivalent security on a local machine.
+  //   3. requireAuth would break the updater for all users with a password set.
+  // See updaterBridge.ts and the push/drain handlers for the IP check.
+  'src/server/api/updater/action/POST.ts',
+  'src/server/api/updater/drain/GET.ts',
+  'src/server/api/updater/push/POST.ts',
+  'src/server/api/updater/status/GET.ts',
 ]);
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
