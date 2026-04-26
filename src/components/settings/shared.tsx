@@ -157,11 +157,12 @@ export function ConfirmDialog({
 export type TestStatus = 'idle' | 'testing' | 'ok' | 'error';
 
 export function ApiKeyField({
-  label, labelIcon, description, value, onChange, onTest, placeholder, testLabel,
+  label, labelIcon, description, descriptionLink, value, onChange, onTest, placeholder, testLabel,
 }: {
   label: string;
   labelIcon?: ReactNode;
   description: string;
+  descriptionLink?: { href: string; label: string };
   value: string;
   onChange: (v: string) => void;
   onTest?: () => Promise<{ ok: boolean; message?: string }>;
@@ -192,7 +193,12 @@ export function ApiKeyField({
       <p className="text-sm text-foreground font-medium mb-0.5 flex items-center gap-1.5">
         {labelIcon}{label}
       </p>
-      <p className="text-[11px] text-muted-foreground mb-2 leading-snug">{description}</p>
+      <p className="text-[11px] text-muted-foreground mb-2 leading-snug">
+        {description}
+        {descriptionLink && (
+          <> <a href={descriptionLink.href} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline ml-1">{descriptionLink.label}</a></>
+        )}
+      </p>
       <div className="flex gap-1.5">
         <div className="relative flex-1">
           <input
