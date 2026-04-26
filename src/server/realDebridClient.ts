@@ -137,8 +137,9 @@ export async function isConfigured(): Promise<{ ok: boolean; error?: string; use
  * Add a magnet to Real-Debrid and wait for it to be ready.
  * Returns the direct HTTPS download URL for the largest video file.
  *
- * @param magnet  - magnet URI
- * @param onProgress - optional callback with 0–100 progress
+ * @param magnet     - magnet URI
+ * @param apiKey     - RD API token
+ * @param onProgress - optional callback with 0–100 progress and status string
  */
 export async function resolvemagnet(
   magnet: string,
@@ -149,12 +150,49 @@ export async function resolvemagnet(
   const added = await rdFetch<RDAddMagnetResponse>('POST', '/torrents/addMagnet', apiKey, { magnet });
   const torrentId = added.id;
 
-  // 2. Select all files (required after adding)
-  await rdFetch<unknown>('POST', `/torrents/selectFiles/${torrentId}`, apiKey, { files: 'all' });
+  // 2. Select files — RD requires explicit file selection before it starts downloading.
+  //
+  //    WRONG (silently ignored by RD API, torrent stays in waiting_files_selection forever):
+  //      POST selectFiles  { files: 'all' }
+  //
+  //    CORRECT: fetch torrent info first to get the actual file IDs, then POST them
+  //    as a comma-separated string.  If the torrent is still in magnet_conversion
+  //    (metadata not yet fetched), poll briefly until file IDs are available.
+  {
+    const FILE_WAIT_MS = 30_000; // wait up to 30 s for magnet metadata
+    const FILE_POLL_MS = 2_000;
+    const fileWaitStart = Date.now();
+    let fileIds: string | null = null;
 
-  // 3. Poll until downloaded (or error)
-  const MAX_WAIT_MS  = 30 * 60 * 1000; // 30 minutes
-  const POLL_INTERVAL = 5_000;           // 5 seconds
+    while (Date.now() - fileWaitStart < FILE_WAIT_MS) {
+      const info = await rdFetch<RDTorrentInfo>('GET', `/torrents/info/${torrentId}`, apiKey);
+
+      if (['magnet_error', 'error', 'virus', 'dead'].includes(info.status)) {
+        await rdFetch<unknown>('DELETE', `/torrents/delete/${torrentId}`, apiKey).catch(() => {});
+        throw new Error(`RD: torrent failed during metadata fetch with status "${info.status}"`);
+      }
+
+      if (info.files && info.files.length > 0) {
+        // Select all files by their IDs (comma-separated)
+        fileIds = info.files.map(f => String(f.id)).join(',');
+        break;
+      }
+
+      // Still in magnet_conversion — wait and retry
+      await sleep(FILE_POLL_MS);
+    }
+
+    if (!fileIds) {
+      await rdFetch<unknown>('DELETE', `/torrents/delete/${torrentId}`, apiKey).catch(() => {});
+      throw new Error('RD: timed out waiting for torrent metadata (magnet_conversion took > 30 s)');
+    }
+
+    await rdFetch<unknown>('POST', `/torrents/selectFiles/${torrentId}`, apiKey, { files: fileIds });
+  }
+
+  // 3. Poll until downloaded (or error/timeout)
+  const MAX_WAIT_MS   = 30 * 60 * 1000; // 30 minutes
+  const POLL_INTERVAL = 5_000;
   const start = Date.now();
 
   while (Date.now() - start < MAX_WAIT_MS) {
@@ -162,17 +200,17 @@ export async function resolvemagnet(
     onProgress?.(info.progress, info.status);
 
     if (info.status === 'downloaded') {
-      // 4. Pick the largest video file link
-      const link = pickBestLink(info.links);
-      if (!link) throw new Error('RD: torrent downloaded but no links available');
+      if (!info.links || info.links.length === 0) {
+        throw new Error('RD: torrent downloaded but no links available');
+      }
 
-      // 5. Unrestrict the link to get a direct download URL
-      const unrestricted = await rdFetch<RDUnrestrictResponse>('POST', '/unrestrict/link', apiKey, { link });
-      return unrestricted.download;
+      // 4. Pick the best video link — unrestrict all links in parallel and
+      //    choose the one with the largest filesize (avoids picking samples/extras).
+      const unrestricted = await pickLargestVideoLink(info.links, apiKey);
+      return unrestricted;
     }
 
     if (['magnet_error', 'error', 'virus', 'dead'].includes(info.status)) {
-      // Clean up the failed torrent
       await rdFetch<unknown>('DELETE', `/torrents/delete/${torrentId}`, apiKey).catch(() => {});
       throw new Error(`RD: torrent failed with status "${info.status}"`);
     }
@@ -184,8 +222,47 @@ export async function resolvemagnet(
 }
 
 /**
+ * Unrestrict all RD links in parallel and return the direct download URL
+ * for the largest file (by filesize reported by RD).
+ *
+ * Why not just pick links[0]?
+ *   RD returns links in file-selection order, not size order.  A torrent
+ *   often contains extras, samples, or subtitle files before the main feature.
+ *   Picking by filesize guarantees we get the actual video.
+ */
+async function pickLargestVideoLink(links: string[], apiKey: string): Promise<string> {
+  // Unrestrict all links concurrently (RD rate-limits are generous for /unrestrict/link)
+  const results = await Promise.allSettled(
+    links.map(link =>
+      rdFetch<RDUnrestrictResponse>('POST', '/unrestrict/link', apiKey, { link })
+    )
+  );
+
+  let bestUrl = '';
+  let bestSize = -1;
+
+  for (const result of results) {
+    if (result.status !== 'fulfilled') continue;
+    const r = result.value;
+    if (!r.download) continue;
+    if (r.filesize > bestSize) {
+      bestSize = r.filesize;
+      bestUrl = r.download;
+    }
+  }
+
+  if (!bestUrl) throw new Error('RD: failed to unrestrict any download links');
+  return bestUrl;
+}
+
+/**
  * Download a direct HTTPS URL to a local file path, streaming to disk.
  * Reports progress via onProgress(bytesDownloaded, totalBytes).
+ *
+ * Includes a 30-second socket inactivity timeout — if the CDN stalls
+ * mid-transfer (connection stays open but no data flows), the request is
+ * destroyed and the promise rejects so the job can be marked as error
+ * rather than hanging indefinitely.
  */
 export async function downloadUrl(
   url: string,
@@ -194,11 +271,13 @@ export async function downloadUrl(
 ): Promise<void> {
   await fs.promises.mkdir(path.dirname(destPath), { recursive: true });
 
+  const SOCKET_IDLE_TIMEOUT_MS = 30_000; // 30 s of no data = stalled CDN
+
   return new Promise((resolve, reject) => {
     const protocol = url.startsWith('https') ? https : http;
 
     const doRequest = (reqUrl: string) => {
-      protocol.get(reqUrl, (res) => {
+      const req = protocol.get(reqUrl, (res) => {
         // Follow redirects
         if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
           doRequest(res.headers.location);
@@ -222,7 +301,13 @@ export async function downloadUrl(
         out.on('finish', resolve);
         out.on('error', reject);
         res.on('error', reject);
-      }).on('error', reject);
+      });
+
+      // Destroy the request if the socket is idle for too long (stalled CDN)
+      req.setTimeout(SOCKET_IDLE_TIMEOUT_MS, () => {
+        req.destroy(new Error(`RD download stalled — no data for ${SOCKET_IDLE_TIMEOUT_MS / 1000} s`));
+      });
+      req.on('error', reject);
     };
 
     doRequest(url);
@@ -230,11 +315,6 @@ export async function downloadUrl(
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-/** Pick the first link (RD returns them in quality order, best first). */
-function pickBestLink(links: string[]): string | null {
-  return links[0] ?? null;
-}
 
 function sleep(ms: number): Promise<void> {
   return new Promise(r => setTimeout(r, ms));
