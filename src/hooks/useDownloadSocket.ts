@@ -140,9 +140,10 @@ export function useDownloadSocket(): DownloadState {
 
 /** Convenience: derive the active download count from socket state */
 export function useActiveDownloadCount(): number {
-  const { jobs, qbitTorrents } = useDownloadSocket();
+  const { jobs, qbitTorrents, rdJobs } = useDownloadSocket();
   const active =
     jobs.filter(j => j.status === 'downloading' || j.status === 'queued' || j.status === 'transcoding').length +
-    qbitTorrents.filter(t => t.status === 'downloading' || t.status === 'queued').length;
+    qbitTorrents.filter(t => t.status === 'downloading' || t.status === 'queued').length +
+    rdJobs.filter(r => r.status === 'downloading' || r.status === 'queued').length;
   return active;
 }

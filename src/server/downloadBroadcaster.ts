@@ -143,7 +143,10 @@ export function attachDownloadBroadcaster(server: Server): void {
 
   _wss.on('connection', async (ws: WebSocket, req: IncomingMessage) => {
     if (!isAuthed(req)) {
-      ws.close();
+      // Send 4001 so clients know this is an auth failure (not a network drop)
+      // and can clear their stored token / show a login gate.
+      // Mirrors the same code used in remoteControl.ts.
+      ws.close(4001, 'Unauthorized');
       return;
     }
 
