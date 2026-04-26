@@ -1,15 +1,32 @@
 /**
- * updaterBridge — shared in-memory state between the Electron main process
- * and the Express API routes.
+ * updaterBridge — in-memory state store for the auto-updater, living in the
+ * Express server process.
  *
- * The Electron main process (main.cjs) calls setUpdaterStatus() whenever the
- * auto-updater state changes.  The API route GET /api/updater/status reads it
- * via getUpdaterStatus().  This lets the React app (running in the system
- * browser, not an Electron BrowserWindow) poll for update state over HTTP
- * instead of needing IPC / window.electronAPI.
+ * Architecture overview:
+ *
+ *   ┌─────────────────────────┐        HTTP (loopback)       ┌──────────────────────────┐
+ *   │  Electron main process  │ ──POST /api/updater/push──▶  │  Express server process  │
+ *   │  (updater.cjs)          │                              │  (updaterBridge.ts)      │
+ *   │                         │ ◀─GET  /api/updater/drain──  │                          │
+ *   └─────────────────────────┘                              └──────────────────────────┘
+ *                                                                        │  HTTP poll
+ *                                                                        ▼
+ *                                                            ┌──────────────────────────┐
+ *                                                            │  React app (browser)     │
+ *                                                            │  useAppUpdater hook      │
+ *                                                            └──────────────────────────┘
+ *
+ * Push path  (Electron → server → React):
+ *   Electron calls POST /api/updater/push with the new state.
+ *   The bridge stores it.  React polls GET /api/updater/status every 10 s.
+ *
+ * Action path (React → server → Electron):
+ *   React calls POST /api/updater/action { action }.
+ *   The bridge enqueues the action.
+ *   Electron polls GET /api/updater/drain every 5 s and executes any queued actions.
  *
  * When running outside Electron (dev server, browser preview) the status
- * stays at { state: 'idle' } and action callbacks are no-ops.
+ * stays at { state: 'idle', isElectron: false } and the drain queue is always empty.
  */
 
 export interface UpdaterStatus {
@@ -22,39 +39,35 @@ export interface UpdaterStatus {
   isElectron?: boolean;
 }
 
+export type UpdaterAction = 'check' | 'download' | 'install';
+
 let _status: UpdaterStatus = { state: 'idle', isElectron: false };
 
-// Callbacks registered by the Electron main process
-let _onCheck:    (() => void) | null = null;
-let _onDownload: (() => void) | null = null;
-let _onInstall:  (() => void) | null = null;
+// Pending actions queued by the React app, drained by Electron
+const _actionQueue: UpdaterAction[] = [];
 
-/** Called by the Electron main process to push state into the bridge */
+/** Called by POST /api/updater/push (from Electron main process over loopback) */
 export function setUpdaterStatus(status: UpdaterStatus): void {
   _status = { ...status, isElectron: true };
 }
 
-/** Called by GET /api/updater/status */
+/** Called by GET /api/updater/status (polled by React app) */
 export function getUpdaterStatus(): UpdaterStatus {
   return _status;
 }
 
-/** Called by the Electron main process to register action handlers */
-export function registerUpdaterCallbacks(callbacks: {
-  onCheck:    () => void;
-  onDownload: () => void;
-  onInstall:  () => void;
-}): void {
-  _onCheck    = callbacks.onCheck;
-  _onDownload = callbacks.onDownload;
-  _onInstall  = callbacks.onInstall;
-  // Mark as running inside Electron
-  _status = { ..._status, isElectron: true };
+/** Called by POST /api/updater/action (from React app) */
+export function enqueueUpdaterAction(action: UpdaterAction): void {
+  // Deduplicate — no point queuing the same action twice
+  if (!_actionQueue.includes(action)) {
+    _actionQueue.push(action);
+  }
 }
 
-/** Called by POST /api/updater/action */
-export function triggerUpdaterAction(action: 'check' | 'download' | 'install'): void {
-  if (action === 'check')    _onCheck?.();
-  if (action === 'download') _onDownload?.();
-  if (action === 'install')  _onInstall?.();
+/**
+ * Called by GET /api/updater/drain (polled by Electron main process).
+ * Returns and clears all pending actions.
+ */
+export function drainUpdaterActions(): UpdaterAction[] {
+  return _actionQueue.splice(0);
 }
