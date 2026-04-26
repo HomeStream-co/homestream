@@ -51,6 +51,8 @@ class FakeWS {
 
   send(data: string) { this.sent.push(JSON.parse(data)); }
   terminate() { this.terminated = true; this.readyState = 3; }
+  /** ws.close(code, reason) — used by auth rejection (code 4001) */
+  close(_code?: number, _reason?: string) { this.terminated = true; this.readyState = 3; }
   ping() { /* no-op */ }
   on(event: string, cb: (...args: unknown[]) => void) {
     if (!this.handlers[event]) this.handlers[event] = [];

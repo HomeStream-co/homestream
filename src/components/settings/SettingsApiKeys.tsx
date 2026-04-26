@@ -188,11 +188,16 @@ function RealDebridPremiumBadge({ hasSavedKey }: { hasSavedKey: boolean }) {
   useEffect(() => {
     if (!hasSavedKey) return;
     setLoading(true);
-    fetch('/api/real-debrid/status', { credentials: 'include' })
-      .then(r => r.json())
+    // 10-second abort guard — if the RD API is slow or unreachable the spinner
+    // must not run forever; fall through to the error state instead.
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10_000);
+    fetch('/api/real-debrid/status', { credentials: 'include', signal: controller.signal })
+      .then(r => r.ok ? r.json() : Promise.reject(r.status))
       .then((data: RDStatus) => setStatus(data))
       .catch(() => setStatus({ ok: false, reason: 'fetch_failed' }))
-      .finally(() => setLoading(false));
+      .finally(() => { clearTimeout(timeout); setLoading(false); });
+    return () => { controller.abort(); clearTimeout(timeout); };
   }, [hasSavedKey]);
 
   if (!hasSavedKey) return null;

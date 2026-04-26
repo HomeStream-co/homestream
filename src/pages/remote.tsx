@@ -1451,9 +1451,44 @@ function CastPanel({
   send: (cmd: Record<string, unknown>) => void;
   onClose: () => void;
 }) {
-  const progress = (cast.duration ?? 0) > 0
-    ? ((cast.currentTime ?? 0) / (cast.duration ?? 1)) * 100
-    : 0;
+  // ── DLNA position polling ─────────────────────────────────────────────────
+  // For DLNA casts the TV plays independently — the WS state.cast.currentTime
+  // never updates.  Poll GetPositionInfo every 5 s to keep the seek bar live.
+  const [dlnaTime, setDlnaTime] = useState<number | null>(null);
+  const [dlnaDuration, setDlnaDuration] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!cast.dlnaDeviceLocation) return; // Chromecast — WS handles position
+
+    let cancelled = false;
+
+    async function poll() {
+      try {
+        const url = `/api/cast/position?deviceLocation=${encodeURIComponent(cast.dlnaDeviceLocation!)}`;
+        const res = await fetch(url, { credentials: 'include', headers: remoteAuthHeaders() });
+        if (!res.ok || cancelled) return;
+        const data = await res.json() as { ok: boolean; currentTime?: number; duration?: number };
+        if (data.ok && !cancelled) {
+          if (typeof data.currentTime === 'number') setDlnaTime(data.currentTime);
+          if (typeof data.duration === 'number' && data.duration > 0) setDlnaDuration(data.duration);
+        }
+      } catch { /* non-fatal — TV may not support GetPositionInfo */ }
+    }
+
+    poll(); // immediate first poll
+    const interval = setInterval(poll, 5000);
+    return () => { cancelled = true; clearInterval(interval); };
+  }, [cast.dlnaDeviceLocation]);
+
+  // Use DLNA-polled position when available, fall back to WS state
+  const currentTime = cast.dlnaDeviceLocation
+    ? (dlnaTime ?? cast.currentTime ?? 0)
+    : (cast.currentTime ?? 0);
+  const duration = cast.dlnaDeviceLocation
+    ? (dlnaDuration ?? cast.duration ?? 0)
+    : (cast.duration ?? 0);
+
+  const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
 
   // ── DLNA direct control helper ────────────────────────────────────────────
   // For DLNA casts (Samsung/LG TVs) the phone calls /api/cast/control directly
@@ -1498,14 +1533,14 @@ function CastPanel({
       </div>
 
       {/* Progress bar */}
-      {(cast.duration ?? 0) > 0 && (
+      {duration > 0 && (
         <div className="mb-3">
           <input
             type="range"
             min={0}
-            max={cast.duration ?? 100}
+            max={duration}
             step={1}
-            value={cast.currentTime ?? 0}
+            value={currentTime}
             onChange={e => {
               haptic(20);
               const pos = Number(e.target.value);
@@ -1518,8 +1553,8 @@ function CastPanel({
             }}
           />
           <div className="flex justify-between text-[10px] text-muted-foreground font-mono mt-1">
-            <span>{formatTime(cast.currentTime ?? 0)}</span>
-            <span>{formatTime(cast.duration ?? 0)}</span>
+            <span>{formatTime(currentTime)}</span>
+            <span>{formatTime(duration)}</span>
           </div>
         </div>
       )}

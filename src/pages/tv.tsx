@@ -492,7 +492,9 @@ function TvNotConnected({ serverIP }: { serverIP: string }) {
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function TvPage() {
-  const [serverReady, setServerReady] = useState<boolean | null>(null);
+  // null = still loading, true = ready, false = server reachable but not set up,
+  // 'unreachable' = network error / wrong address
+  const [serverReady, setServerReady] = useState<boolean | null | 'unreachable'>(null);
   const [serverIP, setServerIP] = useState('');
 
   useEffect(() => {
@@ -502,7 +504,7 @@ export default function TvPage() {
     fetch('/api/health')
       .then(r => r.json())
       .then((d: { setupComplete?: boolean }) => setServerReady(!!d.setupComplete))
-      .catch(() => setServerReady(false));
+      .catch(() => setServerReady('unreachable'));
 
     fetch('/api/network/info')
       .then(r => r.json())
@@ -526,7 +528,49 @@ export default function TvPage() {
     );
   }
 
-  if (!serverReady) return <TvNotConnected serverIP={serverIP} />;
+  // Server is reachable but setup wizard has not been completed yet.
+  // Show a clear prompt to complete setup — not the generic "not connected" screen.
+  if (serverReady === false) {
+    return (
+      <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center gap-8 px-12 text-center">
+        <title>HomeStream TV — Setup Required</title>
+        <div className="w-16 h-16 rounded-2xl bg-primary flex items-center justify-center">
+          <Play className="w-8 h-8 text-primary-foreground fill-primary-foreground ml-1" />
+        </div>
+        <div>
+          <h1 className="text-4xl font-bold mb-3">Setup Required</h1>
+          <p className="text-xl text-white/60 max-w-lg">
+            HomeStream needs to be configured before you can use the TV interface.
+          </p>
+        </div>
+        <div className="bg-white/10 rounded-2xl px-8 py-6 max-w-lg w-full text-left">
+          <p className="text-white/50 text-sm uppercase tracking-widest mb-4 font-semibold text-center">How to get started</p>
+          <ol className="space-y-3 text-white/80 text-lg">
+            <li><span className="text-primary font-bold mr-2">1.</span> Open HomeStream on your home PC</li>
+            <li><span className="text-primary font-bold mr-2">2.</span> Complete the setup wizard (takes about 2 minutes)</li>
+            <li><span className="text-primary font-bold mr-2">3.</span> Come back to this screen — it will load automatically</li>
+          </ol>
+        </div>
+        <div className="flex flex-col items-center gap-3">
+          <a
+            href="/setup"
+            className="px-8 py-3 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-bold text-lg transition-colors"
+          >
+            Open Setup Wizard
+          </a>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-6 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-semibold transition-colors text-sm"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Network error — server is not reachable at this address
+  if (serverReady === 'unreachable') return <TvNotConnected serverIP={serverIP} />;
 
   return <TvPageInner />;
 }
