@@ -1350,6 +1350,21 @@ export default function DownloadsPage() {
     }
   }, [fetchData]);
 
+  /** Dismiss a Real-Debrid job from the queue (removes the persisted record). */
+  const handleRdDismiss = useCallback(async (jobId: string) => {
+    try {
+      const res = await fetch(`/api/stremio/downloads/${encodeURIComponent(jobId)}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      toast.success('Job removed from queue');
+      fetchData();
+    } catch (err) {
+      toast.error(`Failed to remove job: ${String(err)}`);
+    }
+  }, [fetchData]);
+
   // ── Filter logic ──
   const qbitAll: QbitTorrent[] = data?.qbitTorrents ?? [];
   const wtAll: WtJob[] = data?.jobs ?? [];
@@ -1927,6 +1942,16 @@ export default function DownloadsPage() {
                           >
                             <RotateCcw className="w-3.5 h-3.5" />
                             Retry
+                          </button>
+                        )}
+                        {/* Dismiss button — shown for done and error jobs */}
+                        {(j.status === 'done' || j.status === 'error') && (
+                          <button
+                            onClick={() => handleRdDismiss(j.jobId)}
+                            className="w-7 h-7 rounded-lg bg-muted hover:bg-destructive/20 hover:text-destructive flex items-center justify-center transition-colors flex-shrink-0 text-muted-foreground"
+                            title="Remove from queue"
+                          >
+                            <X className="w-3.5 h-3.5" />
                           </button>
                         )}
                       </motion.div>
