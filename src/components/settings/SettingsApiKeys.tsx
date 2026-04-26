@@ -362,7 +362,8 @@ export default function SettingsApiKeys({
           <ApiKeyField
             label="Real-Debrid"
             labelIcon={<Zap className="w-3 h-3 text-yellow-400" />}
-            description="Premium download backend — resolves torrents server-side, no torrent client needed. Get key at real-debrid.com/apitoken"
+            description="Premium download backend — resolves torrents server-side, no torrent client needed."
+            descriptionLink={{ href: 'https://real-debrid.com/apitoken', label: 'Get API key →' }}
             value={apiKeys.realDebridApiKey}
             onChange={v => onChangeKey('realDebridApiKey', v)}
             onTest={onTestRealDebrid}

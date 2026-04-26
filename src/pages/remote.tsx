@@ -1156,11 +1156,13 @@ function IdleState({
       <p className="text-foreground font-semibold mb-2">
         {status === 'connecting' ? 'Connecting to HomeStream…' :
          status === 'no_screen'  ? 'No video playing' :
-                                   'Connection lost — reconnecting…'}
+                                   'Reconnecting…'}
       </p>
       <p className="text-muted-foreground text-sm leading-relaxed max-w-xs mx-auto">
         {status === 'no_screen'
           ? 'Open HomeStream on your TV or desktop and start playing something.'
+          : status === 'disconnected'
+          ? 'Lost connection to HomeStream — retrying automatically. Make sure HomeStream is running.'
           : 'Make sure HomeStream is running on your home network.'}
       </p>
 

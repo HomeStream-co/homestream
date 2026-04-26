@@ -578,9 +578,9 @@ export default function SettingsPanel({
                         />
                       )}
                       <SettingsBackup />
-                      {/* Update banner — compact pill, only visible in Electron */}
-                      <div className="px-4 pb-1">
-                        <UpdateBanner compact />
+                      {/* Update section — always visible in Electron, hidden in browser */}
+                      <div className="px-4 pb-2 flex flex-col gap-1.5">
+                        <UpdateBanner compact={false} />
                       </div>
                       <SettingsTools
                         onClose={handleClose}

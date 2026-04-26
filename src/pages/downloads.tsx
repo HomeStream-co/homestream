@@ -340,13 +340,19 @@ function QbitOfflineHelp({ visible }: { visible: boolean }) {
 }
 
 // Hook: fetch RD status once on mount
+// 10s timeout guard — if the fetch hangs (e.g. RD API slow), fall back to
+// fetch_failed so the dot shows red instead of spinning grey forever.
 function useRdStatus() {
   const [rd, setRd] = useState<RdStatus | null>(null);
   useEffect(() => {
-    fetch('/api/real-debrid/status', { credentials: 'include' })
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10_000);
+    fetch('/api/real-debrid/status', { credentials: 'include', signal: controller.signal })
       .then(r => r.ok ? r.json() : Promise.reject(r.status))
       .then((d: RdStatus) => setRd(d))
-      .catch(() => setRd({ ok: false, reason: 'fetch_failed' }));
+      .catch(() => setRd({ ok: false, reason: 'fetch_failed' }))
+      .finally(() => clearTimeout(timeout));
+    return () => { controller.abort(); clearTimeout(timeout); };
   }, []);
   return rd;
 }
