@@ -32,16 +32,29 @@ interface DownloadEntry {
 
 /** Wraps useDownloadSocket — fires toast/bell notifications on status transitions */
 function useActiveDownloadCount(): number {
-  const { jobs, qbitTorrents } = useDownloadSocket();
+  const { jobs, qbitTorrents, rdJobs } = useDownloadSocket();
   const prevStatuses = useRef<Map<string, string>>(new Map());
   const { refreshLibrary } = useMedia();
 
-  const allEntries: DownloadEntry[] = [...(jobs ?? []), ...(qbitTorrents ?? [])];
+  // Unified entry list — qBit/WT use `hash` as key; RD uses `jobId`.
+  // We normalise to a single `key` field so the notification tracker works
+  // correctly for all three backends.
+  const allEntries: (DownloadEntry & { key: string })[] = [
+    ...(jobs ?? []).map(e => ({ ...e, key: e.hash })),
+    ...(qbitTorrents ?? []).map(e => ({ ...e, key: e.hash })),
+    ...(rdJobs ?? []).map(e => ({
+      hash: e.jobId,   // satisfy DownloadEntry shape
+      status: e.status,
+      title: e.title,
+      progress: e.progress,
+      key: e.jobId,
+    })),
+  ];
 
   // Fire notifications on status transitions
   useEffect(() => {
     for (const entry of allEntries) {
-      const prev = prevStatuses.current.get(entry.hash);
+      const prev = prevStatuses.current.get(entry.key);
       const isNowDone = entry.status === 'done' || entry.status === 'seeding';
       const isNowError = entry.status === 'error';
       const wasActive = prev === 'downloading' || prev === 'queued';
@@ -64,10 +77,10 @@ function useActiveDownloadCount(): number {
     }
 
     const next = new Map<string, string>();
-    for (const e of allEntries) next.set(e.hash, e.status);
+    for (const e of allEntries) next.set(e.key, e.status);
     prevStatuses.current = next;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [jobs, qbitTorrents]);
+  }, [jobs, qbitTorrents, rdJobs]);
 
   return allEntries.filter(
     e => e.status === 'downloading' || e.status === 'queued' || e.status === 'transcoding'
