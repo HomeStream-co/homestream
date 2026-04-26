@@ -48,6 +48,31 @@ let availableVersion = null;
 let autoCheckTimer = null;
 let getControlWindow = null; // injected by main.js
 
+// ── HTTP bridge ───────────────────────────────────────────────────────────────
+// The React app runs in the system browser (not an Electron BrowserWindow) so
+// window.electronAPI / IPC is unavailable there.  We push updater state into
+// the Express server's in-memory bridge so the React app can poll it via HTTP.
+// The bridge module is loaded lazily (server may not be bundled yet at require time).
+let _bridge = null;
+function getBridge() {
+  if (_bridge) return _bridge;
+  try {
+    // In the packaged app the server bundle is a single CJS file.
+    // The bridge is exported from updaterBridge.js inside that bundle.
+    // We reach it via the same require path the server uses internally.
+    _bridge = require('../src/server/updaterBridge.js');
+  } catch {
+    try {
+      // Fallback: try the compiled server bundle path (production)
+      const path = require('path');
+      _bridge = require(path.join(process.resourcesPath ?? '', 'server', 'updaterBridge.js'));
+    } catch {
+      _bridge = null;
+    }
+  }
+  return _bridge;
+}
+
 // Beta channel opt-in — persisted to a simple JSON file next to the app data.
 // When true, autoUpdater.allowPrerelease = true so pre-release tags (v1.6.0-beta.1)
 // are included in update checks alongside stable releases.
@@ -80,8 +105,11 @@ function saveBetaPreference(enabled) {
 function sendStatus(state, extra = {}) {
   currentState = state;
   const payload = { state, version: availableVersion, ...extra };
+  // 1. IPC → control panel tray window
   const win = getControlWindow?.();
   win?.webContents?.send('update-status', payload);
+  // 2. HTTP bridge → React app in system browser
+  try { getBridge()?.setUpdaterStatus({ ...payload, isElectron: true }); } catch { /* ignore */ }
 }
 
 function log(msg, level = 'info') {
@@ -141,6 +169,32 @@ function setupAutoUpdater({ controlWindowGetter, pushLog }) {
   }
 
   log(`Auto-updater configured for ${owner}/${repo}`);
+
+  // Register HTTP bridge callbacks so the React app can trigger actions
+  // via POST /api/updater/action without needing IPC.
+  try {
+    getBridge()?.registerUpdaterCallbacks({
+      onCheck:    () => checkForUpdate(),
+      onDownload: () => {
+        if (currentState !== 'available') return;
+        autoUpdater.downloadUpdate().catch(err => {
+          log(`Download failed: ${err?.message ?? err}`, 'error');
+          sendStatus('error', { error: err?.message ?? String(err) });
+        });
+      },
+      onInstall: () => {
+        if (currentState !== 'ready') return;
+        const currentVersion = app.getVersion();
+        if (!availableVersion || !semverGt(availableVersion, currentVersion)) {
+          log(`Refusing to install v${availableVersion} — not newer than v${currentVersion}`, 'warn');
+          sendStatus('idle');
+          return;
+        }
+        log('Restarting to install update…', 'warn');
+        setImmediate(() => autoUpdater.quitAndInstall(false, true));
+      },
+    });
+  } catch { /* bridge not available yet — IPC path still works */ }
 
   // ── Private repo: inject GitHub token ───────────────────────────────────────
   // The repo is private so electron-updater must authenticate with a GitHub

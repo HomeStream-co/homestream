@@ -1,11 +1,18 @@
 /**
  * useAppUpdater
  *
- * Bridges the Electron IPC auto-updater into React state.
- * Works in both Electron (real IPC) and browser (no-op / hidden).
+ * Polls GET /api/updater/status every 10 seconds so the React app can show
+ * the UpdateBanner without needing Electron IPC.
+ *
+ * Why HTTP polling instead of IPC:
+ *   The React app runs in the system browser (shell.openExternal), NOT in an
+ *   Electron BrowserWindow with a preload script.  window.electronAPI is
+ *   therefore always undefined in the React app.  The Electron main process
+ *   pushes updater state into the Express server's in-memory bridge
+ *   (updaterBridge.ts) and this hook reads it over HTTP.
  *
  * States:
- *   idle          — no update activity
+ *   idle          — no update activity (or not running in Electron)
  *   checking      — checking GitHub for a newer version
  *   available     — a newer version exists, not yet downloaded
  *   not-available — already on the latest version
@@ -14,7 +21,7 @@
  *   error         — something went wrong
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 
 export type UpdateState =
   | 'idle'
@@ -27,90 +34,95 @@ export type UpdateState =
 
 export interface UpdateStatus {
   state: UpdateState;
-  version?: string;   // available/ready: the new version string
-  percent?: number;   // downloading: 0-100
+  version?: string;
+  percent?: number;
   bytesPerSecond?: number;
-  error?: string;     // error: message
-  betaChannel?: boolean;
-}
-
-type ElectronUpdaterAPI = {
-  checkForUpdate?: () => void;
-  downloadUpdate?: () => void;
-  installUpdate?: () => void;
-  setBetaChannel?: (enabled: boolean) => void;
-  getBetaChannel?: () => Promise<boolean>;
-  onUpdateStatus?: (cb: (data: UpdateStatus) => void) => void;
-};
-
-function getAPI(): ElectronUpdaterAPI | null {
-  return (window as unknown as { electronAPI?: ElectronUpdaterAPI }).electronAPI ?? null;
+  error?: string;
+  isElectron?: boolean;
 }
 
 export interface UseAppUpdaterReturn {
-  /** Whether we're running inside Electron (false = browser, hide all update UI) */
+  /** True when the server reports it is running inside the packaged Electron app */
   isElectron: boolean;
   status: UpdateStatus;
   checkForUpdate: () => void;
   downloadUpdate: () => void;
   installUpdate: () => void;
   dismiss: () => void;
-  betaEnabled: boolean;
-  toggleBeta: () => void;
+}
+
+const POLL_INTERVAL_MS = 10_000; // poll every 10 s
+
+async function fetchStatus(): Promise<UpdateStatus> {
+  const r = await fetch('/api/updater/status');
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  return r.json() as Promise<UpdateStatus>;
+}
+
+async function postAction(action: 'check' | 'download' | 'install'): Promise<void> {
+  await fetch('/api/updater/action', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ action }),
+  });
 }
 
 export function useAppUpdater(): UseAppUpdaterReturn {
-  const api = getAPI();
-  const isElectron = !!api?.onUpdateStatus;
+  const [status, setStatus] = useState<UpdateStatus>({ state: 'idle', isElectron: false });
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const dismissedRef = useRef(false);
 
-  const [status, setStatus] = useState<UpdateStatus>({ state: 'idle' });
-  const [betaEnabled, setBetaEnabled] = useState(false);
-
-  // Subscribe to update-status events from the main process
-  useEffect(() => {
-    if (!api?.onUpdateStatus) return;
-    api.onUpdateStatus((data) => setStatus(data));
-
-    // Load current beta preference
-    api.getBetaChannel?.().then(v => setBetaEnabled(!!v)).catch(() => {});
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const poll = useCallback(async () => {
+    // Don't overwrite a user-dismissed state with a stale 'idle' from the server
+    try {
+      const s = await fetchStatus();
+      // If the user dismissed, only update if the server has a non-idle state
+      if (dismissedRef.current && s.state === 'idle') return;
+      dismissedRef.current = false;
+      setStatus(s);
+    } catch {
+      // Network error — don't change state, just wait for next poll
+    }
   }, []);
+
+  useEffect(() => {
+    // Initial fetch
+    poll();
+    // Poll every 10 s
+    timerRef.current = setInterval(poll, POLL_INTERVAL_MS);
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, [poll]);
 
   const checkForUpdate = useCallback(() => {
-    if (!api?.checkForUpdate) return;
-    setStatus({ state: 'checking' });
-    api.checkForUpdate();
-  }, [api]);
+    setStatus(s => ({ ...s, state: 'checking' }));
+    postAction('check').catch(() => {});
+    // Poll immediately after triggering so the UI updates fast
+    setTimeout(poll, 1_000);
+  }, [poll]);
 
   const downloadUpdate = useCallback(() => {
-    if (!api?.downloadUpdate) return;
-    api.downloadUpdate();
-  }, [api]);
+    postAction('download').catch(() => {});
+    setTimeout(poll, 1_000);
+  }, [poll]);
 
   const installUpdate = useCallback(() => {
-    if (!api?.installUpdate) return;
-    api.installUpdate();
-  }, [api]);
-
-  const dismiss = useCallback(() => {
-    setStatus({ state: 'idle' });
+    postAction('install').catch(() => {});
   }, []);
 
-  const toggleBeta = useCallback(() => {
-    if (!api?.setBetaChannel) return;
-    const next = !betaEnabled;
-    setBetaEnabled(next);
-    api.setBetaChannel(next);
-  }, [api, betaEnabled]);
+  const dismiss = useCallback(() => {
+    dismissedRef.current = true;
+    setStatus(s => ({ ...s, state: 'idle' }));
+  }, []);
 
   return {
-    isElectron,
+    isElectron: !!status.isElectron,
     status,
     checkForUpdate,
     downloadUpdate,
     installUpdate,
     dismiss,
-    betaEnabled,
-    toggleBeta,
   };
 }
