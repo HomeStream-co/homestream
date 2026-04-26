@@ -455,18 +455,18 @@ function TvNotConnected({ serverIP }: { serverIP: string }) {
       <div>
         <h1 className="text-4xl font-bold mb-3">HomeStream TV</h1>
         <p className="text-xl text-white/60 max-w-lg">
-          This TV is not connected to a HomeStream server.
+          Setup not complete, or this browser is pointed at the wrong server.
         </p>
       </div>
       <div className="bg-white/10 rounded-2xl px-8 py-6 max-w-lg w-full">
         <p className="text-white/50 text-sm uppercase tracking-widest mb-4 font-semibold">How to connect</p>
         <ol className="text-left space-y-3 text-white/80 text-lg">
-          <li><span className="text-primary font-bold mr-2">1.</span> Open HomeStream on your home PC or server</li>
-          <li><span className="text-primary font-bold mr-2">2.</span> Make sure your TV is on the same WiFi network</li>
-          <li><span className="text-primary font-bold mr-2">3.</span> In your TV browser, go to:</li>
+          <li><span className="text-primary font-bold mr-2">1.</span> Open HomeStream on your home PC</li>
+          <li><span className="text-primary font-bold mr-2">2.</span> Make sure your TV is on the same WiFi</li>
+          <li><span className="text-primary font-bold mr-2">3.</span> Scan the QR code shown on the TV screen, <span className="text-white/50">or</span> type this exact address:</li>
         </ol>
         {serverIP ? (
-          <div className="mt-4 bg-black/40 rounded-xl px-6 py-4 font-mono text-2xl text-primary font-bold tracking-wide text-center">
+          <div className="mt-4 bg-black/60 border border-primary/40 rounded-xl px-6 py-5 font-mono text-2xl text-primary font-bold tracking-wide text-center break-all">
             {serverIP}
           </div>
         ) : (
@@ -474,10 +474,17 @@ function TvNotConnected({ serverIP }: { serverIP: string }) {
             Check HomeStream → Settings → Network for your IP
           </div>
         )}
+        <p className="text-white/40 text-sm mt-3">
+          ⚠ The port number matters — HomeStream may use 3000, 3001, 3002, etc.<br/>
+          Always use the address shown above or scan the QR code.
+        </p>
       </div>
-      <p className="text-white/30 text-sm">
-        Find your server IP in HomeStream Settings → Network (e.g. <span className="font-mono text-white/50">http://192.168.x.x:3000/tv</span>)
-      </p>
+      <button
+        onClick={() => window.location.reload()}
+        className="px-6 py-3 rounded-xl bg-white/10 hover:bg-white/20 text-white font-semibold transition-colors"
+      >
+        Retry connection
+      </button>
     </div>
   );
 }
