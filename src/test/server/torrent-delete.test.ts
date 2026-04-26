@@ -5,10 +5,12 @@
  *
  * Covers:
  *   - 400 when hash is missing
- *   - 503 when qBittorrent is not reachable
- *   - Successful delete without file deletion
- *   - Successful delete with file deletion (?deleteFiles=true)
- *   - Hash is lowercased before sending to qBit
+ *   - Real-Debrid job: deleted from store, qBit never called
+ *   - Real-Debrid job: "rd-" prefix pattern (safety net)
+ *   - 503 when qBittorrent is not reachable (non-RD hash)
+ *   - Successful qBit delete without file deletion
+ *   - Successful qBit delete with file deletion (?deleteFiles=true)
+ *   - Hash is passed as-is to qBit (client lowercases internally)
  *   - 500 on qBit API error
  */
 
@@ -20,6 +22,8 @@ import type { Request, Response } from 'express';
 let mockQbitReachable = true;
 
 const mockDeleteTorrent = vi.fn().mockResolvedValue(undefined);
+const mockDeleteJob     = vi.fn();
+let   mockPersistedJob: { backend: string } | undefined = undefined;
 
 vi.mock('../../server/qbittorrentClient.js', () => ({
   isReachable:     () => Promise.resolve(mockQbitReachable),
@@ -28,6 +32,11 @@ vi.mock('../../server/qbittorrentClient.js', () => ({
 
 vi.mock('../../server/authMiddleware.js', () => ({
   requireAuth: () => true,
+}));
+
+vi.mock('../../server/downloadJobStore.js', () => ({
+  getPersistedJob: (_id: string) => mockPersistedJob,
+  deleteJob:       (...args: unknown[]) => mockDeleteJob(...args),
 }));
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -57,9 +66,54 @@ describe('DELETE /api/stremio/downloads/:hash — validation', () => {
   });
 });
 
+describe('DELETE /api/stremio/downloads/:hash — Real-Debrid jobs', () => {
+  beforeEach(() => {
+    mockDeleteJob.mockClear();
+    mockDeleteTorrent.mockClear();
+    mockQbitReachable = true;
+  });
+
+  it('deletes RD job from store when persisted job is real-debrid backend', async () => {
+    mockPersistedJob = { backend: 'real-debrid' };
+    const { req, res, data } = makeReqRes({ hash: 'rd-abc123-1700000000000' });
+    await handler(req, res);
+    expect(mockDeleteJob).toHaveBeenCalledWith('rd-abc123-1700000000000');
+    expect((data.json as { ok: boolean }).ok).toBe(true);
+    expect((data.json as { backend: string }).backend).toBe('real-debrid');
+  });
+
+  it('does NOT call qBit deleteTorrent for RD jobs', async () => {
+    mockPersistedJob = { backend: 'real-debrid' };
+    const { req, res } = makeReqRes({ hash: 'rd-abc123-1700000000000' });
+    await handler(req, res);
+    expect(mockDeleteTorrent).not.toHaveBeenCalled();
+  });
+
+  it('handles "rd-" prefix pattern even when job not in store', async () => {
+    mockPersistedJob = undefined; // not in store
+    const { req, res, data } = makeReqRes({ hash: 'rd-deadbeef-9999999999' });
+    await handler(req, res);
+    // deleteJob called as a no-op safety net
+    expect(mockDeleteJob).toHaveBeenCalledWith('rd-deadbeef-9999999999');
+    expect((data.json as { ok: boolean }).ok).toBe(true);
+    expect((data.json as { backend: string }).backend).toBe('real-debrid');
+  });
+
+  it('does NOT call qBit for "rd-" prefix hash even when qBit is offline', async () => {
+    mockPersistedJob = undefined;
+    mockQbitReachable = false;
+    const { req, res } = makeReqRes({ hash: 'rd-deadbeef-9999999999' });
+    await handler(req, res);
+    expect(mockDeleteTorrent).not.toHaveBeenCalled();
+    // Should succeed (not 503)
+    expect(res.status).not.toHaveBeenCalledWith(503);
+  });
+});
+
 describe('DELETE /api/stremio/downloads/:hash — qBit offline', () => {
   beforeEach(() => {
     mockQbitReachable = false;
+    mockPersistedJob = undefined;
     mockDeleteTorrent.mockClear();
   });
 
@@ -76,9 +130,10 @@ describe('DELETE /api/stremio/downloads/:hash — qBit offline', () => {
   });
 });
 
-describe('DELETE /api/stremio/downloads/:hash — successful delete', () => {
+describe('DELETE /api/stremio/downloads/:hash — successful qBit delete', () => {
   beforeEach(() => {
     mockQbitReachable = true;
+    mockPersistedJob = undefined;
     mockDeleteTorrent.mockClear();
   });
 
@@ -122,7 +177,6 @@ describe('DELETE /api/stremio/downloads/:hash — successful delete', () => {
     const MIXED_CASE = 'AABBCCDD1122334455667788990011223344556677';
     const { req, res } = makeReqRes({ hash: MIXED_CASE });
     await handler(req, res);
-    // The handler passes the hash directly; qbittorrentClient.deleteTorrent lowercases it
     expect(mockDeleteTorrent).toHaveBeenCalledWith(MIXED_CASE, false);
   });
 });
@@ -130,6 +184,7 @@ describe('DELETE /api/stremio/downloads/:hash — successful delete', () => {
 describe('DELETE /api/stremio/downloads/:hash — error handling', () => {
   beforeEach(() => {
     mockQbitReachable = true;
+    mockPersistedJob = undefined;
     mockDeleteTorrent.mockClear();
   });
 
