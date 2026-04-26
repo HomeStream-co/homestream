@@ -306,10 +306,15 @@ export default function RemotePage() {
 
   if (needsAuth) return <RemoteLoginGate onAuth={() => setNeedsAuth(false)} />;
 
-  return <RemotePageInner />;
+  return <RemotePageInner onAuthExpired={() => {
+    // WS server sent 4001 — stored token is invalid (stale or from a different
+    // server). Clear it and show the login gate so the user can re-authenticate.
+    try { localStorage.removeItem('hs_token'); } catch { /* ignore */ }
+    setNeedsAuth(true);
+  }} />;
 }
 
-function RemotePageInner() {
+function RemotePageInner({ onAuthExpired }: { onAuthExpired: () => void }) {
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const connectRef = useRef<(() => void) | null>(null);
@@ -460,10 +465,19 @@ function RemotePageInner() {
       } catch { /* ignore */ }
     };
 
-    ws.onclose = () => {
+    ws.onclose = (e) => {
       // Suppress state updates after unmount — avoids React warning and
       // prevents a ghost reconnect loop after the page is navigated away.
       if (destroyedRef.current) return;
+
+      // Code 4001 = server rejected the token (stale session / wrong server).
+      // Clear the stored token and bubble up to RemotePage so the login gate
+      // re-appears — the user can re-enter their password to get a fresh token.
+      if (e.code === 4001) {
+        onAuthExpired();
+        return; // don't schedule a reconnect — we need a new token first
+      }
+
       setStatus('disconnected');
       // Exponential back-off: 3s → 6s → 12s → … → 30s cap
       retryCountRef.current += 1;
@@ -486,7 +500,7 @@ function RemotePageInner() {
         ws.close();
       }
     };
-  }, []);
+  }, [onAuthExpired]);
 
   // Keep connectRef in sync with the latest connect function
   connectRef.current = connect;
@@ -1160,7 +1174,7 @@ function IdleState({
       </p>
       <p className="text-muted-foreground text-sm leading-relaxed max-w-xs mx-auto">
         {status === 'no_screen'
-          ? 'Open HomeStream on your TV or desktop and start playing something.'
+          ? <>Tap the <span className="text-foreground font-semibold">Browse</span> tab below to pick something to watch — it will start playing on your TV automatically.</>
           : status === 'disconnected'
           ? 'Lost connection to HomeStream — retrying automatically. Make sure HomeStream is running.'
           : 'Make sure HomeStream is running on your home network.'}
