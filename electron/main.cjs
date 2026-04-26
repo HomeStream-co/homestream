@@ -631,9 +631,12 @@ app.whenReady().then(async () => {
   // Set up auto-updater after window exists so it can send IPC events to it.
   // Passes a getter (not the window directly) so it always uses the current
   // window reference even if the window is recreated.
+  // Also passes the active port so the updater can push state to the Express
+  // server over loopback (the server runs in a separate process — no shared memory).
   setupAutoUpdater({
     controlWindowGetter: () => controlWindow,
     pushLog,
+    port: activePort,
   });
 });
 

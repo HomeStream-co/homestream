@@ -46,31 +46,95 @@ const STARTUP_CHECK_DELAY_MS = 10_000;
 let currentState = 'idle';
 let availableVersion = null;
 let autoCheckTimer = null;
+let drainTimer = null;
 let getControlWindow = null; // injected by main.js
+let activePort = 3000;       // injected by main.js via setupAutoUpdater({ port })
 
-// ── HTTP bridge ───────────────────────────────────────────────────────────────
-// The React app runs in the system browser (not an Electron BrowserWindow) so
-// window.electronAPI / IPC is unavailable there.  We push updater state into
-// the Express server's in-memory bridge so the React app can poll it via HTTP.
-// The bridge module is loaded lazily (server may not be bundled yet at require time).
-let _bridge = null;
-function getBridge() {
-  if (_bridge) return _bridge;
-  try {
-    // In the packaged app the server bundle is a single CJS file.
-    // The bridge is exported from updaterBridge.js inside that bundle.
-    // We reach it via the same require path the server uses internally.
-    _bridge = require('../src/server/updaterBridge.js');
-  } catch {
-    try {
-      // Fallback: try the compiled server bundle path (production)
-      const path = require('path');
-      _bridge = require(path.join(process.resourcesPath ?? '', 'server', 'updaterBridge.js'));
-    } catch {
-      _bridge = null;
+// ── HTTP bridge helpers ───────────────────────────────────────────────────────
+// The Electron main process and the Express server are separate OS processes
+// (utilityProcess.fork).  They share no memory.  The only way to communicate
+// is over the loopback network.
+//
+// Push path  (Electron → server → React):
+//   sendStatus() calls POST /api/updater/push with the new state.
+//   The server stores it.  React polls GET /api/updater/status every 10 s.
+//
+// Action path (React → server → Electron):
+//   React calls POST /api/updater/action { action }.
+//   The server enqueues it.  Electron polls GET /api/updater/drain every 5 s.
+
+const http = require('http');
+
+function httpPost(path, body) {
+  return new Promise((resolve) => {
+    const data = JSON.stringify(body);
+    const req = http.request(
+      { hostname: '127.0.0.1', port: activePort, path, method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) } },
+      (res) => { res.resume(); resolve(res.statusCode); }
+    );
+    req.on('error', () => resolve(null));
+    req.setTimeout(3000, () => { req.destroy(); resolve(null); });
+    req.write(data);
+    req.end();
+  });
+}
+
+function httpGet(path) {
+  return new Promise((resolve) => {
+    const req = http.get(
+      { hostname: '127.0.0.1', port: activePort, path },
+      (res) => {
+        let body = '';
+        res.on('data', d => { body += d; });
+        res.on('end', () => {
+          try { resolve(JSON.parse(body)); } catch { resolve(null); }
+        });
+      }
+    );
+    req.on('error', () => resolve(null));
+    req.setTimeout(3000, () => { req.destroy(); resolve(null); });
+  });
+}
+
+function pushStatus(state, extra = {}) {
+  httpPost('/api/updater/push', { state, version: availableVersion, ...extra, isElectron: true })
+    .catch(() => {}); // fire-and-forget; errors are non-fatal
+}
+
+function startDrainPoller() {
+  if (drainTimer) return; // already running
+  drainTimer = setInterval(async () => {
+    const result = await httpGet('/api/updater/drain');
+    if (!result?.actions?.length) return;
+    for (const action of result.actions) {
+      if (action === 'check')    checkForUpdate();
+      if (action === 'download') handleDownload();
+      if (action === 'install')  handleInstall();
     }
+  }, 5_000);
+  drainTimer.unref();
+}
+
+function handleDownload() {
+  if (currentState !== 'available') return;
+  pushLogFn?.('[updater] Starting update download…', 'info');
+  autoUpdater.downloadUpdate().catch(err => {
+    pushLogFn?.(`[updater] Download failed: ${err?.message ?? err}`, 'error');
+    sendStatus('error', { error: err?.message ?? String(err) });
+  });
+}
+
+function handleInstall() {
+  if (currentState !== 'ready') return;
+  const currentVersion = app.getVersion();
+  if (!availableVersion || !semverGt(availableVersion, currentVersion)) {
+    pushLogFn?.(`[updater] Refusing to install v${availableVersion} — not newer than v${currentVersion}`, 'warn');
+    sendStatus('idle');
+    return;
   }
-  return _bridge;
+  pushLogFn?.('[updater] Restarting to install update…', 'warn');
+  setImmediate(() => autoUpdater.quitAndInstall(false, true));
 }
 
 // Beta channel opt-in — persisted to a simple JSON file next to the app data.
@@ -108,8 +172,8 @@ function sendStatus(state, extra = {}) {
   // 1. IPC → control panel tray window
   const win = getControlWindow?.();
   win?.webContents?.send('update-status', payload);
-  // 2. HTTP bridge → React app in system browser
-  try { getBridge()?.setUpdaterStatus({ ...payload, isElectron: true }); } catch { /* ignore */ }
+  // 2. HTTP push → Express server → React app polling /api/updater/status
+  pushStatus(state, extra);
 }
 
 function log(msg, level = 'info') {
@@ -138,9 +202,10 @@ function semverGt(a, b) {
 
 
 
-function setupAutoUpdater({ controlWindowGetter, pushLog }) {
+function setupAutoUpdater({ controlWindowGetter, pushLog, port = 3000 }) {
   getControlWindow = controlWindowGetter;
   pushLogFn = pushLog;
+  activePort = port;
 
   // Load beta preference from disk before anything else
   loadBetaPreference();
@@ -152,10 +217,6 @@ function setupAutoUpdater({ controlWindowGetter, pushLog }) {
   }
 
   // Skip if the GitHub repo hasn't been configured yet.
-  // Owner/repo are baked in two ways (first found wins):
-  //   1. HOMESTREAM_GH_OWNER / HOMESTREAM_GH_REPO env vars (set by CI at build time)
-  //   2. package.json build.ghOwner / build.ghRepo (written via extraMetadata in electron-builder.yml)
-  // If neither is set, the auto-updater is silently disabled.
   let pkg = {};
   try { pkg = require('../package.json'); } catch { /* ignore */ }
 
@@ -169,32 +230,6 @@ function setupAutoUpdater({ controlWindowGetter, pushLog }) {
   }
 
   log(`Auto-updater configured for ${owner}/${repo}`);
-
-  // Register HTTP bridge callbacks so the React app can trigger actions
-  // via POST /api/updater/action without needing IPC.
-  try {
-    getBridge()?.registerUpdaterCallbacks({
-      onCheck:    () => checkForUpdate(),
-      onDownload: () => {
-        if (currentState !== 'available') return;
-        autoUpdater.downloadUpdate().catch(err => {
-          log(`Download failed: ${err?.message ?? err}`, 'error');
-          sendStatus('error', { error: err?.message ?? String(err) });
-        });
-      },
-      onInstall: () => {
-        if (currentState !== 'ready') return;
-        const currentVersion = app.getVersion();
-        if (!availableVersion || !semverGt(availableVersion, currentVersion)) {
-          log(`Refusing to install v${availableVersion} — not newer than v${currentVersion}`, 'warn');
-          sendStatus('idle');
-          return;
-        }
-        log('Restarting to install update…', 'warn');
-        setImmediate(() => autoUpdater.quitAndInstall(false, true));
-      },
-    });
-  } catch { /* bridge not available yet — IPC path still works */ }
 
   // ── Private repo: inject GitHub token ───────────────────────────────────────
   // The repo is private so electron-updater must authenticate with a GitHub
@@ -336,6 +371,12 @@ function setupAutoUpdater({ controlWindowGetter, pushLog }) {
     if (app.isPackaged) checkForUpdate();
   }, AUTO_CHECK_INTERVAL_MS);
   autoCheckTimer.unref(); // don't block clean exit
+
+  // ── Action drain poller ─────────────────────────────────────────────────────
+  // Poll the server every 5 s for actions queued by the React app
+  // (check / download / install).  Starts after a short delay so the server
+  // has time to boot before the first request.
+  setTimeout(() => startDrainPoller(), STARTUP_CHECK_DELAY_MS);
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────
@@ -350,10 +391,8 @@ function checkForUpdate() {
 }
 
 function teardown() {
-  if (autoCheckTimer) {
-    clearInterval(autoCheckTimer);
-    autoCheckTimer = null;
-  }
+  if (autoCheckTimer) { clearInterval(autoCheckTimer); autoCheckTimer = null; }
+  if (drainTimer)     { clearInterval(drainTimer);     drainTimer = null; }
 }
 
 module.exports = { setupAutoUpdater, teardown };
