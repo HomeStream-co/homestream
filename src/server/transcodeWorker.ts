@@ -36,8 +36,11 @@ import { createRequire } from 'module';
 import fs from 'fs';
 import path from 'path';
 import { updateJob, broadcast, getJob } from './transcodeStore.js';
+import { dataDir } from './dataDir.js';
 
-const UPLOADS_DIR = path.resolve('./uploads');
+// Uploads live inside the data directory so they are writable in packaged
+// Electron on Linux (AppImage mounts read-only; process.cwd() is not writable).
+const UPLOADS_DIR = path.join(dataDir(), 'uploads');
 
 // Resolve FFmpeg binary: prefer FFMPEG_PATH env var (set by Electron when
 // bundling ffmpeg-static), then try ffmpeg-static directly, then fall back

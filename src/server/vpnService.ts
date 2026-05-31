@@ -268,8 +268,10 @@ async function ovpnDisconnect(): Promise<void> {
 
 async function ovpnIsUp(): Promise<boolean> {
   try {
-    const { stdout } = await execAsync('ip link show tun0 2>/dev/null');
-    return stdout.includes('tun0');
+    // Check for any tun interface (tun0, tun1, etc.) — the index varies
+    // depending on what other VPN software is running on the host.
+    const { stdout } = await execAsync('ip link show type tun 2>/dev/null');
+    return stdout.includes('tun');
   } catch { return false; }
 }
 
@@ -277,11 +279,14 @@ async function ovpnIsUp(): Promise<boolean> {
 
 async function getPublicIp(): Promise<string | undefined> {
   try {
-    // Use a fast, privacy-respecting IP check
-    const { stdout } = await execAsync(
-      'curl -s --max-time 4 https://api.ipify.org 2>/dev/null || echo ""'
-    );
-    return stdout.trim() || undefined;
+    // Use Node's built-in fetch — avoids a curl dependency that may not be
+    // present on minimal Linux installs (Alpine, base Arch, etc.).
+    const res = await fetch('https://api.ipify.org?format=text', {
+      signal: AbortSignal.timeout(4_000),
+    });
+    if (!res.ok) return undefined;
+    const ip = (await res.text()).trim();
+    return ip || undefined;
   } catch { return undefined; }
 }
 

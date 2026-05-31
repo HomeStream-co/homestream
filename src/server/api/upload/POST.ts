@@ -13,8 +13,11 @@ import {
   runEnrichmentInBackground,
   runCaptionFetchInBackground,
 } from '../../mediaUtils.js';
+import { dataDir } from '../../dataDir.js';
 
-const UPLOADS_DIR = path.resolve('./uploads');
+// Uploads live inside the data directory so they are writable in packaged
+// Electron on Linux (AppImage mounts read-only; process.cwd() is not writable).
+const UPLOADS_DIR = path.join(dataDir(), 'uploads');
 if (!fs.existsSync(UPLOADS_DIR)) {
   fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 }

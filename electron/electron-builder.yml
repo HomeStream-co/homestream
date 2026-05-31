@@ -177,7 +177,7 @@ pacman:
   depends:
     - libnotify
     - libxtst
-    - libnss
+    - nss
     - gtk3
     - libxss
     - libxrandr

@@ -50,9 +50,11 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 
-import { dataPath } from './dataDir.js';
+import { dataPath, dataDir } from './dataDir.js';
 const LIBRARY_PATH = dataPath('media-library.json');
-const UPLOADS_DIR  = path.resolve('./uploads');
+// Uploads live inside the data directory so they are writable in packaged
+// Electron on Linux (AppImage mounts read-only; process.cwd() is not writable).
+const UPLOADS_DIR  = path.join(dataDir(), 'uploads');
 
 // Mirrors the constant in hlsTranscoder.ts — kept in sync via the exported
 // HLS_BASE_DIR value, but we also need it synchronously here before the

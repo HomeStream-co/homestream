@@ -19,8 +19,11 @@ import fs from 'fs';
 import path from 'path';
 import { requireAuth } from '../../../authMiddleware.js';
 import { readLibrary } from '../../../libraryStore.js';
+import { dataDir } from '../../../dataDir.js';
 
-const UPLOADS_DIR = path.resolve('./uploads');
+// Uploads live inside the data directory so they are writable in packaged
+// Electron on Linux (AppImage mounts read-only; process.cwd() is not writable).
+const UPLOADS_DIR = path.join(dataDir(), 'uploads');
 
 // 4 MB — large enough to fill the browser's initial buffer in one shot on LAN
 const CHUNK_SIZE = 4 * 1024 * 1024;
