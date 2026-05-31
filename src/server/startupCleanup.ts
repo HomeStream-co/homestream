@@ -296,23 +296,38 @@ export function runStartupCleanup(): void {
   //
   // Fix: on boot, mark any RD job that is still queued/downloading as error
   // so the Downloads page shows a "Retry" button instead of a stuck spinner.
-  import('./downloadJobStore.js').then(({ getAllPersistedJobs, upsertJob: upsertRdJob }) => {
+  import('./downloadJobStore.js').then(({ getAllPersistedJobs, upsertJob: upsertAnyJob, markJobInterrupted }) => {
     const allJobs = getAllPersistedJobs();
+
+    // Real-Debrid: mark stuck jobs as error so the UI shows a Retry button.
     const stuckRd = allJobs.filter(
       j => j.backend === 'real-debrid' && (j.status === 'queued' || j.status === 'downloading')
     );
-    if (stuckRd.length === 0) return;
-    console.log(`[startup] Found ${stuckRd.length} interrupted Real-Debrid job(s) — marking as error.`);
-    for (const job of stuckRd) {
-      upsertRdJob({
-        ...job,
-        status: 'error',
-        completedAt: new Date().toISOString(),
-      });
-      console.log(`[startup]   ✗ RD "${job.title}" — interrupted by server restart`);
+    if (stuckRd.length > 0) {
+      console.log(`[startup] Found ${stuckRd.length} interrupted Real-Debrid job(s) — marking as error.`);
+      for (const job of stuckRd) {
+        upsertAnyJob({ ...job, status: 'error', completedAt: new Date().toISOString() });
+        console.log(`[startup]   ✗ RD "${job.title}" — interrupted by server restart`);
+      }
+    }
+
+    // qBittorrent / WebTorrent: these run in-process (WT) or via external client (qBit).
+    // On restart the in-process WebTorrent engine is gone and qBit may have lost the
+    // torrent too.  Mark any active qBit/WT job as interrupted so the Downloads page
+    // shows a "Resume" button instead of a stuck spinner.
+    const stuckLocal = allJobs.filter(
+      j => (j.backend === 'qbittorrent' || j.backend === 'webtorrent') &&
+           (j.status === 'queued' || j.status === 'downloading')
+    );
+    if (stuckLocal.length > 0) {
+      console.log(`[startup] Found ${stuckLocal.length} interrupted qBit/WT job(s) — marking as interrupted.`);
+      for (const job of stuckLocal) {
+        markJobInterrupted(job.jobId);
+        console.log(`[startup]   ✗ ${job.backend} "${job.title}" — interrupted by server restart`);
+      }
     }
   }).catch(err => {
-    console.error('[startup] RD job cleanup failed:', err);
+    console.error('[startup] Download job cleanup failed:', err);
   });
 
   const stuckTranscoding = library.filter(m => m.transcoding === true);
