@@ -1849,7 +1849,11 @@ export default function DownloadsPage() {
               </div>
               <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground bg-muted/30 rounded-xl px-4 py-2.5">
                 <Zap className="w-3.5 h-3.5 text-primary" />
-                Downloads are routed through qBittorrent. Make sure qBittorrent is running and configured in Settings → Downloads.
+                {data?.qbitOnline
+                  ? 'Downloads will use qBittorrent — it\'s running and ready.'
+                  : rdStatus?.ok
+                    ? 'Downloads will use Real-Debrid — your premium account is active.'
+                    : 'Downloads use the built-in downloader. For faster speeds, add a Real-Debrid key or start qBittorrent in Settings → Downloads.'}
               </div>
             </motion.div>
           ) : filteredQbit.length === 0 && filteredWt.length === 0 && filteredRd.length === 0 ? (
