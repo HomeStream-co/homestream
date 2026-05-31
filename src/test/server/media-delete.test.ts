@@ -43,9 +43,11 @@ vi.mock('fs', () => ({
   default: {
     existsSync: (p: string) => existingPaths.has(p),
     unlinkSync: (p: string) => { unlinkedPaths.push(p); },
+    mkdirSync: vi.fn(), // dataDir() calls this at module load — must be present
   },
   existsSync: (p: string) => existingPaths.has(p),
   unlinkSync: (p: string) => { unlinkedPaths.push(p); },
+  mkdirSync: vi.fn(),
 }));
 
 vi.mock('../../server/libraryStore.js', () => ({

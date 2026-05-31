@@ -41,6 +41,7 @@ vi.mock('../../server/libraryStore.js', () => ({
 }));
 
 vi.mock('../../server/dataDir.js', () => ({
+  dataDir:  () => '/tmp/test-homestream',
   dataPath: (f: string) => `/tmp/test-homestream/${f}`,
 }));
 

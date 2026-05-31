@@ -101,7 +101,6 @@ export function usePlayerProgress({
       if (ct > 0 && dur > 0) updateProgress(id, (ct / dur) * 100, ct, dur);
     }, 10000);
     return () => clearInterval(interval);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, updateProgress]);
 
   // ── Save on tab hide / window blur ────────────────────────────────────────
