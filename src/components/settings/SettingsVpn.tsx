@@ -1,4 +1,4 @@
-import { WifiOff, CheckCircle2, Loader2 } from 'lucide-react';
+import { WifiOff, CheckCircle2, Loader2, AlertTriangle } from 'lucide-react';
 import { SectionHeader } from './shared';
 
 export interface VpnInterface {
@@ -32,6 +32,21 @@ export default function SettingsVpn({
           Lock downloads to your VPN adapter. If the VPN disconnects, all downloads pause
           automatically so your real IP is never exposed.
         </p>
+
+        {/* Linux root-requirement notice */}
+        <div className="flex items-start gap-2 px-3 py-2.5 rounded-lg bg-amber-500/10 border border-amber-500/25">
+          <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
+          <div className="flex flex-col gap-0.5">
+            <p className="text-[11px] text-amber-300 font-medium">Linux: WireGuard requires root</p>
+            <p className="text-[10px] text-amber-300/70 leading-relaxed">
+              <code className="font-mono">wg-quick</code> needs root or a sudoers entry.
+              Run the installer to add it automatically:
+            </p>
+            <code className="text-[9px] font-mono text-amber-200/60 mt-0.5 break-all">
+              echo &quot;$(whoami) ALL=(ALL) NOPASSWD: /usr/bin/wg-quick&quot; | sudo tee /etc/sudoers.d/homestream-wg
+            </code>
+          </div>
+        </div>
 
         {/* Current binding status */}
         {vpnCurrentInterface ? (

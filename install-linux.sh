@@ -214,5 +214,40 @@ echo ""
 echo "  Phone remote:  http://<your-server-ip>:3000/remote"
 echo "  TV mode:       http://<your-server-ip>:3000/tv"
 echo ""
+
+# ── Optional: WireGuard sudoers entry ─────────────────────────────────────────
+# wg-quick requires root. Add a passwordless sudoers rule so HomeStream can
+# bring the VPN tunnel up/down without prompting for a password.
+# This is optional — skip it if you don't plan to use the VPN kill-switch.
+if command -v wg-quick &>/dev/null; then
+  echo -e "${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
+  echo -e "${YELLOW}  Optional: WireGuard VPN support${RESET}"
+  echo -e "${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
+  echo ""
+  echo "  WireGuard is installed. To let HomeStream manage the VPN tunnel"
+  echo "  without a password prompt, add a sudoers entry:"
+  echo ""
+  echo -e "    ${CYAN}echo \"\$(whoami) ALL=(ALL) NOPASSWD: /usr/bin/wg-quick\" | sudo tee /etc/sudoers.d/homestream-wg${RESET}"
+  echo ""
+  echo "  This is only needed if you want to use the VPN kill-switch feature."
+  echo "  You can skip this and add it later from the Settings page."
+  echo ""
+
+  # Offer to add it automatically
+  read -r -p "  Add the sudoers entry now? [y/N] " _wg_answer
+  case "$_wg_answer" in
+    [yY][eE][sS]|[yY])
+      SUDOERS_FILE="/etc/sudoers.d/homestream-wg"
+      echo "$(whoami) ALL=(ALL) NOPASSWD: /usr/bin/wg-quick" | sudo tee "$SUDOERS_FILE" > /dev/null
+      sudo chmod 0440 "$SUDOERS_FILE"
+      success "Sudoers entry added: ${SUDOERS_FILE}"
+      ;;
+    *)
+      info "Skipped. You can add it later from Settings → VPN."
+      ;;
+  esac
+  echo ""
+fi
+
 echo -e "  ${CYAN}Enjoy your personal Netflix!${RESET}"
 echo ""

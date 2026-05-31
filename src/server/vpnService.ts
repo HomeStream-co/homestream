@@ -202,7 +202,27 @@ const OVPN_PID_PATH  = path.join(os.tmpdir(), 'homestream-openvpn.pid');
 async function wgConnect(config: VPNConfig): Promise<void> {
   await fs.mkdir(path.dirname(WG_CONF_PATH), { recursive: true });
   await fs.writeFile(WG_CONF_PATH, config.configContent, { mode: 0o600 });
-  await execAsync(`wg-quick up ${WG_IFACE}`);
+  try {
+    await execAsync(`wg-quick up ${WG_IFACE}`);
+  } catch (err) {
+    const msg = String(err);
+    // On Linux, wg-quick requires root (or a sudoers entry).
+    // Translate the raw EACCES / "Operation not permitted" into an actionable message.
+    if (
+      msg.includes('EACCES') ||
+      msg.includes('Operation not permitted') ||
+      msg.includes('Permission denied') ||
+      msg.includes('sudo')
+    ) {
+      throw new Error(
+        'wg-quick requires root privileges on Linux. ' +
+        'Either run HomeStream as root, or add a sudoers entry:\n' +
+        '  echo "$(whoami) ALL=(ALL) NOPASSWD: /usr/bin/wg-quick" | sudo tee /etc/sudoers.d/homestream-wg\n' +
+        'See install-linux.sh for the one-command setup.',
+      );
+    }
+    throw err;
+  }
 }
 
 async function wgDisconnect(): Promise<void> {
@@ -256,7 +276,7 @@ async function ovpnConnect(config: VPNConfig): Promise<void> {
     await new Promise(r => setTimeout(r, 500));
     if (await ovpnIsUp()) return;
   }
-  throw new Error('OpenVPN did not connect within 15 seconds — check /tmp/homestream-openvpn.log');
+  throw new Error(`OpenVPN did not connect within 15 seconds — check ${path.join(os.tmpdir(), 'homestream-openvpn.log')}`);
 }
 
 async function ovpnDisconnect(): Promise<void> {
