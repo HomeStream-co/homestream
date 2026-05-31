@@ -144,11 +144,22 @@ dmg:
     height: 380
 
 # ── Linux ─────────────────────────────────────────────────────────────────────
+#
+# Three formats are produced:
+#   AppImage  — universal, runs on any x86_64 or arm64 Linux (no install needed)
+#   deb       — Debian / Ubuntu / Pop!_OS
+#   pacman    — Arch Linux / Manjaro / CachyOS (installs via `sudo pacman -U`)
+#
+# The pacman target produces a .pkg.tar.zst file that integrates with pacman's
+# dependency tracking and shows up in `pacman -Q`. CachyOS users can also
+# install the AppImage directly without any package manager.
 linux:
   target:
     - target: AppImage
       arch: [x64, arm64]
     - target: deb
+      arch: [x64]
+    - target: pacman
       arch: [x64]
   icon: electron/assets/icon.png
   category: AudioVideo
@@ -158,3 +169,16 @@ linux:
       Name: HomeStream
       Comment: Stream your personal media collection
       Categories: AudioVideo;Video;Player;
+
+# ── pacman package options ─────────────────────────────────────────────────────
+# depends: minimal runtime libs that are always present on a base Arch install.
+# fpm is used under the hood — electron-builder installs it automatically.
+pacman:
+  depends:
+    - libnotify
+    - libxtst
+    - libnss
+    - gtk3
+    - libxss
+    - libxrandr
+    - alsa-lib

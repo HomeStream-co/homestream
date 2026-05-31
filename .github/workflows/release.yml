@@ -163,3 +163,102 @@ jobs:
           $body = '{"draft":false,"prerelease":false,"make_latest":"true"}'
           Invoke-RestMethod -Method Patch -Uri "https://api.github.com/repos/${{ github.repository }}/releases/$id" -Headers $headers -Body $body
           Write-Host "Release $tag is now published and marked as latest."
+
+  # ── Linux build ──────────────────────────────────────────────────────────────
+  # Produces:
+  #   AppImage (x64 + arm64) — universal, no install needed
+  #   .deb     (x64)         — Debian / Ubuntu
+  #   .pkg.tar.zst (x64)     — Arch Linux / Manjaro / CachyOS (pacman)
+  #
+  # Runs on ubuntu-latest (glibc 2.35+). The AppImage bundles all libs so it
+  # runs on older glibc too. The pacman package requires Arch's glibc (always
+  # current), which is fine for CachyOS.
+  release-linux:
+    name: Build & Publish Linux Packages
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Cache node_modules
+        id: cache-node-modules
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: Linux-node22-modules-${{ hashFiles('package-lock.json') }}
+
+      - name: Install dependencies
+        if: steps.cache-node-modules.outputs.cache-hit != 'true'
+        run: npm ci
+        env:
+          npm_config_optional: true
+
+      # fpm is required by electron-builder for the pacman target.
+      # ruby is pre-installed on ubuntu-latest; we just need the fpm gem.
+      - name: Install fpm (required for pacman .pkg.tar.zst)
+        run: |
+          sudo apt-get install -y ruby-dev build-essential rpm libarchive-tools
+          sudo gem install fpm --no-document
+
+      - name: Build app (Vite + server bundle)
+        run: npm run build
+        env:
+          CI: true
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+
+      - name: Verify build artifacts
+        run: |
+          test -f dist/server.bundle.cjs || (echo "dist/server.bundle.cjs MISSING" && exit 1)
+          test -f dist/client/index.html || (echo "dist/client/index.html MISSING" && exit 1)
+          SIZE=$(du -sh dist/server.bundle.cjs | cut -f1)
+          echo "server.bundle.cjs: $SIZE"
+          if [ -f node_modules/ffmpeg-static/ffmpeg ]; then
+            FFSIZE=$(du -sh node_modules/ffmpeg-static/ffmpeg | cut -f1)
+            echo "ffmpeg-static/ffmpeg: $FFSIZE — OK"
+          else
+            echo "WARNING: ffmpeg-static/ffmpeg NOT FOUND — transcoding will be broken"
+          fi
+          echo "Build artifacts verified."
+
+      # Patch package.json so updater.cjs can read pkg.build.ghToken at runtime.
+      - name: Inject build metadata into package.json
+        run: |
+          node -e "
+            const fs = require('fs');
+            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+            pkg.build = pkg.build || {};
+            pkg.build.ghToken = '${{ secrets.GH_TOKEN }}';
+            pkg.build.ghOwner = 'HomeStream-co';
+            pkg.build.ghRepo  = 'homestream';
+            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+            console.log('package.json patched with build metadata');
+          "
+
+      # Build AppImage (x64 + arm64), .deb (x64), and pacman .pkg.tar.zst (x64).
+      # --publish always uploads all artifacts to the existing GitHub Release
+      # created by the Windows job. If the Windows job hasn't finished yet,
+      # electron-builder will create the release itself (idempotent).
+      - name: Package & publish Linux builds
+        run: npx electron-builder --linux --config electron/electron-builder.yml --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          DEBUG: electron-builder
+
+      - name: Upload Linux artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: HomeStream-Linux-${{ github.ref_name }}
+          path: |
+            dist-electron/*.AppImage
+            dist-electron/*.deb
+            dist-electron/*.pkg.tar.zst
+            dist-electron/*.yml
+          retention-days: 30
+          if-no-files-found: warn
+
