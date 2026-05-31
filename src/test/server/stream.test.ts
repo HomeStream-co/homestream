@@ -33,31 +33,21 @@ let mockLibrary: Array<{ filename?: string; filePath?: string; filepath?: string
 // We provide only the methods the stream handler uses.
 
 vi.mock('fs', () => {
+  const existsSync = (p: string) => {
+    const base = p.split('/').pop() ?? '';
+    return mockFiles.has(base) || mockFiles.has(p);
+  };
+  const statSync = (p: string) => {
+    const base = p.split('/').pop() ?? '';
+    const f = mockFiles.get(base) ?? mockFiles.get(p);
+    if (!f) throw Object.assign(new Error(`ENOENT: ${p}`), { code: 'ENOENT' });
+    return { size: f.size, mtimeMs: f.mtimeMs, mtime: new Date(f.mtimeMs) };
+  };
+  const mkdirSync = vi.fn(); // dataDir() calls this at module load — must be present
+  const createReadStream = vi.fn(() => ({ pipe: vi.fn() }));
   return {
-    default: {
-      existsSync: (p: string) => {
-        const base = p.split('/').pop() ?? '';
-        return mockFiles.has(base) || mockFiles.has(p);
-      },
-      statSync: (p: string) => {
-        const base = p.split('/').pop() ?? '';
-        const f = mockFiles.get(base) ?? mockFiles.get(p);
-        if (!f) throw Object.assign(new Error(`ENOENT: ${p}`), { code: 'ENOENT' });
-        return { size: f.size, mtimeMs: f.mtimeMs, mtime: new Date(f.mtimeMs) };
-      },
-      createReadStream: vi.fn(() => ({ pipe: vi.fn() })),
-    },
-    existsSync: (p: string) => {
-      const base = p.split('/').pop() ?? '';
-      return mockFiles.has(base) || mockFiles.has(p);
-    },
-    statSync: (p: string) => {
-      const base = p.split('/').pop() ?? '';
-      const f = mockFiles.get(base) ?? mockFiles.get(p);
-      if (!f) throw Object.assign(new Error(`ENOENT: ${p}`), { code: 'ENOENT' });
-      return { size: f.size, mtimeMs: f.mtimeMs, mtime: new Date(f.mtimeMs) };
-    },
-    createReadStream: vi.fn(() => ({ pipe: vi.fn() })),
+    default: { existsSync, statSync, mkdirSync, createReadStream },
+    existsSync, statSync, mkdirSync, createReadStream,
   };
 });
 
