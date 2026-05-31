@@ -18,6 +18,7 @@ import SettingsAppearance       from './settings/SettingsAppearance';
 import SettingsPlayback         from './settings/SettingsPlayback';
 import SettingsLibrary          from './settings/SettingsLibrary';
 import SettingsDiscover         from './settings/SettingsDiscover';
+import SettingsDownloads        from './settings/SettingsDownloads';
 import SettingsStorage, { type StorageStats } from './settings/SettingsStorage';
 import SettingsParentalControls from './settings/SettingsParentalControls';
 import SettingsApiKeys, { type ApiKeysState, type ApiKeysSavedState } from './settings/SettingsApiKeys';
@@ -504,6 +505,7 @@ export default function SettingsPanel({
                         tmdbStale={tmdbStale}
                         onRefresh={handleTmdbRefresh}
                       />
+                      <SettingsDownloads />
                     </motion.div>
                   )}
 
