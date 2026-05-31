@@ -210,6 +210,13 @@ const OVPN_PID_PATH  = path.join(os.tmpdir(), 'homestream-openvpn.pid');
 // ── WireGuard ─────────────────────────────────────────────────────────────────
 
 async function wgConnect(config: VPNConfig): Promise<void> {
+  // WireGuard / wg-quick is not available on Windows — guard early.
+  if (process.platform === 'win32') {
+    throw new Error(
+      'WireGuard VPN is not supported on Windows in this build. ' +
+      'Use OpenVPN instead, or run HomeStream on Linux/macOS.',
+    );
+  }
   await fs.mkdir(path.dirname(WG_CONF_PATH), { recursive: true });
   await fs.writeFile(WG_CONF_PATH, config.configContent, { mode: 0o600 });
   try {
@@ -236,12 +243,16 @@ async function wgConnect(config: VPNConfig): Promise<void> {
 }
 
 async function wgDisconnect(): Promise<void> {
+  if (process.platform === 'win32') return; // not supported
   try { await execAsync(`wg-quick down ${WG_IFACE}`); } catch { /* already down */ }
 }
 
 async function wgIsUp(): Promise<boolean> {
+  if (process.platform === 'win32') return false; // not supported
   try {
-    const { stdout } = await execAsync(`wg show ${WG_IFACE} 2>/dev/null`);
+    // Use execAsync without shell redirect — pipe stderr via the exec options
+    // so this works on both Linux and macOS without Unix shell syntax.
+    const { stdout } = await execAsync(`wg show ${WG_IFACE}`, { timeout: 4000 });
     return stdout.trim().length > 0;
   } catch { return false; }
 }
@@ -272,16 +283,31 @@ async function ovpnConnect(config: VPNConfig): Promise<void> {
   const content = await buildOvpnConfig(config);
   await fs.writeFile(OVPN_CONF_PATH, content, { mode: 0o600 });
 
-  const proc = spawn('openvpn', [
-    '--config', OVPN_CONF_PATH,
-    '--daemon',
-    '--writepid', OVPN_PID_PATH,
-    '--log', path.join(os.tmpdir(), 'homestream-openvpn.log'),
-    '--script-security', '2',
-  ], { detached: true, stdio: 'ignore' });
+  // --daemon and --writepid are Unix-only flags.
+  // On Windows, spawn OpenVPN in the background using detached:true instead.
+  const isWindows = process.platform === 'win32';
+  const args = isWindows
+    ? [
+        '--config', OVPN_CONF_PATH,
+        '--log', path.join(os.tmpdir(), 'homestream-openvpn.log'),
+        '--script-security', '2',
+      ]
+    : [
+        '--config', OVPN_CONF_PATH,
+        '--daemon',
+        '--writepid', OVPN_PID_PATH,
+        '--log', path.join(os.tmpdir(), 'homestream-openvpn.log'),
+        '--script-security', '2',
+      ];
+
+  const proc = spawn('openvpn', args, { detached: true, stdio: 'ignore' });
+  // On Windows, save the PID ourselves since --writepid is not used
+  if (isWindows && proc.pid) {
+    await fs.writeFile(OVPN_PID_PATH, String(proc.pid), 'utf8');
+  }
   proc.unref();
 
-  // Wait up to 15s for tun0 to appear
+  // Wait up to 15s for the VPN interface to appear
   for (let i = 0; i < 30; i++) {
     await new Promise(r => setTimeout(r, 500));
     if (await ovpnIsUp()) return;
@@ -291,18 +317,33 @@ async function ovpnConnect(config: VPNConfig): Promise<void> {
 
 async function ovpnDisconnect(): Promise<void> {
   try {
-    const pid = (await fs.readFile(OVPN_PID_PATH, 'utf8')).trim();
-    await execAsync(`kill ${pid}`);
+    const pidStr = (await fs.readFile(OVPN_PID_PATH, 'utf8')).trim();
+    const pid = parseInt(pidStr, 10);
+    if (!isNaN(pid) && pid > 0) {
+      // Use Node's process.kill() — works on Windows, Linux, and macOS.
+      // On Windows, this sends SIGTERM which OpenVPN handles for graceful shutdown.
+      try { process.kill(pid, 'SIGTERM'); } catch { /* process already gone */ }
+    }
     await fs.unlink(OVPN_PID_PATH).catch(() => {});
-  } catch { /* already stopped */ }
+  } catch { /* already stopped or PID file missing */ }
 }
 
 async function ovpnIsUp(): Promise<boolean> {
   try {
-    // Check for any tun interface (tun0, tun1, etc.) — the index varies
-    // depending on what other VPN software is running on the host.
-    const { stdout } = await execAsync('ip link show type tun 2>/dev/null');
-    return stdout.includes('tun');
+    if (process.platform === 'win32') {
+      // Windows: check for a TAP/TUN adapter named "HomeStream" or any "tun" adapter
+      // via netsh. OpenVPN on Windows creates a TAP-Windows adapter.
+      const { stdout } = await execAsync('netsh interface show interface', { timeout: 4000 });
+      return stdout.toLowerCase().includes('tun') || stdout.toLowerCase().includes('tap');
+    } else if (process.platform === 'darwin') {
+      // macOS: OpenVPN creates utun interfaces (utun0, utun1, …)
+      const { stdout } = await execAsync('ifconfig 2>/dev/null | grep -c "^utun"', { timeout: 4000 });
+      return parseInt(stdout.trim(), 10) > 0;
+    } else {
+      // Linux: check for any tun interface via ip link
+      const { stdout } = await execAsync('ip link show type tun', { timeout: 4000 });
+      return stdout.includes('tun');
+    }
   } catch { return false; }
 }
 

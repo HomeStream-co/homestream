@@ -5,7 +5,7 @@
  * other codec the browser can't decode natively, this module:
  *
  *  1. Spawns FFmpeg to transcode the source file to HLS (H.264 + AAC)
- *  2. Writes segments to /tmp/homestream-hls/<mediaId>/
+ *  2. Writes segments to os.tmpdir()/homestream-hls/<mediaId>/
  *  3. Serves the .m3u8 playlist and .ts segments via /api/hls/:id/*
  *  4. Cleans up segments after 30 minutes of inactivity
  *

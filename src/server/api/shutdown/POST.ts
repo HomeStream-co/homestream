@@ -4,7 +4,7 @@
  * Graceful shutdown endpoint called by the Electron main process before
  * killing the server child process. Gives the server a chance to:
  *   1. Stop all active HLS transcoding jobs
- *   2. Clean up /tmp/homestream-hls/ segments
+ *   2. Clean up HLS temp segments (os.tmpdir()/homestream-hls/)
  *   3. Flush any pending writes
  *
  * POST (not GET) to prevent CSRF — a malicious page cannot trigger shutdown
