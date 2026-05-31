@@ -6,7 +6,49 @@ auto-launch of the setup wizard on first run.
 
 ---
 
-## What the .exe does
+## Installing on Linux / CachyOS (end users)
+
+### One-command installer (recommended)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/HomeStream-co/homestream/main/install-linux.sh | bash
+```
+
+The script auto-detects your distro and picks the best package format:
+
+| Distro | Package | How it installs |
+|--------|---------|-----------------|
+| **CachyOS / Arch / Manjaro** | `.pkg.tar.zst` | `sudo pacman -U` — shows up in `pacman -Q` |
+| Debian / Ubuntu / Pop!_OS | `.deb` | `sudo dpkg -i` |
+| Everything else | `.AppImage` | Copied to `~/.local/bin`, desktop entry created |
+
+### Manual install on CachyOS (pacman)
+
+```bash
+# 1. Download the latest .pkg.tar.zst from GitHub Releases
+#    https://github.com/HomeStream-co/homestream/releases/latest
+
+# 2. Install with pacman
+sudo pacman -U HomeStream-1.x.x-x86_64.pkg.tar.zst
+
+# 3. Launch
+homestream
+```
+
+### Manual install — AppImage (any distro, no root needed)
+
+```bash
+# Download the AppImage
+wget https://github.com/HomeStream-co/homestream/releases/latest/download/HomeStream-1.x.x-x86_64.AppImage
+
+# Make it executable and run
+chmod +x HomeStream-*.AppImage
+./HomeStream-*.AppImage
+```
+
+---
+
+## What the app does
 
 1. Launches a small **Control Panel** window showing server status + logs
 2. Starts the HomeStream Express server as a background child process
@@ -24,7 +66,7 @@ auto-launch of the setup wizard on first run.
 | npm | 10+ | Comes with Node |
 | Windows | 10/11 | Cross-compile from macOS/Linux is possible but not recommended for .exe |
 
-End users need **nothing** pre-installed — FFmpeg is bundled inside the .exe.
+End users need **nothing** pre-installed — FFmpeg is bundled inside the package.
 
 ---
 
@@ -46,11 +88,33 @@ Output files land in `dist-electron/`:
 
 ---
 
+## Build for Linux (produces AppImage + .deb + pacman .pkg.tar.zst)
+
+```bash
+npm run electron:linux
+```
+
+Output files land in `dist-electron/`:
+
+| File | Description |
+|------|-------------|
+| `HomeStream-1.x.x.AppImage` | Universal AppImage (x64) |
+| `HomeStream-1.x.x-arm64.AppImage` | Universal AppImage (arm64 / Raspberry Pi) |
+| `homestream_1.x.x_amd64.deb` | Debian/Ubuntu package |
+| `homestream-1.x.x-x86_64.pkg.tar.zst` | Arch/CachyOS pacman package |
+
+> **Note:** The pacman target requires `fpm` to be installed on the build machine:
+> ```bash
+> sudo gem install fpm
+> ```
+
+---
+
 ## Build for other platforms
 
 ```bash
 npm run electron:mac    # macOS .dmg (must run on macOS)
-npm run electron:linux  # Linux .AppImage + .deb
+npm run electron:linux  # Linux .AppImage + .deb + .pkg.tar.zst
 npm run electron:build  # All platforms (requires platform-specific runners)
 ```
 
@@ -76,7 +140,7 @@ The `.js` copies are kept as backups but are **not used** by the build.
 
 ## Where user data is stored (end user's machine)
 
-All data files are written to the OS user-data folder — **never** next to the .exe:
+All data files are written to the OS user-data folder — **never** next to the app:
 
 | OS | Path |
 |----|------|
@@ -141,7 +205,8 @@ git tag v1.2.0
 git push origin v1.2.0
 ```
 
-GitHub Actions (`release.yml`) will build and publish the installer automatically.
+GitHub Actions (`release.yml`) will build and publish the installer automatically
+for **both Windows and Linux** (parallel jobs).
 
 ### Re-tagging (rebuild the same version after a fix)
 
@@ -157,7 +222,7 @@ git push origin v1.1.0
 
 ## Development mode
 
-```powershell
+```bash
 # Terminal 1 — start the Vite dev server
 npm run dev
 
@@ -167,3 +232,4 @@ npm run electron:dev
 
 In dev mode the Electron control panel shows a notice to use `npm run dev`
 and does not spawn a server child process (Vite handles it).
+
