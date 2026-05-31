@@ -25,7 +25,7 @@
  * the library can point to a non-existent `_tc.mp4`. The transcode cleanup
  * above handles this by falling through to the "original file" check.
  *
- * Problem 4: HLS segments written to /tmp/homestream-hls/<mediaId>/ are
+ * Problem 4: HLS segments written to os.tmpdir()/homestream-hls/<mediaId>/ are
  * never cleaned up if the server restarts — the in-memory jobs map is wiped
  * but the directories remain on disk and accumulate indefinitely.
  *

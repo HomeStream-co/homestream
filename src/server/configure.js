@@ -170,7 +170,7 @@ export const serverBefore = (server) => {
 
   const shutdown = async (signal) => {
     console.log(`Got ${signal}, shutting down gracefully...`);
-    // Clean up HLS temp segments so /tmp doesn't accumulate across restarts
+    // Clean up HLS temp segments so os.tmpdir() doesn't accumulate across restarts
     try {
       const { stopAllHlsJobs, HLS_BASE_DIR } = await import('./hlsTranscoder.js');
       stopAllHlsJobs();
