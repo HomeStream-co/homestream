@@ -4,8 +4,9 @@ import fs from 'fs';
 import { probeFile } from '../../../../probeCache.js';
 import { requireAuth } from '../../../../authMiddleware.js';
 import { readLibrary } from '../../../../libraryStore.js';
+import { dataDir } from '../../../../dataDir.js';
 
-const UPLOADS_DIR = path.resolve('./uploads');
+const UPLOADS_DIR = path.join(dataDir(), 'uploads');
 
 export default async function handler(req: Request, res: Response) {
   try {

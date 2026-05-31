@@ -32,6 +32,7 @@ import { deleteJob } from '../../../downloadJobStore.js';
 import { clearCrashLog } from '../../../crashLogger.js';
 import { readConfig } from '../../../configStore.js';
 import { pruneStaleTmdbCache } from '../../../startupCleanup.js';
+import { dataDir } from '../../../dataDir.js';
 import type { TorrentJob } from '../../../torrentManager.js';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -144,7 +145,7 @@ async function testNetwork(): Promise<string> {
 }
 
 async function purgeOrphanedUploads(): Promise<string> {
-  const uploadsDir = path.resolve('./uploads');
+  const uploadsDir = path.join(dataDir(), 'uploads');
   if (!fs.existsSync(uploadsDir)) return 'Uploads directory does not exist — nothing to purge';
 
   const VIDEO_EXTENSIONS = new Set(['.mp4', '.mkv', '.avi', '.mov', '.webm', '.m4v', '.ts']);

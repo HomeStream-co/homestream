@@ -23,6 +23,7 @@ import { transcodeFile } from './transcodeWorker.js';
 import { fetchOMDB } from './mediaUtils.js';
 import { upsertJob, updateJobStatus, getAllPersistedJobs } from './downloadJobStore.js';
 import { readConfig } from './configStore.js';
+import { dataDir } from './dataDir.js';
 
 /** Returns the active downloads directory, preferring mediaDir/downloads from config. */
 function getDownloadsDir(): string {
@@ -32,8 +33,9 @@ function getDownloadsDir(): string {
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     return dir;
   }
-  // Fallback: ./uploads (legacy, cloud/dev environment)
-  const fallback = path.resolve('./uploads');
+  // Fallback: uploads inside the data directory (writable on all platforms,
+  // including packaged Electron on Linux where process.cwd() is read-only).
+  const fallback = path.join(dataDir(), 'uploads');
   if (!fs.existsSync(fallback)) fs.mkdirSync(fallback, { recursive: true });
   return fallback;
 }

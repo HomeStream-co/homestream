@@ -4,8 +4,9 @@ import path from 'path';
 import { readLibrary, writeLibrary } from '../../../libraryStore.js';
 import { removeFromAllWatchlists } from '../../../watchlistStore.js';
 import { requireAuth } from '../../../authMiddleware.js';
+import { dataDir } from '../../../dataDir.js';
 
-const UPLOADS_DIR = path.resolve('./uploads');
+const UPLOADS_DIR = path.join(dataDir(), 'uploads');
 
 /**
  * Safely delete a file that belongs to this media item.
