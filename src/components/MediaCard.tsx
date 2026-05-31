@@ -12,11 +12,38 @@
 import { useState, useRef, useCallback, useMemo, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
-import { Play, Plus, Check, Star, Film, Tv2, Info, CheckCircle2 } from 'lucide-react';
+import { Play, Plus, Check, Star, Film, Tv2, Info, CheckCircle2, Clock } from 'lucide-react';
 import type { MediaItem } from '@/types/media';
 import { useMedia } from '@/context/MediaContext';
 import { useTheme } from '@/context/ThemeContext';
 import MediaContextMenu from '@/components/MediaContextMenu';
+
+/** Format seconds remaining as "1h 23m left" or "42m left" */
+function formatTimeLeft(watchProgress: number, totalSeconds?: number): string | null {
+  if (!totalSeconds || totalSeconds <= 0 || watchProgress <= 0) return null;
+  const watchedSec = (watchProgress / 100) * totalSeconds;
+  const leftSec = Math.max(0, totalSeconds - watchedSec);
+  if (leftSec < 60) return null; // less than a minute — not worth showing
+  const h = Math.floor(leftSec / 3600);
+  const m = Math.round((leftSec % 3600) / 60);
+  if (h > 0) return `${h}h ${m}m left`;
+  return `${m}m left`;
+}
+
+/** Format ISO timestamp as "X hours ago", "Yesterday", etc. */
+function formatRelativeTime(iso?: string): string | null {
+  if (!iso) return null;
+  const diff = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diff / 60_000);
+  if (mins < 2) return 'Just now';
+  if (mins < 60) return `${mins} min ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs} hour${hrs > 1 ? 's' : ''} ago`;
+  const days = Math.floor(hrs / 24);
+  if (days === 1) return 'Yesterday';
+  if (days < 7) return `${days} days ago`;
+  return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
 
 interface MediaCardProps {
   item: MediaItem;
@@ -55,12 +82,29 @@ function MediaCard({ item, showProgress = false, size = 'sm' }: MediaCardProps) 
   // Derive item-specific values with useMemo so the card only re-renders when
   // its own watchlist/progress state actually changes — not on every library update.
   const inWatchlist = useMemo(() => watchlist.includes(item.id), [watchlist, item.id]);
-  const watchProgress = useMemo(
-    () => continueWatching.find(c => c.id === item.id)?.progress || 0,
+  const cwEntry = useMemo(
+    () => continueWatching.find(c => c.id === item.id),
     [continueWatching, item.id],
   );
+  const watchProgress = cwEntry?.progress ?? 0;
   const epProgress = item.type === 'series' ? getEpisodeProgress(item) : null;
   const allDone = epProgress ? epProgress.watched === epProgress.total && epProgress.total > 0 : false;
+
+  // Time-remaining label shown on hover when progress > 0
+  const timeLeft = useMemo(
+    () => showProgress && watchProgress > 0
+      ? formatTimeLeft(watchProgress, cwEntry?.totalSeconds ?? item.totalSeconds)
+      : null,
+    [showProgress, watchProgress, cwEntry?.totalSeconds, item.totalSeconds],
+  );
+
+  // "Last watched X ago" label shown on hover
+  const lastWatched = useMemo(
+    () => showProgress && watchProgress > 0
+      ? formatRelativeTime(cwEntry?.lastWatchedAt ?? item.lastWatchedAt)
+      : null,
+    [showProgress, watchProgress, cwEntry?.lastWatchedAt, item.lastWatchedAt],
+  );
 
   const hoverTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const handleMouseEnter = useCallback(() => {
@@ -164,6 +208,26 @@ function MediaCard({ item, showProgress = false, size = 'sm' }: MediaCardProps) 
                     </button>
                   )}
                 </motion.div>
+
+                {/* ── Time remaining + last watched (shown when in Continue Watching) ── */}
+                {(timeLeft || lastWatched) && (
+                  <motion.div
+                    initial={{ y: 6, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    transition={{ delay: 0.12, duration: 0.2 }}
+                    className="absolute bottom-8 left-0 right-0 flex flex-col items-center gap-0.5 px-2"
+                  >
+                    {timeLeft && (
+                      <div className="flex items-center gap-1 bg-black/60 backdrop-blur-sm rounded-full px-2 py-0.5">
+                        <Clock className="w-2.5 h-2.5 text-primary" />
+                        <span className="text-[10px] text-white font-medium">{timeLeft}</span>
+                      </div>
+                    )}
+                    {lastWatched && (
+                      <span className="text-[9px] text-white/50">{lastWatched}</span>
+                    )}
+                  </motion.div>
+                )}
               </motion.div>
             )}
           </AnimatePresence>

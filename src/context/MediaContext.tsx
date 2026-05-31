@@ -6,6 +6,8 @@ import { useProfile } from '@/context/ProfileContext';
 interface ContinueWatchingItem {
   id: string;
   progress: number;
+  lastWatchedAt?: string;
+  totalSeconds?: number;
 }
 
 interface MediaContextType {
@@ -113,7 +115,12 @@ export function MediaProvider({ children }: { children: ReactNode }) {
             const tb = b.lastWatchedAt ? new Date(b.lastWatchedAt).getTime() : 0;
             return tb - ta;
           })
-          .map(m => ({ id: m.id, progress: m.watchProgress! }));
+          .map(m => ({
+            id: m.id,
+            progress: m.watchProgress!,
+            lastWatchedAt: m.lastWatchedAt,
+            totalSeconds: m.totalSeconds,
+          }));
         if (serverProgress.length > 0) {
           setContinueWatching(serverProgress);
           localStorage.setItem(progressKey, JSON.stringify(serverProgress));
@@ -202,6 +209,8 @@ export function MediaProvider({ children }: { children: ReactNode }) {
   const updateProgress = useCallback((id: string, progress: number, currentTime?: number, duration?: number) => {
     // If complete (≥95%), remove from Continue Watching
     const isComplete = progress >= 95;
+    const now = new Date().toISOString();
+    const totalSeconds = duration;
     setContinueWatching(prev => {
       let next: ContinueWatchingItem[];
       if (isComplete) {
@@ -210,9 +219,9 @@ export function MediaProvider({ children }: { children: ReactNode }) {
         const existing = prev.findIndex(c => c.id === id);
         if (existing >= 0) {
           next = [...prev];
-          next[existing] = { id, progress };
+          next[existing] = { id, progress, lastWatchedAt: now, totalSeconds };
         } else {
-          next = [...prev, { id, progress }];
+          next = [...prev, { id, progress, lastWatchedAt: now, totalSeconds }];
         }
       }
       localStorage.setItem(progressKey, JSON.stringify(next));

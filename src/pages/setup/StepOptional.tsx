@@ -357,7 +357,7 @@ export default function StepOptional({
               The installer adds this automatically, or run it manually:
             </p>
             <code className="text-[9px] font-mono text-amber-200/60 mt-0.5 break-all">
-              echo &quot;$(whoami) ALL=(ALL) NOPASSWD: /usr/bin/wg-quick&quot; | sudo tee /etc/sudoers.d/homestream-wg
+              echo &quot;$(whoami) ALL=(ALL) NOPASSWD: $(which wg-quick)&quot; | sudo tee /etc/sudoers.d/homestream-wg
             </code>
           </div>
         </div>
