@@ -111,15 +111,6 @@ jobs:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
           DEBUG: electron-builder
 
-      - name: Upload NSIS installer artifact
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: HomeStream-Windows-Installer-${{ github.ref_name }}
-          path: dist-electron/
-          retention-days: 30
-          if-no-files-found: warn
-
       # Portable — NO auto-updater support. For smoke testing only.
       # Only runs if NSIS succeeded — avoids burning windows-latest minutes on a broken build.
       - name: Package portable .exe
@@ -127,15 +118,6 @@ jobs:
         run: npx electron-builder --win --config electron/electron-builder.yml --config.win.target=portable --publish never
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
-
-      - name: Upload portable artifact
-        if: success()
-        uses: actions/upload-artifact@v4
-        with:
-          name: HomeStream-Portable-${{ github.ref_name }}
-          path: dist-electron/*Portable*.exe
-          retention-days: 14
-          if-no-files-found: warn
 
       # electron-builder sometimes leaves the release as a draft even with
       # releaseType: release. Explicitly un-draft and mark as latest so
@@ -175,6 +157,7 @@ jobs:
     name: Build & Publish Linux Packages
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    needs: release-windows
 
     steps:
       - uses: actions/checkout@v4
@@ -247,7 +230,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
 
       - name: Package & publish AppImage (arm64)
-        run: npx electron-builder --linux AppImage --ia32 --arm64 --config electron/electron-builder.yml --publish always
+        run: npx electron-builder --linux AppImage --arm64 --config electron/electron-builder.yml --publish always
         continue-on-error: true
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
@@ -263,13 +246,4 @@ jobs:
         continue-on-error: true
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
-
-      - name: Upload Linux artifacts
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: HomeStream-Linux-${{ github.ref_name }}
-          path: dist-electron/
-          retention-days: 30
-          if-no-files-found: warn
 

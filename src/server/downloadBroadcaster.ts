@@ -146,7 +146,7 @@ export function attachDownloadBroadcaster(server: Server): void {
       // Send 4001 so clients know this is an auth failure (not a network drop)
       // and can clear their stored token / show a login gate.
       // Mirrors the same code used in remoteControl.ts.
-      ws.close(4001, 'Unauthorized');
+      (ws.close as (code: number, reason: string) => void)(4001, 'Unauthorized');
       return;
     }
 

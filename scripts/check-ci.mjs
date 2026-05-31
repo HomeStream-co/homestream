@@ -20,7 +20,6 @@ function ghGet(path) {
   });
 }
 
-// Workflow runs
 const runs = await ghGet('/repos/HomeStream-co/homestream/actions/runs?per_page=10');
 console.log('=== WORKFLOW RUNS ===');
 if (!runs.workflow_runs?.length) {
@@ -32,8 +31,7 @@ if (!runs.workflow_runs?.length) {
   }
 }
 
-// Releases
-const releases = await ghGet('/repos/HomeStream-co/homestream/releases?per_page=5');
+const releases = await ghGet('/repos/HomeStream-co/homestream/releases?per_page=3');
 console.log('\n=== RELEASES ===');
 if (!Array.isArray(releases)) {
   console.log('Error:', releases.message);
