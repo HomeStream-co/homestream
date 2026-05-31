@@ -21,7 +21,6 @@ import { URL } from 'url';
 import os from 'os';
 import { requireAuth } from '../../../authMiddleware.js';
 import { readLibrary } from '../../../libraryStore.js';
-import { startTracking } from '../../../dlnaPositionTracker.js';
 
 // ── Resolve LAN IP (same logic as /api/remote/qr) ────────────────────────────
 
@@ -246,11 +245,6 @@ export default async function handler(req: Request, res: Response) {
     }
 
     res.json({ ok: true, message: `Now casting to device` });
-
-    // Start server-side DLNA position polling so the seek bar stays live
-    // even when the CastPanel is closed.
-    const castMediaId = (req.body as { mediaId?: string }).mediaId ?? '';
-    if (castMediaId) startTracking(deviceLocation, castMediaId);
   } catch (err) {
     res.status(500).json({ error: 'Cast failed', message: String(err) });
   }

@@ -9,7 +9,6 @@ import type { Request, Response } from 'express';
 import http from 'http';
 import { URL } from 'url';
 import { requireAuth } from '../../../authMiddleware.js';
-import { stopTracking } from '../../../dlnaPositionTracker.js';
 
 const AV_TRANSPORT = 'urn:schemas-upnp-org:service:AVTransport:1';
 
@@ -117,7 +116,6 @@ export default async function handler(req: Request, res: Response) {
 
     await sendSOAP(deviceBase, controlPath, AV_TRANSPORT, 'Stop', '<InstanceID>0</InstanceID>');
 
-    stopTracking(); // stop server-side DLNA position polling
     res.json({ ok: true });
   } catch (err) {
     // Non-fatal — if stop fails the TV will eventually time out
