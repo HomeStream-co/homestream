@@ -193,7 +193,17 @@ export interface VPNStatus {
 let activeDownloadCount = 0;
 
 const WG_IFACE = 'homestream-vpn';
-const WG_CONF_PATH = `/etc/wireguard/${WG_IFACE}.conf`;
+
+// WireGuard config path:
+//   Linux/macOS — /etc/wireguard/<iface>.conf  (standard wg-quick location)
+//   Windows     — %APPDATA%\WireGuard\<iface>.conf  (WireGuard for Windows)
+//   NOTE: WireGuard / wg-quick is not supported on Windows in this build.
+//         The path is defined here for completeness; the connect functions
+//         guard on process.platform before calling wg-quick.
+const WG_CONF_PATH = process.platform === 'win32'
+  ? path.join(os.homedir(), 'AppData', 'Roaming', 'WireGuard', `${WG_IFACE}.conf`)
+  : `/etc/wireguard/${WG_IFACE}.conf`;
+
 const OVPN_CONF_PATH = path.join(os.tmpdir(), 'homestream-vpn.ovpn');
 const OVPN_PID_PATH  = path.join(os.tmpdir(), 'homestream-openvpn.pid');
 
