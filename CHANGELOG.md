@@ -7,6 +7,29 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.8.7] — 2026-05-31 (release)
+
+### Fixed
+
+#### CI / Test Suite
+- `stream.test.ts`: added `mkdirSync` to `fs` mock — `dataDir.ts` calls `fs.mkdirSync` at module load when resolving `UPLOADS_DIR`; missing mock caused `TypeError: default.mkdirSync is not a function` in CI
+- `media-delete.test.ts`: same `mkdirSync` fix applied to `fs` mock
+- `phase5-startup-rd-cleanup.test.ts`: added `dataDir()` named export to `dataDir.js` mock alongside `dataPath` — `startupCleanup.ts` imports both; missing export caused `Error: No "dataDir" export is defined on the mock`
+- `login-gate.test.tsx`: `LoginGate` calls `setTimeout(() => setShake(false), 600)` after a failed login; that timer was firing after jsdom teardown, causing React's scheduler to throw `window is not defined` as an unhandled error that failed the entire CI run (all 1277 tests passed but Vitest reported exit code 1). Fixed by using `vi.useFakeTimers({ shouldAdvanceTime: true })` in `beforeEach` and draining pending timers with `act(() => vi.runAllTimers())` in `afterEach` before jsdom is destroyed.
+
+#### Player
+- `usePlayerProgress`: `currentTime` and `duration` were listed as `useCallback` dependencies, causing the 10-second save interval to be torn down and recreated on every video tick. Moved reads inside the callback via refs — interval is now created once per media item.
+
+#### UI
+- `FeedbackButton`: Lucide `Wifi`/`WifiOff` icons wrapped in `<span title="...">` — passing `title` directly as a prop caused a TypeScript error
+- Removed stale `// eslint-disable-next-line` comments in `ChromecastButton.tsx`, `player.tsx`, and `usePlayerProgress.ts` left over from earlier hook corrections
+
+### Tests
+- 83 test files, 1277 unit tests — all passing
+- GitHub Actions CI: Tests ✓ | TypeScript ✓ | Lint ✓ | Build ✓
+
+---
+
 ## [1.3.7] — 2026-04-23 (release)
 
 ### Fixed
