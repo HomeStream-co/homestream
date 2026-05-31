@@ -159,7 +159,7 @@ export function attachRemoteControl(server: Server): WebSocketServer {
       console.warn('[remote] Rejected unauthenticated WebSocket connection from', req.socket.remoteAddress);
       // Send close code 4001 so the client knows this is an auth failure
       // (not a network drop) and can clear its stored token + show login gate.
-      ws.close(4001, 'Unauthorized');
+      (ws.close as (code: number, reason: string) => void)(4001, 'Unauthorized');
       return;
     }
 
