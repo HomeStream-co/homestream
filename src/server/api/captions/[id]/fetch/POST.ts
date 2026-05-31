@@ -4,6 +4,7 @@ import path from 'path';
 import { createRequire } from 'module';
 import { readLibrary } from '../../../../libraryStore.js';
 import { requireAuth } from '../../../../authMiddleware.js';
+import { captionsDir } from '../../../../dataDir.js';
 
 /**
  * POST /api/captions/:id/fetch
@@ -98,7 +99,7 @@ export default async function handler(req: Request, res: Response) {
   }
 
   // Ensure caption directory exists
-  const captionDir = path.join('/shared-storage/public/assets/captions', id);
+  const captionDir = path.join(captionsDir(), id);
   fs.mkdirSync(captionDir, { recursive: true });
 
   const langs: Record<string, LangStatus> = { en: 'stub', es: 'stub' };

@@ -44,3 +44,23 @@ export function dataDir(): string {
 export function dataPath(filename: string): string {
   return path.join(dataDir(), filename);
 }
+
+/**
+ * captionsDir — resolves the correct directory for WebVTT caption files.
+ *
+ * On the Airo cloud platform, captions are stored under /shared-storage so
+ * they are web-accessible via the static asset server.
+ * On Electron (desktop), they live inside the user-data directory alongside
+ * all other HomeStream data — the Express server serves them via the
+ * /api/captions/:id/:lang endpoint, so they don't need to be web-accessible.
+ */
+export function captionsDir(): string {
+  // Cloud: use shared-storage so the static asset server can serve them
+  if (fs.existsSync('/shared-storage/public/assets')) {
+    return '/shared-storage/public/assets/captions';
+  }
+  // Electron / local dev: store inside the data directory
+  const dir = path.join(dataDir(), 'captions');
+  fs.mkdirSync(dir, { recursive: true });
+  return dir;
+}

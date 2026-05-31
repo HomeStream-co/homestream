@@ -22,6 +22,7 @@ import path from 'path';
 import multer from 'multer';
 import { readLibrary, writeLibrary } from '../../../../libraryStore.js';
 import { requireAuth } from '../../../../authMiddleware.js';
+import { captionsDir } from '../../../../dataDir.js';
 
 // ── Multer — memory storage so we can inspect before writing ─────────────────
 
@@ -83,7 +84,7 @@ export default function handler(req: Request, res: Response) {
 
     try {
       // Ensure caption directory exists
-      const captionDir = path.join('/shared-storage/public/assets/captions', id);
+      const captionDir = path.join(captionsDir(), id);
       fs.mkdirSync(captionDir, { recursive: true });
 
       const vttPath = path.join(captionDir, `${lang}.vtt`);

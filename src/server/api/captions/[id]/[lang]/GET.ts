@@ -1,14 +1,15 @@
 import type { Request, Response } from 'express';
 import fs from 'fs';
 import path from 'path';
+import { captionsDir } from '../../../../dataDir.js';
 
 /**
  * GET /api/captions/:id/:lang
  *
  * Serves a WebVTT subtitle file for the given media item and language.
- * Caption files are expected at:
- *   /shared-storage/public/assets/captions/<id>/<lang>.vtt
- *   e.g. /shared-storage/public/assets/captions/abc123/en.vtt
+ * Caption files are stored in captionsDir() — on cloud this is
+ * /shared-storage/public/assets/captions; on Electron it is inside
+ * the user-data directory.
  *
  * If no file exists, returns an empty (but valid) WebVTT document so the
  * browser <track> element doesn't throw a network error.
@@ -33,11 +34,7 @@ export default async function handler(req: Request, res: Response) {
     return;
   }
 
-  const captionPath = path.join(
-    '/shared-storage/public/assets/captions',
-    id,
-    `${lang}.vtt`,
-  );
+  const captionPath = path.join(captionsDir(), id, `${lang}.vtt`);
 
   res.setHeader('Content-Type', 'text/vtt; charset=utf-8');
   res.setHeader('Cache-Control', 'public, max-age=3600');
