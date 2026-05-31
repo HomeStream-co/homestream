@@ -71,21 +71,38 @@ export function usePlayerProgress({
   const profileIdRef = useRef(profileId);
   useEffect(() => { profileIdRef.current = profileId; }, [profileId]);
 
+  // Capture currentTime + duration in refs so the 10s interval closure always
+  // reads the latest values without listing them as deps (which would tear down
+  // and recreate the interval on every video tick, preventing it from firing).
+  const currentTimeRef = useRef(currentTime);
+  const durationRef = useRef(duration);
+  useEffect(() => { currentTimeRef.current = currentTime; }, [currentTime]);
+  useEffect(() => { durationRef.current = duration; }, [duration]);
+
   // ── Save progress helper ──────────────────────────────────────────────────
+  // Reads from refs so this callback is stable (no currentTime/duration deps)
+  // and the visibilitychange / beforeunload listeners don't re-register on
+  // every video tick.
   const saveProgress = useCallback(() => {
-    if (!id || duration <= 0 || currentTime <= 0) return;
-    const pct = (currentTime / duration) * 100;
-    updateProgress(id, pct, currentTime, duration);
-  }, [id, currentTime, duration, updateProgress]);
+    const ct = currentTimeRef.current;
+    const dur = durationRef.current;
+    if (!id || dur <= 0 || ct <= 0) return;
+    updateProgress(id, (ct / dur) * 100, ct, dur);
+  }, [id, updateProgress]);
 
   // ── Save every 10s ────────────────────────────────────────────────────────
+  // Deps intentionally exclude currentTime/duration — those are read via refs
+  // so the interval is created once per media item and fires reliably every 10s.
   useEffect(() => {
-    if (!id || currentTime === 0) return;
+    if (!id) return;
     const interval = setInterval(() => {
-      if (duration > 0) updateProgress(id, (currentTime / duration) * 100, currentTime, duration);
+      const ct = currentTimeRef.current;
+      const dur = durationRef.current;
+      if (ct > 0 && dur > 0) updateProgress(id, (ct / dur) * 100, ct, dur);
     }, 10000);
     return () => clearInterval(interval);
-  }, [id, currentTime, duration, updateProgress]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, updateProgress]);
 
   // ── Save on tab hide / window blur ────────────────────────────────────────
   useEffect(() => {
