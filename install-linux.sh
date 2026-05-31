@@ -227,7 +227,7 @@ if command -v wg-quick &>/dev/null; then
   echo "  WireGuard is installed. To let HomeStream manage the VPN tunnel"
   echo "  without a password prompt, add a sudoers entry:"
   echo ""
-  echo -e "    ${CYAN}echo \"\$(whoami) ALL=(ALL) NOPASSWD: /usr/bin/wg-quick\" | sudo tee /etc/sudoers.d/homestream-wg${RESET}"
+  echo -e "    ${CYAN}echo \"\$(whoami) ALL=(ALL) NOPASSWD: \$(which wg-quick)\" | sudo tee /etc/sudoers.d/homestream-wg${RESET}"
   echo ""
   echo "  This is only needed if you want to use the VPN kill-switch feature."
   echo "  You can skip this and add it later from the Settings page."
@@ -238,7 +238,8 @@ if command -v wg-quick &>/dev/null; then
   case "$_wg_answer" in
     [yY][eE][sS]|[yY])
       SUDOERS_FILE="/etc/sudoers.d/homestream-wg"
-      echo "$(whoami) ALL=(ALL) NOPASSWD: /usr/bin/wg-quick" | sudo tee "$SUDOERS_FILE" > /dev/null
+      WG_QUICK_PATH=$(which wg-quick 2>/dev/null || echo "/usr/bin/wg-quick")
+      echo "$(whoami) ALL=(ALL) NOPASSWD: ${WG_QUICK_PATH}" | sudo tee "$SUDOERS_FILE" > /dev/null
       sudo chmod 0440 "$SUDOERS_FILE"
       success "Sudoers entry added: ${SUDOERS_FILE}"
       ;;

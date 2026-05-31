@@ -210,14 +210,24 @@ const OVPN_PID_PATH  = path.join(os.tmpdir(), 'homestream-openvpn.pid');
 // ── WireGuard ─────────────────────────────────────────────────────────────────
 
 async function resolveWgQuick(): Promise<string> {
-  // Try to find wg-quick on PATH first (works on all distros regardless of prefix)
-  for (const candidate of ['wg-quick', '/usr/bin/wg-quick', '/usr/local/bin/wg-quick', '/sbin/wg-quick']) {
+  // 1. Check if wg-quick is on PATH (covers all distros where /usr/bin is in PATH)
+  try {
+    const { stdout } = await execAsync('which wg-quick 2>/dev/null || command -v wg-quick 2>/dev/null', { timeout: 2000 });
+    const resolved = stdout.trim();
+    if (resolved) return resolved;
+  } catch { /* not on PATH */ }
+
+  // 2. Check known absolute locations for distros with non-standard PATH
+  const { constants } = await import('fs');
+  for (const abs of ['/usr/bin/wg-quick', '/usr/local/bin/wg-quick', '/sbin/wg-quick', '/usr/sbin/wg-quick']) {
     try {
-      await execAsync(`command -v ${candidate}`, { timeout: 2000 });
-      return candidate;
-    } catch { /* not found at this path */ }
+      await fs.access(abs, constants.X_OK);
+      return abs;
+    } catch { /* not found here */ }
   }
-  return 'wg-quick'; // fall back to PATH lookup — will fail with a clear ENOENT
+
+  // 3. Fall back to bare name — exec will fail with a clear ENOENT if missing
+  return 'wg-quick';
 }
 
 async function wgConnect(config: VPNConfig): Promise<void> {
