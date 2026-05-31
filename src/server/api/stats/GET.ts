@@ -42,6 +42,29 @@ interface LibraryItem {
 }
 
 function getDiskStats(dir: string): { free: number; total: number } | null {
+  // Windows: use wmic to get disk free/total for the drive letter.
+  // Mirrors the same logic in api/library/storage/GET.ts.
+  if (process.platform === 'win32') {
+    try {
+      const driveLetter = dir.match(/^([A-Za-z]:)/)?.[1];
+      if (!driveLetter) return null;
+      const out = execSync(
+        `wmic logicaldisk where "DeviceID='${driveLetter}'" get FreeSpace,Size /format:csv`,
+        { timeout: 5000 },
+      ).toString().trim();
+      const lines = out.split('\n').map(l => l.trim()).filter(Boolean);
+      const dataLine = lines.find(l => !l.startsWith('Node') && l.includes(','));
+      if (dataLine) {
+        const parts = dataLine.split(',');
+        const free  = parseInt(parts[1] ?? '0', 10);
+        const total = parseInt(parts[2] ?? '0', 10);
+        if (!isNaN(free) && !isNaN(total) && total > 0) return { free, total };
+      }
+    } catch { /* wmic unavailable */ }
+    return null;
+  }
+
+  // Linux / macOS: use df -k.
   // Sanitise dir to prevent shell injection — only allow safe path characters.
   // The path comes from the user-configured mediaDir in homestream-config.json.
   const safePath = dir.replace(/[`$\\|;&<>(){}!]/g, '');

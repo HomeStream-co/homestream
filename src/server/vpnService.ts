@@ -30,6 +30,7 @@
 
 import { spawn } from 'child_process';
 import fs from 'fs/promises';
+import os from 'os';
 import path from 'path';
 import { execAsync } from './execHelper.js';
 import { pickFastestServer, patchOvpnRemote } from './vpnServerRanker.js';
@@ -193,8 +194,8 @@ let activeDownloadCount = 0;
 
 const WG_IFACE = 'homestream-vpn';
 const WG_CONF_PATH = `/etc/wireguard/${WG_IFACE}.conf`;
-const OVPN_CONF_PATH = '/tmp/homestream-vpn.ovpn';
-const OVPN_PID_PATH = '/tmp/homestream-openvpn.pid';
+const OVPN_CONF_PATH = path.join(os.tmpdir(), 'homestream-vpn.ovpn');
+const OVPN_PID_PATH  = path.join(os.tmpdir(), 'homestream-openvpn.pid');
 
 // ── WireGuard ─────────────────────────────────────────────────────────────────
 
@@ -223,7 +224,7 @@ async function buildOvpnConfig(config: VPNConfig): Promise<string> {
   // For credential-based providers, inject auth inline
   if (config.username && config.password) {
     // Write auth file
-    const authPath = '/tmp/homestream-vpn-auth.txt';
+    const authPath = path.join(os.tmpdir(), 'homestream-vpn-auth.txt');
     await fs.writeFile(authPath, `${config.username}\n${config.password}`, { mode: 0o600 });
 
     // Replace or add auth-user-pass directive
@@ -245,7 +246,7 @@ async function ovpnConnect(config: VPNConfig): Promise<void> {
     '--config', OVPN_CONF_PATH,
     '--daemon',
     '--writepid', OVPN_PID_PATH,
-    '--log', '/tmp/homestream-openvpn.log',
+    '--log', path.join(os.tmpdir(), 'homestream-openvpn.log'),
     '--script-security', '2',
   ], { detached: true, stdio: 'ignore' });
   proc.unref();
