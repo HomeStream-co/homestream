@@ -23,8 +23,8 @@
  *   LOGIN_GATE_TOGGLE      — show/hide password toggle didn't work
  */
 
-import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 // ── Mock AuthContext ──────────────────────────────────────────────────────────
@@ -59,7 +59,24 @@ function renderLoginGate() {
   return render(<LoginGate />);
 }
 
+// ── Timer management ──────────────────────────────────────────────────────────
+// LoginGate calls setTimeout(() => setShake(false), 600) after a failed login.
+// If that timer fires after jsdom tears down, React's scheduler throws
+// "window is not defined" — an unhandled error that fails the whole test run.
+//
+// Strategy: use shouldAdvanceTime:true so real-time async (waitFor, promises)
+// still works, but we can also call vi.runAllTimers() in afterEach to drain
+// the 600ms shake timer before jsdom is destroyed.
+
+beforeEach(() => {
+  vi.useFakeTimers({ shouldAdvanceTime: true });
+});
+
 afterEach(() => {
+  // Drain any pending timers (e.g. the 600ms shake reset) inside act() so
+  // React can flush the resulting state update before jsdom tears down.
+  act(() => { vi.runAllTimers(); });
+  vi.useRealTimers();
   vi.clearAllMocks();
 });
 
