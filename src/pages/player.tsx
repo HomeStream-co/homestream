@@ -285,7 +285,6 @@ export default function PlayerPage() {
       ],
       activeSubtitle: ps.ccLang === 'off' ? -1 : ps.ccLang === 'en' ? 0 : 1,
       cast: ps.castInfo ?? undefined,
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     }), [id, item, nextItem, ps.ccLang, ps.castInfo]),
   });
 

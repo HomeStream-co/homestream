@@ -387,8 +387,6 @@ export default function ChromecastButton({
         setMuted(level === 0);
       },
     });
-  // onControlRef is a stable ref callback — intentionally not in deps
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [onControlRef]);
 
   const togglePlayPause = useCallback(() => {
