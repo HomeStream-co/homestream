@@ -116,9 +116,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: HomeStream-Windows-Installer-${{ github.ref_name }}
-          path: |
-            dist-electron/*Setup*.exe
-            dist-electron/*.yml
+          path: dist-electron/
           retention-days: 30
           if-no-files-found: warn
 
@@ -198,12 +196,14 @@ jobs:
         env:
           npm_config_optional: true
 
-      # fpm is required by electron-builder for the pacman target.
-      # ruby is pre-installed on ubuntu-latest; we just need the fpm gem.
+      # fpm + zstd are required by electron-builder for the pacman .pkg.tar.zst target.
+      # libarchive-tools provides bsdtar which fpm uses to create the .tar.zst archive.
       - name: Install fpm (required for pacman .pkg.tar.zst)
         run: |
-          sudo apt-get install -y ruby-dev build-essential rpm libarchive-tools
+          sudo apt-get update -qq
+          sudo apt-get install -y ruby-dev build-essential rpm zstd libarchive-tools
           sudo gem install fpm --no-document
+          fpm --version
 
       - name: Build app (Vite + server bundle)
         run: npm run build
@@ -239,26 +239,37 @@ jobs:
             console.log('package.json patched with build metadata');
           "
 
-      # Build AppImage (x64 + arm64), .deb (x64), and pacman .pkg.tar.zst (x64).
-      # --publish always uploads all artifacts to the existing GitHub Release
-      # created by the Windows job. If the Windows job hasn't finished yet,
-      # electron-builder will create the release itself (idempotent).
-      - name: Package & publish Linux builds
-        run: npx electron-builder --linux --config electron/electron-builder.yml --publish always
+      # Build and publish each Linux target separately so a single target failure
+      # doesn't block the others. AppImage is the most important (universal).
+      - name: Package & publish AppImage (x64)
+        run: npx electron-builder --linux AppImage --config electron/electron-builder.yml --publish always
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
-          DEBUG: electron-builder
+
+      - name: Package & publish AppImage (arm64)
+        run: npx electron-builder --linux AppImage --ia32 --arm64 --config electron/electron-builder.yml --publish always
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+
+      - name: Package & publish .deb (x64)
+        run: npx electron-builder --linux deb --config electron/electron-builder.yml --publish always
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+
+      - name: Package & publish pacman .pkg.tar.zst (x64)
+        run: npx electron-builder --linux pacman --config electron/electron-builder.yml --publish always
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
 
       - name: Upload Linux artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: HomeStream-Linux-${{ github.ref_name }}
-          path: |
-            dist-electron/*.AppImage
-            dist-electron/*.deb
-            dist-electron/*.pkg.tar.zst
-            dist-electron/*.yml
+          path: dist-electron/
           retention-days: 30
           if-no-files-found: warn
 
