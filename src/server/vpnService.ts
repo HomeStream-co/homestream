@@ -209,6 +209,17 @@ const OVPN_PID_PATH  = path.join(os.tmpdir(), 'homestream-openvpn.pid');
 
 // ── WireGuard ─────────────────────────────────────────────────────────────────
 
+async function resolveWgQuick(): Promise<string> {
+  // Try to find wg-quick on PATH first (works on all distros regardless of prefix)
+  for (const candidate of ['wg-quick', '/usr/bin/wg-quick', '/usr/local/bin/wg-quick', '/sbin/wg-quick']) {
+    try {
+      await execAsync(`command -v ${candidate}`, { timeout: 2000 });
+      return candidate;
+    } catch { /* not found at this path */ }
+  }
+  return 'wg-quick'; // fall back to PATH lookup — will fail with a clear ENOENT
+}
+
 async function wgConnect(config: VPNConfig): Promise<void> {
   // WireGuard / wg-quick is not available on Windows — guard early.
   if (process.platform === 'win32') {
@@ -219,8 +230,9 @@ async function wgConnect(config: VPNConfig): Promise<void> {
   }
   await fs.mkdir(path.dirname(WG_CONF_PATH), { recursive: true });
   await fs.writeFile(WG_CONF_PATH, config.configContent, { mode: 0o600 });
+  const wgQuick = await resolveWgQuick();
   try {
-    await execAsync(`wg-quick up ${WG_IFACE}`);
+    await execAsync(`${wgQuick} up ${WG_IFACE}`);
   } catch (err) {
     const msg = String(err);
     // On Linux, wg-quick requires root (or a sudoers entry).
@@ -234,7 +246,7 @@ async function wgConnect(config: VPNConfig): Promise<void> {
       throw new Error(
         'wg-quick requires root privileges on Linux. ' +
         'Either run HomeStream as root, or add a sudoers entry:\n' +
-        '  echo "$(whoami) ALL=(ALL) NOPASSWD: /usr/bin/wg-quick" | sudo tee /etc/sudoers.d/homestream-wg\n' +
+        `  echo "$(whoami) ALL=(ALL) NOPASSWD: ${wgQuick}" | sudo tee /etc/sudoers.d/homestream-wg\n` +
         'See install-linux.sh for the one-command setup.',
       );
     }
@@ -244,7 +256,8 @@ async function wgConnect(config: VPNConfig): Promise<void> {
 
 async function wgDisconnect(): Promise<void> {
   if (process.platform === 'win32') return; // not supported
-  try { await execAsync(`wg-quick down ${WG_IFACE}`); } catch { /* already down */ }
+  const wgQuick = await resolveWgQuick();
+  try { await execAsync(`${wgQuick} down ${WG_IFACE}`); } catch { /* already down */ }
 }
 
 async function wgIsUp(): Promise<boolean> {
@@ -337,11 +350,15 @@ async function ovpnIsUp(): Promise<boolean> {
       return stdout.toLowerCase().includes('tun') || stdout.toLowerCase().includes('tap');
     } else if (process.platform === 'darwin') {
       // macOS: OpenVPN creates utun interfaces (utun0, utun1, …)
-      const { stdout } = await execAsync('ifconfig 2>/dev/null | grep -c "^utun"', { timeout: 4000 });
+      // Use ifconfig piped through grep — /bin/sh handles the pipe correctly.
+      const { stdout } = await execAsync('ifconfig | grep -c "^utun"', { timeout: 4000 });
       return parseInt(stdout.trim(), 10) > 0;
     } else {
-      // Linux: check for any tun interface via ip link
-      const { stdout } = await execAsync('ip link show type tun', { timeout: 4000 });
+      // Linux: check for any tun interface via ip link.
+      // `ip link show type tun` exits 0 with output when tun interfaces exist,
+      // exits 0 with empty output when none exist (does NOT exit 1 on empty).
+      // We check stdout content rather than exit code to be safe.
+      const { stdout } = await execAsync('ip link show type tun 2>/dev/null || true', { timeout: 4000 });
       return stdout.includes('tun');
     }
   } catch { return false; }
