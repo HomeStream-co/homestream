@@ -107,7 +107,14 @@
     "vite-plugin-api-routes": "1.2.6",
     "webtorrent": "^2.8.5",
     "zod": "^3.25.76",
-    "zustand": "^5.0.2"
+    "zustand": "^5.0.2",
+    "@lexical/html": "^0.43.0",
+    "@lexical/link": "^0.43.0",
+    "@lexical/list": "^0.43.0",
+    "@lexical/react": "^0.43.0",
+    "@lexical/selection": "^0.43.0",
+    "@lexical/utils": "^0.43.0",
+    "lexical": "^0.43.0"
   },
   "devDependencies": {
     "@babel/core": "^7.29.0",
@@ -146,7 +153,10 @@
     "tsx": "^4.20.6",
     "typescript": "^5.7.2",
     "vite": "^6.4.2",
-    "vitest": "^3.2.4"
+    "vitest": "^3.2.4",
+    "@babel/generator": "^7.29.1",
+    "@babel/parser": "^7.29.3",
+    "@babel/traverse": "^7.29.0"
   },
   "engines": {
     "node": ">=22"
