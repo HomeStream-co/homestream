@@ -2,6 +2,20 @@ export interface DevContext {
   fileName: string;
   componentName: string;
   lineNumber: number;
+  devId?: string;
+}
+
+/**
+ * Return the class list of any element as a plain string.
+ *
+ * `Element.className` is a string on HTML elements but an SVGAnimatedString
+ * on SVG elements, and the latter is not structured-cloneable via
+ * postMessage (throws DataCloneError). `classList.toString()` is defined on
+ * both HTML and SVG elements via the shared Element interface and always
+ * returns a space-separated class string.
+ */
+export function getElementClassName(element: Element): string {
+  return element.classList.toString();
 }
 
 /** Generate a precise nth-child CSS selector for an element */
@@ -46,6 +60,7 @@ export function extractDevContext(element: HTMLElement): DevContext | undefined 
           .replace(/.*\/app\//, "app/"),
         componentName: current.getAttribute("data-dev-component") || "unknown",
         lineNumber: parseInt(line, 10),
+        devId: current.getAttribute("data-dev-id") || undefined,
       };
     }
     current = current.parentElement;

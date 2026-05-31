@@ -1,16 +1,26 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { safePostMessage, isOriginAllowed } from '../utils/postMessage'
 import { captureAndResizeScreenshot, captureViewportScreenshot } from '../utils/screenshot'
 import { useEditMode } from "../hooks/useEditMode";
-import ImageHoverBar from "./ImageHoverBar";
-import { initTranslations } from "../utils/translations";
+import ElementHoverBar from "./ElementHoverBar";
+import { setTranslations } from "../utils/translations";
+import { resolveRouteForModule } from "../route-discovery";
 
 export default function DevelopmentMode() {
-  // Load translations from i18n API on mount
-  useEffect(() => { void initTranslations(); }, []);
   const [isEditModeActive, setIsEditModeActive] = useState(false); // off by default, parent enables via EDIT_MODE_ENABLED message
+  const [isMultiSelectActive, setIsMultiSelectActive] = useState(false); // off by default, parent enables via MULTI_SELECT_ENABLED message
+  const [, setTranslationsLoaded] = useState(0); // counter that always changes to force re-render
 
-  const { hoveredImage, handleBarMouseEnter, handleBarMouseLeave } = useEditMode(isEditModeActive)
+  const { hoveredElement, handleBarMouseEnter, handleBarMouseLeave } = useEditMode(isEditModeActive, isMultiSelectActive)
+  const [quickEditActive, setQuickEditActive] = useState(false)
+  const frozenElementRef = useRef(hoveredElement)
+
+  // Keep the frozen ref up to date whenever we're not in quick edit mode
+  if (!quickEditActive && hoveredElement) {
+    frozenElementRef.current = hoveredElement
+  }
+
+  const effectiveElement = quickEditActive ? frozenElementRef.current : hoveredElement
 
   // Visual context capture for AI assistance
   useEffect(() => {
@@ -52,6 +62,7 @@ export default function DevelopmentMode() {
     // Clear stale theme preview state from previous sessions
     localStorage.removeItem('airo-dev-original-theme')
     localStorage.removeItem('airo-dev-preview-theme')
+    localStorage.removeItem('airo-dev-original-font')
 
     // Theme preview: convert hex to HSL for CSS custom properties
     function hexToHsl(hex: string): string {
@@ -157,6 +168,69 @@ export default function DevelopmentMode() {
 
       localStorage.removeItem('airo-dev-original-theme')
       localStorage.removeItem('airo-dev-preview-theme')
+    }
+
+    function buildGoogleFontsHref(headerFont: { name: string; weights: string[] }, bodyFont: { name: string; weights: string[] }) {
+      const fontMap = new Map<string, Set<string>>()
+      for (const f of [headerFont, bodyFont]) {
+        if (!f?.name) continue
+        const existing = fontMap.get(f.name) || new Set<string>()
+        for (const w of f.weights || ['400', '700']) existing.add(w)
+        fontMap.set(f.name, existing)
+      }
+      const parts: string[] = []
+      fontMap.forEach((weights, name) => {
+        const enc = encodeURIComponent(name).replace(/%20/g, '+')
+        parts.push(`${enc}:wght@${Array.from(weights).sort().join(';')}`)
+      })
+      return `https://fonts.googleapis.com/css2?family=${parts.join('&family=')}&display=swap`
+    }
+
+    function applyFontPreview(data: { headerFont: { name: string; weights: string[] }; bodyFont: { name: string; weights: string[] } }) {
+      const root = document.documentElement
+      const { headerFont, bodyFont } = data
+      if (!headerFont?.name || !bodyFont?.name) return
+
+      const hasOriginalFont = localStorage.getItem('airo-dev-original-font')
+      if (!hasOriginalFont) {
+        const originalFont: Record<string, string> = {
+          '--font-heading': getComputedStyle(root).getPropertyValue('--font-heading').trim(),
+          '--font-sans': getComputedStyle(root).getPropertyValue('--font-sans').trim(),
+        }
+        localStorage.setItem('airo-dev-original-font', JSON.stringify(originalFont))
+      }
+
+      let fontLink = document.getElementById('airo-preview-font-link') as HTMLLinkElement | null
+      if (!fontLink) {
+        fontLink = document.createElement('link')
+        fontLink.id = 'airo-preview-font-link'
+        fontLink.rel = 'stylesheet'
+        document.head.appendChild(fontLink)
+      }
+      fontLink.href = buildGoogleFontsHref(headerFont, bodyFont)
+
+      root.style.setProperty('--font-heading', `"${headerFont.name}", ui-sans-serif, system-ui, sans-serif`)
+      root.style.setProperty('--font-sans', `"${bodyFont.name}", ui-sans-serif, system-ui, sans-serif`)
+    }
+
+    function revertFontPreview() {
+      const originalFontStr = localStorage.getItem('airo-dev-original-font')
+      if (!originalFontStr) return
+
+      try {
+        const originalFont = JSON.parse(originalFontStr) as Record<string, string>
+        const root = document.documentElement
+        Object.entries(originalFont).forEach(([key, value]) => {
+          root.style.setProperty(key, value)
+        })
+        localStorage.removeItem('airo-dev-original-font')
+        const fontLink = document.getElementById('airo-preview-font-link')
+        fontLink?.remove()
+      } catch (error) {
+        // Clear stale/corrupt localStorage key but keep preview font active
+        // (removing the link without restoring CSS vars would break the preview)
+        localStorage.removeItem('airo-dev-original-font')
+      }
     }
 
     // Media version cache-busting via MutationObserver
@@ -543,12 +617,28 @@ export default function DevelopmentMode() {
           return
         }
 
+        if (event.data && event.data.type === 'DEVTOOLS_TRANSLATIONS') {
+          // Receive devtools_* translations from parent window (AAB app)
+          if (event.data.translations && typeof event.data.translations === 'object') {
+            setTranslations(event.data.translations);
+            setTranslationsLoaded(v => v + 1); // Increment counter to force re-render
+          }
+          return;
+        }
         if (event.data && event.data.type === 'EDIT_MODE_ENABLED') {
           setIsEditModeActive(true);
           return;
         }
         if (event.data && event.data.type === 'EDIT_MODE_DISABLED') {
           setIsEditModeActive(false);
+          return;
+        }
+        if (event.data && event.data.type === 'MULTI_SELECT_ENABLED') {
+          setIsMultiSelectActive(true);
+          return;
+        }
+        if (event.data && event.data.type === 'MULTI_SELECT_DISABLED') {
+          setIsMultiSelectActive(false);
           return;
         }
         if (event.data && event.data.type === 'RESTORE_SCROLL_POSITION') {
@@ -560,14 +650,27 @@ export default function DevelopmentMode() {
             }
           }
         } else if (event.data && event.data.type === 'RESTORE_STATE_AFTER_REFRESH') {
-          // Restore URL/navigation first
-          if (event.data.url) {
-            const currentPath = window.location.pathname + window.location.search + window.location.hash
-            if (currentPath !== event.data.url) {
+          // `modulePath`, when present, is the source file the parent wants
+          // us to land on the registered route for. We resolve it against the
+          // live route registry so skill-installed pages (mounted at
+          // non-filename paths) navigate correctly. Falls back to the raw
+          // `url` when the registry can't help.
+          const url: string | null = typeof event.data.url === 'string' ? event.data.url : null
+          const modulePath: string | null =
+            typeof event.data.modulePath === 'string' ? event.data.modulePath : null
+          const currentPath = window.location.pathname + window.location.search + window.location.hash
+          const resolvePromise: Promise<string | null> = (url || modulePath)
+            ? resolveRouteForModule({ url, modulePath }, currentPath).catch((error) => {
+                console.error('Failed to resolve route for checkout hint:', error)
+                return url && url !== currentPath ? url : null
+              })
+            : Promise.resolve(null)
+
+          resolvePromise.then((target) => {
+            if (target && target !== currentPath) {
               try {
                 // Use original pushState to avoid triggering our monkey-patched navigation handler
-                originalPushState(null, '', event.data.url)
-
+                originalPushState(null, '', target)
                 // Dispatch a popstate event to notify React Router of the navigation
                 const popStateEvent = new PopStateEvent('popstate', { state: null })
                 window.dispatchEvent(popStateEvent)
@@ -575,7 +678,7 @@ export default function DevelopmentMode() {
                 console.error('Failed to restore URL:', error)
               }
             }
-          }
+          })
 
           // Then restore scroll position after a delay to ensure page has updated
           if (event.data.scrollPosition) {
@@ -627,11 +730,31 @@ export default function DevelopmentMode() {
           applyThemePreview(event.data.palette)
         } else if (event.data?.type === 'REVERT_THEME') {
           revertThemePreview()
+        } else if (
+          event.data?.type === 'PREVIEW_FONT' &&
+          event.data.headerFont &&
+          event.data.bodyFont
+        ) {
+          try {
+            applyFontPreview({
+              bodyFont: event.data.bodyFont as { name: string; weights: string[] },
+              headerFont: event.data.headerFont as { name: string; weights: string[] },
+            })
+          } catch (fontError) {
+            console.error('[DevTools] Font preview failed:', fontError)
+          }
+        } else if (event.data?.type === 'REVERT_FONT') {
+          try {
+            revertFontPreview()
+          } catch (fontError) {
+            console.error('[DevTools] Font revert failed:', fontError)
+          }
         }
       } catch (error) {
+        console.error('[DevTools] Message handler error:', error, 'Message type:', event.data?.type)
 
-        // Send error response
-        if (window.parent !== window) {
+        // Send error response only for visual context requests (not font/theme preview errors)
+        if (window.parent !== window && event.data?.type === 'REQUEST_VISUAL_CONTEXT') {
           safePostMessage(window.parent, {
             type: 'VISUAL_CONTEXT_RESPONSE',
             context: {
@@ -681,11 +804,13 @@ export default function DevelopmentMode() {
 
   return (
     <div data-airo-dev-tools>
-      {isEditModeActive && hoveredImage && (
-        <ImageHoverBar
-          hoveredImage={hoveredImage}
+      {isEditModeActive && effectiveElement && !(isMultiSelectActive && effectiveElement.element.hasAttribute("data-ai-selected-num")) && (
+        <ElementHoverBar
+          hoveredElement={effectiveElement}
+          isMultiSelectActive={isMultiSelectActive}
           onMouseEnter={handleBarMouseEnter}
           onMouseLeave={handleBarMouseLeave}
+          onQuickEditModeChange={setQuickEditActive}
         />
       )}
     </div>
