@@ -1,22 +1,23 @@
 /**
  * phase5-startup-rd-cleanup.test.ts
  *
- * Phase 5 fix: runStartupCleanup() must mark stuck Real-Debrid jobs as error.
+ * Phase 5 fix: runStartupCleanup() must mark stuck Real-Debrid jobs as error,
+ * and mark stuck qBittorrent/WebTorrent jobs as interrupted on restart.
  *
  * RD downloads run as fire-and-forget async tasks. If the server restarts
  * while an RD download is in progress, the job stays stuck at
  * status='queued' or status='downloading' forever — the background task
  * that would have called upsertJob({status:'done'|'error'}) is gone.
  *
- * Fix: on boot, any RD job still in queued/downloading is marked as error
- * so the Downloads page shows a "Retry" button instead of a stuck spinner.
+ * qBit/WT jobs are also lost on restart (in-process engine is gone).
+ * markJobInterrupted() is called for these so the UI shows a Resume button.
  *
  * Coverage:
  *   - queued RD job → marked as error on startup
  *   - downloading RD job → marked as error on startup
  *   - done RD job → NOT touched on startup
  *   - error RD job → NOT touched on startup (already terminal)
- *   - qBit/WT jobs in queued/downloading → NOT touched (only RD is affected)
+ *   - qBit/WT queued/downloading → markJobInterrupted called (NOT upsertJob)
  *   - upsertJob is called once per stuck RD job
  *   - upsertJob is NOT called when no stuck RD jobs exist
  *   - completedAt is set on the error record
@@ -29,7 +30,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 // ── Shared mock state ─────────────────────────────────────────────────────────
 
 let mockPersistedJobs: Record<string, unknown>[] = [];
-const mockUpsertJob = vi.fn();
+const mockUpsertJob         = vi.fn();
+const mockMarkJobInterrupted = vi.fn();
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
@@ -58,9 +60,10 @@ vi.mock('../../server/probeCache.js', () => ({
 }));
 
 vi.mock('../../server/downloadJobStore.js', () => ({
-  getAllPersistedJobs: () => mockPersistedJobs,
-  upsertJob:          (...args: unknown[]) => mockUpsertJob(...args),
-  updateJobStatus:    vi.fn(),
+  getAllPersistedJobs:  () => mockPersistedJobs,
+  upsertJob:           (...args: unknown[]) => mockUpsertJob(...args),
+  updateJobStatus:     vi.fn(),
+  markJobInterrupted:  (...args: unknown[]) => mockMarkJobInterrupted(...args),
 }));
 
 // Stub fs so the HLS/upload cleanup sections don't touch the real filesystem
@@ -126,6 +129,7 @@ describe('runStartupCleanup — Phase 5: RD interrupted job cleanup', () => {
   beforeEach(() => {
     mockPersistedJobs = [];
     mockUpsertJob.mockClear();
+    mockMarkJobInterrupted.mockClear();
     logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     vi.spyOn(console, 'error').mockImplementation(() => {});
     vi.spyOn(console, 'warn').mockImplementation(() => {});
@@ -170,11 +174,27 @@ describe('runStartupCleanup — Phase 5: RD interrupted job cleanup', () => {
     expect(mockUpsertJob).not.toHaveBeenCalled();
   });
 
-  it('does NOT touch queued/downloading qBit jobs on startup', async () => {
+  it('does NOT call upsertJob for queued/downloading qBit jobs on startup', async () => {
     mockPersistedJobs = [makeQbitJob('queued'), makeQbitJob('downloading')];
     runStartupCleanup();
     await new Promise(r => setTimeout(r, 200));
     expect(mockUpsertJob).not.toHaveBeenCalled();
+  });
+
+  it('calls markJobInterrupted for queued/downloading qBit jobs on startup', async () => {
+    mockPersistedJobs = [makeQbitJob('queued'), makeQbitJob('downloading')];
+    runStartupCleanup();
+    await vi.waitFor(
+      () => expect(mockMarkJobInterrupted).toHaveBeenCalledTimes(2),
+      { timeout: 2000 },
+    );
+  });
+
+  it('does NOT call markJobInterrupted for done/error qBit jobs', async () => {
+    mockPersistedJobs = [makeQbitJob('done'), makeQbitJob('error')];
+    runStartupCleanup();
+    await new Promise(r => setTimeout(r, 200));
+    expect(mockMarkJobInterrupted).not.toHaveBeenCalled();
   });
 
   it('marks multiple stuck RD jobs — one upsertJob call per job', async () => {
