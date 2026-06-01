@@ -288,31 +288,42 @@ export function runStartupCleanup(): void {
     }
   }).catch(() => { /* non-fatal — cache will self-correct on next probe() */ });
 
-  // ── Real-Debrid interrupted job cleanup ──────────────────────────────────────
-  // RD downloads run as fire-and-forget async tasks. If the server restarts
-  // while an RD download is in progress, the job stays stuck at
-  // status='queued' or status='downloading' forever — the background task
-  // that would have called upsertJob({status:'done'|'error'}) is gone.
+  // ── Download job interrupted-on-restart cleanup ───────────────────────────
+  // Any job still queued/downloading when the server restarts will never
+  // complete — the background task that drives it is gone.  Mark them so the
+  // Downloads page shows a Retry/Resume button instead of a stuck spinner.
   //
-  // Fix: on boot, mark any RD job that is still queued/downloading as error
-  // so the Downloads page shows a "Retry" button instead of a stuck spinner.
-  import('./downloadJobStore.js').then(({ getAllPersistedJobs, upsertJob: upsertRdJob }) => {
+  // RD jobs  → status='error'  (standard retry flow)
+  // qBit/WT  → interrupted=true + status='error'  (Resume button)
+  import('./downloadJobStore.js').then(({ getAllPersistedJobs, upsertJob: upsertAnyJob, markJobInterrupted }) => {
     const allJobs = getAllPersistedJobs();
+
+    // Real-Debrid
     const stuckRd = allJobs.filter(
-      j => j.backend === 'real-debrid' && (j.status === 'queued' || j.status === 'downloading')
+      j => j.backend === 'real-debrid' && (j.status === 'queued' || j.status === 'downloading'),
     );
-    if (stuckRd.length === 0) return;
-    console.log(`[startup] Found ${stuckRd.length} interrupted Real-Debrid job(s) — marking as error.`);
-    for (const job of stuckRd) {
-      upsertRdJob({
-        ...job,
-        status: 'error',
-        completedAt: new Date().toISOString(),
-      });
-      console.log(`[startup]   ✗ RD "${job.title}" — interrupted by server restart`);
+    if (stuckRd.length > 0) {
+      console.log(`[startup] Found ${stuckRd.length} interrupted Real-Debrid job(s) — marking as error.`);
+      for (const job of stuckRd) {
+        upsertAnyJob({ ...job, status: 'error', completedAt: new Date().toISOString() });
+        console.log(`[startup]   ✗ RD "${job.title}" — interrupted by server restart`);
+      }
+    }
+
+    // qBittorrent / WebTorrent — mark interrupted so the UI shows Resume
+    const stuckLocal = allJobs.filter(
+      j => (j.backend === 'qbittorrent' || j.backend === 'webtorrent') &&
+           (j.status === 'queued' || j.status === 'downloading'),
+    );
+    if (stuckLocal.length > 0) {
+      console.log(`[startup] Found ${stuckLocal.length} interrupted qBit/WT job(s) — marking as interrupted.`);
+      for (const job of stuckLocal) {
+        markJobInterrupted(job.jobId);
+        console.log(`[startup]   ✗ ${job.backend} "${job.title}" — interrupted by server restart`);
+      }
     }
   }).catch(err => {
-    console.error('[startup] RD job cleanup failed:', err);
+    console.error('[startup] Download job cleanup failed:', err);
   });
 
   const stuckTranscoding = library.filter(m => m.transcoding === true);

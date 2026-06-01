@@ -14,7 +14,7 @@
  * this component is pure UI — no raw sockets needed on the phone.
  */
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Tv2, Wifi, WifiOff, RefreshCw, Check, AlertCircle,
@@ -63,6 +63,38 @@ export default function CastTab({ playerState, send }: CastTabProps) {
   const [successId, setSuccessId]   = useState<string | null>(null);
   const [castError, setCastError]   = useState('');
   const [activeDevice, setActiveDevice] = useState<DLNADevice | null>(null);
+
+  // ── Server-side position seed ──────────────────────────────────────────────
+  // On mount, check whether the server is already tracking a DLNA cast session
+  // (e.g. the user closed and reopened the CastTab).  If so, restore the
+  // "Casting to X" banner so the UI doesn't look like nothing is happening.
+  // We only restore the banner — actual seek position is owned by the player.
+  const seededRef = useRef(false);
+  useEffect(() => {
+    if (seededRef.current) return;
+    seededRef.current = true;
+    fetch('/api/cast/position/server', {
+      credentials: 'include',
+      headers: remoteAuthHeaders(),
+    })
+      .then(r => r.json())
+      .then((data: { ok?: boolean; mediaId?: string; currentTime?: number }) => {
+        if (data.ok && data.mediaId && playerState?.mediaId === data.mediaId) {
+          // A cast session is active for the currently-playing media.
+          // We don't have the device object here, so synthesise a minimal one
+          // so the "Casting" banner re-appears.
+          setSuccessId('__restored__');
+          setActiveDevice({
+            id: '__restored__',
+            name: 'TV',
+            type: 'MediaRenderer',
+            location: '',
+            isRenderer: true,
+          });
+        }
+      })
+      .catch(() => { /* non-fatal — banner just won't restore */ });
+  }, [playerState?.mediaId]);
 
   // ── Scan ──────────────────────────────────────────────────────────────────
 

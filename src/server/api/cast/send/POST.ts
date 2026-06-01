@@ -18,6 +18,7 @@
 import type { Request, Response } from 'express';
 import http from 'http';
 import { URL } from 'url';
+import { startTracking } from '../../../dlnaPositionTracker.js';
 import os from 'os';
 import { requireAuth } from '../../../authMiddleware.js';
 import { readLibrary } from '../../../libraryStore.js';
@@ -245,6 +246,11 @@ export default async function handler(req: Request, res: Response) {
     }
 
     res.json({ ok: true, message: `Now casting to device` });
+
+    // Start server-side DLNA position polling so position is preserved even
+    // when the CastTab is closed and reopened.
+    const castMediaId = (req.body as { mediaId?: string }).mediaId ?? '';
+    if (castMediaId) startTracking(deviceLocation, castMediaId);
   } catch (err) {
     res.status(500).json({ error: 'Cast failed', message: String(err) });
   }
