@@ -66,6 +66,7 @@ const ADULT_BUILTIN = {
   color: 'ring-primary',
   restricted: false,
   isBuiltIn: true,
+  isAdmin: true,
   createdAt: new Date(0).toISOString(),
 };
 
@@ -76,6 +77,7 @@ const KIDS_BUILTIN = {
   color: 'ring-yellow-400',
   restricted: true,
   isBuiltIn: true,
+  isAdmin: false,
   createdAt: new Date(0).toISOString(),
 };
 

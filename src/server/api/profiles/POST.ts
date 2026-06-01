@@ -5,11 +5,12 @@ import { requireAuth } from '../../authMiddleware.js';
 export default function handler(req: Request, res: Response) {
   try {
     if (!requireAuth(req, res)) return;
-    const { name, avatar, color, restricted } = req.body as {
+    const { name, avatar, color, restricted, isAdmin } = req.body as {
       name?: string;
       avatar?: string;
       color?: string;
       restricted?: boolean;
+      isAdmin?: boolean;
     };
 
     if (!name?.trim()) {
@@ -21,6 +22,7 @@ export default function handler(req: Request, res: Response) {
       avatar: avatar ?? '🎭',
       color: color ?? 'ring-primary',
       restricted: restricted ?? false,
+      isAdmin: isAdmin ?? false,
     });
 
     res.status(201).json({ profile: toPublic(profile) });

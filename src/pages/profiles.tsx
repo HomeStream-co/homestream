@@ -11,11 +11,19 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import {
-  Plus, Pencil, Trash2, Lock, LockOpen, Check, X, ShieldCheck,
+  Plus, Pencil, Trash2, Lock, LockOpen, Check, X, ShieldCheck, ChevronDown,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useProfile, type Profile } from '@/context/ProfileContext';
 import PinLock from '@/components/PinLock';
+
+// ── Rating ceiling options for restricted profiles ────────────────────────────
+const MAX_RATING_OPTIONS = [
+  { label: 'Kids only (G / PG / TV-PG)',  value: '' },
+  { label: 'PG-13 / TV-14',               value: 'PG-13' },
+  { label: 'R / TV-MA',                   value: 'R' },
+  { label: 'All content (no limit)',       value: 'NC-17' },
+];
 
 // ── Avatar & colour options ───────────────────────────────────────────────────
 const AVATAR_OPTIONS = ['🎬', '🎭', '🎮', '🎵', '📚', '🌙', '⚡', '🔥', '🌊', '🦁', '🐉', '🚀', '🧒', '👩', '👨', '🧑'];
@@ -124,7 +132,7 @@ function ProfileCard({ profile, index, isManaging, onSelect, onEdit, onDelete }:
 interface EditModalProps {
   profile: Profile | null; // null = create mode
   onClose: () => void;
-  onSave: (data: { name: string; avatar: string; color: string; restricted: boolean }) => Promise<void>;
+  onSave: (data: { name: string; avatar: string; color: string; restricted: boolean; maxRating?: string }) => Promise<void>;
   onSetPin: (pin: string) => Promise<void>;
   onClearPin: (currentPin: string) => Promise<void>;
   onVerifyPin: (pin: string) => Promise<boolean>;
@@ -136,6 +144,7 @@ function EditModal({ profile, onClose, onSave, onSetPin, onClearPin, onVerifyPin
   const [avatar, setAvatar] = useState(profile?.avatar ?? '🎭');
   const [color, setColor] = useState(profile?.color ?? 'ring-primary');
   const [restricted, setRestricted] = useState(profile?.restricted ?? false);
+  const [maxRating, setMaxRating] = useState(profile?.maxRating ?? '');
   const [saving, setSaving] = useState(false);
 
   // PIN sub-panel
@@ -150,7 +159,10 @@ function EditModal({ profile, onClose, onSave, onSetPin, onClearPin, onVerifyPin
     if (!name.trim()) return;
     setSaving(true);
     try {
-      await onSave({ name: name.trim(), avatar, color, restricted });
+      await onSave({
+        name: name.trim(), avatar, color, restricted,
+        maxRating: restricted ? maxRating : undefined,
+      });
       onClose();
     } catch (err) {
       toast.error(String(err));
@@ -289,11 +301,30 @@ function EditModal({ profile, onClose, onSave, onSetPin, onClearPin, onVerifyPin
             </button>
           </div>
           {restricted && (
-            <div className="px-3 pb-3 text-[11px] text-yellow-400/80 leading-relaxed">
-              This profile will only see G, PG, TV-Y, TV-Y7, TV-G and TV-PG content.
-              Any attempt to open restricted content shows a block screen.
-              Set a PIN below to let a parent temporarily unlock it.
-            </div>
+            <>
+              <div className="px-3 pb-2 text-[11px] text-yellow-400/80 leading-relaxed">
+                This profile will only see content up to the rating ceiling below.
+                Set a PIN to let a parent temporarily unlock it.
+              </div>
+              {/* Rating ceiling picker */}
+              <div className="px-3 pb-3">
+                <label className="text-[11px] text-muted-foreground uppercase tracking-wider mb-1 block">
+                  Max allowed rating
+                </label>
+                <div className="relative">
+                  <select
+                    value={maxRating}
+                    onChange={e => setMaxRating(e.target.value)}
+                    className="w-full appearance-none bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary pr-8 transition-colors"
+                  >
+                    {MAX_RATING_OPTIONS.map(opt => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                  <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+                </div>
+              </div>
+            </>
           )}
         </div>
         )}
@@ -479,7 +510,7 @@ function DeleteModal({ profile, onConfirm, onCancel }: { profile: Profile; onCon
 export default function ProfilesPage() {
   const {
     profiles, loading, activeProfile,
-    setActiveProfile, createProfile, updateProfile, deleteProfile,
+    switchProfile, createProfile, updateProfile, deleteProfile,
     setPin, verifyPin, clearPin,
   } = useProfile();
   const navigate = useNavigate();
@@ -494,20 +525,23 @@ export default function ProfilesPage() {
     if (profile.hasPin) {
       setPinTarget(profile);
     } else {
-      setActiveProfile(profile.id);
-      navigate('/');
+      // Switch server-side (sets hs-profile cookie) then navigate
+      switchProfile(profile.id)
+        .then(() => navigate('/'))
+        .catch(err => toast.error(String(err)));
     }
   }
 
   function handlePinSuccess() {
     if (!pinTarget) return;
-    setActiveProfile(pinTarget.id);
-    setPinTarget(null);
-    navigate('/');
+    // PIN was already verified by PinLock; now switch server-side
+    switchProfile(pinTarget.id)
+      .then(() => { setPinTarget(null); navigate('/'); })
+      .catch(err => { toast.error(String(err)); setPinTarget(null); });
   }
 
   // ── CRUD handlers ──
-  async function handleSave(data: { name: string; avatar: string; color: string; restricted: boolean }) {
+  async function handleSave(data: { name: string; avatar: string; color: string; restricted: boolean; maxRating?: string }) {
     if (editTarget === 'new') {
       await createProfile(data);
       toast.success('Profile created');

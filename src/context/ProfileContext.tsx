@@ -17,8 +17,29 @@ import {
   type ReactNode,
 } from 'react';
 
-// ── MPAA ratings safe for Kids profile ───────────────────────────────────────
+// ── MPAA ratings safe for Kids profile (default restricted set) ──────────────
 export const KIDS_ALLOWED_RATINGS = ['G', 'PG', 'TV-Y', 'TV-Y7', 'TV-G', 'TV-PG'];
+
+// ── Rating order (mirrors ratingGate.ts) ─────────────────────────────────────
+const MOVIE_ORDER = ['G', 'PG', 'PG-13', 'R', 'NC-17', 'X'];
+const TV_ORDER    = ['TV-Y', 'TV-Y7', 'TV-G', 'TV-PG', 'TV-14', 'TV-MA'];
+const DEFAULT_RESTRICTED = new Set(KIDS_ALLOWED_RATINGS);
+
+function ratingScore(rating: string): number {
+  const r = rating.trim().toUpperCase();
+  const tvIdx = TV_ORDER.indexOf(r);
+  if (tvIdx !== -1) return tvIdx;
+  const mvIdx = MOVIE_ORDER.indexOf(r);
+  if (mvIdx !== -1) return mvIdx;
+  return 99; // unknown → treat as adult
+}
+
+function isRatingAllowed(rated: string, maxRating?: string): boolean {
+  const r = rated.trim().toUpperCase();
+  if (!r || r === 'N/A' || r === 'NR' || r === 'UNKNOWN' || r === 'NOT RATED') return false;
+  if (maxRating) return ratingScore(r) <= ratingScore(maxRating);
+  return DEFAULT_RESTRICTED.has(r);
+}
 
 // ── Public profile shape (mirrors server PublicProfile) ──────────────────────
 export interface Profile {
@@ -40,8 +61,14 @@ interface ProfileContextType {
   activeProfile: Profile | null;
   loading: boolean;
 
-  /** Select a profile by id. Returns false if a PIN is required (caller must verify first). */
+  /** Select a profile locally (no PIN check, no server cookie). */
   setActiveProfile: (id: string) => void;
+  /**
+   * Switch to a profile server-side (sets hs-profile cookie) then updates
+   * local state. If the profile has a PIN, caller must verify it first via
+   * verifyPin() before calling switchProfile().
+   */
+  switchProfile: (id: string) => Promise<void>;
   clearProfile: () => void;
   refreshProfiles: () => Promise<void>;
 
@@ -51,7 +78,7 @@ interface ProfileContextType {
   /** Create a new custom profile */
   createProfile: (data: { name: string; avatar: string; color: string; restricted: boolean; isAdmin?: boolean }) => Promise<Profile>;
   /** Update an existing profile */
-  updateProfile: (id: string, data: Partial<{ name: string; avatar: string; color: string; restricted: boolean }>) => Promise<Profile>;
+  updateProfile: (id: string, data: Partial<{ name: string; avatar: string; color: string; restricted: boolean; maxRating?: string; isAdmin?: boolean }>) => Promise<Profile>;
   /** Delete a custom profile */
   deleteProfile: (id: string) => Promise<void>;
 
@@ -100,16 +127,37 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     try { localStorage.setItem(STORAGE_KEY, id); } catch { /* ignore */ }
   }, []);
 
+  /**
+   * Switch profile server-side (sets hs-profile cookie) then syncs local state.
+   * Caller must have already verified the PIN if one is set.
+   */
+  const switchProfile = useCallback(async (id: string): Promise<void> => {
+    const res = await fetch('/api/profiles/switch', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ profileId: id }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({})) as { error?: string };
+      throw new Error(err.error ?? 'Failed to switch profile');
+    }
+    // Mirror to local state so UI updates immediately
+    setActiveProfileId(id);
+    try { localStorage.setItem(STORAGE_KEY, id); } catch { /* ignore */ }
+  }, []);
+
   const clearProfile = useCallback(() => {
     setActiveProfileId(null);
     try { localStorage.removeItem(STORAGE_KEY); } catch { /* ignore */ }
   }, []);
 
   const isAllowed = useCallback((rated?: string): boolean => {
-    if (!activeProfile?.restricted) return true;
-    const normalized = (rated ?? '').trim().toUpperCase();
-    if (!normalized || normalized === 'N/A' || normalized === 'UNKNOWN' || normalized === 'NR') return false;
-    return KIDS_ALLOWED_RATINGS.includes(normalized);
+    // Admin profiles and unrestricted profiles see everything
+    if (!activeProfile?.restricted || activeProfile.isAdmin) return true;
+    const r = (rated ?? '').trim().toUpperCase();
+    if (!r || r === 'N/A' || r === 'NR' || r === 'UNKNOWN' || r === 'NOT RATED') return false;
+    return isRatingAllowed(r, activeProfile.maxRating);
   }, [activeProfile]);
 
   // ── CRUD ──
@@ -200,7 +248,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   return (
     <ProfileContext.Provider value={{
       profiles, activeProfile, loading,
-      setActiveProfile, clearProfile, refreshProfiles, isAllowed,
+      setActiveProfile, switchProfile, clearProfile, refreshProfiles, isAllowed,
       createProfile, updateProfile, deleteProfile,
       setPin, verifyPin, clearPin,
     }}>

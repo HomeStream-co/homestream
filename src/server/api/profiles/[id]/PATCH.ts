@@ -6,14 +6,16 @@ export default function handler(req: Request, res: Response) {
   try {
     if (!requireAuth(req, res)) return;
     const { id } = req.params;
-    const { name, avatar, color, restricted } = req.body as {
+    const { name, avatar, color, restricted, maxRating, isAdmin } = req.body as {
       name?: string;
       avatar?: string;
       color?: string;
       restricted?: boolean;
+      maxRating?: string;
+      isAdmin?: boolean;
     };
 
-    const updated = updateProfile(id, { name, avatar, color, restricted });
+    const updated = updateProfile(id, { name, avatar, color, restricted, maxRating, isAdmin });
     res.json({ profile: toPublic(updated) });
   } catch (err) {
     const msg = String(err);
