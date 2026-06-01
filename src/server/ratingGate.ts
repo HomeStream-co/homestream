@@ -98,8 +98,8 @@ export function checkRating(req: Request, res: Response, rated?: string): boolea
   const profileId = getActiveProfileId(req);
   const profile = getProfile(profileId);
 
-  // Unknown profile or unrestricted — allow
-  if (!profile || !profile.restricted) return true;
+  // Unknown profile, admin, or unrestricted — allow
+  if (!profile || profile.isAdmin || !profile.restricted) return true;
 
   const allowed = isRatingAllowed(rated, profile.maxRating);
   if (!allowed) {
@@ -127,8 +127,8 @@ export function filterByRating<T extends { rated?: string }>(
   const profileId = getActiveProfileId(req);
   const profile = getProfile(profileId);
 
-  // Unrestricted profile — return everything
-  if (!profile || !profile.restricted) return items;
+  // Admin or unrestricted profile — return everything
+  if (!profile || profile.isAdmin || !profile.restricted) return items;
 
   return items.filter(item => {
     const r = item.rated ?? '';

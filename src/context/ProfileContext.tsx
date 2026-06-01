@@ -28,8 +28,10 @@ export interface Profile {
   color: string;
   restricted: boolean;
   isBuiltIn: boolean;
+  isAdmin: boolean;
   hasPin: boolean;
   createdAt: string;
+  maxRating?: string;
 }
 
 // ── Context type ─────────────────────────────────────────────────────────────
@@ -47,7 +49,7 @@ interface ProfileContextType {
   isAllowed: (rated?: string) => boolean;
 
   /** Create a new custom profile */
-  createProfile: (data: { name: string; avatar: string; color: string; restricted: boolean }) => Promise<Profile>;
+  createProfile: (data: { name: string; avatar: string; color: string; restricted: boolean; isAdmin?: boolean }) => Promise<Profile>;
   /** Update an existing profile */
   updateProfile: (id: string, data: Partial<{ name: string; avatar: string; color: string; restricted: boolean }>) => Promise<Profile>;
   /** Delete a custom profile */
@@ -81,8 +83,8 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     } catch {
       // Fallback: seed built-ins so the app is never stuck
       setProfiles([
-        { id: 'adult', name: 'Adult', avatar: '🎬', color: 'ring-primary', restricted: false, isBuiltIn: true, hasPin: false, createdAt: '' },
-        { id: 'kids',  name: 'Kids',  avatar: '🧒', color: 'ring-yellow-400', restricted: true,  isBuiltIn: true, hasPin: false, createdAt: '' },
+        { id: 'adult', name: 'Adult', avatar: '🎬', color: 'ring-primary',      restricted: false, isBuiltIn: true, isAdmin: true,  hasPin: false, createdAt: '' },
+        { id: 'kids',  name: 'Kids',  avatar: '🧒', color: 'ring-yellow-400',   restricted: true,  isBuiltIn: true, isAdmin: false, hasPin: false, createdAt: '' },
       ]);
     } finally {
       setLoading(false);
@@ -111,7 +113,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   }, [activeProfile]);
 
   // ── CRUD ──
-  const createProfile = useCallback(async (data: { name: string; avatar: string; color: string; restricted: boolean }): Promise<Profile> => {
+  const createProfile = useCallback(async (data: { name: string; avatar: string; color: string; restricted: boolean; isAdmin?: boolean }): Promise<Profile> => {
     const res = await fetch('/api/profiles', {
       method: 'POST',
       credentials: 'include',

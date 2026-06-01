@@ -23,6 +23,12 @@ export interface StoredProfile {
   color: string;        // Tailwind ring class e.g. "ring-primary"
   restricted: boolean;  // true = kids mode (G/PG only)
   isBuiltIn: boolean;   // true = cannot be deleted
+  /**
+   * Admin profiles can manage other profiles, access Settings, and are never
+   * subject to parental-control filtering. The built-in "adult" profile is
+   * always admin. Custom profiles are non-admin by default.
+   */
+  isAdmin: boolean;
   pinHash?: string;     // bcrypt hash of PIN, undefined = no PIN
   createdAt: string;
   /**
@@ -43,6 +49,7 @@ const BUILT_INS: StoredProfile[] = [
     color: 'ring-primary',
     restricted: false,
     isBuiltIn: true,
+    isAdmin: true,
     createdAt: new Date(0).toISOString(),
   },
   {
@@ -52,6 +59,7 @@ const BUILT_INS: StoredProfile[] = [
     color: 'ring-yellow-400',
     restricted: true,
     isBuiltIn: true,
+    isAdmin: false,
     createdAt: new Date(0).toISOString(),
   },
 ];
@@ -93,6 +101,7 @@ export function createProfile(data: {
   avatar: string;
   color: string;
   restricted: boolean;
+  isAdmin?: boolean;
 }): StoredProfile {
   const profiles = readProfiles();
   if (profiles.length >= 6) throw new Error('Maximum of 6 profiles reached');
@@ -104,6 +113,7 @@ export function createProfile(data: {
     color: data.color,
     restricted: data.restricted,
     isBuiltIn: false,
+    isAdmin: data.isAdmin ?? false,
     createdAt: new Date().toISOString(),
   };
 
@@ -111,18 +121,23 @@ export function createProfile(data: {
   return profile;
 }
 
-export function updateProfile(id: string, data: Partial<Pick<StoredProfile, 'name' | 'avatar' | 'color' | 'restricted' | 'maxRating'>>): StoredProfile {
+export function updateProfile(id: string, data: Partial<Pick<StoredProfile, 'name' | 'avatar' | 'color' | 'restricted' | 'maxRating' | 'isAdmin'>>): StoredProfile {
   const profiles = readProfiles();
   const idx = profiles.findIndex(p => p.id === id);
   if (idx === -1) throw new Error('Profile not found');
 
+  // Protect the built-in adult profile's admin status — it must always be admin
+  const isBuiltInAdult = profiles[idx].id === 'adult';
+
   const updated: StoredProfile = {
     ...profiles[idx],
-    ...(data.name      !== undefined ? { name: data.name.trim().slice(0, 24) } : {}),
-    ...(data.avatar    !== undefined ? { avatar: data.avatar } : {}),
-    ...(data.color     !== undefined ? { color: data.color } : {}),
+    ...(data.name       !== undefined ? { name: data.name.trim().slice(0, 24) } : {}),
+    ...(data.avatar     !== undefined ? { avatar: data.avatar } : {}),
+    ...(data.color      !== undefined ? { color: data.color } : {}),
     ...(data.restricted !== undefined ? { restricted: data.restricted } : {}),
-    ...(data.maxRating !== undefined ? { maxRating: data.maxRating || undefined } : {}),
+    ...(data.maxRating  !== undefined ? { maxRating: data.maxRating || undefined } : {}),
+    // isAdmin: allow toggling on custom profiles; built-in adult is always admin
+    ...(data.isAdmin !== undefined && !isBuiltInAdult ? { isAdmin: data.isAdmin } : {}),
   };
 
   profiles[idx] = updated;
@@ -177,6 +192,7 @@ export interface PublicProfile {
   color: string;
   restricted: boolean;
   isBuiltIn: boolean;
+  isAdmin: boolean;
   hasPin: boolean;
   createdAt: string;
   maxRating?: string;
@@ -190,6 +206,7 @@ export function toPublic(p: StoredProfile): PublicProfile {
     color: p.color,
     restricted: p.restricted,
     isBuiltIn: p.isBuiltIn,
+    isAdmin: p.isAdmin,
     hasPin: !!p.pinHash,
     createdAt: p.createdAt,
     ...(p.maxRating ? { maxRating: p.maxRating } : {}),
