@@ -249,8 +249,7 @@ export default async function handler(req: Request, res: Response) {
 
     // Start server-side DLNA position polling so position is preserved even
     // when the CastTab is closed and reopened.
-    const castMediaId = (req.body as { mediaId?: string }).mediaId ?? '';
-    if (castMediaId) startTracking(deviceLocation, castMediaId);
+    if (mediaId) startTracking(deviceLocation, mediaId);
   } catch (err) {
     res.status(500).json({ error: 'Cast failed', message: String(err) });
   }
