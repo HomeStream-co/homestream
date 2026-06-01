@@ -2,7 +2,7 @@
 
 **Self-hosted Netflix-style family media streaming** — watch your personal movie and TV collection from any device on your home network.
 
-> **Current version: 1.8.7** — [Download the latest release →](https://github.com/HomeStream-co/homestream/releases/latest)
+> **Current version: 1.8.8** — [Download the latest release →](https://github.com/HomeStream-co/homestream/releases/latest)
 
 ---
 
@@ -23,18 +23,18 @@ You need a **free GitHub account** to download HomeStream. If you don't have one
 
 1. Open your web browser (Chrome, Edge, Firefox — any of them)
 2. Go to: **https://github.com/HomeStream-co/homestream/releases/latest**
-3. You'll see a page that says **"HomeStream v1.8.7"** at the top
+3. You'll see a page that says **"HomeStream v1.8.8"** at the top
 
 ### Step 2 — Download the installer
 
 1. Scroll down on that page until you see a section called **"Assets"**
-2. Click on the file named **`HomeStream-Setup-1.8.7.exe`**
+2. Click on the file named **`HomeStream-Setup-1.8.8.exe`**
 3. Your browser will download it — check your **Downloads** folder
 
 ### Step 3 — Run the installer
 
 1. Open your **Downloads** folder
-2. Double-click **`HomeStream-Setup-1.8.7.exe`**
+2. Double-click **`HomeStream-Setup-1.8.8.exe`**
 3. Windows will show a blue warning that says **"Windows protected your PC"**
    - This is normal — the app just isn't signed yet
    - Click **"More info"** (it's a small link in the middle of the box)
@@ -67,7 +67,7 @@ HomeStream will open a setup page in your browser automatically. It has **5 step
 ### Step 1 — Download
 
 1. Go to **https://github.com/HomeStream-co/homestream/releases/latest**
-2. Scroll to **Assets** and click **`HomeStream-1.8.7.dmg`**
+2. Scroll to **Assets** and click **`HomeStream-1.8.8.dmg`**
 
 ### Step 2 — Install
 
@@ -105,19 +105,19 @@ The script auto-detects your distro, installs dependencies (FFmpeg, WireGuard to
 
 ```bash
 # Download
-wget https://github.com/HomeStream-co/homestream/releases/latest/download/HomeStream-1.8.7.AppImage
+wget https://github.com/HomeStream-co/homestream/releases/latest/download/HomeStream-1.8.8.AppImage
 
 # Make executable and run
-chmod +x HomeStream-1.8.7.AppImage
-./HomeStream-1.8.7.AppImage
+chmod +x HomeStream-1.8.8.AppImage
+./HomeStream-1.8.8.AppImage
 ```
 
 ### Option C — Native packages
 
 | Distro | Package | Command |
 |---|---|---|
-| Arch / CachyOS / Manjaro | `.pkg.tar.zst` (pacman) | `sudo pacman -U HomeStream-1.8.7.pkg.tar.zst` |
-| Debian / Ubuntu / Mint | `.deb` | `sudo dpkg -i HomeStream-1.8.7.deb` |
+| Arch / CachyOS / Manjaro | `.pkg.tar.zst` (pacman) | `sudo pacman -U HomeStream-1.8.8.pkg.tar.zst` |
+| Debian / Ubuntu / Mint | `.deb` | `sudo dpkg -i HomeStream-1.8.8.deb` |
 
 ### Linux — VPN / WireGuard (optional)
 
@@ -286,7 +286,7 @@ npm run electron:linux
 **Automated releases via GitHub Actions** — push a version tag and the installers build themselves for Windows and Linux:
 
 ```bash
-npm version 1.8.7
+npm version 1.8.8
 git push origin main --tags
 ```
 

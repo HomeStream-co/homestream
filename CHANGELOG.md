@@ -7,6 +7,30 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.8.8] — 2026-06-01 (release)
+
+### Added
+
+#### Phase 3 — Server-Side Profiles & Parental Controls
+- `profilesStore.ts`: `StoredProfile` / `PublicProfile` now include `maxRating` and `isAdmin`; built-in Adult profile has `isAdmin: true`; bcrypt PIN hashing; `toPublic()` exposes `isAdmin`
+- `ratingGate.ts`: `checkRating()` gates individual stream/HLS requests with 403 on restricted content; `filterByRating()` strips restricted titles from list responses; `getActiveProfileId()` reads `hs-profile` httpOnly cookie with `adult` fallback
+- `POST /api/profiles/switch`: sets `hs-profile` httpOnly cookie (sameSite strict, 30-day maxAge); validates PIN server-side; returns public profile on success
+- `GET /api/media`: `filterByRating()` applied to both raw and profile-resolved responses
+- `GET /api/stream/:filename` + HLS endpoints: `checkRating()` gates delivery
+- `ProfileContext`: `switchProfile()` calls server cookie endpoint; `isAllowed()` uses `maxRating`-aware logic; admin profiles bypass rating gate entirely
+
+#### Phase 4 — Profile API Test Suite
+- `profiles-switch.test.ts` (20 tests): clear-profile (empty/whitespace/absent `profileId`), no-PIN switch (cookie value, `httpOnly`, `sameSite`, 30-day `maxAge`, public profile in body), PIN-protected switch (correct/wrong/missing PIN, cookie not set on failure), 404 unknown profile, 500 on store crash and `verifyPin` rejection
+- `rating-gate.test.ts` (47 tests): `getActiveProfileId` cookie read/fallback/trim, `checkRating` for admin/unrestricted/unknown profiles, default restricted set (all 6 allowed + 5 blocked + NR + unknown string + case-insensitive), `maxRating` PG-13 and R ceilings, 403 body shape, `filterByRating` for all profile types and edge cases
+- `profiles-api.test.ts` (+6 tests): PATCH passes `maxRating`, `isAdmin: true`, `isAdmin: false`, both together; updated profile body includes `maxRating`
+
+### Tests
+- 85 test files, 1347 unit tests — all passing
+- TypeScript: zero errors
+- GitHub Actions CI: Tests ✓ | TypeScript ✓ | Lint ✓ | Build ✓
+
+---
+
 ## [1.8.7] — 2026-05-31 (release)
 
 ### Fixed
