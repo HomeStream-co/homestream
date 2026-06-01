@@ -235,6 +235,75 @@ describe('PATCH /api/profiles/:id', () => {
       name: 'New', avatar: '🐻', color: 'ring-blue-400', restricted: true,
     });
   });
+
+  it('passes maxRating to store when provided', () => {
+    const req = mockReq({
+      params: { id: 'profile_1' },
+      body: { restricted: true, maxRating: 'PG-13' },
+    });
+    const res = mockRes();
+    patchHandler(req as never, res as never);
+    expect(store.updateProfile).toHaveBeenCalledWith(
+      'profile_1',
+      expect.objectContaining({ maxRating: 'PG-13' }),
+    );
+  });
+
+  it('passes isAdmin: true to store when provided', () => {
+    const req = mockReq({
+      params: { id: 'profile_1' },
+      body: { isAdmin: true },
+    });
+    const res = mockRes();
+    patchHandler(req as never, res as never);
+    expect(store.updateProfile).toHaveBeenCalledWith(
+      'profile_1',
+      expect.objectContaining({ isAdmin: true }),
+    );
+  });
+
+  it('passes isAdmin: false to store when provided', () => {
+    const req = mockReq({
+      params: { id: 'profile_1' },
+      body: { isAdmin: false },
+    });
+    const res = mockRes();
+    patchHandler(req as never, res as never);
+    expect(store.updateProfile).toHaveBeenCalledWith(
+      'profile_1',
+      expect.objectContaining({ isAdmin: false }),
+    );
+  });
+
+  it('passes maxRating and isAdmin together', () => {
+    const req = mockReq({
+      params: { id: 'profile_1' },
+      body: { restricted: true, maxRating: 'R', isAdmin: false },
+    });
+    const res = mockRes();
+    patchHandler(req as never, res as never);
+    expect(store.updateProfile).toHaveBeenCalledWith(
+      'profile_1',
+      expect.objectContaining({ maxRating: 'R', isAdmin: false }),
+    );
+  });
+
+  it('returns updated profile with maxRating in response body', () => {
+    store.updateProfile.mockReturnValue({ ...CUSTOM, restricted: true, maxRating: 'PG-13' });
+    store.toPublic.mockImplementation((p: object) => ({
+      ...(p as object),
+      hasPin: false,
+    }));
+    const req = mockReq({
+      params: { id: 'profile_1' },
+      body: { restricted: true, maxRating: 'PG-13' },
+    });
+    const res = mockRes();
+    patchHandler(req as never, res as never);
+    expect(res.statusCode).toBe(200);
+    const profile = (res.body as { profile: { maxRating: string } }).profile;
+    expect(profile.maxRating).toBe('PG-13');
+  });
 });
 
 // ── DELETE /api/profiles/:id ──────────────────────────────────────────────────
