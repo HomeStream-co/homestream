@@ -22,6 +22,7 @@ import { createRequire } from 'module';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
+import { detectHwEncoder } from './hwEncoderDetect.js';
 
 // ── Binary resolution (lazy, cached) ─────────────────────────────────────────
 //
@@ -95,6 +96,8 @@ interface HlsJob {
   waiters: Array<() => void>;
   lastAccess: number;
   cleanupTimer: ReturnType<typeof setTimeout> | null;
+  /** Human-readable encoder label for the player overlay */
+  encoderLabel?: string;
 }
 
 const jobs = new Map<string, HlsJob>();
@@ -205,8 +208,63 @@ export async function startHlsJob(mediaId: string, sourceFilePath: string): Prom
   };
   jobs.set(mediaId, job);
 
+  // Detect hardware encoder (cached after first call — no repeated probing)
+  const hw = await detectHwEncoder();
+
+  // Build video encoder args
+  // Hardware path: use detected GPU encoder (much faster, lower CPU load)
+  // Software path: libx264 veryfast CRF 22 (original behaviour)
+  let videoArgs: string[];
+  if (hw.encoder) {
+    console.log(`[hls] Using hardware encoder: ${hw.label} for ${mediaId}`);
+    if (hw.encoder === 'h264_vaapi') {
+      // VAAPI requires device init + pixel format conversion before -c:v
+      videoArgs = [
+        '-vaapi_device', '/dev/dri/renderD128',
+        '-vf', 'format=nv12,hwupload',
+        '-c:v', 'h264_vaapi',
+        '-qp', '22',
+      ];
+    } else if (hw.encoder === 'h264_nvenc') {
+      videoArgs = [
+        '-c:v', 'h264_nvenc',
+        '-preset', 'p4',       // balanced speed/quality (NVENC SDK preset)
+        '-cq', '22',           // constant quality mode
+        '-profile:v', 'high',
+      ];
+    } else if (hw.encoder === 'h264_videotoolbox') {
+      videoArgs = [
+        '-c:v', 'h264_videotoolbox',
+        '-q:v', '65',          // 0–100, higher = better quality
+        '-profile:v', 'high',
+      ];
+    } else if (hw.encoder === 'h264_qsv') {
+      videoArgs = [
+        '-c:v', 'h264_qsv',
+        '-global_quality', '22',
+        '-preset', 'medium',
+      ];
+    } else {
+      // h264_amf (AMD)
+      videoArgs = [
+        '-c:v', 'h264_amf',
+        '-quality', 'balanced',
+        '-qp_i', '22',
+        '-qp_p', '22',
+      ];
+    }
+  } else {
+    // Software fallback
+    videoArgs = [
+      '-c:v', 'libx264',
+      '-preset', 'veryfast',
+      '-crf', '22',
+    ];
+  }
+
+  job.encoderLabel = hw.label;
+
   // FFmpeg HLS transcode command
-  // -c:v libx264 -preset veryfast -crf 22 — fast H.264 encode
   // -c:a aac -b:a 128k                    — AAC audio
   // -hls_time 4                           — 4s segments
   // -hls_list_size 0                      — keep all segments in playlist
@@ -214,9 +272,7 @@ export async function startHlsJob(mediaId: string, sourceFilePath: string): Prom
   // -start_number 0                       — segments start at 0000.ts
   const args = [
     '-i', sourceFilePath,
-    '-c:v', 'libx264',
-    '-preset', 'veryfast',
-    '-crf', '22',
+    ...videoArgs,
     '-c:a', 'aac',
     '-b:a', '128k',
     '-ac', '2',                   // stereo (handles 5.1 downmix)
@@ -303,6 +359,14 @@ export function getHlsJobDir(mediaId: string): string | null {
   if (!job) return null;
   touchJob(mediaId);
   return job.outputDir;
+}
+
+/**
+ * Get the encoder label for an active job (e.g. "NVIDIA NVENC").
+ * Returns null if no job exists for this mediaId.
+ */
+export function getHlsEncoderLabel(mediaId: string): string | null {
+  return jobs.get(mediaId)?.encoderLabel ?? null;
 }
 
 /**

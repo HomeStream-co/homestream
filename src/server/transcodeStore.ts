@@ -22,6 +22,8 @@ export interface TranscodeJob {
   outputFile: string;     // final filename served by stream endpoint
   startedAt?: number;
   finishedAt?: number;
+  /** Human-readable encoder label, e.g. "NVIDIA NVENC" or "Software (libx264)" */
+  encoderLabel?: string;
 }
 
 // Module-level singleton map: mediaId → job

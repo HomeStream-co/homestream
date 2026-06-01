@@ -37,6 +37,7 @@ import fs from 'fs';
 import path from 'path';
 import { updateJob, broadcast, getJob } from './transcodeStore.js';
 import { dataDir } from './dataDir.js';
+import { detectHwEncoder } from './hwEncoderDetect.js';
 
 // Uploads live inside the data directory so they are writable in packaged
 // Electron on Linux (AppImage mounts read-only; process.cwd() is not writable).
@@ -296,19 +297,26 @@ export async function transcodeFile(
   // ── 2. Decide strategy ───────────────────────────────────────────────────
   const strategy = transcodeStrategy(info, path.basename(resolvedInput));
 
+  // ── 3. Detect hardware encoder (cached) ─────────────────────────────────
+  const hw = await detectHwEncoder();
+  const encoderLabel = hw.label;
+  updateJob(mediaId, { encoderLabel });
+  broadcast(mediaId, getJob(mediaId)!);
+
   console.log(
     `[transcode] ${path.basename(resolvedInput)} → strategy=${strategy} ` +
     `codec=${info.codec} res=${info.width}x${info.height} ` +
     `bitrate=${(info.bitrateBps / 1_000_000).toFixed(1)}Mbps ` +
-    `size=${(originalSize / 1_048_576).toFixed(1)}MB`
+    `size=${(originalSize / 1_048_576).toFixed(1)}MB ` +
+    `encoder=${encoderLabel}`
   );
 
-  // ── 3. Audio args (shared across all paths) ──────────────────────────────
+  // ── 4. Audio args (shared across all paths) ──────────────────────────────
   const audioArgs: string[] = info.audioStreams > 0
     ? ['-c:a', 'aac', '-b:a', '192k', '-ac', '2']
     : ['-an'];
 
-  // ── 4. Build FFmpeg args based on strategy ───────────────────────────────
+  // ── 5. Build FFmpeg args based on strategy ───────────────────────────────
   let ffmpegArgs: string[];
 
   if (strategy === 'skip_remux_only' || strategy === 'remux') {
@@ -322,23 +330,93 @@ export async function transcodeFile(
       resolvedOutput,
     ];
   } else {
-    // Full H.264 re-encode with CRF quality targeting
+    // Full re-encode — use hardware encoder if available, else libx264
     const crf = crfForResolution(info.height);
-    console.log(`[transcode] CRF=${crf} for ${info.height}p content`);
 
-    ffmpegArgs = [
-      '-i', resolvedInput,
-      '-c:v', 'libx264',
-      '-crf', String(crf),
-      '-preset', 'medium',       // Better compression than 'fast'; still reasonable speed
-      '-profile:v', 'high',
-      '-level', '4.1',
-      '-pix_fmt', 'yuv420p',     // Maximum browser compatibility
-      ...audioArgs,
-      '-movflags', '+faststart',
-      '-y',
-      resolvedOutput,
-    ];
+    if (hw.encoder === 'h264_nvenc') {
+      console.log(`[transcode] Using NVENC hardware encode for ${info.height}p`);
+      ffmpegArgs = [
+        '-i', resolvedInput,
+        '-c:v', 'h264_nvenc',
+        '-preset', 'p4',
+        '-cq', String(crf),
+        '-profile:v', 'high',
+        '-pix_fmt', 'yuv420p',
+        ...audioArgs,
+        '-movflags', '+faststart',
+        '-y',
+        resolvedOutput,
+      ];
+    } else if (hw.encoder === 'h264_vaapi') {
+      console.log(`[transcode] Using VAAPI hardware encode for ${info.height}p`);
+      ffmpegArgs = [
+        '-vaapi_device', '/dev/dri/renderD128',
+        '-i', resolvedInput,
+        '-vf', 'format=nv12,hwupload',
+        '-c:v', 'h264_vaapi',
+        '-qp', String(crf),
+        ...audioArgs,
+        '-movflags', '+faststart',
+        '-y',
+        resolvedOutput,
+      ];
+    } else if (hw.encoder === 'h264_videotoolbox') {
+      console.log(`[transcode] Using VideoToolbox hardware encode for ${info.height}p`);
+      ffmpegArgs = [
+        '-i', resolvedInput,
+        '-c:v', 'h264_videotoolbox',
+        '-q:v', String(Math.max(20, 100 - crf * 3)),
+        '-profile:v', 'high',
+        '-pix_fmt', 'yuv420p',
+        ...audioArgs,
+        '-movflags', '+faststart',
+        '-y',
+        resolvedOutput,
+      ];
+    } else if (hw.encoder === 'h264_qsv') {
+      console.log(`[transcode] Using QSV hardware encode for ${info.height}p`);
+      ffmpegArgs = [
+        '-i', resolvedInput,
+        '-c:v', 'h264_qsv',
+        '-global_quality', String(crf),
+        '-preset', 'medium',
+        '-pix_fmt', 'yuv420p',
+        ...audioArgs,
+        '-movflags', '+faststart',
+        '-y',
+        resolvedOutput,
+      ];
+    } else if (hw.encoder === 'h264_amf') {
+      console.log(`[transcode] Using AMF hardware encode for ${info.height}p`);
+      ffmpegArgs = [
+        '-i', resolvedInput,
+        '-c:v', 'h264_amf',
+        '-quality', 'balanced',
+        '-qp_i', String(crf),
+        '-qp_p', String(crf),
+        '-pix_fmt', 'yuv420p',
+        ...audioArgs,
+        '-movflags', '+faststart',
+        '-y',
+        resolvedOutput,
+      ];
+    } else {
+      // Software libx264 fallback
+      console.log(`[transcode] Using software libx264 CRF=${crf} for ${info.height}p`);
+      ffmpegArgs = [
+        '-i', resolvedInput,
+        '-c:v', 'libx264',
+        '-crf', String(crf),
+        '-preset', 'medium',
+        '-profile:v', 'high',
+        '-level', '4.1',
+        '-pix_fmt', 'yuv420p',
+        ...audioArgs,
+        '-movflags', '+faststart',
+        '-y',
+        resolvedOutput,
+      ];
+    }
   }
 
   // ── 5. Run FFmpeg ────────────────────────────────────────────────────────
