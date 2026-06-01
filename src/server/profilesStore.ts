@@ -25,6 +25,12 @@ export interface StoredProfile {
   isBuiltIn: boolean;   // true = cannot be deleted
   pinHash?: string;     // bcrypt hash of PIN, undefined = no PIN
   createdAt: string;
+  /**
+   * Optional custom rating ceiling for restricted profiles.
+   * When set, overrides the default kids-safe set.
+   * Examples: "PG-13" (allow PG-13 but not R), "TV-14" (allow TV-14 but not TV-MA)
+   */
+  maxRating?: string;
 }
 
 // ── Built-in profiles (always seeded) ────────────────────────────────────────
@@ -105,7 +111,7 @@ export function createProfile(data: {
   return profile;
 }
 
-export function updateProfile(id: string, data: Partial<Pick<StoredProfile, 'name' | 'avatar' | 'color' | 'restricted'>>): StoredProfile {
+export function updateProfile(id: string, data: Partial<Pick<StoredProfile, 'name' | 'avatar' | 'color' | 'restricted' | 'maxRating'>>): StoredProfile {
   const profiles = readProfiles();
   const idx = profiles.findIndex(p => p.id === id);
   if (idx === -1) throw new Error('Profile not found');
@@ -116,6 +122,7 @@ export function updateProfile(id: string, data: Partial<Pick<StoredProfile, 'nam
     ...(data.avatar    !== undefined ? { avatar: data.avatar } : {}),
     ...(data.color     !== undefined ? { color: data.color } : {}),
     ...(data.restricted !== undefined ? { restricted: data.restricted } : {}),
+    ...(data.maxRating !== undefined ? { maxRating: data.maxRating || undefined } : {}),
   };
 
   profiles[idx] = updated;
@@ -172,6 +179,7 @@ export interface PublicProfile {
   isBuiltIn: boolean;
   hasPin: boolean;
   createdAt: string;
+  maxRating?: string;
 }
 
 export function toPublic(p: StoredProfile): PublicProfile {
@@ -184,5 +192,6 @@ export function toPublic(p: StoredProfile): PublicProfile {
     isBuiltIn: p.isBuiltIn,
     hasPin: !!p.pinHash,
     createdAt: p.createdAt,
+    ...(p.maxRating ? { maxRating: p.maxRating } : {}),
   };
 }
