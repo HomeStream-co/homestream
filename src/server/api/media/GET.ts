@@ -23,6 +23,7 @@ import type { Request, Response } from 'express';
 import crypto from 'crypto';
 import { readLibrary } from '../../libraryStore.js';
 import { requireAuth } from '../../authMiddleware.js';
+import { filterByRating } from '../../ratingGate.js';
 
 interface ProfileProgressEntry {
   progress: number;
@@ -62,8 +63,9 @@ export default function handler(req: Request, res: Response) {
     }
 
     if (!profileId) {
-      // No profile filter — return raw data
-      return res.json(library);
+      // No profile filter — apply rating gate based on active session profile, return data
+      const filtered = filterByRating(req, library as Array<{ rated?: string } & Record<string, unknown>>);
+      return res.json(filtered);
     }
 
     // Resolve per-profile progress fields
@@ -98,7 +100,7 @@ export default function handler(req: Request, res: Response) {
       };
     });
 
-    res.json(resolved);
+    res.json(filterByRating(req, resolved as Array<{ rated?: string } & Record<string, unknown>>));
   } catch (error) {
     res.status(500).json({ error: 'Failed to read media library', message: String(error) });
   }

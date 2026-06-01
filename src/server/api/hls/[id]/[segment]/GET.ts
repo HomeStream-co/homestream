@@ -12,6 +12,7 @@ import path from 'path';
 import { requireAuth } from '../../../../authMiddleware.js';
 import { getHlsJobDir, startHlsJob } from '../../../../hlsTranscoder.js';
 import { readLibrary } from '../../../../libraryStore.js';
+import { checkRating } from '../../../../ratingGate.js';
 
 const SEGMENT_WAIT_MS = 10_000;
 const POLL_INTERVAL_MS = 200;
@@ -52,9 +53,13 @@ export default async function handler(req: Request, res: Response) {
         id: string;
         filePath?: string;
         filepath?: string;
+        rated?: string;
       }>();
       const item = library.find(m => m.id === id);
       if (!item) return res.status(404).json({ error: 'Media not found' });
+
+      // ── Rating gate ─────────────────────────────────────────────────────────
+      if (!checkRating(req, res, item.rated)) return;
 
       const filePath = item.filePath ?? item.filepath ?? '';
       if (!filePath || !fs.existsSync(filePath)) {

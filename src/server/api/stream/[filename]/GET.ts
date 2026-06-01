@@ -20,6 +20,7 @@ import path from 'path';
 import { requireAuth } from '../../../authMiddleware.js';
 import { readLibrary } from '../../../libraryStore.js';
 import { dataDir } from '../../../dataDir.js';
+import { checkRating } from '../../../ratingGate.js';
 
 // Uploads live inside the data directory so they are writable in packaged
 // Electron on Linux (AppImage mounts read-only; process.cwd() is not writable).
@@ -87,6 +88,15 @@ export default function handler(req: Request, res: Response) {
   if (!requireAuth(req, res)) return;
   try {
     const { filename } = req.params;
+
+    // ── Rating gate — look up the item's rating and check against active profile ──
+    try {
+      const library = readLibrary<{ filename?: string; rated?: string }>();
+      const item = library.find(m => m.filename === path.basename(filename));
+      if (item?.rated) {
+        if (!checkRating(req, res, item.rated)) return;
+      }
+    } catch { /* library read failure — allow stream, don't block */ }
 
     const filePath = resolveFilePath(filename);
 
