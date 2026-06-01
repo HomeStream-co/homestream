@@ -59,6 +59,7 @@ export default async function handler(req: Request, res: Response) {
           'omdbApiKey', 'googleAiApiKey', 'tmdbApiKey', 'virusTotalApiKey',
           'aiProvider', 'ollamaUrl', 'ollamaModel',
           'preferredQuality', 'watchFolderEnabled', 'autoTranscode',
+          'transcodePreset',
           // VPN fields
           'vpnEnabled', 'vpnProtocol', 'vpnProvider',
           'vpnConfigContent', 'vpnUsername', 'vpnPassword', 'vpnAutoConnect',

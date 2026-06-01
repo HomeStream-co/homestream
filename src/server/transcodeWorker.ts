@@ -38,6 +38,7 @@ import path from 'path';
 import { updateJob, broadcast, getJob } from './transcodeStore.js';
 import { dataDir } from './dataDir.js';
 import { detectHwEncoder } from './hwEncoderDetect.js';
+import { readConfig } from './configStore.js';
 
 // Uploads live inside the data directory so they are writable in packaged
 // Electron on Linux (AppImage mounts read-only; process.cwd() is not writable).
@@ -189,15 +190,27 @@ function transcodeStrategy(info: VideoInfo, inputFilename: string): EncodeStrate
 }
 
 /**
- * Pick CRF value based on resolution.
+ * Pick CRF value based on resolution, adjusted by quality preset.
  * Lower CRF = better quality + larger file.
  * These values mirror HandBrake's default RF presets.
+ *
+ * Preset offsets:
+ *   fast      → +4  (smaller files, slightly softer)
+ *   balanced  → ±0  (default)
+ *   quality   → -3  (larger files, sharper)
+ *   lossless  → 0   (CRF 0 = mathematically lossless for libx264)
  */
-function crfForResolution(height: number): number {
-  if (height <= 480)  return 23; // SD  — HandBrake RF 23
-  if (height <= 720)  return 22; // HD-ready — HandBrake RF 22
-  if (height <= 1080) return 20; // Full HD — HandBrake RF 20
-  return 18;                     // 4K/UHD — HandBrake RF 18
+function crfForResolution(height: number, preset: string = 'balanced'): number {
+  let base: number;
+  if (height <= 480)  base = 23;
+  else if (height <= 720)  base = 22;
+  else if (height <= 1080) base = 20;
+  else base = 18;
+
+  if (preset === 'lossless') return 0;
+  if (preset === 'fast')    return Math.min(51, base + 4);
+  if (preset === 'quality') return Math.max(0, base - 3);
+  return base; // balanced
 }
 
 // ─── Progress parser ──────────────────────────────────────────────────────────
@@ -331,7 +344,8 @@ export async function transcodeFile(
     ];
   } else {
     // Full re-encode — use hardware encoder if available, else libx264
-    const crf = crfForResolution(info.height);
+    const transcodePreset = readConfig().transcodePreset ?? 'balanced';
+    const crf = crfForResolution(info.height, transcodePreset);
 
     if (hw.encoder === 'h264_nvenc') {
       console.log(`[transcode] Using NVENC hardware encode for ${info.height}p`);

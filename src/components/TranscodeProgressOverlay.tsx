@@ -6,10 +6,11 @@
  *   - Animated progress bar (0–100%)
  *   - Status label (Queued / Transcoding / Done / Error)
  *   - Live stats: FPS, encode speed, ETA
+ *   - Active encoder badge (NVIDIA NVENC / VAAPI / VideoToolbox / Software)
  *   - Error message if FFmpeg failed
  */
 import { motion, AnimatePresence } from 'motion/react';
-import { Loader2, AlertCircle, Zap, Clock, Film } from 'lucide-react';
+import { Loader2, AlertCircle, Zap, Clock, Film, Cpu } from 'lucide-react';
 import type { TranscodeProgress } from '@/hooks/useTranscodeProgress';
 
 interface Props {
@@ -24,6 +25,18 @@ function formatEta(secs: number): string {
   return s > 0 ? `${m}m ${s}s` : `${m}m`;
 }
 
+/** Returns a short badge label and whether it's hardware-accelerated */
+function encoderBadge(label: string | undefined): { text: string; isHw: boolean } {
+  if (!label) return { text: 'Software', isHw: false };
+  const isHw = !label.toLowerCase().includes('software');
+  // Shorten for badge display
+  const text = label
+    .replace('Intel/AMD ', '')
+    .replace('Apple ', '')
+    .replace('NVIDIA ', '');
+  return { text, isHw };
+}
+
 export default function TranscodeProgressOverlay({ job }: Props) {
   const isQueued     = job.status === 'queued';
   const isActive     = job.status === 'transcoding';
@@ -33,6 +46,8 @@ export default function TranscodeProgressOverlay({ job }: Props) {
 
   // Don't render for terminal-success states — player takes over
   if (isDone || isSkipped) return null;
+
+  const badge = encoderBadge(job.encoderLabel);
 
   return (
     <AnimatePresence>
@@ -91,6 +106,22 @@ export default function TranscodeProgressOverlay({ job }: Props) {
                   : 'Converting to browser-compatible format'}
               </p>
             </div>
+
+            {/* Encoder badge */}
+            {job.encoderLabel && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border ${
+                  badge.isHw
+                    ? 'bg-green-500/10 border-green-500/30 text-green-400'
+                    : 'bg-white/5 border-white/10 text-white/40'
+                }`}
+              >
+                <Cpu className="w-3 h-3" />
+                <span>{badge.isHw ? `GPU · ${badge.text}` : badge.text}</span>
+              </motion.div>
+            )}
 
             {/* Progress bar */}
             <div className="w-full">

@@ -28,6 +28,7 @@ import SettingsTools            from './settings/SettingsTools';
 import SettingsSession          from './settings/SettingsSession';
 import SettingsProwlarr         from './settings/SettingsProwlarr';
 import UpdateBanner             from './UpdateBanner';
+import SettingsTranscode        from './settings/SettingsTranscode';
 
 // ── Props ─────────────────────────────────────────────────────────────────────
 
@@ -584,6 +585,7 @@ export default function SettingsPanel({
                       <div className="px-4 pb-2 flex flex-col gap-1.5">
                         <UpdateBanner compact={false} />
                       </div>
+                      <SettingsTranscode />
                       <SettingsTools
                         onClose={handleClose}
                         onOpenSecurity={onOpenSecurity}

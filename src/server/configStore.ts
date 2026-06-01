@@ -36,6 +36,8 @@ export interface AppConfig {
   watchFolderEnabled: boolean;
   autoTranscode: boolean;
   preferredQuality: '720p' | '1080p' | '4k' | 'best';
+  /** Transcode quality preset — controls CRF offset applied during re-encode */
+  transcodePreset: 'fast' | 'balanced' | 'quality' | 'lossless';
   virusTotalApiKey: string;   // optional — activates Layer 2 hash lookup
   setupCompletedAt?: string;
   // VPN interface binding — torrent traffic is locked to this adapter
@@ -86,6 +88,7 @@ const DEFAULTS: AppConfig = {
   watchFolderEnabled: true,
   autoTranscode: true,
   preferredQuality: '1080p',
+  transcodePreset: 'balanced',
   virusTotalApiKey: process.env.VIRUSTOTAL_API_KEY || '',
   storageMoviesPct: 60,
   storageTvPct: 30,

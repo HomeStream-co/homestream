@@ -26,6 +26,8 @@ export interface TranscodeProgress {
   speed?: string;     // e.g. "1.4x"
   eta?: number;       // seconds remaining
   error?: string;
+  /** Human-readable encoder label, e.g. "NVIDIA NVENC" or "Software (libx264)" */
+  encoderLabel?: string;
 }
 
 const TERMINAL: TranscodeStatus[] = ['done', 'error', 'skipped'];
