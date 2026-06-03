@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { safePostMessage } from "../utils/postMessage";
 import { generatePreciseSelector, extractDevContext, getElementClassName } from "../utils/element-helpers";
 import { isTouchDevice } from "../utils/device";
@@ -11,6 +11,7 @@ import {
 import type { HoveredElement } from "../hooks/useImageHoverDetection";
 import { Bookmark, Image, Pencil, Pointer, Sparkles } from "lucide-react";
 import { isClickable, isTextElement, isTextBlockElement, isListElement } from "../utils/element-detection";
+import { trackEventBus } from "../utils/eventBus";
 import { t } from "../utils/translations";
 import { HoverBar, HoverBarButton } from "./HoverBar";
 import { QuickEditBar } from "./QuickEditBar";
@@ -59,6 +60,8 @@ function ensureHoverPulseKeyframes(): void {
 interface ElementHoverBarProps {
   hoveredElement: HoveredElement;
   isMultiSelectActive: boolean;
+  toolbarMode: boolean;
+  setToolbarMode: (open: boolean) => void;
   onMouseEnter: () => void;
   onMouseLeave: () => void;
   onQuickEditModeChange?: (active: boolean) => void;
@@ -67,12 +70,15 @@ interface ElementHoverBarProps {
 export default function ElementHoverBar({
   hoveredElement,
   isMultiSelectActive,
+  toolbarMode,
+  setToolbarMode,
   onMouseEnter,
   onMouseLeave,
   onQuickEditModeChange,
 }: ElementHoverBarProps) {
   const { element } = hoveredElement;
   const isImage = hoveredElement.type === "image";
+  const isVideo = hoveredElement.type === "image" && hoveredElement.isVideo;
 
   // Commerce Storefront (VITE_GODADDY_STORE_ID): product images come from the
   // Commerce API — hide Replace/Modify for images without data-dev-id or media slot.
@@ -80,7 +86,6 @@ export default function ElementHoverBar({
   const isUneditableImage = isImage && !element.getAttribute("data-dev-id") && !hoveredElement.isMediaSlot;
   const showImageActions = isImage && !(isCommerceIntegrated && isUneditableImage);
 
-  const [toolbarMode, setToolbarMode] = useState(false);
   const [quickEditMode, setQuickEditMode] = useState(false);
   // Single source of truth for which Hover Bar popover is open (Color Picker /
   // Size Stepper / Text Align). Children are controlled — opening one
@@ -155,9 +160,10 @@ export default function ElementHoverBar({
     };
   }, [element]);
 
-  // Reset all modes when the hovered element changes
+  // Reset auxiliary modes when the hovered element changes. toolbarMode is
+  // owned by useImageHoverDetection so resetting it here would race click
+  // commits and close the bar on first click.
   useEffect(() => {
-    setToolbarMode(false);
     setQuickEditMode(false);
     setOpenMenu(null);
     pendingContextRef.current = null;
@@ -187,43 +193,29 @@ export default function ElementHoverBar({
     onQuickEditModeChange?.(toolbarMode || quickEditMode);
   }, [toolbarMode, quickEditMode, onQuickEditModeChange]);
 
+  // Toolbar-view impression: fires once per appearance. The element prop is
+  // frozen by DevelopmentMode while toolbarMode is true, so deps can be just
+  // [toolbarMode].
+  useEffect(() => {
+    if (!toolbarMode) return;
+    trackEventBus.impression("devtools.toolbar.view", { surface: isImage ? "image" : "text" });
+  }, [toolbarMode]);
+
   // Release the freeze when this component unmounts
   useEffect(() => {
     return () => onQuickEditModeChange?.(false);
   }, [onQuickEditModeChange]);
 
-  // Clicking the element opens the toolbar.
-  // Registered at document capture phase so it fires alongside useTextEditing's
-  // capture handler — text editing still activates normally on the same click.
-  //
-  // useLayoutEffect (not useEffect) so closure re-registration happens
-  // synchronously during commit. Pairs with the mousedown→flushSync handler
-  // in useImageHoverDetection: when the user clicks within the hover-detect
-  // showBarTimer window, that handler flushes the pending `hoveredElement`
-  // state, React commits + runs this layout effect, the new closure (with the
-  // fresh `element` prop) is attached — all before the click event fires.
-  // With plain useEffect, the cleanup/reattach would be deferred past the
-  // click and the stale closure would still bail on the target check.
-  useLayoutEffect(() => {
-    const handleClick = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-      if (!target) return;
-      // Ignore clicks inside dev-tools overlays (toolbar, Lexical editor, etc.)
-      if (
-        target.closest(".edit-mode-hover-bar") ||
-        target.closest("[data-airo-dev-tools]") ||
-        target.closest("[data-dev-tools]")
-      ) return;
-      // Only act when the click target is the tracked element or a descendant
-      if (target !== element && !element.contains(target)) return;
-      // Capture the element and hoveredElement at the moment the toolbar opens
+  // Capture the element/hoveredElement when toolbar opens so action handlers
+  // (Replace, Modify, Reference, etc.) target the element the user clicked,
+  // even if the cursor has since moved away. The click handler that flips
+  // toolbarMode lives in useImageHoverDetection.
+  useEffect(() => {
+    if (toolbarMode) {
       toolbarElementRef.current = element;
       toolbarHoveredElementRef.current = hoveredElement;
-      setToolbarMode(true);
-    };
-    document.addEventListener("click", handleClick, true);
-    return () => document.removeEventListener("click", handleClick, true);
-  }, [element, hoveredElement]);
+    }
+  }, [toolbarMode, element, hoveredElement]);
 
   // Dismiss toolbar/quick edit when clicking outside the bar, the element, or editor overlays
   useEffect(() => {
@@ -322,6 +314,7 @@ export default function ElementHoverBar({
     const el = toolbarElementRef.current;
     const hovered = toolbarHoveredElementRef.current;
     if (!el || !hovered || hovered.type !== "image") return;
+    trackEventBus.click("devtools.toolbar.replace_image");
     const { imageUrl, isMediaSlot, slotPath } = hovered;
     if (isMediaSlot && slotPath) {
       safePostMessage(window.parent, { type: "OPEN_MEDIA_SLOT_DIALOG", slotName: slotPath });
@@ -343,6 +336,7 @@ export default function ElementHoverBar({
     const el = toolbarElementRef.current;
     const hovered = toolbarHoveredElementRef.current;
     if (!el || !hovered || hovered.type !== "image") return;
+    trackEventBus.click("devtools.toolbar.modify_image");
     const { imageUrl, isMediaSlot, slotPath } = hovered;
     if (isMediaSlot && slotPath) {
       safePostMessage(window.parent, { type: "OPEN_IMAGE_EDITOR", slotName: slotPath });
@@ -407,6 +401,7 @@ export default function ElementHoverBar({
   const handleReference = useCallback(() => {
     const el = toolbarElementRef.current;
     if (!el) return;
+    trackEventBus.click("devtools.toolbar.multi_select_add");
 
     let selectionNumber: number | undefined;
     if (isMultiSelectActive) {
@@ -414,6 +409,7 @@ export default function ElementHoverBar({
       selectionNumber = getNextSelectionNumber();
       const num = selectionNumber;
       addNumberedOverlay(el, num, () => {
+        trackEventBus.click("devtools.toolbar.multi_select_remove");
         removeNumberedOverlay(num);
         safePostMessage(window.parent, { type: "REMOVE_SELECTION_FROM_PREVIEW", data: { number: num } });
       });
@@ -428,6 +424,7 @@ export default function ElementHoverBar({
   // Sparkles: build context locally and open Quick Edit — no selection overlay,
   // no postMessage until the user submits the prompt
   const handleEditWithAI = useCallback(() => {
+    trackEventBus.click("devtools.toolbar.sparkles");
     pendingContextRef.current = buildContextData();
     setToolbarMode(false);
     setQuickEditMode(true);
@@ -435,6 +432,7 @@ export default function ElementHoverBar({
 
   // On submit: send context first so the store is set before QUICK_EDIT_SEND reads it
   const handleQuickEditSubmit = useCallback((prompt: string) => {
+    trackEventBus.click("devtools.toolbar.quick_edit_submit");
     if (pendingContextRef.current) {
       safePostMessage(window.parent, { type: "EDIT_WITH_AI", data: pendingContextRef.current });
       pendingContextRef.current = null;
@@ -444,6 +442,7 @@ export default function ElementHoverBar({
   }, []);
 
   const handleQuickEditDismiss = useCallback(() => {
+    trackEventBus.click("devtools.toolbar.quick_edit_dismiss");
     setQuickEditMode(false);
   }, []);
 
@@ -474,9 +473,15 @@ export default function ElementHoverBar({
   const handleFixAccept = useCallback(() => {
     const el = toolbarElementRef.current;
     if (!el) return;
+    trackEventBus.click("devtools.toolbar.text_fix_accept");
     fix.accept(el);
     setToolbarMode(false);
   }, [fix.accept]);
+
+  const handleFixReject = useCallback(() => {
+    trackEventBus.click("devtools.toolbar.text_fix_reject");
+    fix.reject();
+  }, [fix.reject]);
 
   // Bold/Italic: show for any text-bearing element (less strict than isTextEditable
   // which also rejects data-dev-dynamic — we only need class toggle, not text editing).
@@ -523,7 +528,7 @@ export default function ElementHoverBar({
         oldText={oldDisplay}
         newText={newDisplay}
         onAccept={handleFixAccept}
-        onReject={fix.reject}
+        onReject={handleFixReject}
         onMouseEnter={onMouseEnter}
         onMouseLeave={onMouseLeave}
       />
@@ -542,12 +547,14 @@ export default function ElementHoverBar({
             icon={<Image width={15} height={15} />}
             label={t("devtools_image_replace", "Replace")}
           />
-          <HoverBarButton
-            onClick={handleModify}
-            title={t("devtools_image_modify_title", "Modify image")}
-            icon={<Pencil width={15} height={15} />}
-            label={t("devtools_image_modify", "Modify")}
-          />
+          {!isVideo && (
+            <HoverBarButton
+              onClick={handleModify}
+              title={t("devtools_image_modify_title", "Modify image")}
+              icon={<Pencil width={15} height={15} />}
+              label={t("devtools_image_modify", "Modify")}
+            />
+          )}
         </>
       )}
       {elementIsText && (

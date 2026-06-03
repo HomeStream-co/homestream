@@ -10,6 +10,7 @@ import {
   nearestSizeClass,
   type SizeClass,
 } from "../utils/text-size";
+import { trackEventBus } from "../utils/eventBus";
 
 interface TextSizeStepperButtonProps {
   selectedElement: HTMLElement | null;
@@ -146,11 +147,15 @@ export default function TextSizeStepperButton({ selectedElement, isOpen, onOpenC
   );
 
   const handleDecrement = useCallback(() => {
-    if (stepDownTarget) applySize(stepDownTarget);
+    if (!stepDownTarget) return;
+    trackEventBus.click("devtools.toolbar.text_size_down");
+    applySize(stepDownTarget);
   }, [applySize, stepDownTarget]);
 
   const handleIncrement = useCallback(() => {
-    if (stepUpTarget) applySize(stepUpTarget);
+    if (!stepUpTarget) return;
+    trackEventBus.click("devtools.toolbar.text_size_up");
+    applySize(stepUpTarget);
   }, [applySize, stepUpTarget]);
 
   return (
@@ -158,6 +163,7 @@ export default function TextSizeStepperButton({ selectedElement, isOpen, onOpenC
       <HoverBarButton
         onClick={() => onOpenChange(!isOpen)}
         title={t("devtools_text_size_title", "Text size")}
+        suppressTooltip={isOpen}
         icon={<ALargeSmall width={15} height={15} />}
         active={isOpen}
       />
