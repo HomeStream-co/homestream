@@ -1,6 +1,6 @@
 import type { Request, Response } from 'express';
 import { pickBestStream } from '../../../torrentManager.js';
-import { addMagnet, testConnection } from '../../../qbittorrentClient.js';
+import { addMagnet, isReachable } from '../../../qbittorrentClient.js';
 import { readConfig } from '../../../configStore.js';
 import { runPreDownloadScan } from '../../../security/threatScanner.js';
 import { connectForDownload, disconnectAfterDownload } from '../../../vpnService.js';
@@ -467,27 +467,30 @@ export default async function handler(req: Request, res: Response) {
   const useRD = !!rdApiKey;
   const preferredQuality = (cfg.preferredQuality as '720p' | '1080p' | '4k' | 'best') ?? '1080p';
 
-  // Only check qBit / WebTorrent if RD is not configured
+  // Only check qBit / WebTorrent if RD is not configured.
+  //
+  // FIX (🔴): Previously called testConnection() here, which goes through the
+  // shared login() path and writes to the module-level sessionCookie. If qBit
+  // is down, login() throws and sets sessionCookie = null — silently invalidating
+  // any active qBit session for concurrent downloads already in flight.
+  //
+  // isReachable() is a plain unauthenticated GET to /api/v2/app/version. It
+  // never touches sessionCookie, so a down qBit cannot corrupt live sessions.
   let useQbit = false;
   let wtAvailable = false;
   if (!useRD) {
-    const qbitResult = await testConnection();
-    useQbit = qbitResult.ok;
+    useQbit = await isReachable();
     if (!useQbit) {
       try { await import('webtorrent'); wtAvailable = true; } catch { /* not bundled */ }
       if (!wtAvailable) {
         res.status(503).json({
           error: 'No download backend available',
-          message: qbitResult.error
-            ? `qBittorrent is offline (${qbitResult.error}) and the built-in downloader is not available. Configure Real-Debrid in Settings → Downloads for dependency-free downloads, or start qBittorrent.`
-            : 'No download backend available. Configure Real-Debrid in Settings → Downloads, or start qBittorrent.',
+          message: 'qBittorrent is offline and the built-in downloader is not available. Configure Real-Debrid in Settings → Downloads for dependency-free downloads, or start qBittorrent.',
           hint: 'real-debrid',
         });
         return;
       }
-      if (qbitResult.error) {
-        console.warn(`[download] qBittorrent unavailable: ${qbitResult.error} — falling back to WebTorrent`);
-      }
+      console.warn('[download] qBittorrent unreachable — falling back to WebTorrent');
     }
   }
 

@@ -49,28 +49,55 @@ export interface PersistedJob {
   bytesTotal?: number;
 }
 
-// ── Write queue ───────────────────────────────────────────────────────────────
+// ── Write-through in-memory cache ─────────────────────────────────────────────
+//
+// FIX (🟡): Previously enqueueWrite called readRaw() (a synchronous disk read)
+// inside every queue callback to get the current state before applying the
+// updater. Under rapid Real-Debrid progress updates (up to 1 write/sec per
+// active download × N concurrent downloads) this produced N disk reads per
+// second — a read-before-every-write pattern that adds unnecessary I/O and
+// latency.
+//
+// Now we maintain a module-level _cache that mirrors the on-disk state. The
+// write queue applies updaters against _cache (memory), then flushes to disk.
+// readRaw() returns _cache when populated, falling back to a one-time disk
+// read on first access (cold start / after a server restart). This means:
+//   - All writes after the first are pure memory → disk (no read round-trip).
+//   - getAllPersistedJobs() / findJobByInfoHash() / getPersistedJob() all read
+//     from memory — zero disk I/O for the common case.
+//   - The write queue serialisation is preserved, so concurrent upserts are
+//     still applied in order without races.
+
+let _cache: PersistedJob[] | null = null;
+
+function readRaw(): PersistedJob[] {
+  if (_cache !== null) return _cache;
+  if (!fs.existsSync(JOBS_PATH)) {
+    _cache = [];
+    return _cache;
+  }
+  try {
+    _cache = JSON.parse(fs.readFileSync(JOBS_PATH, 'utf-8')) as PersistedJob[];
+  } catch {
+    _cache = [];
+  }
+  return _cache;
+}
 
 let writeQueue: Promise<void> = Promise.resolve();
 
-function readRaw(): PersistedJob[] {
-  if (!fs.existsSync(JOBS_PATH)) return [];
-  try {
-    return JSON.parse(fs.readFileSync(JOBS_PATH, 'utf-8')) as PersistedJob[];
-  } catch {
-    return [];
-  }
-}
-
 function enqueueWrite(updater: (current: PersistedJob[]) => PersistedJob[]): void {
   writeQueue = writeQueue.then(() => {
-    const current = readRaw();
-    const next = updater(current);
+    // Apply updater against the in-memory cache — no disk read needed.
+    const next = updater(readRaw());
+    _cache = next; // keep cache in sync before the disk write
     const tmp = JOBS_PATH + '.tmp';
     fs.writeFileSync(tmp, JSON.stringify(next, null, 2));
     fs.renameSync(tmp, JOBS_PATH);
   }).catch(err => {
     console.error('[downloadJobStore] Write failed:', err);
+    // On write failure, invalidate the cache so the next read re-syncs from disk.
+    _cache = null;
   });
 }
 
@@ -93,6 +120,15 @@ enqueueWrite(pruneOld);
 
 export function getAllPersistedJobs(): PersistedJob[] {
   return readRaw();
+}
+
+/**
+ * Reset the in-memory cache. FOR TESTING ONLY.
+ * Call this in beforeEach when the fs mock resets diskData so the cache
+ * doesn't serve stale data from a previous test.
+ */
+export function _resetCacheForTesting(): void {
+  _cache = null;
 }
 
 export function upsertJob(job: PersistedJob): void {

@@ -63,11 +63,15 @@ const {
   markJobInterrupted,
   getInterruptedJobs,
   getAllPersistedJobs,
+  _resetCacheForTesting,
 } = await import('../../server/downloadJobStore.js');
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function resetDisk() { diskData = '[]'; }
+function resetDisk() {
+  diskData = '[]';
+  _resetCacheForTesting(); // also clear the write-through in-memory cache
+}
 
 /** Flush the async write queue — upsertJob enqueues via Promise chain */
 async function flush() {
