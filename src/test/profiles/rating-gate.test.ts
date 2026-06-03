@@ -138,23 +138,62 @@ describe('checkRating — admin / unrestricted profiles', () => {
 });
 
 // ── checkRating — no rating info ──────────────────────────────────────────────
+//
+// FIX (🟡): Previously checkRating() returned true (allowed) for undefined /
+// empty / 'N/A' rated values even for restricted profiles, while
+// filterByRating() returned false (blocked) for the same values. The two
+// functions are now consistent: restricted profiles are blocked from unrated
+// content in both the stream gate and the list filter.
+//
+// Unrestricted / admin profiles still allow unrated content (no change).
 
-describe('checkRating — missing / empty rating', () => {
+describe('checkRating — missing / empty rating (restricted profile)', () => {
   beforeEach(() => { store.getProfile.mockReturnValue(RESTRICTED_DEFAULT); });
 
-  it('allows when rated is undefined', () => {
+  it('blocks when rated is undefined (conservative default for restricted profiles)', () => {
     const r = res();
-    expect(checkRating(req('kids'), r as unknown as Response, undefined)).toBe(true);
+    expect(checkRating(req('kids'), r as unknown as Response, undefined)).toBe(false);
+    expect(r.statusCode).toBe(403);
   });
 
-  it('allows when rated is empty string', () => {
+  it('blocks when rated is empty string', () => {
     const r = res();
-    expect(checkRating(req('kids'), r as unknown as Response, '')).toBe(true);
+    expect(checkRating(req('kids'), r as unknown as Response, '')).toBe(false);
+    expect(r.statusCode).toBe(403);
   });
 
-  it('allows when rated is "N/A"', () => {
+  it('blocks when rated is "N/A"', () => {
     const r = res();
-    expect(checkRating(req('kids'), r as unknown as Response, 'N/A')).toBe(true);
+    expect(checkRating(req('kids'), r as unknown as Response, 'N/A')).toBe(false);
+    expect(r.statusCode).toBe(403);
+  });
+
+  it('403 body uses "(unrated)" message when rated is undefined', () => {
+    const r = res();
+    checkRating(req('kids'), r as unknown as Response, undefined);
+    const body = r.body as { message: string; rated: null };
+    expect(body.message).toContain('unrated');
+    expect(body.rated).toBeNull();
+  });
+});
+
+describe('checkRating — missing / empty rating (unrestricted / admin profiles)', () => {
+  it('allows undefined rated for admin profile', () => {
+    store.getProfile.mockReturnValue(ADMIN_PROFILE);
+    const r = res();
+    expect(checkRating(req('adult'), r as unknown as Response, undefined)).toBe(true);
+  });
+
+  it('allows N/A rated for unrestricted profile', () => {
+    store.getProfile.mockReturnValue(UNRESTRICTED_PROFILE);
+    const r = res();
+    expect(checkRating(req('custom'), r as unknown as Response, 'N/A')).toBe(true);
+  });
+
+  it('allows undefined rated when profile is not found', () => {
+    store.getProfile.mockReturnValue(undefined);
+    const r = res();
+    expect(checkRating(req('ghost'), r as unknown as Response, undefined)).toBe(true);
   });
 });
 
