@@ -101,17 +101,18 @@ export function scanExistingMedia(mediaDir: string): ScanResult {
     ...library.map(m => m.filePath ?? ''),
     ...library.map(m => m.filepath ?? ''),
   ]);
-  const knownNames = new Set([
-    ...library.map(m => m.originalFilename ?? ''),
-    ...library.map(m => m.filename ?? ''),
-  ]);
+  // FIX (🟡): Previously also deduplicated by bare filename (knownNames), which
+  // caused false-positive skips when two different directories contained files
+  // with the same name (e.g. /movies/movie.mkv and /shows/movie.mkv). The
+  // absolute-path check (knownPaths) is sufficient and correct — bare-name
+  // deduplication is removed.
 
   const allFiles = walkDir(mediaDir);
   const newFiles: ScannedFile[] = [];
   let skipped = 0;
 
   for (const f of allFiles) {
-    if (knownPaths.has(f.path) || knownNames.has(f.name)) {
+    if (knownPaths.has(f.path)) {
       skipped++;
     } else {
       newFiles.push(f);

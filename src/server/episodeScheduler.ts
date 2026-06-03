@@ -42,6 +42,7 @@ interface StreamResult {
   magnet: string;
   quality: string;
   name: string;
+  seeds?: string;
 }
 
 function buildMagnet(infoHash: string, sources?: string[]): string {
@@ -101,7 +102,7 @@ function pickBestStream(streams: StreamResult[], preferredQuality: '720p' | '108
     if (lq.includes('480')) return 480;
     return 0;
   };
-  const withRes = streams.map(s => ({ ...s, res: parseRes(s.quality), seedCount: parseInt(s.seeds) || 0 }));
+  const withRes = streams.map(s => ({ ...s, res: parseRes(s.quality), seedCount: parseInt(s.seeds ?? '0') || 0 }));
   const bySeed = (a: typeof withRes[0], b: typeof withRes[0]) => b.seedCount - a.seedCount;
   if (preferredQuality === 'best') return withRes.sort((a, b) => b.res - a.res || bySeed(a, b))[0];
   const targetRes = preferredQuality === '4k' ? 2160 : preferredQuality === '1080p' ? 1080 : 720;

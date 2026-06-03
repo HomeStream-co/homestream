@@ -318,7 +318,13 @@ export async function isReachable(): Promise<boolean> {
     const res = await fetch(`${getQbitUrl()}/api/v2/app/version`, {
       signal: AbortSignal.timeout(5_000),
     });
-    return res.status !== 0;
+    // FIX (🔴): Previously checked `res.status !== 0` which is always true for
+    // any HTTP response (fetch never returns status 0 — that's XHR-only). This
+    // meant isReachable() returned true even when qBit returned 401/404/500,
+    // causing the Downloads page to show "qBit online" when it was actually
+    // misconfigured. Now checks for a 2xx or 4xx response (anything that proves
+    // the server is up and responding), excluding 5xx server errors.
+    return res.status > 0 && res.status < 500;
   } catch {
     return false; // non-fatal — ignore
   }

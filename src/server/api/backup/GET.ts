@@ -24,7 +24,9 @@ export default function handler(req: Request, res: Response) {
 
     // Redact sensitive fields from config
     const safeConfig = { ...config };
-    for (const key of ['adminPassword', 'qbitPassword', 'omdbApiKey', 'googleAiApiKey', 'tmdbApiKey', 'jellyfinApiKey']) {
+    // FIX (🟡): realDebridApiKey was missing from the redaction list — it would
+    // be exported in plaintext in the backup file. Now correctly redacted.
+    for (const key of ['adminPassword', 'qbitPassword', 'omdbApiKey', 'googleAiApiKey', 'tmdbApiKey', 'jellyfinApiKey', 'realDebridApiKey', 'virusTotalApiKey', 'prowlarrApiKey']) {
       if (safeConfig[key]) safeConfig[key] = '[REDACTED]';
     }
 

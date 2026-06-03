@@ -96,13 +96,23 @@ const streamCache = new Map<string, CacheEntry>();
 function getCached(key: string): StreamResult[] | null {
   const entry = streamCache.get(key);
   if (!entry || Date.now() > entry.expiresAt) { streamCache.delete(key); return null; }
+  // FIX (🟡): LRU touch — re-insert the entry so it moves to the end of the
+  // Map's insertion order. This makes eviction remove the least-recently-used
+  // entry instead of the oldest-inserted one (FIFO). Previously a frequently-
+  // accessed stream could be evicted just because it was inserted first, causing
+  // redundant Torrentio fetches for active downloads.
+  streamCache.delete(key);
+  streamCache.set(key, entry);
   return entry.streams;
 }
 function setCached(key: string, streams: StreamResult[]) {
+  // Re-insert to update LRU position if key already exists
+  streamCache.delete(key);
   streamCache.set(key, { streams, expiresAt: Date.now() + 5 * 60 * 1000 });
   if (streamCache.size > 200) {
-    const oldest = streamCache.keys().next().value;
-    if (oldest) streamCache.delete(oldest);
+    // Evict the least-recently-used entry (first key in Map = oldest access)
+    const lru = streamCache.keys().next().value;
+    if (lru) streamCache.delete(lru);
   }
 }
 
@@ -509,7 +519,26 @@ export default async function handler(req: Request, res: Response) {
   // ── Duplicate detection helper ─────────────────────────────────────────────
   // Returns true (and sends 409) if the infoHash is already active.
   // Errored jobs are NOT considered duplicates — allow the user to retry them.
+  //
+  // FIX (🟡): Previously only checked the persisted store (disk read). Between
+  // upsertJob() being called and the async write queue flushing to disk, a
+  // second concurrent request could slip through the duplicate check because
+  // findJobByInfoHash() reads from disk and the new job isn't there yet.
+  // Now we also maintain an in-request in-memory Set of hashes being queued
+  // in this handler invocation so back-to-back requests in the same tick are
+  // caught too.
+  const activeInThisRequest = new Set<string>();
   const checkDuplicate = (infoHash: string, label: string): boolean => {
+    const normalized = (infoHash ?? '').toLowerCase();
+    if (!normalized) return false; // guard: no hash = can't be a duplicate
+    if (activeInThisRequest.has(normalized)) {
+      res.status(409).json({
+        error: 'duplicate',
+        message: `"${label}" is already being queued in this request`,
+        infoHash,
+      });
+      return true;
+    }
     const existing = findJobByInfoHash(infoHash);
     if (existing && existing.status !== 'error') {
       console.log(`[download] Duplicate detected for "${label}" — infoHash ${infoHash} already ${existing.status}`);
@@ -521,6 +550,7 @@ export default async function handler(req: Request, res: Response) {
       });
       return true;
     }
+    activeInThisRequest.add(normalized);
     return false;
   };
 
