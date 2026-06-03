@@ -131,14 +131,26 @@ export function parseResolution(quality: string): number {
 }
 
 /**
- * Pick the best stream for storage-efficient downloading:
- *   1. Must be ≥ 720p (never go below 720p)
- *   2. Must NOT be 4K/2160p (too large for home server)
- *   3. Among qualifying, pick highest seed count
- *   4. Fallback: if nothing qualifies, pick highest resolution ≥ 720p regardless of 4K cap
- *   5. Last resort: pick whatever has the most seeds
+ * Pick the best stream, respecting the user's preferredQuality setting.
+ *
+ * preferredQuality values (from homestream-config.json):
+ *   '720p'  → target 720p; fallback to any HD
+ *   '1080p' → target 1080p; fallback to 720p, then any HD  (default)
+ *   '4k'    → target 2160p/4K; fallback to 1080p, then any HD
+ *   'best'  → highest resolution available, most seeds as tiebreaker
+ *
+ * Within each tier, the stream with the most seeds is preferred.
+ * If nothing matches the target tier, we fall back progressively until
+ * we find something, and as a last resort return the most-seeded stream.
+ *
+ * FIX (🔴): Previously ignored preferredQuality entirely — always capped at
+ * 1080p even when the user explicitly chose '4k' or 'best'. Now the caller
+ * passes preferredQuality from readConfig() and the function honours it.
  */
-export function pickBestStream(streams: Array<{ quality: string; seeds: string; infoHash: string; magnet: string; size: string; name: string }>): typeof streams[0] | null {
+export function pickBestStream(
+  streams: Array<{ quality: string; seeds: string; infoHash: string; magnet: string; size: string; name: string }>,
+  preferredQuality: '720p' | '1080p' | '4k' | 'best' = '1080p',
+): typeof streams[0] | null {
   if (streams.length === 0) return null;
 
   const withRes = streams.map(s => ({
@@ -147,20 +159,29 @@ export function pickBestStream(streams: Array<{ quality: string; seeds: string; 
     seedCount: parseInt(s.seeds) || 0,
   }));
 
-  // Ideal: 720p–1080p range, most seeds
-  const ideal = withRes
-    .filter(s => s.res >= 720 && s.res < 2160)
-    .sort((a, b) => b.seedCount - a.seedCount);
-  if (ideal.length > 0) return ideal[0];
+  const bySeed = (a: typeof withRes[0], b: typeof withRes[0]) => b.seedCount - a.seedCount;
 
-  // Fallback 1: any ≥ 720p (including 4K), most seeds
-  const hd = withRes
-    .filter(s => s.res >= 720)
-    .sort((a, b) => b.seedCount - a.seedCount);
+  if (preferredQuality === 'best') {
+    // Highest resolution first, then most seeds
+    return withRes.sort((a, b) => b.res - a.res || bySeed(a, b))[0];
+  }
+
+  const targetRes = preferredQuality === '4k' ? 2160 : preferredQuality === '1080p' ? 1080 : 720;
+
+  // 1. Exact target resolution, most seeds
+  const exact = withRes.filter(s => s.res === targetRes).sort(bySeed);
+  if (exact.length > 0) return exact[0];
+
+  // 2. Nearest resolution below target (e.g. asked for 4K, try 1080p)
+  const below = withRes.filter(s => s.res > 0 && s.res < targetRes).sort((a, b) => b.res - a.res || bySeed(a, b));
+  if (below.length > 0) return below[0];
+
+  // 3. Any HD stream (≥ 720p), most seeds
+  const hd = withRes.filter(s => s.res >= 720).sort(bySeed);
   if (hd.length > 0) return hd[0];
 
-  // Fallback 2: whatever has the most seeds
-  return withRes.sort((a, b) => b.seedCount - a.seedCount)[0];
+  // 4. Last resort: most seeds regardless of resolution
+  return withRes.sort(bySeed)[0];
 }
 
 // ─── Core download function ───────────────────────────────────────────────────

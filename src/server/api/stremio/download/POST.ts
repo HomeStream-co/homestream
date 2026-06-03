@@ -455,6 +455,7 @@ export default async function handler(req: Request, res: Response) {
   const cfg = readConfig();
   const rdApiKey = cfg.realDebridApiKey?.trim();
   const useRD = !!rdApiKey;
+  const preferredQuality = (cfg.preferredQuality as '720p' | '1080p' | '4k' | 'best') ?? '1080p';
 
   // Only check qBit / WebTorrent if RD is not configured
   let useQbit = false;
@@ -529,7 +530,7 @@ export default async function handler(req: Request, res: Response) {
       if (!streams || streams.length === 0) {
         streams = await fetchStreamsForEpisode(finalImdbId, 'movie', title);
       }
-      const best = pickBestStream(streams ?? []);
+      const best = pickBestStream(streams ?? [], preferredQuality);
       if (!best) {
         await releaseVPN();
         res.status(404).json({ error: 'No suitable streams found for this title' });
@@ -618,7 +619,7 @@ export default async function handler(req: Request, res: Response) {
       if (season != null && episode != null) {
         const epTitle = `${title} S${String(season).padStart(2, '0')}E${String(episode).padStart(2, '0')}`;
         const streams = await fetchStreamsForEpisode(finalImdbId, 'series', title, season, episode);
-        const best = pickBestStream(streams);
+        const best = pickBestStream(streams, preferredQuality);
         if (!best) {
           await releaseVPN();
           res.status(404).json({ error: `No streams found for ${epTitle}` });
@@ -669,6 +670,8 @@ export default async function handler(req: Request, res: Response) {
           await releaseVPN();
           res.json({ queued: 1, jobs: [job], backend: 'qbittorrent', vpnUsed: vpnConnected });
         } else {
+          // FIX (🟡): WebTorrent single-episode path was missing duplicate check.
+          if (checkDuplicate(best.infoHash, epTitle)) { await releaseVPN(); return; }
           const { queueDownload } = await import('../../../torrentManager.js');
           const job = queueDownload({ infoHash: best.infoHash, magnet: best.magnet, quality: best.quality, title: epTitle, type: 'series', season, episode, imdbId: finalImdbId, poster, year });
           await releaseVPN();
@@ -686,15 +689,20 @@ export default async function handler(req: Request, res: Response) {
       }
 
       const MAX_EPISODES_PER_SEASON = 50;
-      const episodeTasks: Array<{ season: number; episode: number }> = [];
+      // FIX (🔴): Previously the probe loop fetched streams for each episode
+      // sequentially to find where the season ends, then the batch loop fetched
+      // the same episodes *again* via Promise.all. This doubled the number of
+      // Torrentio/Prowlarr requests and was very slow for long seasons. Now we
+      // store the probe results directly and reuse them — no second fetch.
+      const episodeTasks: Array<{ season: number; episode: number; streams: StreamResult[] }> = [];
       for (const s of seasonsToFetch) {
         for (let ep = 1; ep <= MAX_EPISODES_PER_SEASON; ep++) {
-          const probe = await fetchStreamsForEpisode(finalImdbId, 'series', title, s, ep);
-          if (probe.length === 0) {
+          const streams = await fetchStreamsForEpisode(finalImdbId, 'series', title, s, ep);
+          if (streams.length === 0) {
             console.log(`[download] S${s} ends at E${ep - 1} (no streams found for E${ep})`);
             break;
           }
-          episodeTasks.push({ season: s, episode: ep });
+          episodeTasks.push({ season: s, episode: ep, streams });
         }
       }
 
@@ -703,18 +711,11 @@ export default async function handler(req: Request, res: Response) {
 
       for (let i = 0; i < episodeTasks.length; i += BATCH) {
         const batch = episodeTasks.slice(i, i + BATCH);
-        const batchResults = await Promise.all(
-          batch.map(({ season: s, episode: ep }) =>
-            fetchStreamsForEpisode(finalImdbId, 'series', title, s, ep)
-          )
-        );
 
-        for (let j = 0; j < batch.length; j++) {
-          const { season: s, episode: ep } = batch[j];
-          const epStreams = batchResults[j];
+        for (const { season: s, episode: ep, streams: epStreams } of batch) {
           if (epStreams.length === 0) continue;
 
-          const best = pickBestStream(epStreams);
+          const best = pickBestStream(epStreams, preferredQuality);
           if (!best) continue;
 
           const epTitle = `${title} S${String(s).padStart(2, '0')}E${String(ep).padStart(2, '0')}`;

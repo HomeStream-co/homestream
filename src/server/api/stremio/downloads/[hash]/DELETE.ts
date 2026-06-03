@@ -52,6 +52,11 @@ export default async function handler(req: Request, res: Response) {
 
   try {
     await deleteTorrent(hash, deleteFiles);
+    // FIX (🔴): Previously only called deleteTorrent() but never removed the
+    // job from the persisted store. After deletion the job would reappear on
+    // the Downloads page on the next poll/refresh because the store still had
+    // it. Now we always clean up the persisted record too.
+    deleteJob(hash);
     res.json({ ok: true, hash, deleteFiles });
   } catch (err) {
     res.status(500).json({ error: 'Failed to delete torrent', message: String(err) });

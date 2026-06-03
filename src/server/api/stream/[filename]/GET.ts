@@ -113,8 +113,16 @@ export default function handler(req: Request, res: Response) {
     const etag = `"${stat.size}-${stat.mtimeMs.toString(36)}"`;
     const lastModified = stat.mtime.toUTCString();
 
-    // 304 Not Modified — browser already has this chunk
-    if (req.headers['if-none-match'] === etag) {
+    // FIX (🔴): Previously returned 304 for ALL requests with a matching ETag,
+    // including Range requests. A 304 on a Range request tells the browser "use
+    // your cached copy" — but the browser only has the previously-fetched range,
+    // not the full file. This broke seeking: after seeking to a new position the
+    // browser sent a Range + If-None-Match request, got 304, and stalled because
+    // it had no cached data for that byte range.
+    //
+    // Correct behaviour: 304 is only valid for full-file (non-Range) requests.
+    // Range requests must always get a 206 with the actual bytes.
+    if (!req.headers.range && req.headers['if-none-match'] === etag) {
       return res.status(304).end();
     }
 

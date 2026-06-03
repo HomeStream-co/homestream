@@ -86,15 +86,32 @@ async function fetchStreamsForEpisode(
   }
 }
 
-function pickBestStream(streams: StreamResult[]): StreamResult | null {
+function pickBestStream(streams: StreamResult[], preferredQuality: '720p' | '1080p' | '4k' | 'best' = '1080p'): StreamResult | null {
   if (streams.length === 0) return null;
-  // Prefer 1080p → 720p → 4K (4K last to avoid wasting storage on TV episodes)
-  const prefer = ['1080p', '720p', '2160p', '4K'];
-  for (const q of prefer) {
-    const match = streams.find(s => s.quality.includes(q));
-    if (match) return match;
-  }
-  return streams[0];
+  // FIX (🟡): Previously hardcoded 1080p→720p→4K order, ignoring the user's
+  // preferredQuality setting. Now delegates to the shared torrentManager helper
+  // so the scheduler honours the same quality preference as manual downloads.
+  // Import is deferred to avoid circular deps — use inline logic matching
+  // torrentManager.pickBestStream for the scheduler's StreamResult shape.
+  const parseRes = (q: string): number => {
+    const lq = q.toLowerCase();
+    if (lq.includes('2160') || lq.includes('4k') || lq.includes('uhd')) return 2160;
+    if (lq.includes('1080')) return 1080;
+    if (lq.includes('720')) return 720;
+    if (lq.includes('480')) return 480;
+    return 0;
+  };
+  const withRes = streams.map(s => ({ ...s, res: parseRes(s.quality), seedCount: parseInt(s.seeds) || 0 }));
+  const bySeed = (a: typeof withRes[0], b: typeof withRes[0]) => b.seedCount - a.seedCount;
+  if (preferredQuality === 'best') return withRes.sort((a, b) => b.res - a.res || bySeed(a, b))[0];
+  const targetRes = preferredQuality === '4k' ? 2160 : preferredQuality === '1080p' ? 1080 : 720;
+  const exact = withRes.filter(s => s.res === targetRes).sort(bySeed);
+  if (exact.length > 0) return exact[0];
+  const below = withRes.filter(s => s.res > 0 && s.res < targetRes).sort((a, b) => b.res - a.res || bySeed(a, b));
+  if (below.length > 0) return below[0];
+  const hd = withRes.filter(s => s.res >= 720).sort(bySeed);
+  if (hd.length > 0) return hd[0];
+  return withRes.sort(bySeed)[0];
 }
 
 // ── Core check logic ──────────────────────────────────────────────────────────
@@ -136,6 +153,7 @@ async function checkSubscription(sub: ShowSubscription): Promise<void> {
   const fullCfg = cfg as unknown as Record<string, unknown>;
   const vpnCfg = fullCfg.vpn as Parameters<typeof connectForDownload>[0] | undefined;
   const useQbit = !!cfg.qbitUrl;
+  const preferredQuality = (cfg.preferredQuality as '720p' | '1080p' | '4k' | 'best') ?? '1080p';
 
   let vpnConnected = false;
 
@@ -160,7 +178,7 @@ async function checkSubscription(sub: ShowSubscription): Promise<void> {
           break;
         }
 
-        const best = pickBestStream(streams);
+        const best = pickBestStream(streams, preferredQuality);
         if (!best) continue;
 
         const epTitle = `${sub.title} S${String(s).padStart(2, '0')}E${String(ep).padStart(2, '0')}`;

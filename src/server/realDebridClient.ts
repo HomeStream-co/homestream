@@ -274,10 +274,14 @@ export async function downloadUrl(
   const SOCKET_IDLE_TIMEOUT_MS = 30_000; // 30 s of no data = stalled CDN
 
   return new Promise((resolve, reject) => {
-    const protocol = url.startsWith('https') ? https : http;
-
     const doRequest = (reqUrl: string) => {
-      const req = protocol.get(reqUrl, (res) => {
+      // FIX (🔴): Previously captured `protocol` from the outer closure, which
+      // was always based on the *original* URL. If a redirect crossed http↔https
+      // (common with CDN redirects), the wrong Node.js module was used, causing
+      // the request to fail or hang. Now we re-derive the module from each URL.
+      const proto = reqUrl.startsWith('https') ? https : http;
+
+      const req = proto.get(reqUrl, (res) => {
         // Follow redirects
         if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
           doRequest(res.headers.location);

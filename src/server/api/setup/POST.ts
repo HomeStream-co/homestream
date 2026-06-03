@@ -167,14 +167,21 @@ export default async function handler(req: Request, res: Response) {
       }
 
       case 'test_qbit': {
-        // Pass credentials directly — never mutate process.env, which would
-        // permanently overwrite the live server's qBit config for the duration
-        // of the process and leak wizard-entered credentials into the runtime.
         const result = await testQbit({
           url:      fields.qbitUrl      || undefined,
           username: fields.qbitUsername || undefined,
           password: fields.qbitPassword || undefined,
         });
+        // FIX (🔴): After a successful connection test, persist the credentials
+        // to process.env so the qBittorrent client uses them for the rest of
+        // the session. Previously the handler passed credentials directly to
+        // testQbit() but never updated process.env, so the live qBit client
+        // continued using the old (or empty) credentials after the wizard.
+        if (result.ok) {
+          if (fields.qbitUrl)      process.env.QBIT_URL      = fields.qbitUrl;
+          if (fields.qbitUsername) process.env.QBIT_USERNAME = fields.qbitUsername;
+          if (fields.qbitPassword) process.env.QBIT_PASSWORD = fields.qbitPassword;
+        }
         res.json(result);
         break;
       }
