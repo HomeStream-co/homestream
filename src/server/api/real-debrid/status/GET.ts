@@ -13,9 +13,8 @@ import { readConfig, writeConfig } from '../../../configStore.js';
 import { getUser } from '../../../realDebridClient.js';
 import { requireAuth } from '../../../authMiddleware.js';
 
-export default [requireAuth, handler];
-
-async function handler(req: Request, res: Response) {
+export default async function handler(req: Request, res: Response) {
+  if (!requireAuth(req, res)) return;
   const config = readConfig();
 
   if (!config.realDebridApiKey) {

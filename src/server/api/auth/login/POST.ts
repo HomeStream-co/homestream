@@ -30,16 +30,16 @@ export { isValidSession, clearAllSessions, getSessionCount };
 
 // ── Rate limiter ──────────────────────────────────────────────────────────────
 //
-// FIX (🔴): rateBuckets was a plain in-memory Map — a server restart wiped all
-// state, allowing unlimited brute-force attempts immediately after any restart.
-// Rate-limit state is now persisted to homestream-ratelimit.json via the same
-// write-through cache pattern as sessionStore so it survives restarts.
+// Max 10 attempts per IP per 15-minute window. After 5 failures, responses
+// are delayed by 2 s to slow brute-force attacks.
 //
-// FIX (🟡): getClientIp() previously trusted X-Forwarded-For unconditionally.
-// A LAN attacker could spoof any IP by setting their own X-Forwarded-For header,
-// bypassing per-IP rate limiting entirely. We now only trust X-Forwarded-For
-// when the TCP connection originates from localhost (i.e. a trusted reverse
-// proxy running on the same machine). Direct LAN connections use the socket IP.
+// Rate-limit state is persisted to homestream-ratelimit.json so it survives
+// server restarts — an attacker can't reset their bucket by restarting the
+// server.
+//
+// X-Forwarded-For is only trusted when the TCP connection comes from localhost
+// (a reverse proxy on the same machine). Direct LAN connections use the socket
+// IP to prevent header spoofing.
 
 import fs from 'fs';
 import { dataPath } from '../../../dataDir.js';
@@ -57,45 +57,28 @@ const FAILURE_DELAY_MS = 2000;           // 2s delay per attempt after threshold
 
 // ── Rate-limit store ──────────────────────────────────────────────────────────
 //
-// FIX (🔴 partial): The original rateBuckets Map was purely in-memory — a
-// server restart wiped all state. We now persist to disk asynchronously so
-// the state is available for future use. However, we do NOT load from disk on
-// startup because the auth test does not mock dataDir and the file accumulates
-// state across test runs, causing spurious 429s after 10 calls.
+// Buckets are persisted to homestream-ratelimit.json so rate-limit state
+// survives server restarts. An attacker who triggers a restart gets at most
+// one extra 15-minute window of attempts — acceptable for a home server.
 //
-// For a home server, losing rate-limit state on restart is acceptable — the
-// 15-minute window means an attacker who triggers a restart gets at most one
-// extra window of attempts. The in-memory Map is the authoritative source.
-//
-// FIX (🟡): getClientIp() now only trusts X-Forwarded-For when the TCP
-// connection comes from localhost (trusted reverse proxy). Direct LAN
-// connections use the socket IP to prevent header spoofing.
+// In the Vitest environment (process.env.VITEST === 'true') all disk I/O is
+// skipped so tests don't bleed state across runs and don't write to disk.
+
+/** True when running inside Vitest — used to skip disk I/O in tests. */
+const IS_TEST = process.env.VITEST === 'true';
 
 const RATELIMIT_PATH = dataPath('homestream-ratelimit.json');
-
-// ── In-memory Map — authoritative for this process ────────────────────────────
-//
-// FIX (🔴): Previously the Map was never loaded from disk on startup, so a
-// server restart wiped all rate-limit state and an attacker could trigger a
-// restart to reset their bucket. We now load persisted state on module init
-// (skipped in test env so tests don't bleed state across runs).
-//
-// Expired buckets are pruned on load so stale entries from a previous run
-// don't block legitimate users after the 15-minute window has passed.
 
 const rateBuckets = new Map<string, RateBucket>();
 
 function loadPersistedRateLimits(): void {
-  if (process.env.NODE_ENV === 'test') return; // test isolation
+  if (IS_TEST) return;
   try {
     if (!fs.existsSync(RATELIMIT_PATH)) return;
     const raw = JSON.parse(fs.readFileSync(RATELIMIT_PATH, 'utf-8')) as Record<string, RateBucket>;
     const cutoff = Date.now() - RATE_WINDOW_MS;
     for (const [ip, bucket] of Object.entries(raw)) {
-      // Only restore buckets whose window hasn't expired yet
-      if (bucket.windowStart > cutoff) {
-        rateBuckets.set(ip, bucket);
-      }
+      if (bucket.windowStart > cutoff) rateBuckets.set(ip, bucket);
     }
     if (rateBuckets.size > 0) {
       console.log(`[auth] Restored ${rateBuckets.size} rate-limit bucket(s) from disk`);
@@ -110,13 +93,24 @@ loadPersistedRateLimits();
 /**
  * Reset all rate-limit buckets. FOR TESTING ONLY.
  * Call this in beforeEach so rate-limit state doesn't bleed between tests.
+ * Also re-enables the failure delay so tests that need it work correctly.
  */
 export function _resetRateLimitsForTesting(): void {
   rateBuckets.clear();
+  _testDelayDisabled = false; // always restore delay on reset
 }
 
+/**
+ * Disable the failure delay (the 2s setTimeout after 5 bad attempts).
+ * FOR TESTING ONLY — call once in beforeAll for rate-limit test suites
+ * so exhaust() loops complete instantly without fake-timer gymnastics.
+ */
+let _testDelayDisabled = false;
+export function _disableFailureDelayForTesting(): void { _testDelayDisabled = true; }
+export function _enableFailureDelayForTesting(): void  { _testDelayDisabled = false; }
+
 function persistRateLimits(): void {
-  if (process.env.NODE_ENV === 'test') return; // test isolation — no disk writes
+  if (IS_TEST) return;
   const data: Record<string, RateBucket> = {};
   for (const [ip, bucket] of rateBuckets) data[ip] = bucket;
   const tmp = RATELIMIT_PATH + '.tmp';
@@ -125,18 +119,20 @@ function persistRateLimits(): void {
     fs.renameSync(tmp, RATELIMIT_PATH);
   } catch {
     try { fs.unlinkSync(tmp); } catch { /* ignore */ }
-    // Non-fatal — in-memory state is still correct
   }
 }
 
-// Prune expired buckets every 30 minutes and persist
-setInterval(() => {
-  const cutoff = Date.now() - RATE_WINDOW_MS;
-  for (const [ip, bucket] of rateBuckets) {
-    if (bucket.windowStart < cutoff) rateBuckets.delete(ip);
-  }
-  persistRateLimits();
-}, 30 * 60 * 1000).unref();
+// Prune expired buckets every 30 minutes and persist.
+// Skipped in Vitest — fake timers would fire this and wipe buckets mid-test.
+if (!IS_TEST) {
+  setInterval(() => {
+    const cutoff = Date.now() - RATE_WINDOW_MS;
+    for (const [ip, bucket] of rateBuckets) {
+      if (bucket.windowStart < cutoff) rateBuckets.delete(ip);
+    }
+    persistRateLimits();
+  }, 30 * 60 * 1000).unref();
+}
 
 // ── IP extraction ─────────────────────────────────────────────────────────────
 
@@ -156,7 +152,6 @@ function getClientIp(req: Request): string {
 // ── Rate-limit helpers ────────────────────────────────────────────────────────
 
 function checkRateLimit(ip: string): { allowed: boolean; retryAfterSecs?: number } {
-  if (process.env.NODE_ENV === 'test') return { allowed: true };
   const now = Date.now();
   let bucket = rateBuckets.get(ip);
 
@@ -166,8 +161,6 @@ function checkRateLimit(ip: string): { allowed: boolean; retryAfterSecs?: number
 
   bucket.attempts++;
   rateBuckets.set(ip, bucket);
-  // Persist on every attempt so the count survives a restart mid-attack.
-  // This is a fire-and-forget write — we don't await it.
   persistRateLimits();
 
   if (bucket.attempts > MAX_ATTEMPTS) {
@@ -179,18 +172,15 @@ function checkRateLimit(ip: string): { allowed: boolean; retryAfterSecs?: number
 }
 
 function recordFailure(ip: string): void {
-  if (process.env.NODE_ENV === 'test') return;
   const bucket = rateBuckets.get(ip);
   if (bucket) {
     bucket.failures++;
     rateBuckets.set(ip, bucket);
-    // Persist immediately so a restart mid-attack doesn't reset the failure count
     persistRateLimits();
   }
 }
 
 function getFailureDelay(ip: string): number {
-  if (process.env.NODE_ENV === 'test') return 0;
   const bucket = rateBuckets.get(ip);
   if (!bucket || bucket.failures < DELAY_AFTER_FAILURES) return 0;
   return FAILURE_DELAY_MS;
@@ -247,7 +237,7 @@ export default async function handler(req: Request, res: Response) {
     if (!valid) {
       recordFailure(ip);
       const delay = getFailureDelay(ip);
-      if (delay > 0) {
+      if (delay > 0 && !_testDelayDisabled) {
         await new Promise(r => setTimeout(r, delay));
       }
       return res.status(401).json({ error: 'Incorrect password' });

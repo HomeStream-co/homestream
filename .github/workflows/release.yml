@@ -157,7 +157,9 @@ jobs:
     name: Build & Publish Linux Packages
     runs-on: ubuntu-latest
     timeout-minutes: 60
-    needs: release-windows
+    # Runs in parallel with release-windows — no dependency between them.
+    # Both jobs upload to the same GitHub Release; electron-builder handles
+    # concurrent uploads safely via the GitHub Releases API.
 
     steps:
       - uses: actions/checkout@v4
@@ -247,3 +249,92 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
 
+  # ── AUR publish ──────────────────────────────────────────────────────────────
+  # Bumps homestream-bin on the AUR so `yay -Syu` picks up the new version.
+  #
+  # Prerequisites (one-time setup):
+  #   1. Generate a dedicated SSH key:  ssh-keygen -t ed25519 -C "homestream-aur-ci" -f aur_key
+  #   2. Add the PUBLIC key to your AUR account at https://aur.archlinux.org/account/<you>/edit
+  #   3. Add the PRIVATE key as a GitHub secret named AUR_SSH_PRIVATE_KEY
+  #      (Settings → Secrets → Actions → New repository secret)
+  #
+  # If AUR_SSH_PRIVATE_KEY is not set, this job is skipped silently — the
+  # rest of the release still completes normally.
+  publish-aur:
+    name: Publish to AUR
+    runs-on: ubuntu-latest
+    needs: [release-windows, release-linux]
+    # Run whenever linux build succeeded (windows failure is non-blocking).
+    # The steps below check for AUR_SSH_PRIVATE_KEY and exit 0 if not set.
+    if: ${{ always() && needs.release-linux.result == 'success' }}
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract version from tag
+        id: version
+        run: echo "ver=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up SSH for AUR
+        env:
+          AUR_KEY: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+        run: |
+          if [[ -z "$AUR_KEY" ]]; then
+            echo "AUR_SSH_PRIVATE_KEY not set — skipping AUR publish."
+            echo "See aur/README.md for one-time setup instructions."
+            exit 0
+          fi
+          mkdir -p ~/.ssh
+          printf '%s\n' "$AUR_KEY" > ~/.ssh/aur_key
+          chmod 600 ~/.ssh/aur_key
+          ssh-keyscan -H aur.archlinux.org >> ~/.ssh/known_hosts
+          cat >> ~/.ssh/config <<'SSHEOF'
+Host aur.archlinux.org
+  IdentityFile ~/.ssh/aur_key
+  User aur
+SSHEOF
+          echo "AUR_KEY_CONFIGURED=true" >> "$GITHUB_ENV"
+
+      - name: Configure git
+        if: env.AUR_KEY_CONFIGURED == 'true'
+        run: |
+          git config --global user.name  "HomeStream CI"
+          git config --global user.email "homestream-ci@users.noreply.github.com"
+
+      - name: Clone AUR repo
+        if: env.AUR_KEY_CONFIGURED == 'true'
+        run: |
+          # If the AUR package hasn't been submitted yet (first-time setup),
+          # the clone will fail. We catch that and skip gracefully — the
+          # release still completes, the AUR just needs the one-time manual
+          # submission described in aur/README.md.
+          if git clone ssh://aur@aur.archlinux.org/homestream-bin.git /tmp/homestream-aur 2>&1; then
+            echo "AUR_CLONED=true" >> "$GITHUB_ENV"
+          else
+            echo "AUR clone failed — package may not exist yet on AUR."
+            echo "Complete the one-time manual submission described in aur/README.md."
+            echo "AUR_CLONED=false" >> "$GITHUB_ENV"
+          fi
+
+      - name: Bump version in PKGBUILD and .SRCINFO
+        if: env.AUR_KEY_CONFIGURED == 'true' && env.AUR_CLONED == 'true'
+        run: |
+          VER="${{ steps.version.outputs.ver }}"
+          sed -i "s/^pkgver=.*/pkgver=${VER}/" aur/PKGBUILD
+          sed -i "s/^pkgrel=.*/pkgrel=1/"      aur/PKGBUILD
+          sed -i "s/pkgver = .*/pkgver = ${VER}/" aur/.SRCINFO
+          OLD_VER=$(grep -oP 'HomeStream-\K[\d.]+(?=\.AppImage)' aur/.SRCINFO | head -1)
+          if [[ -n "$OLD_VER" ]]; then
+            sed -i "s/${OLD_VER}/${VER}/g" aur/.SRCINFO
+          fi
+
+      - name: Copy files to AUR clone and push
+        if: env.AUR_KEY_CONFIGURED == 'true' && env.AUR_CLONED == 'true'
+        run: |
+          cp aur/PKGBUILD aur/.SRCINFO aur/homestream.desktop /tmp/homestream-aur/
+          cd /tmp/homestream-aur
+          git add PKGBUILD .SRCINFO homestream.desktop
+          git diff --cached --stat
+          git commit -m "upgpkg: homestream-bin ${{ steps.version.outputs.ver }}"
+          git push

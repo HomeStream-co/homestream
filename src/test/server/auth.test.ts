@@ -9,7 +9,7 @@
  * All filesystem and bcrypt I/O is mocked — no disk access, no real hashing.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { Request, Response } from 'express';
 
 // ── Shared mock state ─────────────────────────────────────────────────────────
@@ -87,9 +87,15 @@ const { _resetRateLimitsForTesting } = await import('../../server/api/auth/login
 
 describe('POST /api/auth/login', () => {
   beforeEach(() => {
+    vi.useRealTimers(); // ensure fake timers from a previous test never bleed in
     mockAdminPassword = 'secret123';
     mockSessions.clear();
     _resetRateLimitsForTesting(); // prevent rate-limit state bleeding between tests
+  });
+
+  afterEach(() => {
+    vi.useRealTimers(); // always restore — even if the test throws mid-way
+    _resetRateLimitsForTesting();
   });
 
   it('returns 400 when password field is missing', async () => {
@@ -221,18 +227,20 @@ describe('POST /api/auth/login', () => {
   it('rate-limits after 10 attempts from the same IP', async () => {
     // Use a unique IP so we don't bleed into other tests
     const ip = '10.0.0.99';
-    // Use fake timers to skip the 2s failure delay (triggered after 5 failures)
+    // Use fake timers to skip the 2s failure delay (triggered after 5 failures).
+    // Use advanceTimersByTime(3000) — NOT runAllTimers() — so we don't fire the
+    // 30-minute prune interval which would wipe the bucket mid-test.
     vi.useFakeTimers();
     for (let i = 0; i < 10; i++) {
       const { req, res } = makeReqRes({ password: 'wrong' }, {}, ip);
       const p = loginHandler(req, res);
-      vi.runAllTimers();
+      vi.advanceTimersByTime(3000);
       await p;
     }
     // 11th attempt should be rate-limited
     const { req, res } = makeReqRes({ password: 'wrong' }, {}, ip);
     const p = loginHandler(req, res);
-    vi.runAllTimers();
+    vi.advanceTimersByTime(3000);
     await p;
     vi.useRealTimers();
     expect(res.status).toHaveBeenCalledWith(429);
@@ -255,7 +263,7 @@ describe('POST /api/auth/login', () => {
         set: vi.fn().mockReturnThis(),
       } as unknown as Response;
       const p = loginHandler(req, res);
-      vi.runAllTimers();
+      vi.advanceTimersByTime(3000);
       await p;
     }
     const req = {
@@ -271,7 +279,7 @@ describe('POST /api/auth/login', () => {
       set: vi.fn().mockReturnThis(),
     } as unknown as Response;
     const p = loginHandler(req, res);
-    vi.runAllTimers();
+    vi.advanceTimersByTime(3000);
     await p;
     vi.useRealTimers();
     expect(res.status).toHaveBeenCalledWith(429);

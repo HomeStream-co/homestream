@@ -55,7 +55,7 @@
  *     ✓ All 429 responses include { error: string }
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, beforeAll, afterEach, afterAll } from 'vitest';
 import type { Request, Response } from 'express';
 
 // ── Shared mock state ─────────────────────────────────────────────────────────
@@ -181,7 +181,6 @@ describe('HTTP 400 — Bad Request', () => {
   });
 
   it('POST /api/auth/login — missing password field → 400', async () => {
-    vi.resetModules();
     const mod = await import('../../server/api/auth/login/POST.js');
     const res = makeRes();
     await mod.default(makeReq({ body: {} }), res as unknown as Response);
@@ -190,7 +189,6 @@ describe('HTTP 400 — Bad Request', () => {
   });
 
   it('POST /api/auth/login — empty string password → 400', async () => {
-    vi.resetModules();
     const mod = await import('../../server/api/auth/login/POST.js');
     const res = makeRes();
     await mod.default(makeReq({ body: { password: '' } }), res as unknown as Response);
@@ -198,7 +196,6 @@ describe('HTTP 400 — Bad Request', () => {
   });
 
   it('POST /api/setup — unknown action → 400', async () => {
-    vi.resetModules();
     const mod = await import('../../server/api/setup/POST.js');
     const res = makeRes();
     await mod.default(makeReq({ body: { action: 'do_evil_thing' } }), res as unknown as Response);
@@ -208,7 +205,6 @@ describe('HTTP 400 — Bad Request', () => {
 
   it('POST /api/setup — scan_existing with no mediaDir → 400', async () => {
     mockReadConfig.mockReturnValue({ ...BASE_CONFIG, mediaDir: '' });
-    vi.resetModules();
     const mod = await import('../../server/api/setup/POST.js');
     const res = makeRes();
     await mod.default(makeReq({ body: { action: 'scan_existing' } }), res as unknown as Response);
@@ -216,7 +212,6 @@ describe('HTTP 400 — Bad Request', () => {
   });
 
   it('POST /api/setup/test-keys — missing key field → 400', async () => {
-    vi.resetModules();
     const mod = await import('../../server/api/setup/test-keys/POST.js');
     const res = makeRes();
     await mod.default(makeReq({ body: { value: 'somevalue' } }), res as unknown as Response);
@@ -224,7 +219,6 @@ describe('HTTP 400 — Bad Request', () => {
   });
 
   it('POST /api/setup/test-keys — missing value field → 400', async () => {
-    vi.resetModules();
     const mod = await import('../../server/api/setup/test-keys/POST.js');
     const res = makeRes();
     await mod.default(makeReq({ body: { key: 'tmdb' } }), res as unknown as Response);
@@ -232,7 +226,6 @@ describe('HTTP 400 — Bad Request', () => {
   });
 
   it('POST /api/setup/test-keys — unknown key type → 400', async () => {
-    vi.resetModules();
     const mod = await import('../../server/api/setup/test-keys/POST.js');
     const res = makeRes();
     await mod.default(makeReq({ body: { key: 'unknown_service', value: 'abc' } }), res as unknown as Response);
@@ -240,7 +233,6 @@ describe('HTTP 400 — Bad Request', () => {
   });
 
   it('POST /api/setup/test-keys — whitespace-only value → 400', async () => {
-    vi.resetModules();
     const mod = await import('../../server/api/setup/test-keys/POST.js');
     const res = makeRes();
     await mod.default(makeReq({ body: { key: 'tmdb', value: '   ' } }), res as unknown as Response);
@@ -263,7 +255,6 @@ describe('HTTP 401 — Unauthorized', () => {
   });
 
   it('GET /api/health/full — no session cookie → 401', async () => {
-    vi.resetModules();
     const mod = await import('../../server/api/health/full/GET.js');
     const res = makeRes();
     await mod.default(makeReq({ cookies: {} }), res as unknown as Response);
@@ -271,7 +262,6 @@ describe('HTTP 401 — Unauthorized', () => {
   });
 
   it('GET /api/dev/diagnostics — no session cookie → 401', async () => {
-    vi.resetModules();
     const mod = await import('../../server/api/dev/diagnostics/GET.js');
     const res = makeRes();
     mod.default(makeReq({ cookies: {} }), res as unknown as Response);
@@ -279,7 +269,6 @@ describe('HTTP 401 — Unauthorized', () => {
   });
 
   it('POST /api/setup — save after setup complete, no auth → 401', async () => {
-    vi.resetModules();
     const mod = await import('../../server/api/setup/POST.js');
     const res = makeRes();
     await mod.default(makeReq({ body: { action: 'save', tmdbApiKey: 'x' }, cookies: {} }), res as unknown as Response);
@@ -298,7 +287,6 @@ describe('HTTP 403 — Forbidden', () => {
   });
 
   it('POST /api/setup — adminPassword change blocked by DEVELOPER_LOCK → 403', async () => {
-    vi.resetModules();
     const mod = await import('../../server/api/setup/POST.js');
     const res = makeRes();
     await mod.default(makeReq({ body: { action: 'save', adminPassword: 'hacker' } }), res as unknown as Response);
@@ -308,25 +296,49 @@ describe('HTTP 403 — Forbidden', () => {
 });
 
 // ── 429 Too Many Requests ─────────────────────────────────────────────────────
-// IMPORTANT: All three 429 tests share ONE module import so the in-memory
-// rate-limit bucket accumulates across them. We use a unique IP per test
-// and import the handler ONCE at describe scope (no vi.resetModules here).
+// All three tests share one loginHandler instance (rate bucket must accumulate).
+// Each test uses a unique IP so buckets don't bleed between tests.
+// We disable the 2s failure-delay so exhaust() completes instantly.
+//
+// NOTE: We do NOT call vi.resetModules() here. The login module is already
+// imported (with all vi.mock() registrations active) by the 400 tests above.
+// We grab the same instance and use its testing exports directly.
 
 describe('HTTP 429 — Too Many Requests', () => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let loginHandler: (req: Request, res: Response) => Promise<any>;
+  let resetRateLimits: () => void;
+  let disableDelay: () => void;
+  let enableDelay: () => void;
 
-  // Import once — rate limiter state is module-level and must persist
-  beforeEach(async () => {
+  beforeAll(async () => {
+    // Import without resetting modules — reuse the already-mocked instance
+    const mod = await import('../../server/api/auth/login/POST.js');
+    loginHandler = mod.default;
+    const m = mod as unknown as {
+      _resetRateLimitsForTesting: () => void;
+      _disableFailureDelayForTesting: () => void;
+      _enableFailureDelayForTesting: () => void;
+    };
+    resetRateLimits = m._resetRateLimitsForTesting;
+    disableDelay   = m._disableFailureDelayForTesting;
+    enableDelay    = m._enableFailureDelayForTesting;
+    disableDelay();
+  });
+
+  beforeEach(() => {
+    resetRateLimits(); // also re-enables delay
+    disableDelay();    // disable it again for this test suite
     mockReadConfig.mockReturnValue(BASE_CONFIG);
     mockBcryptCompare.mockResolvedValue(false);
     mockCreateSession.mockReturnValue('tok');
-    if (!loginHandler) {
-      vi.resetModules();
-      const mod = await import('../../server/api/auth/login/POST.js');
-      loginHandler = mod.default;
-    }
   });
+
+  afterEach(() => {
+    resetRateLimits(); // clears bucket AND re-enables delay
+  });
+
+  afterAll(() => { enableDelay(); }); // belt-and-suspenders
 
   async function exhaust(ip: string) {
     for (let i = 0; i < 10; i++) {
@@ -377,7 +389,6 @@ describe('Legacy error message format — all error responses include { error: s
   });
 
   it('400 response from login (no password) has { error: string }', async () => {
-    vi.resetModules();
     const mod = await import('../../server/api/auth/login/POST.js');
     const res = makeRes();
     await mod.default(makeReq({ body: {} }), res as unknown as Response);
@@ -387,7 +398,6 @@ describe('Legacy error message format — all error responses include { error: s
   });
 
   it('400 response from setup (unknown action) has { error: string }', async () => {
-    vi.resetModules();
     const mod = await import('../../server/api/setup/POST.js');
     const res = makeRes();
     await mod.default(makeReq({ body: { action: 'bad_action' } }), res as unknown as Response);
@@ -400,7 +410,6 @@ describe('Legacy error message format — all error responses include { error: s
     mockGetAllJobs.mockReturnValue([]);
     mockExistsSync.mockReturnValue(true);
     mockIsSetupComplete.mockReturnValue(true);
-    vi.resetModules();
     const mod = await import('../../server/api/health/full/GET.js');
     const res = makeRes();
     await mod.default(makeReq({ cookies: {} }), res as unknown as Response);
@@ -410,7 +419,6 @@ describe('Legacy error message format — all error responses include { error: s
 
   it('403 response from setup (DEVELOPER_LOCK) has { error: string }', async () => {
     mockIsDeveloperLocked.mockReturnValue(true);
-    vi.resetModules();
     const mod = await import('../../server/api/setup/POST.js');
     const res = makeRes();
     await mod.default(makeReq({ body: { action: 'save', adminPassword: 'x' } }), res as unknown as Response);

@@ -246,7 +246,7 @@ export default function StremioPanel() {
 
   const handleLogout = () => {
     setAccount(null);
-    localStorage.removeItem('stremio_account');
+    try { localStorage.removeItem('stremio_account'); } catch { /* non-fatal — ignore in restricted environments */ }
     setResults([]);
     setSelected(null);
     setQuery('');
@@ -546,7 +546,7 @@ export default function StremioPanel() {
                         onClick={() => {
                           const guest: StremioAccount = { email: 'guest' };
                           setAccount(guest);
-                          localStorage.setItem('stremio_account', JSON.stringify(guest));
+                          try { localStorage.setItem('stremio_account', JSON.stringify(guest)); } catch { /* non-fatal */ }
                           setView('search');
                         }}
                         className="flex items-center justify-center gap-2 border border-border hover:border-primary/40 text-foreground py-2.5 rounded-lg font-medium text-sm transition-colors"

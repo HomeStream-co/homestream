@@ -1,6 +1,6 @@
 {
   "name": "homestream",
-  "version": "1.9.0",
+  "version": "1.9.4",
   "description": "Self-hosted Netflix-style family media streaming app",
   "author": "HomeStream",
   "repository": {

@@ -186,7 +186,145 @@ const STATUS_CONFIG = {
   error:       { color: 'text-red-400',     bg: 'bg-red-400/10',    label: 'Error',       icon: AlertCircle },
 } as const;
 
-// ─── Backend Status Indicators ───────────────────────────────────────────────
+// ─── Live countdown hook ──────────────────────────────────────────────────────
+// Returns a human-readable "starts in X" string that ticks every second.
+// Used by the scheduled downloads panel so the user sees a live timer.
+
+function useCountdown(targetIso: string): string {
+  const [display, setDisplay] = useState(() => formatCountdown(targetIso));
+  useEffect(() => {
+    const tick = () => setDisplay(formatCountdown(targetIso));
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [targetIso]);
+  return display;
+}
+
+function formatCountdown(targetIso: string): string {
+  const diff = new Date(targetIso).getTime() - Date.now();
+  if (diff <= 0) return 'Starting…';
+  const totalSecs = Math.floor(diff / 1000);
+  const d = Math.floor(totalSecs / 86400);
+  const h = Math.floor((totalSecs % 86400) / 3600);
+  const m = Math.floor((totalSecs % 3600) / 60);
+  const s = totalSecs % 60;
+  if (d > 0) return `${d}d ${h}h ${m}m`;
+  if (h > 0) return `${h}h ${m}m ${s}s`;
+  if (m > 0) return `${m}m ${s}s`;
+  return `${s}s`;
+}
+
+// ─── Scheduled job row (extracted so it can use the countdown hook) ───────────
+
+function ScheduledJobRow({
+  job,
+  cancellingScheduleId,
+  onCancel,
+}: {
+  job: ScheduledJob;
+  cancellingScheduleId: string | null;
+  onCancel: (id: string, title: string) => void;
+}) {
+  const isPending = job.status === 'pending';
+  const isFired   = job.status === 'fired';
+  const isError   = job.status === 'error';
+  const fireDate  = new Date(job.scheduledFor);
+  const isOverdue = isPending && fireDate.getTime() < Date.now();
+  const countdown = useCountdown(job.scheduledFor);
+
+  return (
+    <motion.div
+      key={job.id}
+      layout
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -8 }}
+      className={`flex items-center gap-3 p-3 rounded-xl border transition-colors ${
+        isFired
+          ? 'bg-green-500/5 border-green-500/20'
+          : isError
+          ? 'bg-destructive/5 border-destructive/20'
+          : isOverdue
+          ? 'bg-amber-500/5 border-amber-500/20'
+          : 'bg-card border-border'
+      }`}
+    >
+      {/* Poster */}
+      {job.poster ? (
+        <img
+          src={job.poster}
+          alt={job.title}
+          className="w-10 h-14 object-cover rounded-lg flex-shrink-0"
+          onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+        />
+      ) : (
+        <div className="w-10 h-14 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
+          {job.type === 'series' ? <Tv2 className="w-4 h-4 text-muted-foreground" /> : <Film className="w-4 h-4 text-muted-foreground" />}
+        </div>
+      )}
+
+      {/* Info */}
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-semibold text-foreground truncate">{job.title}</p>
+        <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+          {job.type === 'series' && job.season != null && (
+            <span className="text-[10px] text-muted-foreground">
+              S{String(job.season).padStart(2, '0')}{job.episode != null ? `E${String(job.episode).padStart(2, '0')}` : ''}
+            </span>
+          )}
+          {/* Status badge — live countdown for pending jobs */}
+          {isPending && !isOverdue && (
+            <span className="flex items-center gap-1 text-[10px] text-primary font-semibold">
+              <Clock className="w-3 h-3" />
+              Starts in {countdown}
+            </span>
+          )}
+          {isPending && !isOverdue && (
+            <span className="text-[10px] text-muted-foreground">
+              · {fireDate.toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+            </span>
+          )}
+          {isPending && isOverdue && (
+            <span className="flex items-center gap-1 text-[10px] text-amber-400">
+              <Loader2 className="w-3 h-3 animate-spin" />
+              Firing soon…
+            </span>
+          )}
+          {isFired && (
+            <span className="flex items-center gap-1 text-[10px] text-green-400">
+              <CheckCircle2 className="w-3 h-3" />
+              Fired {job.firedAt ? new Date(job.firedAt).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : ''}
+            </span>
+          )}
+          {isError && (
+            <span className="flex items-center gap-1 text-[10px] text-destructive" title={job.error}>
+              <AlertCircle className="w-3 h-3" />
+              Failed — {job.error?.slice(0, 60)}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Cancel button (pending only) */}
+      {isPending && (
+        <button
+          onClick={() => onCancel(job.id, job.title)}
+          disabled={cancellingScheduleId === job.id}
+          className="p-2 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50 flex-shrink-0"
+          title="Cancel scheduled download"
+        >
+          {cancellingScheduleId === job.id
+            ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            : <X className="w-3.5 h-3.5" />
+          }
+        </button>
+      )}
+    </motion.div>
+  );
+}
+
+
 // Two compact labeled dots in the page header.
 //
 // qBittorrent dot:
@@ -2004,98 +2142,14 @@ export default function DownloadsPage() {
 
               <div className="space-y-2">
                 <AnimatePresence initial={false}>
-                  {scheduledJobs.map(job => {
-                    const isPending = job.status === 'pending';
-                    const isFired = job.status === 'fired';
-                    const isError = job.status === 'error';
-                    const fireDate = new Date(job.scheduledFor);
-                    const isOverdue = isPending && fireDate.getTime() < Date.now();
-
-                    return (
-                      <motion.div
-                        key={job.id}
-                        layout
-                        initial={{ opacity: 0, y: 8 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -8 }}
-                        className={`flex items-center gap-3 p-3 rounded-xl border transition-colors ${
-                          isFired
-                            ? 'bg-green-500/5 border-green-500/20'
-                            : isError
-                            ? 'bg-destructive/5 border-destructive/20'
-                            : isOverdue
-                            ? 'bg-amber-500/5 border-amber-500/20'
-                            : 'bg-card border-border'
-                        }`}
-                      >
-                        {/* Poster */}
-                        {job.poster ? (
-                          <img
-                            src={job.poster}
-                            alt={job.title}
-                            className="w-10 h-14 object-cover rounded-lg flex-shrink-0"
-                            onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                          />
-                        ) : (
-                          <div className="w-10 h-14 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
-                            {job.type === 'series' ? <Tv2 className="w-4 h-4 text-muted-foreground" /> : <Film className="w-4 h-4 text-muted-foreground" />}
-                          </div>
-                        )}
-
-                        {/* Info */}
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-semibold text-foreground truncate">{job.title}</p>
-                          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                            {job.type === 'series' && job.season != null && (
-                              <span className="text-[10px] text-muted-foreground">
-                                S{String(job.season).padStart(2, '0')}{job.episode != null ? `E${String(job.episode).padStart(2, '0')}` : ''}
-                              </span>
-                            )}
-                            {/* Status badge */}
-                            {isPending && !isOverdue && (
-                              <span className="flex items-center gap-1 text-[10px] text-primary">
-                                <Clock className="w-3 h-3" />
-                                {fireDate.toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
-                              </span>
-                            )}
-                            {isPending && isOverdue && (
-                              <span className="flex items-center gap-1 text-[10px] text-amber-400">
-                                <Loader2 className="w-3 h-3 animate-spin" />
-                                Firing soon…
-                              </span>
-                            )}
-                            {isFired && (
-                              <span className="flex items-center gap-1 text-[10px] text-green-400">
-                                <CheckCircle2 className="w-3 h-3" />
-                                Fired {job.firedAt ? new Date(job.firedAt).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : ''}
-                              </span>
-                            )}
-                            {isError && (
-                              <span className="flex items-center gap-1 text-[10px] text-destructive" title={job.error}>
-                                <AlertCircle className="w-3 h-3" />
-                                Failed — {job.error?.slice(0, 60)}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Cancel button (pending only) */}
-                        {isPending && (
-                          <button
-                            onClick={() => handleCancelScheduled(job.id, job.title)}
-                            disabled={cancellingScheduleId === job.id}
-                            className="p-2 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50 flex-shrink-0"
-                            title="Cancel scheduled download"
-                          >
-                            {cancellingScheduleId === job.id
-                              ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                              : <X className="w-3.5 h-3.5" />
-                            }
-                          </button>
-                        )}
-                      </motion.div>
-                    );
-                  })}
+                  {scheduledJobs.map(job => (
+                    <ScheduledJobRow
+                      key={job.id}
+                      job={job}
+                      cancellingScheduleId={cancellingScheduleId}
+                      onCancel={handleCancelScheduled}
+                    />
+                  ))}
                 </AnimatePresence>
               </div>
 

@@ -165,8 +165,11 @@ export async function importExistingMedia(
       // 3. Write to library (concurrent-safe via queue)
       await writeLibrary(lib => {
         const exists = lib.some(m => {
-          const r = m as { filePath?: string; filepath?: string; originalFilename?: string };
-          return r.filePath === file.path || r.filepath === file.path || r.originalFilename === file.name;
+          const r = m as { filePath?: string; filepath?: string };
+          // FIX: deduplicate by absolute path only — bare filename check removed
+          // to avoid false-positive skips when two directories contain files with
+          // the same name (e.g. /movies/movie.mkv and /shows/movie.mkv).
+          return r.filePath === file.path || r.filepath === file.path;
         });
         if (!exists) lib.push(mediaItem as unknown as Record<string, unknown>);
         return lib;

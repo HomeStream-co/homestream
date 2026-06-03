@@ -232,4 +232,89 @@ describe('POST /api/backup — restore', () => {
     expect(body.ok).toBe(true);
     expect(Array.isArray(body.restored)).toBe(true);
   });
+
+  // ── Built-in profile merge (🔴 Phase 6 fix) ──────────────────────────────
+  // The backup may not include the built-in adult/kids profiles (e.g. if they
+  // were stripped by an older export). The restore must always inject them so
+  // parental-control logic never runs without its required built-ins.
+
+  it('injects built-in adult profile when backup omits it', async () => {
+    const backupWithoutBuiltIns = {
+      ...VALID_BACKUP,
+      profiles: [{ id: 'custom', name: 'Custom', restricted: false }],
+    };
+    const { req, res } = makeReqRes({ backup: backupWithoutBuiltIns });
+    await handler(req as Request, res as Response);
+
+    const profilesCall = mockWriteFileSync.mock.calls.find(
+      (c: unknown[]) => (c[0] as string).includes('profiles'),
+    );
+    expect(profilesCall).toBeDefined();
+    const written = JSON.parse(profilesCall![1] as string) as Array<Record<string, unknown>>;
+    const adult = written.find(p => p.id === 'adult');
+    expect(adult).toBeDefined();
+    expect(adult?.isBuiltIn).toBe(true);
+    expect(adult?.isAdmin).toBe(true);
+  });
+
+  it('injects built-in kids profile when backup omits it', async () => {
+    const backupWithoutBuiltIns = {
+      ...VALID_BACKUP,
+      profiles: [{ id: 'custom', name: 'Custom', restricted: false }],
+    };
+    const { req, res } = makeReqRes({ backup: backupWithoutBuiltIns });
+    await handler(req as Request, res as Response);
+
+    const profilesCall = mockWriteFileSync.mock.calls.find(
+      (c: unknown[]) => (c[0] as string).includes('profiles'),
+    );
+    const written = JSON.parse(profilesCall![1] as string) as Array<Record<string, unknown>>;
+    const kids = written.find(p => p.id === 'kids');
+    expect(kids).toBeDefined();
+    expect(kids?.isBuiltIn).toBe(true);
+    expect(kids?.restricted).toBe(true);
+  });
+
+  it('preserves backup version of built-in profiles when present', async () => {
+    const backupWithCustomisedAdult = {
+      ...VALID_BACKUP,
+      profiles: [
+        { id: 'adult', name: 'Dad', avatar: '🎬', isBuiltIn: false }, // isBuiltIn stripped
+        { id: 'kids',  name: 'Kids', avatar: '🧒', isBuiltIn: true  },
+      ],
+    };
+    const { req, res } = makeReqRes({ backup: backupWithCustomisedAdult });
+    await handler(req as Request, res as Response);
+
+    const profilesCall = mockWriteFileSync.mock.calls.find(
+      (c: unknown[]) => (c[0] as string).includes('profiles'),
+    );
+    const written = JSON.parse(profilesCall![1] as string) as Array<Record<string, unknown>>;
+    const adult = written.find(p => p.id === 'adult');
+    // Custom name preserved, but isBuiltIn enforced back to true
+    expect(adult?.name).toBe('Dad');
+    expect(adult?.isBuiltIn).toBe(true);
+  });
+
+  it('does not duplicate built-in profiles when backup already includes them', async () => {
+    const backupWithBuiltIns = {
+      ...VALID_BACKUP,
+      profiles: [
+        { id: 'adult', name: 'Adult', isBuiltIn: true, isAdmin: true },
+        { id: 'kids',  name: 'Kids',  isBuiltIn: true, restricted: true },
+        { id: 'custom', name: 'Custom' },
+      ],
+    };
+    const { req, res } = makeReqRes({ backup: backupWithBuiltIns });
+    await handler(req as Request, res as Response);
+
+    const profilesCall = mockWriteFileSync.mock.calls.find(
+      (c: unknown[]) => (c[0] as string).includes('profiles'),
+    );
+    const written = JSON.parse(profilesCall![1] as string) as Array<Record<string, unknown>>;
+    const adultCount = written.filter(p => p.id === 'adult').length;
+    const kidsCount  = written.filter(p => p.id === 'kids').length;
+    expect(adultCount).toBe(1);
+    expect(kidsCount).toBe(1);
+  });
 });
