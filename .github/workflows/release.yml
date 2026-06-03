@@ -5,6 +5,13 @@ on:
     tags:
       - 'v*'
 
+# Required for electron-builder to create and upload GitHub Releases.
+# contents: write  -- create releases, upload assets
+# actions: read    -- read workflow run context
+permissions:
+  contents: write
+  actions: read
+
 jobs:
   release-windows:
     name: Build & Publish Windows Installer
