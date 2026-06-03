@@ -48,12 +48,13 @@ vi.mock('../../server/dataDir.js', () => ({
 
 // ── Import AFTER mocks ────────────────────────────────────────────────────────
 
-const { readConfig, writeConfig, isSetupComplete } = await import('../../server/configStore.js');
+const { readConfig, writeConfig, isSetupComplete, _resetConfigCacheForTesting } = await import('../../server/configStore.js');
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function resetDisk() {
   diskData = null;
+  _resetConfigCacheForTesting(); // also clear the write-through in-memory cache
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────

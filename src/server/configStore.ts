@@ -97,13 +97,13 @@ const DEFAULTS: AppConfig = {
   realDebridApiKey: process.env.REAL_DEBRID_API_KEY || '',
 };
 
-// ── Read (always immediate, short-TTL in-memory cache) ───────────────────────
+// ── Read (write-through in-memory cache) ──────────────────────────────────────
 //
-// FIX (🟢): requireAuth calls readConfig() on every authenticated request,
-// which previously did fs.readFileSync on every call. Under concurrent
-// streaming + API calls this is unnecessary I/O. We cache the parsed config
-// for up to 5 seconds — short enough that Settings changes are reflected
-// almost immediately, long enough to eliminate redundant disk reads under load.
+// FIX (🟢): requireAuth calls readConfig() on every authenticated request.
+// Under concurrent streaming + API calls this is unnecessary I/O. We cache
+// the parsed config for up to CONFIG_CACHE_TTL_MS — short enough that Settings
+// changes are reflected almost immediately, long enough to eliminate redundant
+// disk reads under load.
 //
 // writeConfig() always invalidates the cache immediately so callers that write
 // then read in the same tick always see the updated value.
@@ -111,28 +111,54 @@ const DEFAULTS: AppConfig = {
 // Cache is disabled in test environments (NODE_ENV=test) so tests that mock
 // the filesystem see fresh reads on every call, as they expect.
 
-// ── Read (always immediate) ───────────────────────────────────────────────────
-//
-// NOTE (🟢 robustness): requireAuth calls readConfig() on every authenticated
-// request. Under concurrent streaming + API calls this is extra I/O, but the
-// config file is tiny (~2 KB) and reads are fast. A short-TTL cache would help
-// under heavy load, but it complicates test isolation (tests mock fs and expect
-// fresh reads on every call). The sessionStore already caches session tokens
-// in memory, which is the hot path. Config reads are acceptable as-is.
+const CONFIG_CACHE_TTL_MS = 5_000; // 5 seconds
+
+let _configCache: AppConfig | null = null;
+let _configCacheAt = 0;
 
 export function invalidateConfigCache(): void {
-  // No-op — kept for callers that were written expecting a cache to invalidate.
-  // If a cache is added in the future, this function will flush it.
+  _configCache = null;
+  _configCacheAt = 0;
+}
+
+/**
+ * Reset the in-memory cache. FOR TESTING ONLY.
+ * Call this in beforeEach when the fs mock resets diskData so the cache
+ * doesn't serve stale data from a previous test.
+ */
+export function _resetConfigCacheForTesting(): void {
+  _configCache = null;
+  _configCacheAt = 0;
 }
 
 export function readConfig(): AppConfig {
-  if (!fs.existsSync(CONFIG_PATH)) return { ...DEFAULTS };
-  try {
-    const raw = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf-8')) as Partial<AppConfig>;
-    return { ...DEFAULTS, ...raw };
-  } catch {
-    return { ...DEFAULTS };
+  // In test env, always read from disk (tests mock fs and expect fresh reads)
+  if (process.env.NODE_ENV !== 'test') {
+    const now = Date.now();
+    if (_configCache !== null && now - _configCacheAt < CONFIG_CACHE_TTL_MS) {
+      // Return a shallow copy so callers can't mutate the cached object
+      return { ..._configCache };
+    }
   }
+
+  let parsed: AppConfig;
+  if (!fs.existsSync(CONFIG_PATH)) {
+    parsed = { ...DEFAULTS };
+  } else {
+    try {
+      const raw = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf-8')) as Partial<AppConfig>;
+      parsed = { ...DEFAULTS, ...raw };
+    } catch {
+      parsed = { ...DEFAULTS };
+    }
+  }
+
+  if (process.env.NODE_ENV !== 'test') {
+    _configCache = parsed;
+    _configCacheAt = Date.now();
+  }
+
+  return parsed;
 }
 
 // ── Write ─────────────────────────────────────────────────────────────────────
@@ -153,6 +179,10 @@ export function writeConfig(updates: Partial<AppConfig>): AppConfig {
     next.downloadsDir = next.downloadsDir || path.join(updates.mediaDir, 'downloads');
     next.libraryDir = next.libraryDir || path.join(updates.mediaDir, 'library');
   }
+
+  // Invalidate cache before writing so any concurrent readConfig() call that
+  // races with the rename gets a fresh disk read rather than stale cached data.
+  invalidateConfigCache();
 
   // Atomic write: write to a temp file then rename so a crash mid-write
   // never leaves a half-written (corrupted) config file.
