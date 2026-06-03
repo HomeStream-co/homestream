@@ -2,9 +2,9 @@
 #
 # Runs on every push and pull request to main/develop.
 # Three jobs run in parallel:
-#   type-check  — tsc --noEmit
-#   lint        — eslint
-#   test        — vitest (867 unit tests)
+#   type-check  - tsc --noEmit
+#   lint        - eslint
+#   test        - vitest (867 unit tests)
 #
 # A fourth job (build-check) depends on all three and does a full
 # Vite production build to catch any bundler-level errors.
@@ -32,7 +32,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # ── Type checking ────────────────────────────────────────────────────────────
+  # -- Type checking ------------------------------------------------------------
   type-check:
     name: TypeScript
     runs-on: ubuntu-latest
@@ -50,7 +50,7 @@ jobs:
       - name: Type check
         run: npm run type-check
 
-  # ── Linting ──────────────────────────────────────────────────────────────────
+  # -- Linting ------------------------------------------------------------------
   lint:
     name: Lint
     runs-on: ubuntu-latest
@@ -68,7 +68,7 @@ jobs:
       - name: Lint
         run: npm run lint
 
-  # ── Tests ────────────────────────────────────────────────────────────────────
+  # -- Tests --------------------------------------------------------------------
   test:
     name: Tests
     runs-on: ubuntu-latest
@@ -94,7 +94,7 @@ jobs:
           path: coverage/
           retention-days: 7
 
-  # ── Production build check ───────────────────────────────────────────────────
+  # -- Production build check ---------------------------------------------------
   build-check:
     name: Build
     runs-on: ubuntu-latest

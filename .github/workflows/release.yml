@@ -18,7 +18,7 @@ jobs:
         with:
           node-version: '22'
 
-      # Windows-specific cache key — never restores a Linux cache onto Windows
+      # Windows-specific cache key - never restores a Linux cache onto Windows
       - name: Cache node_modules
         id: cache-node-modules
         uses: actions/cache@v4
@@ -26,7 +26,7 @@ jobs:
           path: node_modules
           key: Windows-node22-modules-${{ hashFiles('package-lock.json') }}
 
-      # Do NOT use --ignore-scripts here — ffmpeg-static's postinstall script
+      # Do NOT use --ignore-scripts here - ffmpeg-static's postinstall script
       # downloads the platform-specific FFmpeg binary (ffmpeg.exe on Windows).
       # Without it, node_modules/ffmpeg-static/ffmpeg.exe is never created and
       # the packaged app ships with no FFmpeg, breaking transcoding and HLS.
@@ -39,7 +39,7 @@ jobs:
           npm_config_optional: true
 
       # Delete any existing GitHub Release for this tag so electron-builder
-      # can create it fresh. Uses PowerShell — native on windows-latest.
+      # can create it fresh. Uses PowerShell - native on windows-latest.
       - name: Delete existing GitHub Release (if any)
         shell: pwsh
         env:
@@ -57,7 +57,7 @@ jobs:
               Write-Host "Deleted."
             }
           } catch {
-            Write-Host "No existing release found for $tag — proceeding"
+            Write-Host "No existing release found for $tag - proceeding"
           }
 
       - name: Build app (Vite + server bundle)
@@ -82,9 +82,9 @@ jobs:
           # Verify ffmpeg-static downloaded the Windows binary
           if (Test-Path "node_modules/ffmpeg-static/ffmpeg.exe") {
             $ffSize = [math]::Round((Get-Item "node_modules/ffmpeg-static/ffmpeg.exe").Length / 1MB, 1)
-            Write-Host "ffmpeg-static/ffmpeg.exe: $ffSize MB — OK"
+            Write-Host "ffmpeg-static/ffmpeg.exe: $ffSize MB - OK"
           } else {
-            Write-Warning "ffmpeg-static/ffmpeg.exe NOT FOUND — transcoding will be broken in packaged app"
+            Write-Warning "ffmpeg-static/ffmpeg.exe NOT FOUND - transcoding will be broken in packaged app"
           }
           Write-Host "Build artifacts verified."
 
@@ -103,7 +103,7 @@ jobs:
           $pkg | ConvertTo-Json -Depth 10 | Set-Content package.json
           Write-Host "package.json patched with build metadata"
 
-      # NSIS installer — the only build that supports auto-updater.
+      # NSIS installer - the only build that supports auto-updater.
       # Publishes latest.yml + HomeStream-Setup-*.exe to the GitHub Release.
       - name: Package & publish NSIS installer
         run: npx electron-builder --win --config electron/electron-builder.yml --config.win.target=nsis --publish always
@@ -111,8 +111,8 @@ jobs:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
           DEBUG: electron-builder
 
-      # Portable — NO auto-updater support. For smoke testing only.
-      # Only runs if NSIS succeeded — avoids burning windows-latest minutes on a broken build.
+      # Portable - NO auto-updater support. For smoke testing only.
+      # Only runs if NSIS succeeded - avoids burning windows-latest minutes on a broken build.
       - name: Package portable .exe
         if: success()
         run: npx electron-builder --win --config electron/electron-builder.yml --config.win.target=portable --publish never
@@ -130,7 +130,7 @@ jobs:
         run: |
           $tag = "${{ github.ref_name }}"
           $headers = @{ Authorization = "token $env:GH_TOKEN"; Accept = "application/vnd.github+json"; "Content-Type" = "application/json" }
-          # /releases/tags/:tag only returns published releases — drafts are invisible there.
+          # /releases/tags/:tag only returns published releases - drafts are invisible there.
           # Use the list endpoint instead and filter by tag_name so we find drafts too.
           $releases = Invoke-RestMethod -Uri "https://api.github.com/repos/${{ github.repository }}/releases?per_page=20" -Headers $headers
           $release = $releases | Where-Object { $_.tag_name -eq $tag } | Select-Object -First 1
@@ -144,11 +144,11 @@ jobs:
           Invoke-RestMethod -Method Patch -Uri "https://api.github.com/repos/${{ github.repository }}/releases/$id" -Headers $headers -Body $body
           Write-Host "Release $tag is now published and marked as latest."
 
-  # ── Linux build ──────────────────────────────────────────────────────────────
+  # -- Linux build --------------------------------------------------------------
   # Produces:
-  #   AppImage (x64 + arm64) — universal, no install needed
-  #   .deb     (x64)         — Debian / Ubuntu
-  #   .pkg.tar.zst (x64)     — Arch Linux / Manjaro / CachyOS (pacman)
+  #   AppImage (x64 + arm64) - universal, no install needed
+  #   .deb     (x64)         - Debian / Ubuntu
+  #   .pkg.tar.zst (x64)     - Arch Linux / Manjaro / CachyOS (pacman)
   #
   # Runs on ubuntu-latest (glibc 2.35+). The AppImage bundles all libs so it
   # runs on older glibc too. The pacman package requires Arch's glibc (always
@@ -157,7 +157,7 @@ jobs:
     name: Build & Publish Linux Packages
     runs-on: ubuntu-latest
     timeout-minutes: 60
-    # Runs in parallel with release-windows — no dependency between them.
+    # Runs in parallel with release-windows - no dependency between them.
     # Both jobs upload to the same GitHub Release; electron-builder handles
     # concurrent uploads safely via the GitHub Releases API.
 
@@ -204,9 +204,9 @@ jobs:
           echo "server.bundle.cjs: $SIZE"
           if [ -f node_modules/ffmpeg-static/ffmpeg ]; then
             FFSIZE=$(du -sh node_modules/ffmpeg-static/ffmpeg | cut -f1)
-            echo "ffmpeg-static/ffmpeg: $FFSIZE — OK"
+            echo "ffmpeg-static/ffmpeg: $FFSIZE - OK"
           else
-            echo "WARNING: ffmpeg-static/ffmpeg NOT FOUND — transcoding will be broken"
+            echo "WARNING: ffmpeg-static/ffmpeg NOT FOUND - transcoding will be broken"
           fi
           echo "Build artifacts verified."
 
@@ -249,16 +249,16 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
 
-  # ── AUR publish ──────────────────────────────────────────────────────────────
+  # -- AUR publish --------------------------------------------------------------
   # Bumps homestream-bin on the AUR so `yay -Syu` picks up the new version.
   #
   # Prerequisites (one-time setup):
   #   1. Generate a dedicated SSH key:  ssh-keygen -t ed25519 -C "homestream-aur-ci" -f aur_key
   #   2. Add the PUBLIC key to your AUR account at https://aur.archlinux.org/account/<you>/edit
   #   3. Add the PRIVATE key as a GitHub secret named AUR_SSH_PRIVATE_KEY
-  #      (Settings → Secrets → Actions → New repository secret)
+  #      (Settings -> Secrets -> Actions -> New repository secret)
   #
-  # If AUR_SSH_PRIVATE_KEY is not set, this job is skipped silently — the
+  # If AUR_SSH_PRIVATE_KEY is not set, this job is skipped silently - the
   # rest of the release still completes normally.
   publish-aur:
     name: Publish to AUR
@@ -281,7 +281,7 @@ jobs:
           AUR_KEY: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
         run: |
           if [[ -z "$AUR_KEY" ]]; then
-            echo "AUR_SSH_PRIVATE_KEY not set — skipping AUR publish."
+            echo "AUR_SSH_PRIVATE_KEY not set - skipping AUR publish."
             echo "See aur/README.md for one-time setup instructions."
             exit 0
           fi
@@ -306,13 +306,13 @@ SSHEOF
         if: env.AUR_KEY_CONFIGURED == 'true'
         run: |
           # If the AUR package hasn't been submitted yet (first-time setup),
-          # the clone will fail. We catch that and skip gracefully — the
+          # the clone will fail. We catch that and skip gracefully - the
           # release still completes, the AUR just needs the one-time manual
           # submission described in aur/README.md.
           if git clone ssh://aur@aur.archlinux.org/homestream-bin.git /tmp/homestream-aur 2>&1; then
             echo "AUR_CLONED=true" >> "$GITHUB_ENV"
           else
-            echo "AUR clone failed — package may not exist yet on AUR."
+            echo "AUR clone failed - package may not exist yet on AUR."
             echo "Complete the one-time manual submission described in aur/README.md."
             echo "AUR_CLONED=false" >> "$GITHUB_ENV"
           fi

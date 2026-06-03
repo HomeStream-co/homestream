@@ -3,409 +3,184 @@
 All notable changes to HomeStream are documented here.
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
-Versioning follows [Semantic Versioning](https://semver.org/).
+Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-## [1.8.8] — 2026-06-01 (release)
+## [1.0.0] - 2026-06-03
 
-### Added
+First stable public release. Everything below was built and hardened across
+the v1.9.x pre-release series before being promoted to v1.0.0.
 
-#### Phase 3 — Server-Side Profiles & Parental Controls
-- `profilesStore.ts`: `StoredProfile` / `PublicProfile` now include `maxRating` and `isAdmin`; built-in Adult profile has `isAdmin: true`; bcrypt PIN hashing; `toPublic()` exposes `isAdmin`
-- `ratingGate.ts`: `checkRating()` gates individual stream/HLS requests with 403 on restricted content; `filterByRating()` strips restricted titles from list responses; `getActiveProfileId()` reads `hs-profile` httpOnly cookie with `adult` fallback
-- `POST /api/profiles/switch`: sets `hs-profile` httpOnly cookie (sameSite strict, 30-day maxAge); validates PIN server-side; returns public profile on success
-- `GET /api/media`: `filterByRating()` applied to both raw and profile-resolved responses
-- `GET /api/stream/:filename` + HLS endpoints: `checkRating()` gates delivery
-- `ProfileContext`: `switchProfile()` calls server cookie endpoint; `isAllowed()` uses `maxRating`-aware logic; admin profiles bypass rating gate entirely
+### Core Platform
+- 5-step setup wizard (system check, media folder, API keys, optional services, library import)
+- SetupGuard redirect -- app is unusable until setup completes
+- Electron desktop shell with tray icon, auto-updater (electron-updater + GitHub Releases)
+- HTTPS setup wizard -- self-signed cert generation for LAN HTTPS
+- Backup and restore -- one-click config ZIP export/import
+- Auto-updater with drain endpoint and push notification
+- Crash logger with persistent log and `/api/crash-log` endpoint
+- Debug panel and system-info diagnostics endpoint
+- Shutdown API with graceful HLS job cleanup
 
-#### Phase 4 — Profile API Test Suite
-- `profiles-switch.test.ts` (20 tests): clear-profile (empty/whitespace/absent `profileId`), no-PIN switch (cookie value, `httpOnly`, `sameSite`, 30-day `maxAge`, public profile in body), PIN-protected switch (correct/wrong/missing PIN, cookie not set on failure), 404 unknown profile, 500 on store crash and `verifyPin` rejection
-- `rating-gate.test.ts` (47 tests): `getActiveProfileId` cookie read/fallback/trim, `checkRating` for admin/unrestricted/unknown profiles, default restricted set (all 6 allowed + 5 blocked + NR + unknown string + case-insensitive), `maxRating` PG-13 and R ceilings, 403 body shape, `filterByRating` for all profile types and edge cases
-- `profiles-api.test.ts` (+6 tests): PATCH passes `maxRating`, `isAdmin: true`, `isAdmin: false`, both together; updated profile body includes `maxRating`
+### Authentication & Sessions
+- bcrypt admin password hashing (bcryptjs -- pure JS, works on all distros)
+- httpOnly session cookie with configurable TTL
+- Rate limiter with write-through persistence (`homestream-ratelimit.json`)
+- Rate limit buckets survive server restarts
+- `X-HS-Client: tv` header -- TV clients receive login body token; browsers do not
+- Logout and logout-all endpoints
+- Auth audit logging
 
-### Tests
-- 85 test files, 1347 unit tests — all passing
-- TypeScript: zero errors
-- GitHub Actions CI: Tests ✓ | TypeScript ✓ | Lint ✓ | Build ✓
+### Profiles & Parental Controls
+- Netflix-style profile switcher (up to 10 profiles)
+- Server-side profile switching with PIN validation
+- bcrypt PIN hashing per profile
+- Per-profile content rating gate (G / PG / PG-13 / R / NC-17)
+- Fail-closed rating gate -- unrated content blocked for restricted profiles
+- Built-in Adult profile with `isAdmin: true`
+- Profile create, edit, delete, PIN set/change
+- Backup always merges built-in profiles after restore
+- `realDebridApiKey` redacted from backup exports
 
----
+### Streaming & Player
+- HLS transcoder with FFmpeg
+- Hardware encoder detection: NVENC (NVIDIA), VAAPI (Linux/Intel/AMD), VideoToolbox (macOS)
+- Hardware encoder cached; `?refresh=1` forces re-detection
+- Direct stream redirect for browser-safe codecs (zero transcoding overhead)
+- CRF 22 quality target; configurable transcode preset
+- Range requests always return 206
+- TranscodeProgressOverlay -- FFmpeg progress, FPS, speed, ETA, encoder name
+- HLS probe cache with TTL
+- Resume playback -- progress saved every 10 s, on tab hide/blur, on unmount via sendBeacon
+- 85% threshold triggers end overlay; 95% marks as watched
+- Chromecast cast support (cast button, device discovery, position sync)
+- DLNA position tracker
+- Closed captions via OpenSubtitles -- per-profile language preference
+- Caption upload endpoint
+- Trailer hover preview via TMDB
+- Player keyboard shortcuts overlay
+- End-of-episode overlay with next-episode prompt
 
-## [1.8.7] — 2026-05-31 (release)
+### Download Manager
+- Real-Debrid premium backend (fastest path)
+- qBittorrent integration with session cookie isolation (`isReachable()` liveness check)
+- WebTorrent built-in fallback
+- Download waterfall: RD first -> qBit -> WebTorrent
+- Duplicate detection -- 409 on re-request
+- Three torrent sources: Torrentio, Prowlarr (optional), Nyaa.si (anime)
+- `pickBestStream()` with optional `preferredQuality` -- shared between download handler and episode scheduler
+- Full-series batch download with probe loop result caching
+- Queue priority reordering, retry, resume, pause
+- Scheduled downloads with live countdown (`useCountdown` hook)
+- Speed sparkline on download cards
+- Real-Debrid expiry amber warning banner (<=7 days)
+- Startup cleanup -- marks interrupted jobs; Resume button shown
+- `downloadJobStore` write-through in-memory cache
+- Download broadcaster (WebSocket push to all clients)
 
-### Fixed
+### Library & Metadata
+- Library scan -- walks media directory, imports video files
+- OMDB metadata fetch with TMDB poster fallback
+- AI enrichment via Google Gemini or local Ollama (mood, tags, summary)
+- `needsMetadata=true` flag -- retried on next startup for failed imports
+- Media type defaults to `movie` when OMDB unavailable
+- Existing media scanner -- deduplicates by absolute path
+- Watch folder -- new files auto-imported via `folderWatcher`
+- Episode tracker with per-episode progress
+- Media CRUD (create, read, update, delete)
+- Fetch metadata on demand per item
+- Enrich on demand per item
 
-#### CI / Test Suite
-- `stream.test.ts`: added `mkdirSync` to `fs` mock — `dataDir.ts` calls `fs.mkdirSync` at module load when resolving `UPLOADS_DIR`; missing mock caused `TypeError: default.mkdirSync is not a function` in CI
-- `media-delete.test.ts`: same `mkdirSync` fix applied to `fs` mock
-- `phase5-startup-rd-cleanup.test.ts`: added `dataDir()` named export to `dataDir.js` mock alongside `dataPath` — `startupCleanup.ts` imports both; missing export caused `Error: No "dataDir" export is defined on the mock`
-- `login-gate.test.tsx`: `LoginGate` calls `setTimeout(() => setShake(false), 600)` after a failed login; that timer was firing after jsdom teardown, causing React's scheduler to throw `window is not defined` as an unhandled error that failed the entire CI run (all 1277 tests passed but Vitest reported exit code 1). Fixed by using `vi.useFakeTimers({ shouldAdvanceTime: true })` in `beforeEach` and draining pending timers with `act(() => vi.runAllTimers())` in `afterEach` before jsdom is destroyed.
+### VPN
+- WireGuard support (Linux/macOS)
+- OpenVPN fallback
+- Kill switch -- monitors VPN interface every 10 s; pauses qBit on disconnect
+- `POST /api/vpn/bind` -- locks qBit traffic to VPN network interface
+- Auto fastest-server selection (ping-based ranking)
+- VPN server ranker with configurable known-servers list
 
-#### Player
-- `usePlayerProgress`: `currentTime` and `duration` were listed as `useCallback` dependencies, causing the 10-second save interval to be torn down and recreated on every video tick. Moved reads inside the callback via refs — interval is now created once per media item.
+### Remote Control & TV
+- Mobile remote control -- full player control from phone browser
+- QR code pairing (`/api/remote/qr`)
+- Remote tabs: Search, Browse, Cast, Download, AI
+- Samsung Tizen TV optimised UI (raw LAN IP, no mDNS)
+- Global remote launch hook
 
-#### UI
-- `FeedbackButton`: Lucide `Wifi`/`WifiOff` icons wrapped in `<span title="...">` — passing `title` directly as a prop caused a TypeScript error
-- Removed stale `// eslint-disable-next-line` comments in `ChromecastButton.tsx`, `player.tsx`, and `usePlayerProgress.ts` left over from earlier hook corrections
+### Watchlist & History
+- Watchlist add/remove/list
+- Watch history with clear endpoint
+- Stats dashboard -- watch time, storage usage, download history
 
-### Tests
-- 83 test files, 1277 unit tests — all passing
-- GitHub Actions CI: Tests ✓ | TypeScript ✓ | Lint ✓ | Build ✓
+### Jellyfin Compatibility
+- Jellyfin API compatibility layer (Items, Users, Sessions, Videos, Search, System)
+- Jellyfin auth shim
+- Jellyfin discovery (mDNS broadcast)
+- Works with Stremio and other Jellyfin clients
 
----
+### Security
+- Threat scanner with quarantine
+- Security panel UI
+- Auth middleware on all protected routes
+- Ownership seed (first-run admin setup)
 
-## [1.3.7] — 2026-04-23 (release)
-
-### Fixed
-
-#### Data Integrity — Atomic Writes (Critical)
-- `libraryStore.ts`: `writeLibrary()` now uses a tmp-file + `renameSync` atomic write pattern. A crash or power loss mid-write previously could leave `media-library.json` half-written and permanently corrupted (all media metadata lost). Now the rename is atomic at the OS level — the file is either fully written or untouched.
-- `sessionStore.ts`: same atomic write applied to `homestream-sessions.json`. A corrupted sessions file previously forced all users to log in again after a crash.
-- `configStore.ts`: same atomic write applied to `homestream-config.json`. Also fixed a silent-failure bug where a disk-write error was swallowed and the caller received `next` as if the write succeeded — now logs the error and returns `current` so callers can detect the failure.
-- `startupCleanup.ts`: `writeLibrarySafe()` fallback path upgraded from bare `writeFileSync` to the same atomic tmp+rename pattern.
-
-#### Reliability — Transcode Worker
-- `transcodeWorker.ts`: `fs.statSync(resolvedInput)` on line 289 was called unconditionally after `probeFile()` — if the file disappeared between upload and transcode start (race condition, manual deletion), it threw an uncaught `ENOENT` that crashed the transcode job without a clean error. Now wrapped in a safe try/catch that falls back to `0`.
-
-#### Reliability — Episode Scheduler
-- `episodeScheduler.ts`: `checkSubscription()` had no wall-clock timeout. A show with 10 seasons × 50 episodes × a hung Torrentio connection could block the scheduler indefinitely. Added a 5-minute `setTimeout` guard (`.unref()`'d so it never prevents clean process exit) that throws and unblocks the scheduler if a single check runs too long.
-
-#### Reliability — Gzip Middleware
-- `configure.js`: gzip `res.json` patch now checks `res.headersSent` before setting `Content-Encoding` headers. Previously, if Express had already started sending a response (e.g. an upstream middleware called `res.end()` before the gzip callback fired), setting headers would throw `Cannot set headers after they are sent`.
-
-
-- `Dockerfile`: volume was declared at `/app/data` but `dataDir.ts` writes to `process.cwd()/homestream-data` when `HOMESTREAM_DATA` is unset — data was silently lost on container restart
-- Fixed by: setting `ENV HOMESTREAM_DATA=/app/homestream-data` in Dockerfile and declaring `VOLUME ["/app/homestream-data", "/app/uploads"]`
-- `docker-compose.yml`: updated volume mount from `homestream_data:/app/data` → `homestream_data:/app/homestream-data` to match; added `HOMESTREAM_DATA` env var
-- `docker-compose.yml`: healthcheck updated from `wget` (not always available in Alpine) to `curl` (now explicitly installed in Dockerfile)
-- `Dockerfile`: added `curl` to `apk add` for healthcheck; added `HEALTHCHECK` directive so Docker marks the container unhealthy if `/api/health` stops responding; added `start_period: 15s` so the container isn't marked unhealthy during startup
-
-#### Version Strings
-- `health/GET.ts`: hardcoded `version: '1.0.0'` replaced with live `package.json` version via `createRequire`
-- `mdnsService.ts`: hardcoded `version: '1.0.0'` in mDNS TXT record replaced with live `package.json` version
-
-#### Setup Wizard
-- `setup.tsx`: stale doc comment said "9 steps" — updated to accurately describe the current 5-step flow (Requirements → Media Folder → Optional Services → API Keys → Finish)
-
-#### VPN Kill-Switch — Settings Panel
-- `POST /api/vpn/bind`: kill-switch monitor now restarts immediately after rebind so the new interface is enforced without a server restart
-- `GET /api/setup`: confirmed `vpnInterface` and `vpnKillSwitch` are returned so the Settings panel loads the current binding on open
-
-#### CI / Release Workflow
-- `e2e.yml`: `Run E2E tests` step now passes `SETUP_COMPLETE=true`, `E2E_PASSWORD`, and `NODE_ENV=test` env vars
-- `release.yml`: `GH_OWNER`/`GH_REPO` fall back to `github.repository_owner` / `github.event.repository.name` if secrets aren't set
-- `electron-builder.yml`: publish config `owner` was hardcoded; now uses `${HOMESTREAM_GH_OWNER}` env var
-
-#### Electron Control Panel
-- "Check for Updates" button added to action bar (always visible)
-- Update panel messaging: "No reinstall needed" / "Restart & Update"
-- `differentialPackage: true` in NSIS — delta updates, no full reinstall
-
-### Added
-
-#### E2E Test Coverage (80 total, up from 77)
-- `e2e/profiles.spec.ts` — 6 tests
-- `e2e/discover.spec.ts` — 7 tests
-- `e2e/setup-wizard.spec.ts` — 5 tests
-
-### Tests
-- 867 unit tests passing (48 files)
-- 80 Playwright E2E tests across 9 spec files (CI-ready)
-
----
-
-## [1.3.6] — 2026-04-23
-
-### Fixed
-
-#### API
-- `POST /api/vpn/bind` — fixed malformed handler line (two statements on one line); added missing `isSetupComplete` import; auth now correctly allows unauthenticated access during setup wizard, requires auth after setup is complete
-- `GET /api/setup` — now returns `vpnInterface` and `vpnKillSwitch` fields so the Settings panel can display the current VPN binding without a separate API call
-
-#### CI / E2E Tests
-- `waitForApp()` hardened: now uses `waitForSelector` with a list of post-auth-check selectors (`nav`, `main`, `h1`, `header`, `input[type="password"]`, etc.) instead of fragile `waitForFunction` polling — eliminates the all-77-fail blank-page scenario
-- `auth.spec.ts`: "shows login gate when not authenticated" now accepts the home page as a valid state when no admin password is configured (fresh CI environment skips auth entirely)
-
-#### v1.3.5 Fixes (tagged in this release)
-- HTTPS Setup page crash: added `import React` for `React.ElementType` usage
-- Auto-skip intro: fires exactly once per item via `skipIntroFired` ref guard
-- Security Center back button: `forceOpen` prop + `onClose` callback on SettingsPanel
-- Parental controls: "Manage Profiles" hidden for kids/restricted profiles
-- API keys: "Key saved ✓" badges; fields start empty; TMDB test uses `?api_key=`
-- Stats page 401: friendly message; array fields guarded before `.reduce()`
-- History/Discover pages: array guards, duplicate toast (409 → styled yellow)
-- TV Shows discover: 3 rows (Trending This Week, Popular Right Now, All-Time Top Rated)
-- Profiles page: top-aligned layout
-
-### Added
-
-#### VPN Kill-Switch — Settings Panel
-- VPN binding section added directly to Settings panel (no need to re-run setup wizard)
-- Shows current bound interface with green status badge
-- Dropdown lists all active IPv4 adapters; likely VPN adapters marked with 🔒
-- "Apply VPN Binding" / "Clear VPN Binding" button with live feedback
-- Kill-switch monitor restarts immediately after rebind — no server restart needed
-
-#### E2E Test Coverage
-- `e2e/profiles.spec.ts` — 6 tests for the Profiles page
-- `e2e/discover.spec.ts` — 7 tests for the Discover page (all 4 tabs)
-- `e2e/setup-wizard.spec.ts` — 5 tests for the Setup Wizard
-
-#### Electron Auto-Updater — Polish
-- **Delta updates**: `differentialPackage: true` in NSIS config — users download only the diff (a few MB), not the full installer (~150MB). No reinstall required.
-- **"Check for Updates" button** added to control panel action bar — always visible, not just when an update is available
-- Update panel messaging clarified: "No reinstall needed" / "Restart & Update"
-- `electron-builder.yml` publish config now uses `${HOMESTREAM_GH_OWNER}` / `${HOMESTREAM_GH_REPO}` env vars (was hardcoded)
-- Release workflow: `GH_OWNER`/`GH_REPO` fall back to `github.repository_owner` / `github.event.repository.name` if secrets aren't set; artifact upload includes `.yml` update metadata files
-
-#### Samsung TV Setup Guide (`/samsung-tv`)
-- 6-section interactive guide with auto-detected HomeStream URL via `/api/network/info`
-
-#### Phone Remote / QR Widget
-- Always renders regardless of fetch state; falls back to `window.location`
-- LAN IP shown in large text with copy button; QR code black-on-white; full URL copyable
-
-#### Network APIs
-- `GET /api/remote/qr` — open endpoint; real LAN IP via `os.networkInterfaces()`
-- `GET /api/network/info` — open endpoint; Samsung TV setup page uses it to pre-fill server address
-
-#### VPN Interface Binding
-- `GET /api/vpn/interfaces` — lists active Windows adapters (open endpoint)
-- `POST /api/vpn/bind` — saves interface, calls qBittorrent API; requires auth
-- `vpnKillSwitch.ts` — polls every 10s; pauses torrents if VPN drops
-
-#### Playwright E2E Suite
-- 80 tests across 11 spec files: auth, setup, home, discover, downloads, profiles, settings, navigation, profiles, discover, setup-wizard
-
-### Tests
-- 867 unit tests passing (48 files)
-- 80 Playwright E2E tests (CI-ready)
+### Infrastructure & CI
+- 110+ API routes (vite-plugin-api-routes, file-system based)
+- WebSocket download broadcaster
+- mDNS service (`.local` hostname broadcast)
+- Network info endpoint
+- 86 test files, 1369 tests (Vitest)
+- GitHub Actions CI: TypeScript, Tests, Lint, Build
+- GitHub Actions Release: Windows NSIS + portable, Linux AppImage (x64/arm64) + .deb + pacman
+- AUR package (`homestream-bin`) with CI auto-publish
+- All workflow files ASCII-clean (GitHub Actions parser compatible)
 
 ---
 
-## [1.2.5] — 2026-04-22
+## Pre-release History
 
-### Fixed
+### [1.9.4] - 2026-06-03
+- fix: release.yml -- remove `${{}}` wrapper from job-level `if` condition
+- fix: strip non-ASCII characters from all workflow YAML files (root cause of 0-jobs failure)
+- feat: AUR package (`aur/PKGBUILD`, `.SRCINFO`, `homestream.desktop`, `publish-to-aur.sh`)
+- fix: rate-limit test hardening -- `vi.advanceTimersByTime(3000)` instead of `runAllTimers`
+- fix: `afterEach(() => vi.useRealTimers())` in auth.test.ts
 
-#### Episode Scheduler
-- Season advancement bug: `epStart` now only offsets the first season; S2+ correctly start at E1
-- `infoHash` always uses `best.infoHash` (was sometimes using stale local variable)
-- Catch-up subscriptions now have `.finally(() => scheduleOne(updated))` to guarantee rescheduling even on error
-- Double-fire race condition fixed: `scheduleAllSubscriptions` skips `scheduleOne` for subs already being catch-up checked
-- All scheduler timers now call `.unref()` so they don't block graceful shutdown
-- `cancelAllSubscriptions()` exported for clean shutdown integration
-- `savePath` uses `dataPath('downloads')` instead of hardcoded path
+### [1.9.3] - 2026-06-02
+- feat: profiles & rating gate hardening
+- fix: `ratingGate.ts` fail-closed for unrated content
+- fix: built-in profiles always merged after backup restore
+- fix: `realDebridApiKey` redacted from backup exports
+- test: 13 new rating gate tests, 10 new profiles-admin-guard tests
 
-#### Security & API Hardening
-- `hlsTranscoder.ts`: all imports moved to top-level (no dynamic require inside functions)
-- `transcodeWorker.ts`: uses `createRequire` from `module` for CommonJS interop
-- `torrentManager.ts`: stores absolute file paths; post-transcode library update fixed
-- `startupCleanup.ts`: transcode revert now uses absolute paths (was breaking on relative paths)
-- `backup/GET.ts`: uses `readLibrary()` / `readConfig()` / `readProfiles()` instead of direct fs reads; redacts `pinHash`
-- `tracks/GET.ts`: replaced hardcoded `/private` path with `readLibrary()` lookup
-- `captions/upload/POST.ts`: uses `writeLibrary(lib => ...)` updater pattern (safe concurrent writes)
-- `chat/POST.ts` + `enrich/[id]/POST.ts`: standardised to `gemini-2.0-flash` model
-- `stream/[filename]/GET.ts`: added `Vary: Range` header for correct CDN/proxy caching
+### [1.9.2] - 2026-06-01
+- feat: download waterfall (RD -> qBit -> WebTorrent)
+- feat: `pickBestStream()` with `preferredQuality`
+- feat: full-series batch download with probe cache reuse
+- feat: startup cleanup marks interrupted jobs
+- fix: `isReachable()` replaces `testConnection()` -- prevents shared sessionCookie corruption
+- fix: `downloadJobStore` write-through cache
 
-#### TypeScript
-- `downloads.tsx`: `act()` helper widened to accept `() => void | Promise<void>` (was rejecting sync callbacks)
-- `torrent-download.test.ts`: fixed spread of `unknown[]` into typed mock function
-- `profiles-store.test.ts`: fixed double-cast via `unknown` intermediate
-- `session-store.test.ts`: removed unused `afterEach` import
-- `download-duplicate-resume.test.ts`: removed unused `deleteJob` import
+### [1.9.1] - 2026-05-31
+- feat: HLS transcoder with hardware encoder detection
+- feat: NVENC / VAAPI / VideoToolbox support
+- feat: TranscodeProgressOverlay
+- feat: range requests always 206
+- feat: rating gate applied to stream handler
 
-### Added
-
-#### Test Suite (597 tests, 32 files — was 321/21)
-- `downloads-get.test.ts` (37 tests): full coverage of `GET /api/stremio/downloads` — qBit offline path, online happy path with metadata merging, all 12 `normaliseQbitState` branches
-- `downloads-controls.test.ts` (36 tests): full coverage of pause, resume, and priority endpoints — validation, offline guard, success, error handling
-- `download-duplicate-resume.test.ts`: duplicate detection, `markJobInterrupted`, `getInterruptedJobs`, retry handler (WebTorrent + qBit paths)
-- `stream.test.ts` (21 tests): range requests, 304 Not Modified, MIME types, path traversal protection, library-first resolution
-- `torrent-download.test.ts`: validation, qBit vs WebTorrent routing, security scan, VPN integration, preloaded streams
-- `torrent-delete.test.ts` (9 tests): all delete scenarios
-- `torrent-manager.test.ts` (25 tests): `pickBestStream`, `parseResolution`, 1080p-over-4K preference logic
-
----
-
-## [1.0.0] — 2026-04-20
-
-First public release. 120 commits from initial scaffold to production-ready
-self-hosted streaming app.
-
-### Added
-
-#### Core Streaming
-- Custom HTML5 video player with full controls: seek bar, play/pause, volume,
-  fullscreen, picture-in-picture, ±10s skip buttons
-- Speed selector (3×, 2×, 1.5×, 1.25×, 1×, 0.75×, 0.5×) — highest-to-lowest order
-- Keyboard shortcuts overlay (Space, ←/→, ↑/↓, F, M, C, I)
-- Mobile double-tap seek (left = −10s, right = +10s)
-- Hover seek thumbnails on the progress bar
-- Skip Intro button with configurable timestamp
-- Autoplay countdown + next-episode autoplay for TV series
-- Resume playback — saves progress every 10s, resumes to exact second
-- Per-profile watch progress (Adult and Kids profiles track separately)
-- HLS transcoding for HEVC/H.265 files via FFmpeg + HLS.js
-- Transcode status badge in player (live progress via SSE)
-- Audio track switcher for multi-language files
-- Closed caption support: auto-fetch EN/ES WebVTT from OpenSubtitles, SRT upload,
-  one-key CC cycling (C key)
-
-#### Library Management
-- Automatic library scan on startup — finds all video files in media directory
-- Folder watcher — auto-imports completed downloads without manual intervention
-- File stability check — waits until file size stops changing before importing
-- Existing media scanner — imports pre-existing RAID/NAS libraries on first run
-- Upload via browser — drag-and-drop or file picker, up to 200 GB per file
-- Smart transcode pipeline: probe codec → skip (already H.264) / remux / re-encode
-- Post-encode size check — reverts to original if output is larger (saves space)
-- Startup cleanup — resolves stuck `transcoding: true` flags after server restarts
-- HLS orphan cleanup — deletes stale `/tmp/homestream-hls/` segments on restart
-- Library deduplication — same file never imported twice (path + filename check)
-
-#### Metadata & Enrichment
-- OMDB integration — auto-fetches title, poster, rating, genre, plot, cast, director
-- TMDB integration — additional metadata, posters, upcoming movies, trending content
-- Graceful offline mode — imports work without internet; metadata retried on reconnect
-- AI enrichment via Google Gemini — tags, mood, themes, summaries, similar titles
-- AI enrichment via Ollama — local LLM alternative (no cloud required)
-- AI Chat assistant — ask for recommendations from your personal library
-- Enrichment wizard UI — step-by-step progress with per-field status indicators
-- Enrichment reveal modal — animated card flip when AI data arrives
-
-#### Discover Page
-- Three tabs: Movies (upcoming + trending), TV Shows (trending), Search
-- TMDB data with 30-day file-backed cache; `?refresh=1` forces fresh fetch
-- Trailer modal with YouTube embed
-- Download CTAs linking directly to Stremio/Torrentio search
-
-#### Downloads
-- Stremio/Torrentio integration — search and download torrents from the UI
-- qBittorrent integration — full control via qBit REST API (add, pause, resume, delete)
-- WebTorrent fallback — pure-JS torrent engine when qBit is not configured
-- Quality selection strategy: prefer 720p–1080p, avoid 4K to save storage
-- Unified downloads view — qBit torrents + WebTorrent jobs in one list
-- Download completion toast with "Go to Library" action
-- Active download badge on nav Downloads link (pulses while active)
-
-#### Stats Dashboard *(new in v1.0)*
-- Codec breakdown bar chart (H.264, H.265/HEVC, AV1, VP9, etc.) with file counts and sizes
-- Resolution distribution (4K / 1080p / 720p / SD)
-- Disk usage bar with free/used/total and library footprint
-- Content type split (Movies vs TV Shows)
-- Total watch time across all items
-- Top 5 most-watched items with progress bars
-- Recently added items (last 5)
-- Genre distribution (top 10 genres)
-- Live download/upload speed indicator from qBittorrent
-- Session transfer totals (total downloaded / uploaded)
-- Auto-refreshes every 10 seconds
-
-#### Casting
-- DLNA/UPnP casting — cast to any DLNA-compatible TV or receiver on the LAN
-- Chromecast support — cast via Google Cast SDK
-- Phone remote — WebSocket touch UI at `/remote`; QR code modal in header for easy pairing
-- Jellyfin-compatible API — works with Infuse, Jellyfin mobile apps, and other clients
-- mDNS/Bonjour service discovery — HomeStream announces itself on the local network
-
-#### Profiles & Security
-- Adult + Kids profiles — Kids profile filters content rated above PG
-- 4-digit PIN lock on Adult profile — prevents kids from switching profiles
-- Admin password — optional login gate for the whole app (bcrypt, auto-upgrades plaintext)
-- Rate limiting — 10 login attempts per IP per 15 minutes; 5+ failures add 2s delay
-- Session management — `POST /api/auth/logout-all` clears all active sessions
-- 4-layer security scan on downloads: file extension → VirusTotal hash → magic bytes → archive inspection
-- Quarantine system — suspicious files moved to quarantine, never executed
-- Cookie consent banner (GDPR-friendly)
-
-#### Setup Wizard
-- 8-step guided setup: Welcome → Media Folder → qBittorrent → Jellyfin → VPN → API Keys → HTTPS → Finish
-- REQUIRED / OPTIONAL / FREE badges on each step
-- Green callout: "Minimum setup: Just set a media folder"
-- Direct links to sign up for each optional service
-- Setup completion triggers existing media scan + folder watcher activation
-
-#### Infrastructure
-- Express API server with file-based routing (`src/server/api/`)
-- `media-library.json` — flat-file database; concurrent-safe via write queue
-- `homestream-config.json` — persistent config store
-- `crash-log.json` — last 100 crash entries with stack traces
-- AppErrorBoundary — catches React render errors, posts to crash log API, shows recovery screen
-- Debug Panel (dev-only) — crash log viewer, health check, probe cache stats
-- Health check endpoint at `/api/health/full` — 7 subsystem status checks
-- Probe cache — ffprobe results cached by file path + mtime (LRU, max 500 entries)
-- Transcode store — in-memory job tracking with SSE progress streaming
-- VPN integration — connect/disconnect WireGuard/OpenVPN from the UI
-- HTTPS setup wizard at `/https-setup` — generates self-signed cert or configures Let's Encrypt
-- Electron desktop app — wraps the server + UI in a native window (Windows/macOS/Linux)
-- `ffmpeg-static` bundled — no manual FFmpeg install required
-- Docker support — `Dockerfile` + `docker-compose.yml` for one-command deployment
-
-#### UI & Design
-- Netflix-style dark UI with 6 built-in color themes
-- Hero banner with trailer hover preview on home page
-- Lazy-loaded genre carousels (IntersectionObserver — only loads visible rows)
-- MediaCard with context menu (right-click / long-press) for quick actions
-- Watchlist / favorites page
-- Watch history page with per-item removal and clear-all
-- Episode tracker for TV series with season/episode navigation
-- Responsive design — works on desktop, tablet, and mobile
-- Animated transitions (Motion library) throughout
-
-### Fixed *(pre-release bug fixes)*
-
-- **Upload transcode error path** — `filePath` was stored as a relative URL
-  (`/uploads/file.mp4`) instead of an absolute path, causing 404 on playback
-  after a failed transcode. Now stores the absolute `inputPath`.
-- **Demo item `addedAt`** — was set to `new Date()` at module load time, causing
-  Big Buck Bunny to always appear as the most recently added item after every
-  server restart. Now uses a fixed date (`2024-01-01`).
-- **Stats dashboard demo filter** — stats endpoint filtered by `demoStream` flag
-  but the demo item uses `isDemo: true`. Both flags are now checked.
-- **Existing media scanner deduplication** — scanner only checked `originalFilename`
-  for duplicates; now also checks `filename` to prevent re-importing transcoded files.
-- **ESLint false positives** — 620 lint problems reduced to 0 errors / 23 warnings
-  by adding all browser/DOM/Node globals and turning off `no-undef` in favour of
-  TypeScript's type checker.
-- **`startupCleanup.ts`** — `let result` → `const`; `setTimeout` → `global.setTimeout`
-  (server file, not browser context).
-- **`hlsTranscoder.ts` + `transcodeWorker.ts`** — `require('ffmpeg-static')` replaced
-  with `createRequire(import.meta.url)` for correct ESM/CJS interop.
-- **`MediaCard` + `MediaContextMenu`** — ternary-as-statement watchlist toggle
-  replaced with `if/else` to satisfy `no-unused-expressions` lint rule.
-- **`remote.tsx`** — `&&`-as-statement `clearTimeout` call replaced with `if` guard.
-- **`EnrichmentWizard`** — unused `i` loop variable renamed to `_i`.
-
-### Technical Notes
-
-- esbuild target: `node22`; `webrtc-polyfill` stubbed to eliminate TLA propagation
-- `electron/main.js` uses CommonJS `require()` — ESLint `no-var-requires` errors
-  in that file are expected and acceptable (CJS file outside `src/`)
-- `#airo/secrets` module alias is load-bearing platform infrastructure — never rename
-- FFmpeg resolution order: `FFMPEG_PATH` env → `ffmpeg-static` → system `ffmpeg`
-- HLS orphan deletion is unconditional on restart — in-memory jobs map is wiped,
-  source files are intact, FFmpeg regenerates segments on next play request
-
----
-
-## [0.9.0] — Pre-release development
-
-Development builds leading to v1.0. Key milestones:
-
-- Initial scaffold: Vite + React 19 + TypeScript + Express API routes
-- TV show episode tracker with season/episode navigation
-- Watchlist / favorites system
-- Auto-transcode pipeline with progress bar (SSE streaming)
-- AI enrichment integration (Gemini + Ollama)
-- Torrent download system (WebTorrent + qBittorrent)
-- Discover page with TMDB trending data and trailer modal
-- Phone remote WebSocket UI with QR code pairing
-- Electron desktop app with bundled FFmpeg
-- Setup wizard (8 steps) with REQUIRED/OPTIONAL/FREE badges
-- Crash logging system with Debug Panel
-- HLS orphan cleanup on server restart
-- Pre-launch lint audit: 620 → 0 errors
-
----
-
-*HomeStream is MIT licensed. Contributions welcome.*
+### [1.9.0] - 2026-05-30
+- feat: initial full build -- all phases complete
+- feat: setup wizard (5 steps)
+- feat: auth + session + rate limiter
+- feat: profiles + PIN + parental controls
+- feat: download manager (RD, qBit, WebTorrent, Torrentio, Prowlarr, Nyaa)
+- feat: HLS transcoder
+- feat: VPN (WireGuard/OpenVPN, kill switch)
+- feat: captions (OpenSubtitles)
+- feat: cast (Chromecast, DLNA)
+- feat: Jellyfin compatibility layer
+- feat: library scan + AI enrichment
+- feat: watch progress + continue watching
+- feat: remote control + Samsung TV UI
+- feat: backup/restore, stats, history, watchlist
+- feat: 86 test files, 1369 tests passing
