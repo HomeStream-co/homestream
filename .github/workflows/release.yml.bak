@@ -95,16 +95,12 @@ jobs:
           }
           Write-Host "Build artifacts verified."
 
-      # Sync package.json version from the git tag so electron-builder creates
-      # a GitHub Release tagged v1.x.x (matching the pushed tag), not the
-      # stale version baked into package.json.
-      # Also injects build metadata so updater.cjs can read ghToken at runtime.
+      # Patch package.json so updater.cjs can read pkg.build.ghToken at runtime.
+      # electron-builder --extraMetadata.X CLI flag is not supported in this version.
       - name: Inject build metadata into package.json
         shell: pwsh
         run: |
-          $ver = "${{ github.ref_name }}".TrimStart('v')
           $pkg = Get-Content package.json -Raw | ConvertFrom-Json
-          $pkg.version = $ver
           if (-not $pkg.PSObject.Properties['build']) {
             $pkg | Add-Member -NotePropertyName build -NotePropertyValue ([PSCustomObject]@{})
           }
@@ -112,7 +108,7 @@ jobs:
           $pkg.build | Add-Member -NotePropertyName ghOwner -NotePropertyValue "HomeStream-co" -Force
           $pkg.build | Add-Member -NotePropertyName ghRepo  -NotePropertyValue "homestream" -Force
           $pkg | ConvertTo-Json -Depth 10 | Set-Content package.json
-          Write-Host "package.json version set to $ver with build metadata"
+          Write-Host "package.json patched with build metadata"
 
       # NSIS installer - the only build that supports auto-updater.
       # Publishes latest.yml + HomeStream-Setup-*.exe to the GitHub Release.
@@ -221,21 +217,18 @@ jobs:
           fi
           echo "Build artifacts verified."
 
-      # Sync package.json version from the git tag (same as Windows job).
+      # Patch package.json so updater.cjs can read pkg.build.ghToken at runtime.
       - name: Inject build metadata into package.json
         run: |
-          VER="${{ github.ref_name }}"
-          VER="${VER#v}"
           node -e "
             const fs = require('fs');
             const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
-            pkg.version = '${VER}';
             pkg.build = pkg.build || {};
             pkg.build.ghToken = '${{ secrets.GH_TOKEN }}';
             pkg.build.ghOwner = 'HomeStream-co';
             pkg.build.ghRepo  = 'homestream';
             fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
-            console.log('package.json version set to ${VER} with build metadata');
+            console.log('package.json patched with build metadata');
           "
 
       # Build and publish each Linux target separately so a single target failure
@@ -303,7 +296,11 @@ jobs:
           printf '%s\n' "$AUR_KEY" > ~/.ssh/aur_key
           chmod 600 ~/.ssh/aur_key
           ssh-keyscan -H aur.archlinux.org >> ~/.ssh/known_hosts
-          printf 'Host aur.archlinux.org\n  IdentityFile ~/.ssh/aur_key\n  User aur\n' >> ~/.ssh/config
+          cat >> ~/.ssh/config <<'SSHEOF'
+Host aur.archlinux.org
+  IdentityFile ~/.ssh/aur_key
+  User aur
+SSHEOF
           echo "AUR_KEY_CONFIGURED=true" >> "$GITHUB_ENV"
 
       - name: Configure git

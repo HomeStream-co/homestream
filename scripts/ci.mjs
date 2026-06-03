@@ -100,7 +100,11 @@ for (const run of matching) {
 
   const jobs = await get(`/repos/${REPO}/actions/runs/${run.id}/jobs`);
   if (!jobs.jobs?.length) {
-    console.log('   (no jobs — workflow may have failed at parse/queue stage)');
+    if (run.conclusion === 'skipped') {
+      console.log('   (skipped — trigger condition not met, e.g. branch push on tag-only workflow)');
+    } else {
+      console.log(`   (no jobs — conclusion=${run.conclusion} event=${run.event} — workflow may have failed at parse/queue stage)`);
+    }
     if (run.conclusion === 'failure') anyFailure = true;
     continue;
   }

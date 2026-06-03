@@ -2,13 +2,13 @@ name: E2E Tests (Playwright)
 
 # Runs on every push/PR to main.
 # Playwright starts the Vite dev server automatically via the webServer config
-# in playwright.config.ts — no manual pre-flight step needed.
+# in playwright.config.ts - no manual pre-flight step needed.
 #
 # Auth behaviour in CI:
-#   - SETUP_COMPLETE=true  → isSetupComplete() returns true (wizard skipped)
-#   - No ADMIN_PASSWORD    → readConfig().adminPassword is '' → open mode
+#   - SETUP_COMPLETE=true  - isSetupComplete() returns true (wizard skipped)
+#   - No ADMIN_PASSWORD    - readConfig().adminPassword is '' - open mode
 #                            (requireAuth always passes, login gate never shows)
-#   - E2E_PASSWORD         → used by helpers.ts TEST_PASSWORD as a fallback;
+#   - E2E_PASSWORD         - used by helpers.ts TEST_PASSWORD as a fallback;
 #                            set to '' here so the || 'homestream' fallback fires
 #                            when the repo secret is not configured.
 
@@ -33,12 +33,12 @@ jobs:
     env:
       CI: 'true'
       NODE_ENV: test
-      # Setup wizard bypass — must be set before Vite starts
+      # Setup wizard bypass - must be set before Vite starts
       SETUP_COMPLETE: 'true'
-      # Auth — no ADMIN_PASSWORD means open mode (requireAuth always passes).
+      # Auth - no ADMIN_PASSWORD means open mode (requireAuth always passes).
       # E2E_PASSWORD is used by helpers.ts; '' triggers the || 'homestream' fallback.
       E2E_PASSWORD: ${{ secrets.E2E_PASSWORD || '' }}
-      # Playwright base URL — matches the webServer port in playwright.config.ts
+      # Playwright base URL - matches the webServer port in playwright.config.ts
       E2E_BASE_URL: 'http://localhost:5173'
 
     steps:

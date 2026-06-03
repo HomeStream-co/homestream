@@ -1,11 +1,11 @@
-# ── HomeStream Build Check Workflow ──────────────────────────────────────────
+# -- HomeStream Build Check Workflow ------------------------------------------
 #
 # Runs on pushes to version branches (v1.x, v2.x etc.) and on pull requests
 # to main/develop. ci.yml already covers main/develop pushes with a superset
 # of these checks (type-check + lint + test + build), so this workflow only
 # adds value for version branches and as a lightweight PR gate.
 #
-# Does NOT produce an installer — that's the release.yml job.
+# Does NOT produce an installer - that's the release.yml job.
 # Runs on ubuntu-latest (faster + cheaper than windows-latest for checks).
 
 name: Build Check
@@ -13,7 +13,7 @@ name: Build Check
 on:
   push:
     branches:
-      - 'v*'          # version branches only — ci.yml covers main/develop
+      - 'v*'          # version branches only - ci.yml covers main/develop
     paths-ignore:
       - '**.md'
       - 'docs/**'
@@ -38,31 +38,31 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # ── 1. Checkout ──────────────────────────────────────────────────────────
+      # -- 1. Checkout ----------------------------------------------------------
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # ── 2. Node.js ───────────────────────────────────────────────────────────
+      # -- 2. Node.js -----------------------------------------------------------
       - name: Set up Node.js 22
         uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: 'npm'
 
-      # ── 3. Install dependencies ───────────────────────────────────────────────
+      # -- 3. Install dependencies -----------------------------------------------
       - name: Install dependencies
         run: npm ci
 
-      # ── 4. TypeScript ─────────────────────────────────────────────────────────
+      # -- 4. TypeScript ---------------------------------------------------------
       - name: Type-check
         run: npm run type-check
 
-      # ── 5. Lint ───────────────────────────────────────────────────────────────
+      # -- 5. Lint ---------------------------------------------------------------
       - name: Lint
         run: npm run lint
 
-      # ── 6. Build (frontend + server bundle) ───────────────────────────────────
-      # Verifies the full production build succeeds — catches missing imports,
+      # -- 6. Build (frontend + server bundle) -----------------------------------
+      # Verifies the full production build succeeds - catches missing imports,
       # bad dynamic requires, and esbuild bundling errors.
       - name: Build
         run: npm run build
