@@ -40,12 +40,17 @@ vi.mock('../../server/rateLimiter', () => ({
   getFailureDelay: vi.fn(() => 0),
 }));
 
-// Mock authMiddleware so ADMIN_PASSWORD env var doesn't block tests
 vi.mock('../../server/authMiddleware', () => ({
   requireAuth: () => true,
 }));
 vi.mock('../../server/authMiddleware.js', () => ({
   requireAuth: () => true,
+}));
+
+// Mock ratingGate so the isAdmin self-promotion guard always sees an admin
+// caller in these unit tests (the guard itself is tested in profiles-admin-guard.test.ts)
+vi.mock('../../server/ratingGate.js', () => ({
+  getActiveProfileId: vi.fn(() => 'adult'),
 }));
 
 // Import handlers AFTER mocking
@@ -198,6 +203,13 @@ describe('PATCH /api/profiles/:id', () => {
   beforeEach(() => {
     store.updateProfile.mockReturnValue({ ...CUSTOM, name: 'Updated' });
     store.toPublic.mockImplementation((p: object) => ({ ...(p as object), hasPin: false }));
+    // isAdmin guard: getProfile('adult') must return an admin profile so tests
+    // that send isAdmin:true are not blocked by the self-promotion guard.
+    store.getProfile.mockImplementation((id: string) =>
+      id === 'adult'
+        ? { id: 'adult', isAdmin: true, name: 'Adult', restricted: false, isBuiltIn: true, createdAt: '' }
+        : undefined
+    );
   });
 
   it('returns 200 with updated profile', () => {
