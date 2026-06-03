@@ -7,15 +7,8 @@ import type { SetupStepProps } from './types';
 import { apiPost } from './types';
 import { getIsLinux } from './platformUtils';
 
-<<<<<<< HEAD
-// Detect Linux at render time (same pattern as StepSysReqs)
-const isLinux = typeof navigator !== 'undefined' && /Linux/.test(navigator.userAgent) && !/Android/.test(navigator.userAgent);
-
-export default function StepMediaFolder({ form, set, status, setStatus, onNext, onBack, platformDefaultsReady, availableDrives }: SetupStepProps) {
-=======
 export default function StepMediaFolder({ form, set, status, setStatus, onNext, onBack, platformDefaultsReady, availableDrives, serverPlatform }: SetupStepProps) {
   const isLinux = getIsLinux(serverPlatform);
->>>>>>> 20260603011640-9h9yrecco0
   const saveMediaDir = async () => {
     setStatus(s => ({ ...s, mediaDir: 'saving' }));
     try {

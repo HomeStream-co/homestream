@@ -137,6 +137,7 @@ function buildProps(overrides: Partial<SetupStepProps> = {}): SetupStepProps {
     setRdTestMsg: vi.fn(),
     platformDefaultsReady: true,
     availableDrives: [],
+    serverPlatform: undefined,
     ...overrides,
   };
 }

@@ -92,7 +92,8 @@ export function getActiveProfileId(req: Request): string {
  * @param rated   MPAA/TV rating string from the media item (e.g. "PG-13")
  */
 export function checkRating(req: Request, res: Response, rated?: string): boolean {
-  // No rating info — allow (can't gate what we don't know)
+  // No rating info — allow (can't gate what we don't know; user explicitly
+  // chose to play this item). filterByRating() is more conservative for lists.
   if (!rated || rated.trim() === '' || rated.trim().toUpperCase() === 'N/A') return true;
 
   const profileId = getActiveProfileId(req);

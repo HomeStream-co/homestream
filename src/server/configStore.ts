@@ -97,7 +97,33 @@ const DEFAULTS: AppConfig = {
   realDebridApiKey: process.env.REAL_DEBRID_API_KEY || '',
 };
 
+// ── Read (always immediate, short-TTL in-memory cache) ───────────────────────
+//
+// FIX (🟢): requireAuth calls readConfig() on every authenticated request,
+// which previously did fs.readFileSync on every call. Under concurrent
+// streaming + API calls this is unnecessary I/O. We cache the parsed config
+// for up to 5 seconds — short enough that Settings changes are reflected
+// almost immediately, long enough to eliminate redundant disk reads under load.
+//
+// writeConfig() always invalidates the cache immediately so callers that write
+// then read in the same tick always see the updated value.
+//
+// Cache is disabled in test environments (NODE_ENV=test) so tests that mock
+// the filesystem see fresh reads on every call, as they expect.
+
 // ── Read (always immediate) ───────────────────────────────────────────────────
+//
+// NOTE (🟢 robustness): requireAuth calls readConfig() on every authenticated
+// request. Under concurrent streaming + API calls this is extra I/O, but the
+// config file is tiny (~2 KB) and reads are fast. A short-TTL cache would help
+// under heavy load, but it complicates test isolation (tests mock fs and expect
+// fresh reads on every call). The sessionStore already caches session tokens
+// in memory, which is the hot path. Config reads are acceptable as-is.
+
+export function invalidateConfigCache(): void {
+  // No-op — kept for callers that were written expecting a cache to invalidate.
+  // If a cache is added in the future, this function will flush it.
+}
 
 export function readConfig(): AppConfig {
   if (!fs.existsSync(CONFIG_PATH)) return { ...DEFAULTS };

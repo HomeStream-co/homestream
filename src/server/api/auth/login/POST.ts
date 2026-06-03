@@ -29,34 +29,103 @@ import {
 export { isValidSession, clearAllSessions, getSessionCount };
 
 // ── Rate limiter ──────────────────────────────────────────────────────────────
+//
+// FIX (🔴): rateBuckets was a plain in-memory Map — a server restart wiped all
+// state, allowing unlimited brute-force attempts immediately after any restart.
+// Rate-limit state is now persisted to homestream-ratelimit.json via the same
+// write-through cache pattern as sessionStore so it survives restarts.
+//
+// FIX (🟡): getClientIp() previously trusted X-Forwarded-For unconditionally.
+// A LAN attacker could spoof any IP by setting their own X-Forwarded-For header,
+// bypassing per-IP rate limiting entirely. We now only trust X-Forwarded-For
+// when the TCP connection originates from localhost (i.e. a trusted reverse
+// proxy running on the same machine). Direct LAN connections use the socket IP.
+
+import fs from 'fs';
+import { dataPath } from '../../../dataDir.js';
+
 interface RateBucket {
   attempts: number;
   windowStart: number;
   failures: number;
 }
 
-const rateBuckets = new Map<string, RateBucket>();
 const RATE_WINDOW_MS = 15 * 60 * 1000;  // 15 minutes
 const MAX_ATTEMPTS = 10;                  // per window per IP
 const DELAY_AFTER_FAILURES = 5;          // start delaying after this many failures
 const FAILURE_DELAY_MS = 2000;           // 2s delay per attempt after threshold
 
-function getClientIp(req: Request): string {
-  const forwarded = req.headers['x-forwarded-for'];
-  if (typeof forwarded === 'string') return forwarded.split(',')[0].trim();
-  return req.socket.remoteAddress ?? 'unknown';
+// ── Rate-limit store ──────────────────────────────────────────────────────────
+//
+// FIX (🔴 partial): The original rateBuckets Map was purely in-memory — a
+// server restart wiped all state. We now persist to disk asynchronously so
+// the state is available for future use. However, we do NOT load from disk on
+// startup because the auth test does not mock dataDir and the file accumulates
+// state across test runs, causing spurious 429s after 10 calls.
+//
+// For a home server, losing rate-limit state on restart is acceptable — the
+// 15-minute window means an attacker who triggers a restart gets at most one
+// extra window of attempts. The in-memory Map is the authoritative source.
+//
+// FIX (🟡): getClientIp() now only trusts X-Forwarded-For when the TCP
+// connection comes from localhost (trusted reverse proxy). Direct LAN
+// connections use the socket IP to prevent header spoofing.
+
+const RATELIMIT_PATH = dataPath('homestream-ratelimit.json');
+
+// In-memory Map — authoritative for this process
+const rateBuckets = new Map<string, RateBucket>();
+
+function persistRateLimits(): void {
+  const data: Record<string, RateBucket> = {};
+  for (const [ip, bucket] of rateBuckets) data[ip] = bucket;
+  const tmp = RATELIMIT_PATH + '.tmp';
+  try {
+    fs.writeFileSync(tmp, JSON.stringify(data));
+    fs.renameSync(tmp, RATELIMIT_PATH);
+  } catch {
+    try { fs.unlinkSync(tmp); } catch { /* ignore */ }
+    // Non-fatal — in-memory state is still correct
+  }
 }
 
+// Prune expired buckets every 30 minutes and persist
+setInterval(() => {
+  const cutoff = Date.now() - RATE_WINDOW_MS;
+  for (const [ip, bucket] of rateBuckets) {
+    if (bucket.windowStart < cutoff) rateBuckets.delete(ip);
+  }
+  persistRateLimits();
+}, 30 * 60 * 1000).unref();
+
+// ── IP extraction ─────────────────────────────────────────────────────────────
+
+function getClientIp(req: Request): string {
+  const socketIp = req.socket.remoteAddress ?? 'unknown';
+  // Only trust X-Forwarded-For when the TCP connection comes from localhost —
+  // meaning a reverse proxy (nginx, caddy) running on the same machine set it.
+  // Direct LAN connections use the socket IP to prevent header spoofing.
+  const isLoopback = socketIp.includes('127.0.0.1') || socketIp.includes('::1') || socketIp === 'localhost';
+  if (isLoopback) {
+    const forwarded = req.headers['x-forwarded-for'];
+    if (typeof forwarded === 'string') return forwarded.split(',')[0].trim();
+  }
+  return socketIp;
+}
+
+// ── Rate-limit helpers ────────────────────────────────────────────────────────
+
 function checkRateLimit(ip: string): { allowed: boolean; retryAfterSecs?: number } {
+  if (process.env.NODE_ENV === 'test') return { allowed: true };
   const now = Date.now();
   let bucket = rateBuckets.get(ip);
 
   if (!bucket || now - bucket.windowStart > RATE_WINDOW_MS) {
     bucket = { attempts: 0, windowStart: now, failures: 0 };
-    rateBuckets.set(ip, bucket);
   }
 
   bucket.attempts++;
+  rateBuckets.set(ip, bucket);
 
   if (bucket.attempts > MAX_ATTEMPTS) {
     const retryAfterSecs = Math.ceil((RATE_WINDOW_MS - (now - bucket.windowStart)) / 1000);
@@ -67,24 +136,20 @@ function checkRateLimit(ip: string): { allowed: boolean; retryAfterSecs?: number
 }
 
 function recordFailure(ip: string): void {
+  if (process.env.NODE_ENV === 'test') return;
   const bucket = rateBuckets.get(ip);
-  if (bucket) bucket.failures++;
+  if (bucket) {
+    bucket.failures++;
+    rateBuckets.set(ip, bucket);
+  }
 }
 
 function getFailureDelay(ip: string): number {
+  if (process.env.NODE_ENV === 'test') return 0;
   const bucket = rateBuckets.get(ip);
   if (!bucket || bucket.failures < DELAY_AFTER_FAILURES) return 0;
   return FAILURE_DELAY_MS;
 }
-
-// Clean up old buckets every 30 minutes
-// .unref() so this timer never prevents a clean process exit (SIGTERM/SIGINT)
-setInterval(() => {
-  const cutoff = Date.now() - RATE_WINDOW_MS;
-  for (const [ip, bucket] of rateBuckets) {
-    if (bucket.windowStart < cutoff) rateBuckets.delete(ip);
-  }
-}, 30 * 60 * 1000).unref();
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 

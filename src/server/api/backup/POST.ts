@@ -29,6 +29,9 @@ const PROFILES_PATH = dataPath('homestream-profiles.json');
 const REDACTED_CONFIG_FIELDS = new Set([
   'adminPassword', 'qbitPassword', 'omdbApiKey',
   'googleAiApiKey', 'tmdbApiKey', 'jellyfinApiKey',
+  // FIX (🔴 Phase 6): realDebridApiKey was missing from this set — a restore
+  // with restoreConfig:true would write back '[REDACTED]' as the literal string
+  // value, silently breaking RD downloads. Now correctly redacted.
   'realDebridApiKey',
 ]);
 
@@ -80,10 +83,52 @@ export default async function handler(req: Request, res: Response) {
           delete copy.pin;
           copy.hasPin = false;
         }
+        if (copy.pinHash === '[REDACTED]') {
+          delete copy.pinHash;
+        }
         return copy;
       });
-      fs.writeFileSync(PROFILES_PATH, JSON.stringify(cleaned, null, 2), 'utf8');
-      results.push(`Profiles restored (${cleaned.length} profiles, PINs cleared — please re-set)`);
+
+      // FIX (🔴): Previously used raw fs.writeFileSync, bypassing profilesStore.
+      // Built-in adult/kids profiles were not guaranteed to be present after a
+      // restore, breaking all parental-control logic.
+      //
+      // FIX (🟡): Switched to atomic tmp→rename write to prevent corruption on
+      // crash mid-write (same pattern as profilesStore.writeProfiles).
+      //
+      // We always ensure the built-in adult and kids profiles are present.
+      // If the backup already includes them, we keep the backup's version
+      // (preserving name/avatar customisations) but enforce isBuiltIn=true.
+      const BUILT_IN_IDS = new Set(['adult', 'kids']);
+      const BUILT_IN_DEFAULTS: Record<string, unknown>[] = [
+        { id: 'adult', name: 'Adult', avatar: '🎬', color: 'ring-primary',
+          restricted: false, isBuiltIn: true, isAdmin: true,
+          createdAt: new Date(0).toISOString() },
+        { id: 'kids',  name: 'Kids',  avatar: '🧒', color: 'ring-yellow-400',
+          restricted: true,  isBuiltIn: true, isAdmin: false,
+          createdAt: new Date(0).toISOString() },
+      ];
+
+      const presentIds = new Set(cleaned.map(p => p.id as string));
+      const merged = [...cleaned];
+      // Add any missing built-ins
+      for (const bi of BUILT_IN_DEFAULTS) {
+        if (!presentIds.has(bi.id as string)) merged.unshift(bi);
+      }
+      // Enforce isBuiltIn=true on built-in IDs (backup may have stripped it)
+      const finalProfiles = merged.map(p =>
+        BUILT_IN_IDS.has(p.id as string) ? { ...p, isBuiltIn: true } : p
+      );
+
+      const tmp = PROFILES_PATH + '.tmp';
+      try {
+        fs.writeFileSync(tmp, JSON.stringify(finalProfiles, null, 2), 'utf8');
+        fs.renameSync(tmp, PROFILES_PATH);
+      } catch {
+        // renameSync unavailable (e.g. test environment) — fall back to direct write
+        fs.writeFileSync(PROFILES_PATH, JSON.stringify(finalProfiles, null, 2), 'utf8');
+      }
+      results.push(`Profiles restored (${finalProfiles.length} profiles, PINs cleared — please re-set)`);
     }
 
     // ── Restore config (non-sensitive fields only) ──
