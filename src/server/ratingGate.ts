@@ -92,22 +92,31 @@ export function getActiveProfileId(req: Request): string {
  * @param rated   MPAA/TV rating string from the media item (e.g. "PG-13")
  */
 export function checkRating(req: Request, res: Response, rated?: string): boolean {
-  // No rating info — allow (can't gate what we don't know; user explicitly
-  // chose to play this item). filterByRating() is more conservative for lists.
-  if (!rated || rated.trim() === '' || rated.trim().toUpperCase() === 'N/A') return true;
-
   const profileId = getActiveProfileId(req);
   const profile = getProfile(profileId);
 
-  // Unknown profile, admin, or unrestricted — allow
+  // Unknown profile, admin, or unrestricted — allow everything
   if (!profile || profile.isAdmin || !profile.restricted) return true;
 
-  const allowed = isRatingAllowed(rated, profile.maxRating);
+  // FIX (🟡): Previously this function returned true (allowed) when `rated`
+  // was undefined, empty, or 'N/A', while filterByRating() returned false
+  // (blocked) for the same values. The inconsistency meant a restricted Kids
+  // profile could stream unrated content by navigating directly to
+  // /api/hls/:id or /api/stream/:filename, even though the same item was
+  // hidden from the library list.
+  //
+  // The correct conservative default is to block unrated content for
+  // restricted profiles in BOTH functions. isRatingAllowed() already handles
+  // this correctly (returns false for empty/N/A/NR/UNKNOWN). We now delegate
+  // to it unconditionally for restricted profiles, making checkRating and
+  // filterByRating consistent.
+  const allowed = isRatingAllowed(rated ?? '', profile.maxRating);
   if (!allowed) {
     res.status(403).json({
       error: 'Content restricted',
-      message: `This content (rated ${rated}) is not available for the "${profile.name}" profile.`,
-      rated,
+      message: `This content${rated ? ` (rated ${rated})` : ' (unrated)'}` +
+               ` is not available for the "${profile.name}" profile.`,
+      rated: rated ?? null,
       profileId,
     });
     return false;
