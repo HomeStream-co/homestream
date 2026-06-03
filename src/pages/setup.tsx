@@ -51,12 +51,13 @@ export default function SetupPage() {
   const [step, setStep] = useState(0);
 
   // ── Form state ──
-  // Default mediaDir: fetched from the server on mount (Electron injects the
-  // correct OS path; cloud/dev falls back to a sensible platform default).
-  // We start with a Windows path as the optimistic default since the .exe
-  // installer targets Windows first — it gets replaced on mount.
+  // Default mediaDir: empty string until /api/electron responds with the
+  // correct OS-specific path. We no longer hardcode a Windows path here
+  // because it would flash visibly on Linux/macOS before the API responds,
+  // and the "Save & Continue" button is disabled until platformDefaultsReady
+  // anyway — so there's no risk of the user saving an empty string.
   const [form, setForm] = useState<FormData>({
-    mediaDir: 'C:\\Users\\Public\\Videos\\HomeStream',
+    mediaDir: '',
     qbitUrl: 'http://localhost:8080',
     qbitUsername: 'admin',
     qbitPassword: 'homestream',
@@ -135,6 +136,9 @@ export default function SetupPage() {
   const [platformDefaultsReady, setPlatformDefaultsReady] = useState(false);
   // Available fixed drives on Windows (e.g. ["C:\\", "D:\\"]). Empty on macOS/Linux.
   const [availableDrives, setAvailableDrives] = useState<string[]>([]);
+  // Server platform string ('win32' | 'linux' | 'darwin') — authoritative source
+  // for platform-specific UI in step components. Undefined until /api/electron responds.
+  const [serverPlatform, setServerPlatform] = useState<string | undefined>(undefined);
 
   // ── Redirect if already set up ──
   useEffect(() => {
@@ -153,12 +157,15 @@ export default function SetupPage() {
   useEffect(() => {
     fetch('/api/electron')
       .then(r => r.json())
-      .then((data: { defaultMediaDir?: string; availableDrives?: string[] }) => {
+      .then((data: { defaultMediaDir?: string; availableDrives?: string[]; platform?: string }) => {
         if (data.defaultMediaDir) {
           setForm(f => ({ ...f, mediaDir: data.defaultMediaDir! }));
         }
         if (data.availableDrives?.length) {
           setAvailableDrives(data.availableDrives);
+        }
+        if (data.platform) {
+          setServerPlatform(data.platform);
         }
       })
       .catch(() => {/* non-fatal — keep the optimistic default */})
@@ -246,6 +253,7 @@ export default function SetupPage() {
     rdTestMsg, setRdTestMsg,
     platformDefaultsReady,
     availableDrives,
+    serverPlatform,
   };
 
   const currentStep = STEPS[step];

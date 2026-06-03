@@ -9,11 +9,11 @@ import {
   Download, AlertTriangle, ExternalLink, Terminal,
 } from 'lucide-react';
 import type { SetupStepProps } from './types';
+import { getIsLinux } from './platformUtils';
 
-// Detect Linux at render time — navigator.userAgent is available in Electron too
-const isLinux = typeof navigator !== 'undefined' && /Linux/.test(navigator.userAgent) && !/Android/.test(navigator.userAgent);
-
-export default function StepSysReqs({ onNext }: SetupStepProps) {
+// Detect Linux at render time — uses server platform if available, falls back to UA
+export default function StepSysReqs({ onNext, serverPlatform }: SetupStepProps) {
+  const isLinux = getIsLinux(serverPlatform);
   return (
     <div className="flex flex-col gap-6">
       <div className="text-center">

@@ -124,14 +124,24 @@ export interface SetupStepProps {
   platformDefaultsReady: boolean;
   /** Available fixed drives on Windows (e.g. ["C:\\", "D:\\"]). Empty on macOS/Linux. */
   availableDrives: string[];
+  /**
+   * Server platform string from HOMESTREAM_PLATFORM env var ('win32' | 'linux' | 'darwin').
+   * Undefined until /api/electron responds. Use getIsLinux(serverPlatform) from
+   * platformUtils.ts for platform-conditional UI — never rely on navigator.userAgent alone.
+   */
+  serverPlatform: string | undefined;
 }
 
-/** Helper used by all steps */
+/** Helper used by all steps — throws on non-2xx so callers can catch properly */
 export async function apiPost(action: string, data: Record<string, unknown> = {}) {
   const res = await fetch('/api/setup', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ action, ...data }),
   });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({})) as { error?: string; message?: string };
+    throw new Error(body.error ?? body.message ?? `Server error ${res.status}`);
+  }
   return res.json();
 }

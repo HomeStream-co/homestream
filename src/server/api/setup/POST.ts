@@ -19,8 +19,34 @@ import { requireAuth } from '../../authMiddleware.js';
 import { isDeveloperLocked } from '../../ownershipSeed.js';
 import { getUser as getRDUser } from '../../realDebridClient.js';
 
-// In-memory store for scan results so import can reference them
+// In-memory store for scan results so import can reference them.
+// Also persisted to disk so import_existing survives a server restart
+// between the scan and the import (e.g. watchdog restart on slow machines).
 let lastScanFiles: ScannedFile[] = [];
+
+function getScanCachePath(): string {
+  const dataDir = process.env.HOMESTREAM_DATA ?? process.env.HOME ?? os.homedir();
+  return path.join(dataDir, '.homestream-scan-cache.json');
+}
+
+function persistScanCache(files: ScannedFile[]): void {
+  try {
+    fs.writeFileSync(getScanCachePath(), JSON.stringify(files), 'utf-8');
+  } catch { /* non-fatal */ }
+}
+
+function loadScanCache(): ScannedFile[] {
+  try {
+    const raw = fs.readFileSync(getScanCachePath(), 'utf-8');
+    return JSON.parse(raw) as ScannedFile[];
+  } catch {
+    return [];
+  }
+}
+
+function clearScanCache(): void {
+  try { fs.unlinkSync(getScanCachePath()); } catch { /* already gone */ }
+}
 
 /**
  * POST /api/setup
@@ -141,11 +167,14 @@ export default async function handler(req: Request, res: Response) {
       }
 
       case 'test_qbit': {
-        // Temporarily apply credentials from request for testing
-        if (fields.qbitUrl) process.env.QBIT_URL = fields.qbitUrl;
-        if (fields.qbitUsername) process.env.QBIT_USERNAME = fields.qbitUsername;
-        if (fields.qbitPassword) process.env.QBIT_PASSWORD = fields.qbitPassword;
-        const result = await testQbit();
+        // Pass credentials directly — never mutate process.env, which would
+        // permanently overwrite the live server's qBit config for the duration
+        // of the process and leak wizard-entered credentials into the runtime.
+        const result = await testQbit({
+          url:      fields.qbitUrl      || undefined,
+          username: fields.qbitUsername || undefined,
+          password: fields.qbitPassword || undefined,
+        });
         res.json(result);
         break;
       }
@@ -252,6 +281,7 @@ export default async function handler(req: Request, res: Response) {
         }
         const result = scanExistingMedia(scanDir);
         lastScanFiles = result.files;
+        persistScanCache(result.files); // survive server restart between scan and import
         // Return file list with sizes for display (cap at 200 for response size)
         res.json({
           found: result.found,
@@ -267,9 +297,9 @@ export default async function handler(req: Request, res: Response) {
       }
 
       case 'import_existing': {
-        // Import previously scanned files into the library
-        // Uses SSE-style chunked response for progress
-        const filesToImport = lastScanFiles;
+        // Import previously scanned files into the library.
+        // Fall back to the disk cache if the in-memory list was lost (server restart).
+        const filesToImport = lastScanFiles.length > 0 ? lastScanFiles : loadScanCache();
         if (filesToImport.length === 0) {
           res.json({ imported: 0, failed: 0, titles: [] });
           return;
@@ -284,6 +314,7 @@ export default async function handler(req: Request, res: Response) {
         }).then(result => {
           console.log(`[scanner] Import complete: ${result.imported} imported, ${result.failed} failed`);
           lastScanFiles = [];
+          clearScanCache();
         }).catch(err => {
           console.error('[scanner] Import error:', err);
         });

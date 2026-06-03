@@ -109,8 +109,11 @@ export default function StepFinish({
       // Re-save the full form state before completing — the user may have gone
       // Back and changed API keys or other settings without clicking "Save & Continue"
       // again. This ensures the final config always reflects what's shown on screen.
+      // NOTE: adminPassword is intentionally excluded here — it was already bcrypt-hashed
+      // by the server when the user clicked "Save & Continue" on the API Keys step.
+      // Re-sending it here would cause the server to hash the already-hashed value again,
+      // producing an invalid password that can never match.
       await apiPost('save', {
-        adminPassword:   form.adminPassword,
         omdbApiKey:      form.omdbApiKey,
         googleAiApiKey:  form.googleAiApiKey,
         tmdbApiKey:      form.tmdbApiKey,

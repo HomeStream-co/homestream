@@ -151,7 +151,10 @@ export default function StepOptional({
     }
   };
 
+  const [saving, setSaving] = useState(false);
+
   const saveAndContinue = async () => {
+    setSaving(true);
     setStatus(s => ({ ...s, qbit: s.qbit === 'ok' ? 'ok' : 'idle' }));
     // Save whatever was entered (even if not tested — user can skip)
     try {
@@ -168,9 +171,13 @@ export default function StepOptional({
           prowlarrUrl: form.prowlarrUrl,
           prowlarrApiKey: form.prowlarrApiKey,
         }),
-      });
+      }).then(r => { if (!r.ok) throw new Error(`Server error ${r.status}`); });
     } catch {
-      toast.warning('Settings may not have saved — check your connection and try again.');
+      // Non-fatal — warn but still advance. Optional services not saving is
+      // recoverable from Settings; blocking the wizard here is worse UX.
+      toast.warning('Optional settings may not have saved — you can re-enter them in Settings later.');
+    } finally {
+      setSaving(false);
     }
     onNext();
   };
@@ -477,9 +484,9 @@ export default function StepOptional({
         <button onClick={onBack} className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-border text-muted-foreground hover:text-foreground text-sm transition-colors">
           <ChevronLeft className="w-4 h-4" />Back
         </button>
-        <button onClick={saveAndContinue}
-          className="flex-1 flex items-center justify-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground py-2.5 rounded-xl font-semibold text-sm transition-colors">
-          Continue <ChevronRight className="w-4 h-4" />
+        <button onClick={saveAndContinue} disabled={saving}
+          className="flex-1 flex items-center justify-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground py-2.5 rounded-xl font-semibold text-sm transition-colors disabled:opacity-60">
+          {saving ? <><Loader2 className="w-4 h-4 animate-spin" />Saving…</> : <>Continue <ChevronRight className="w-4 h-4" /></>}
         </button>
       </div>
     </div>

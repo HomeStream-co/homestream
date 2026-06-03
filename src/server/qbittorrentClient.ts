@@ -141,9 +141,49 @@ async function request<T = unknown>(
 
 /**
  * Test connection to qBittorrent. Returns version string on success.
+ *
+ * @param overrides  Optional credentials to use instead of process.env.
+ *   Pass these from the setup wizard so we never mutate process.env with
+ *   wizard-entered values (which would permanently overwrite the live config).
  */
-export async function testConnection(): Promise<{ ok: boolean; version?: string; error?: string }> {
+export async function testConnection(overrides?: {
+  url?: string;
+  username?: string;
+  password?: string;
+}): Promise<{ ok: boolean; version?: string; error?: string }> {
   try {
+    if (overrides) {
+      // Scoped test — build a one-shot login without touching process.env
+      const url      = overrides.url      || getQbitUrl();
+      const username = overrides.username || getCredentials().username;
+      const password = overrides.password || getCredentials().password;
+
+      const body = new URLSearchParams({ username, password });
+      const loginRes = await fetch(`${url}/api/v2/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: body.toString(),
+        signal: AbortSignal.timeout(10_000),
+      });
+      const text = await loginRes.text();
+      if (text !== 'Ok.') throw new Error(`qBittorrent login failed: ${text}`);
+
+      const setCookie = loginRes.headers.get('set-cookie');
+      let cookie = '';
+      if (setCookie) {
+        const match = setCookie.match(/SID=([^;]+)/);
+        if (match) cookie = `SID=${match[1]}`;
+      }
+
+      const versionRes = await fetch(`${url}/api/v2/app/version`, {
+        headers: cookie ? { Cookie: cookie } : {},
+        signal: AbortSignal.timeout(10_000),
+      });
+      const version = await versionRes.text();
+      return { ok: true, version: version.trim() };
+    }
+
+    // Normal path — uses process.env credentials
     await login();
     const version = await request<string>('/api/v2/app/version');
     return { ok: true, version };
