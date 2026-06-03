@@ -137,9 +137,23 @@ the v1.9.x pre-release series before being promoted to v1.0.0.
 
 ---
 
+<<<<<<< HEAD
 ## Pre-release History
 
 ### [1.9.4] - 2026-06-03
+=======
+---
+
+## Pre-release History
+
+### [1.9.4] - 2026-06-03
+- fix: replace `<<'SSHEOF'` heredoc with `printf` in release.yml AUR SSH config step
+  (YAML merge-key operator `<<` inside `run: |` caused GitHub Actions parser to silently produce 0 jobs)
+- fix: sync `package.json` version from git tag before `electron-builder` runs
+  (builder was creating releases tagged `v1.9.4` regardless of the pushed tag; un-draft step then failed)
+- fix: add `permissions: contents: write` block to release.yml
+- fix: improve `ci.mjs` diagnostics — show `conclusion` and `event` on 0-job runs; distinguish `skipped` from `failure`
+>>>>>>> 20260603234427-9h9yrecco0
 - fix: release.yml -- remove `${{}}` wrapper from job-level `if` condition
 - fix: strip non-ASCII characters from all workflow YAML files (root cause of 0-jobs failure)
 - feat: AUR package (`aur/PKGBUILD`, `.SRCINFO`, `homestream.desktop`, `publish-to-aur.sh`)
