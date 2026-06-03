@@ -39,12 +39,19 @@ export interface UpdateStatus {
   bytesPerSecond?: number;
   error?: string;
   isElectron?: boolean;
+  /** Linux only — 'appimage' supports auto-update; 'deb'/'pacman'/'unknown' do not */
+  linuxPackageFormat?: 'appimage' | 'deb' | 'pacman' | 'unknown';
 }
 
 export interface UseAppUpdaterReturn {
   /** True when the server reports it is running inside the packaged Electron app */
   isElectron: boolean;
   status: UpdateStatus;
+  /**
+   * True when auto-update (download + restart) is supported on this platform/format.
+   * Always true on Windows/macOS. On Linux, only true for AppImage.
+   */
+  autoUpdateSupported: boolean;
   checkForUpdate: () => void;
   downloadUpdate: () => void;
   installUpdate: () => void;
@@ -120,6 +127,9 @@ export function useAppUpdater(): UseAppUpdaterReturn {
   return {
     isElectron: !!status.isElectron,
     status,
+    // Auto-update works on Windows/macOS always. On Linux only for AppImage.
+    // If linuxPackageFormat is undefined (non-Linux) we assume supported.
+    autoUpdateSupported: !status.linuxPackageFormat || status.linuxPackageFormat === 'appimage',
     checkForUpdate,
     downloadUpdate,
     installUpdate,

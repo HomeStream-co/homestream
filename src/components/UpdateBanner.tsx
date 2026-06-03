@@ -10,7 +10,7 @@
  */
 
 import { useAppUpdater } from '@/hooks/useAppUpdater';
-import { Download, RefreshCw, CheckCircle2, AlertTriangle, Loader2, X, ArrowDownToLine } from 'lucide-react';
+import { Download, RefreshCw, CheckCircle2, AlertTriangle, Loader2, X, ArrowDownToLine, ExternalLink } from 'lucide-react';
 
 interface UpdateBannerProps {
   /** Compact pill style — for use inside settings panels */
@@ -21,6 +21,7 @@ export default function UpdateBanner({ compact = false }: UpdateBannerProps) {
   const {
     isElectron,
     status,
+    autoUpdateSupported,
     checkForUpdate,
     downloadUpdate,
     installUpdate,
@@ -66,6 +67,36 @@ export default function UpdateBanner({ compact = false }: UpdateBannerProps) {
 
   // ── Update available ──────────────────────────────────────────────────────
   if (status.state === 'available') {
+    // deb/pacman on Linux: auto-download not supported — link to releases page
+    if (!autoUpdateSupported) {
+      const fmt = status.linuxPackageFormat ?? 'package';
+      return (
+        <Banner compact={compact} color="blue" onDismiss={dismiss}>
+          <ArrowDownToLine className="w-4 h-4 flex-shrink-0 text-blue-400" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-blue-300">
+              Update available{status.version ? ` — v${status.version}` : ''}
+            </p>
+            {!compact && (
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Auto-update is not supported for the {fmt} install.
+                Download the new {fmt} from GitHub Releases and install it manually.
+              </p>
+            )}
+          </div>
+          <a
+            href="https://github.com/HomeStream-co/homestream/releases/latest"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex-shrink-0 flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors"
+          >
+            <ExternalLink className="w-3.5 h-3.5" />
+            Releases
+          </a>
+        </Banner>
+      );
+    }
+
     return (
       <Banner compact={compact} color="blue" onDismiss={dismiss}>
         <ArrowDownToLine className="w-4 h-4 flex-shrink-0 text-blue-400" />

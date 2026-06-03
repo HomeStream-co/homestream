@@ -98,8 +98,31 @@ function httpGet(path) {
 }
 
 function pushStatus(state, extra = {}) {
-  httpPost('/api/updater/push', { state, version: availableVersion, ...extra, isElectron: true })
-    .catch(() => {}); // fire-and-forget; errors are non-fatal
+  // On Linux, tell the React app which package format is running so it can
+  // show the correct update UI (AppImage = auto-update; deb/pacman = manual).
+  let linuxPackageFormat;
+  if (process.platform === 'linux') {
+    // The APPIMAGE env var is set by the AppImage runtime when running from an
+    // AppImage. deb/pacman installs do not set it.
+    if (process.env.APPIMAGE) {
+      linuxPackageFormat = 'appimage';
+    } else {
+      // Heuristic: check if the executable path looks like a pacman/deb install
+      const execPath = process.execPath || '';
+      if (execPath.includes('/usr/lib/') || execPath.includes('/opt/')) {
+        linuxPackageFormat = execPath.includes('pacman') ? 'pacman' : 'deb';
+      } else {
+        linuxPackageFormat = 'unknown';
+      }
+    }
+  }
+  httpPost('/api/updater/push', {
+    state,
+    version: availableVersion,
+    ...extra,
+    isElectron: true,
+    ...(linuxPackageFormat ? { linuxPackageFormat } : {}),
+  }).catch(() => {}); // fire-and-forget; errors are non-fatal
 }
 
 function startDrainPoller() {

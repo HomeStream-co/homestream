@@ -262,9 +262,16 @@ async function startServer() {
   });
 
   // ── Desktop crash log ─────────────────────────────────────────────────────
-  // Write all server stdout/stderr to Desktop\homestream-debug.txt so the user
-  // can read the actual crash message without hunting through AppData or Event Viewer.
-  const desktopLog = path.join(app.getPath('desktop'), 'homestream-debug.txt');
+  // Write all server stdout/stderr to a debug log file so the user can read
+  // the actual crash message without hunting through AppData or Event Viewer.
+  //
+  // Windows/macOS: write to Desktop\homestream-debug.txt (easy to find).
+  // Linux: Desktop may not exist (headless servers, minimal DEs) — write to
+  //        userData (e.g. ~/.config/HomeStream/homestream-debug.txt) instead.
+  const debugLogDir = process.platform === 'linux'
+    ? app.getPath('userData')
+    : app.getPath('desktop');
+  const desktopLog = path.join(debugLogDir, 'homestream-debug.txt');
   function appendDesktopLog(line) {
     try {
       fs.appendFileSync(desktopLog, `[${new Date().toISOString()}] ${line}\n`);
@@ -329,21 +336,29 @@ async function startServer() {
           pushLog(`Watchdog: ${MAX_FAST_CRASHES} fast crashes — quitting.`, 'error');
 
           // Show the desktop log path in the dialog since crash-log.json may not exist
+          // Show the debug log path in the dialog since crash-log.json may not exist
           let crashDetail = '';
           try {
-            const desktopLogPath = path.join(app.getPath('desktop'), 'homestream-debug.txt');
-            if (fs.existsSync(desktopLogPath)) {
-              const lines = fs.readFileSync(desktopLogPath, 'utf-8').split('\n').slice(-30).join('\n');
+            const debugLogPath = path.join(
+              process.platform === 'linux' ? app.getPath('userData') : app.getPath('desktop'),
+              'homestream-debug.txt'
+            );
+            if (fs.existsSync(debugLogPath)) {
+              const lines = fs.readFileSync(debugLogPath, 'utf-8').split('\n').slice(-30).join('\n');
               crashDetail = `\nLast log lines:\n${lines}`;
             }
           } catch { /* ignore */ }
+
+          const debugLogLocation = process.platform === 'linux'
+            ? `~/.config/HomeStream/homestream-debug.txt`
+            : `homestream-debug.txt on your Desktop`;
 
           dialog.showErrorBox(
             'HomeStream — Crash loop stopped',
             `The server crashed ${MAX_FAST_CRASHES} times instantly.\n\n` +
             `HomeStream has stopped to protect your PC.\n\n` +
-            `Open this file on your Desktop for the full error:\n` +
-            `  homestream-debug.txt` +
+            `Open this file for the full error:\n` +
+            `  ${debugLogLocation}` +
             crashDetail
           );
           app.quit();
@@ -357,11 +372,14 @@ async function startServer() {
       if (watchdogRestarts >= MAX_WATCHDOG_RESTARTS) {
         app.isQuitting = true;
         pushLog(`Watchdog: giving up after ${MAX_WATCHDOG_RESTARTS} restarts.`, 'error');
+        const debugLocation2 = process.platform === 'linux'
+          ? '~/.config/HomeStream/homestream-debug.txt'
+          : 'homestream-debug.txt on your Desktop';
         dialog.showErrorBox(
           'HomeStream — Too many restarts',
           `The HomeStream server crashed ${MAX_WATCHDOG_RESTARTS} times.\n\n` +
-          `Open this file on your Desktop for the full error:\n` +
-          `  homestream-debug.txt`
+          `Open this file for the full error:\n` +
+          `  ${debugLocation2}`
         );
         app.quit();
         return;

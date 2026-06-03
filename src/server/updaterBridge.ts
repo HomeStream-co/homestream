@@ -37,6 +37,13 @@ export interface UpdaterStatus {
   error?: string;
   /** True when running inside the packaged Electron app */
   isElectron?: boolean;
+  /**
+   * Linux package format — only set on Linux.
+   * 'appimage' supports auto-update (electron-updater handles it).
+   * 'deb' and 'pacman' do NOT support auto-update — users must download manually.
+   * Undefined on Windows/macOS (auto-update always works there).
+   */
+  linuxPackageFormat?: 'appimage' | 'deb' | 'pacman' | 'unknown';
 }
 
 export type UpdaterAction = 'check' | 'download' | 'install';

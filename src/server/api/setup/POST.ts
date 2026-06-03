@@ -1,6 +1,15 @@
 import type { Request, Response } from 'express';
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
+
+/** Expand a leading ~ to the real home directory (Linux/macOS). */
+function expandTilde(p: string): string {
+  if (!p) return p;
+  if (p === '~') return os.homedir();
+  if (p.startsWith('~/') || p.startsWith('~\\')) return path.join(os.homedir(), p.slice(2));
+  return p;
+}
 import bcrypt from 'bcryptjs';
 import { writeConfig, readConfig, isSetupComplete } from '../../configStore.js';
 import { testConnection as testQbit } from '../../qbittorrentClient.js';
@@ -93,8 +102,8 @@ export default async function handler(req: Request, res: Response) {
 
         // Create media directories if mediaDir provided
         if (fields.mediaDir) {
-          // Normalise path separators — users may type either / or \ on Windows
-          const mediaDir = fields.mediaDir.replace(/\\/g, path.sep).replace(/\//g, path.sep);
+          // Expand tilde (~/path) then normalise path separators
+          const mediaDir = expandTilde(fields.mediaDir).replace(/\\/g, path.sep).replace(/\//g, path.sep);
           const downloadsDir = path.join(mediaDir, 'downloads');
           const libraryDir   = path.join(mediaDir, 'library');
           const dirs = [
@@ -236,7 +245,7 @@ export default async function handler(req: Request, res: Response) {
       case 'scan_existing': {
         // Scan mediaDir for video files not yet in the library
         const config = readConfig();
-        const scanDir = fields.mediaDir || config.mediaDir;
+        const scanDir = expandTilde(fields.mediaDir || config.mediaDir);
         if (!scanDir) {
           res.status(400).json({ error: 'No media directory configured' });
           return;

@@ -6,6 +6,9 @@ import { HardDrive, FolderOpen, ChevronLeft, ChevronRight, Loader2 } from 'lucid
 import type { SetupStepProps } from './types';
 import { apiPost } from './types';
 
+// Detect Linux at render time (same pattern as StepSysReqs)
+const isLinux = typeof navigator !== 'undefined' && /Linux/.test(navigator.userAgent) && !/Android/.test(navigator.userAgent);
+
 export default function StepMediaFolder({ form, set, status, setStatus, onNext, onBack, platformDefaultsReady, availableDrives }: SetupStepProps) {
   const saveMediaDir = async () => {
     setStatus(s => ({ ...s, mediaDir: 'saving' }));
@@ -85,15 +88,21 @@ export default function StepMediaFolder({ form, set, status, setStatus, onNext, 
               type="text"
               value={form.mediaDir}
               onChange={e => set('mediaDir', e.target.value)}
-              placeholder="D:\HomeStream"
+              placeholder={isLinux ? '/home/you/media/HomeStream' : 'D:\\HomeStream'}
               className="w-full bg-background border border-border rounded-lg pl-9 pr-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary font-mono"
             />
           </div>
           <p className="text-[10px] text-muted-foreground mt-1">
-            HomeStream will create subfolders here automatically. Both forward slashes and backslashes are accepted.
+            HomeStream will create subfolders here automatically.
+            {isLinux
+              ? ' Use an absolute path or start with ~ for your home directory.'
+              : ' Both forward slashes and backslashes are accepted.'}
           </p>
           <p className="text-[10px] text-muted-foreground mt-0.5">
-            Subfolders: <code className="bg-muted px-1 rounded">downloads\</code> and <code className="bg-muted px-1 rounded">library\</code>
+            Subfolders:{' '}
+            <code className="bg-muted px-1 rounded">{isLinux ? 'downloads/' : 'downloads\\'}</code>
+            {' '}and{' '}
+            <code className="bg-muted px-1 rounded">{isLinux ? 'library/' : 'library\\'}</code>
           </p>
         </div>
 
