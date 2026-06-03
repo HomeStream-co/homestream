@@ -111,6 +111,11 @@ const FAST_CRASH_WINDOW_MS = 15000; // exit within 15s of start = "fast crash"
 const MAX_FAST_CRASHES    = 3;      // 3 fast crashes → quit the whole app
 // Resolved at startup — may differ from PREFERRED_PORT if 3000 is taken
 let activePort = PREFERRED_PORT;
+// Tracks whether the browser has been opened this session. Once true, no
+// subsequent server restart (watchdog, manual) will re-open a browser window.
+// This is the definitive spam-open guard — watchdogRestarts alone resets to 0
+// on a successful restart, which would re-open the browser on the second start.
+let browserOpenedThisSession = false;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -409,14 +414,32 @@ async function startServer() {
     pushLog(`LAN address: http://${getLanIp()}:${activePort}`, 'success');
     sendStatus();
 
-    // Only open the browser on the FIRST successful server start, not on
-    // watchdog restarts. This prevents spam-opening browser windows on crash loops.
-    if (watchdogRestarts === 0) {
+    // Only open the browser once per session — never on watchdog restarts or
+    // manual server restarts from the tray. browserOpenedThisSession is the
+    // definitive guard; watchdogRestarts alone resets to 0 on a clean restart
+    // which would incorrectly re-open the browser on the second start.
+    if (!browserOpenedThisSession) {
+      browserOpenedThisSession = true;
       const configPath = path.join(app.getPath('userData'), 'homestream-config.json');
-      const isFirstRun = !fs.existsSync(configPath);
+      // isFirstRun is true when:
+      //   (a) the config file doesn't exist yet — brand new install, OR
+      //   (b) the config file exists but setupComplete is not true — the wizard
+      //       was started but the user never finished it (e.g. crashed mid-setup).
+      //       Without this check, a partial config causes the app to open / with
+      //       a broken/empty library instead of resuming the wizard.
+      let isFirstRun = true;
+      try {
+        if (fs.existsSync(configPath)) {
+          const cfg = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+          isFirstRun = cfg.setupComplete !== true;
+        }
+      } catch {
+        // Corrupt config — treat as first run so the wizard can repair it
+        isFirstRun = true;
+      }
       const startPage = isFirstRun ? '/setup' : '/';
       shell.openExternal(`http://localhost:${activePort}${startPage}`);
-      if (isFirstRun) pushLog('First run detected — opening setup wizard in browser', 'info');
+      if (isFirstRun) pushLog('First run / incomplete setup detected — opening setup wizard in browser', 'info');
     }
   }).catch(err => {
     pushLog(`Server failed to start: ${err.message}`, 'error');

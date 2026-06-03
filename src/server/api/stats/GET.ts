@@ -15,7 +15,7 @@
 
 import type { Request, Response } from 'express';
 import fs from 'fs';
-import { execSync } from 'child_process';
+import { execSync, execFileSync } from 'child_process';
 import { readLibrary } from '../../libraryStore.js';
 import { readConfig } from '../../configStore.js';
 import { getTransferInfo, isReachable } from '../../qbittorrentClient.js';
@@ -64,20 +64,16 @@ function getDiskStats(dir: string): { free: number; total: number } | null {
     return null;
   }
 
-  // Linux / macOS: use df -k.
-  // Sanitise dir to prevent shell injection — only allow safe path characters.
-  // The path comes from the user-configured mediaDir in homestream-config.json.
-  const safePath = dir.replace(/[`$\\|;&<>(){}!]/g, '');
-  if (safePath !== dir) {
-    console.warn('[stats] getDiskStats: suspicious characters in path, sanitised');
-  }
+  // Linux / macOS: use execFileSync with df -k so path spaces and special
+  // characters are passed as a literal argument — no shell injection possible.
   try {
-    const out = execSync(`df -k "${safePath}" 2>/dev/null | tail -1`, { timeout: 3000 }).toString().trim();
-    const parts = out.split(/\s+/);
+    const out = execFileSync('df', ['-k', dir], { timeout: 3000 }).toString().trim();
+    const lastLine = out.split('\n').pop() ?? '';
+    const parts = lastLine.split(/\s+/);
     if (parts.length >= 4) {
       const total = parseInt(parts[1]) * 1024;
       const free  = parseInt(parts[3]) * 1024;
-      if (!isNaN(total) && !isNaN(free)) return { free, total };
+      if (!isNaN(total) && !isNaN(free) && total > 0) return { free, total };
     }
   } catch { /* df unavailable */ }
   return null;
