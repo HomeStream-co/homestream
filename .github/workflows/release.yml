@@ -266,7 +266,7 @@ jobs:
     needs: [release-windows, release-linux]
     # Run whenever linux build succeeded (windows failure is non-blocking).
     # The steps below check for AUR_SSH_PRIVATE_KEY and exit 0 if not set.
-    if: ${{ always() && needs.release-linux.result == 'success' }}
+    if: always() && needs.release-linux.result == 'success'
     timeout-minutes: 10
 
     steps:
