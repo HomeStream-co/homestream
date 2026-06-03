@@ -81,6 +81,7 @@ function makeReqRes(
 const { default: loginHandler }  = await import('../../server/api/auth/login/POST.js');
 const { default: checkHandler }  = await import('../../server/api/auth/check/GET.js');
 const { default: logoutHandler } = await import('../../server/api/auth/logout/POST.js');
+const { _resetRateLimitsForTesting } = await import('../../server/api/auth/login/POST.js');
 
 // ── POST /api/auth/login ──────────────────────────────────────────────────────
 
@@ -88,6 +89,7 @@ describe('POST /api/auth/login', () => {
   beforeEach(() => {
     mockAdminPassword = 'secret123';
     mockSessions.clear();
+    _resetRateLimitsForTesting(); // prevent rate-limit state bleeding between tests
   });
 
   it('returns 400 when password field is missing', async () => {
@@ -111,6 +113,72 @@ describe('POST /api/auth/login', () => {
       expect.any(String),
       expect.objectContaining({ httpOnly: true }),
     );
+  });
+
+  it('omits token from body when request has a Cookie header (browser client)', async () => {
+    // Browser clients send a Cookie header — the token should NOT be in the body
+    // to prevent XSS exposure via localStorage.
+    const req = {
+      body: { password: 'secret123' },
+      cookies: {},
+      headers: { cookie: 'some=existing-cookie' }, // Cookie header present → browser
+      socket: { remoteAddress: '192.168.1.100' },
+    } as unknown as Request;
+    const data: { json?: unknown } = {};
+    const res = {
+      status: vi.fn().mockReturnThis(),
+      json:   vi.fn((v: unknown) => { data.json = v; return res; }),
+      cookie: vi.fn().mockReturnThis(),
+      clearCookie: vi.fn().mockReturnThis(),
+      set:    vi.fn().mockReturnThis(),
+    } as unknown as Response;
+    await loginHandler(req, res);
+    expect((data.json as { ok: boolean }).ok).toBe(true);
+    expect((data.json as { token?: string }).token).toBeUndefined();
+  });
+
+  it('includes token in body when request has no Cookie header (phone/TV client)', async () => {
+    // Phone/TV clients on LAN access cross-origin — browser suppresses Cookie header.
+    // The token must be in the body so the client can use it for WebSocket auth.
+    const req = {
+      body: { password: 'secret123' },
+      cookies: {},
+      headers: {}, // No Cookie header → non-browser
+      socket: { remoteAddress: '192.168.1.200' },
+    } as unknown as Request;
+    const data: { json?: unknown } = {};
+    const res = {
+      status: vi.fn().mockReturnThis(),
+      json:   vi.fn((v: unknown) => { data.json = v; return res; }),
+      cookie: vi.fn().mockReturnThis(),
+      clearCookie: vi.fn().mockReturnThis(),
+      set:    vi.fn().mockReturnThis(),
+    } as unknown as Response;
+    await loginHandler(req, res);
+    expect((data.json as { ok: boolean }).ok).toBe(true);
+    expect(typeof (data.json as { token?: string }).token).toBe('string');
+  });
+
+  it('includes token in body when X-HS-Client: tv header is set (TV client opt-in)', async () => {
+    // TV clients can explicitly opt in to the body token even if they happen
+    // to send a Cookie header (e.g. same-origin TV app).
+    const req = {
+      body: { password: 'secret123' },
+      cookies: {},
+      headers: { cookie: 'some=cookie', 'x-hs-client': 'tv' },
+      socket: { remoteAddress: '192.168.1.50' },
+    } as unknown as Request;
+    const data: { json?: unknown } = {};
+    const res = {
+      status: vi.fn().mockReturnThis(),
+      json:   vi.fn((v: unknown) => { data.json = v; return res; }),
+      cookie: vi.fn().mockReturnThis(),
+      clearCookie: vi.fn().mockReturnThis(),
+      set:    vi.fn().mockReturnThis(),
+    } as unknown as Response;
+    await loginHandler(req, res);
+    expect((data.json as { ok: boolean }).ok).toBe(true);
+    expect(typeof (data.json as { token?: string }).token).toBe('string');
   });
 
   it('returns ok:true for correct bcrypt-hashed password', async () => {
@@ -216,6 +284,7 @@ describe('GET /api/auth/check', () => {
   beforeEach(() => {
     mockAdminPassword = 'secret123';
     mockSessions.clear();
+    _resetRateLimitsForTesting();
   });
 
   it('returns requiresPassword:true when password is set', async () => {

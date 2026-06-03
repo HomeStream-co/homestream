@@ -73,10 +73,50 @@ const FAILURE_DELAY_MS = 2000;           // 2s delay per attempt after threshold
 
 const RATELIMIT_PATH = dataPath('homestream-ratelimit.json');
 
-// In-memory Map — authoritative for this process
+// ── In-memory Map — authoritative for this process ────────────────────────────
+//
+// FIX (🔴): Previously the Map was never loaded from disk on startup, so a
+// server restart wiped all rate-limit state and an attacker could trigger a
+// restart to reset their bucket. We now load persisted state on module init
+// (skipped in test env so tests don't bleed state across runs).
+//
+// Expired buckets are pruned on load so stale entries from a previous run
+// don't block legitimate users after the 15-minute window has passed.
+
 const rateBuckets = new Map<string, RateBucket>();
 
+function loadPersistedRateLimits(): void {
+  if (process.env.NODE_ENV === 'test') return; // test isolation
+  try {
+    if (!fs.existsSync(RATELIMIT_PATH)) return;
+    const raw = JSON.parse(fs.readFileSync(RATELIMIT_PATH, 'utf-8')) as Record<string, RateBucket>;
+    const cutoff = Date.now() - RATE_WINDOW_MS;
+    for (const [ip, bucket] of Object.entries(raw)) {
+      // Only restore buckets whose window hasn't expired yet
+      if (bucket.windowStart > cutoff) {
+        rateBuckets.set(ip, bucket);
+      }
+    }
+    if (rateBuckets.size > 0) {
+      console.log(`[auth] Restored ${rateBuckets.size} rate-limit bucket(s) from disk`);
+    }
+  } catch {
+    // Non-fatal — start with empty buckets if the file is corrupt
+  }
+}
+
+loadPersistedRateLimits();
+
+/**
+ * Reset all rate-limit buckets. FOR TESTING ONLY.
+ * Call this in beforeEach so rate-limit state doesn't bleed between tests.
+ */
+export function _resetRateLimitsForTesting(): void {
+  rateBuckets.clear();
+}
+
 function persistRateLimits(): void {
+  if (process.env.NODE_ENV === 'test') return; // test isolation — no disk writes
   const data: Record<string, RateBucket> = {};
   for (const [ip, bucket] of rateBuckets) data[ip] = bucket;
   const tmp = RATELIMIT_PATH + '.tmp';
@@ -126,6 +166,9 @@ function checkRateLimit(ip: string): { allowed: boolean; retryAfterSecs?: number
 
   bucket.attempts++;
   rateBuckets.set(ip, bucket);
+  // Persist on every attempt so the count survives a restart mid-attack.
+  // This is a fire-and-forget write — we don't await it.
+  persistRateLimits();
 
   if (bucket.attempts > MAX_ATTEMPTS) {
     const retryAfterSecs = Math.ceil((RATE_WINDOW_MS - (now - bucket.windowStart)) / 1000);
@@ -141,6 +184,8 @@ function recordFailure(ip: string): void {
   if (bucket) {
     bucket.failures++;
     rateBuckets.set(ip, bucket);
+    // Persist immediately so a restart mid-attack doesn't reset the failure count
+    persistRateLimits();
   }
 }
 
@@ -226,9 +271,29 @@ export default async function handler(req: Request, res: Response) {
     path: '/',
   });
 
-  // Also return the token in the response body so phone/TV clients on LAN
-  // can store it in localStorage and pass it as ?token= on WebSocket upgrades.
-  // httpOnly cookies are inaccessible to JS, so the phone remote can't read
-  // the cookie — the token param is the only way to authenticate WS on LAN.
-  res.json({ ok: true, token });
+  // FIX (🟡): Previously the token was always returned in the response body.
+  // Browser clients that stored it in localStorage would make it XSS-accessible,
+  // defeating the purpose of the httpOnly cookie.
+  //
+  // Detection heuristic: a browser always sends a Cookie header on same-origin
+  // requests (even if empty, the header is present). Phone/TV clients on LAN
+  // access the server cross-origin (different IP) so the browser suppresses the
+  // Cookie header — making its absence a reliable signal for non-browser clients.
+  //
+  // We also check for an explicit X-HS-Client: tv header that phone/TV clients
+  // can send to opt in to the body token regardless of Cookie header presence.
+  //
+  // The token is still needed by phone/TV clients for WebSocket auth (WS upgrades
+  // cannot send cookies cross-origin) — so we only omit it for browser clients.
+  const hasCookieHeader = typeof req.headers.cookie === 'string';
+  const isTvClient = req.headers['x-hs-client'] === 'tv';
+  const isBrowserClient = hasCookieHeader && !isTvClient;
+
+  if (isBrowserClient) {
+    // Browser: token is in the httpOnly cookie — don't expose it in the body
+    res.json({ ok: true });
+  } else {
+    // Phone/TV/non-browser: return token so client can store it for WS auth
+    res.json({ ok: true, token });
+  }
 }
