@@ -75,13 +75,11 @@ files:
 
 # Extra resources shipped alongside the app (available at process.resourcesPath at runtime)
 extraResources:
-  # Server bundle — CJS format, all node_modules inlined. No external node_modules needed.
-  - from: dist/server.bundle.cjs
-    to: server/server.bundle.cjs
-  # Sourcemap for crash diagnostics (optional — skipped if build didn't produce it)
-  - from: dist/server.bundle.cjs.map
-    to: server/server.bundle.cjs.map
-    filter: "**/*"
+  # Server bundle — output to dist/server/ so electron-builder copies it as a
+  # directory (single-file extraResources entries are silently skipped on Windows
+  # in electron-builder 26.x — directory entries are always reliable).
+  - from: dist/server
+    to: server
   # Client bundle — Vite outputs to dist/client/ (index.html + assets/).
   - from: dist/client
     to: client

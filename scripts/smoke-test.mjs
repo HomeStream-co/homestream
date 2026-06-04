@@ -26,8 +26,9 @@
  *  Group E — Error handling (17)
  */
 
-const BASE_URL   = process.argv[2] ?? 'http://localhost:3000';
-const TIMEOUT_MS = 8000;
+const BASE_URL    = process.argv[2] ?? 'http://localhost:3000';
+const WAIT_MS     = Number(process.argv[3] ?? 60_000);   // optional 3rd arg overrides wait timeout
+const TIMEOUT_MS  = 8000;
 
 // ─── Colour helpers ──────────────────────────────────────────────────────────
 const isTTY  = process.stdout.isTTY;
@@ -71,7 +72,11 @@ async function check(name, fn) {
 }
 
 // ─── Wait for server ──────────────────────────────────────────────────────────
+<<<<<<< HEAD
 async function waitForServer(maxWaitMs = 60_000) {
+=======
+async function waitForServer(maxWaitMs = WAIT_MS) {
+>>>>>>> 20260604224605-9h9yrecco0
   const start = Date.now();
   process.stdout.write(`\nWaiting for server at ${BASE_URL} `);
   while (Date.now() - start < maxWaitMs) {

@@ -149,7 +149,7 @@ jobs:
 
       - name: Start server in background
         run: |
-          node dist/server.bundle.cjs &
+          node dist/server/server.bundle.cjs &
           echo "SERVER_PID=$!" >> $GITHUB_ENV
         env:
           NODE_ENV: production
@@ -236,12 +236,12 @@ jobs:
 
       - name: Verify server bundle exists
         run: |
-          test -f dist/server.bundle.cjs || (echo "MISSING: dist/server.bundle.cjs" && exit 1)
-          echo "Bundle size: $(du -sh dist/server.bundle.cjs | cut -f1)"
+          test -f dist/server/server.bundle.cjs || (echo "MISSING: dist/server/server.bundle.cjs" && exit 1)
+          echo "Bundle size: $(du -sh dist/server/server.bundle.cjs | cut -f1)"
 
       - name: Start server in background
         run: |
-          node dist/server.bundle.cjs &
+          node dist/server/server.bundle.cjs &
           echo "SERVER_PID=$!" >> $GITHUB_ENV
         env:
           NODE_ENV: production
@@ -304,13 +304,13 @@ jobs:
       - name: Verify build artifacts (Windows)
         shell: pwsh
         run: |
-          if (!(Test-Path "dist/server.bundle.cjs")) {
-            Write-Error "dist/server.bundle.cjs MISSING"; exit 1
+          if (!(Test-Path "dist/server/server.bundle.cjs")) {
+            Write-Error "dist/server/server.bundle.cjs MISSING"; exit 1
           }
           if (!(Test-Path "dist/client/index.html")) {
             Write-Error "dist/client/index.html MISSING"; exit 1
           }
-          $size = [math]::Round((Get-Item "dist/server.bundle.cjs").Length / 1MB, 1)
+          $size = [math]::Round((Get-Item "dist/server/server.bundle.cjs").Length / 1MB, 1)
           Write-Host "server.bundle.cjs: $size MB"
           if (Test-Path "node_modules/ffmpeg-static/ffmpeg.exe") {
             $ff = [math]::Round((Get-Item "node_modules/ffmpeg-static/ffmpeg.exe").Length / 1MB, 1)
@@ -433,7 +433,12 @@ jobs:
       - name: Run smoke tests against installed bundle
         # Use 127.0.0.1 explicitly — on Windows, 'localhost' resolves to ::1 (IPv6)
         # but the server binds to 0.0.0.0 (IPv4 only), so the connection is refused.
+<<<<<<< HEAD
         run: node scripts/smoke-test.mjs http://127.0.0.1:3000
+=======
+        # Pass 120000ms wait timeout — Windows CI runners are slower than Linux.
+        run: node scripts/smoke-test.mjs http://127.0.0.1:3000 120000
+>>>>>>> 20260604224605-9h9yrecco0
 
       - name: Dump server logs on failure
         if: failure()

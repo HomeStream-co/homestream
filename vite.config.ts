@@ -62,7 +62,9 @@ function serverBundlePlugin(): Plugin {
 			// CJS + packages:"bundle"  → esbuild inlines everything with normal
 			//   require() calls → no ESM/CJS boundary → no createRequire needed →
 			//   no NODE_PATH needed → works on Windows with spaces in path → FIXED
-			const outfile = path.resolve(__dirname, "dist", "server.bundle.cjs");
+			// Output to dist/server/ subdirectory so electron-builder can copy it
+		// as a directory (more reliable than single-file extraResources on Windows).
+		const outfile = path.resolve(__dirname, "dist", "server", "server.bundle.cjs");
 
 			// Only externalize packages that are genuinely unbundleable:
 			// - webtorrent / webrtc-polyfill / node-datachannel: native addons or
@@ -117,7 +119,7 @@ function serverBundlePlugin(): Plugin {
 				},
 			});
 
-			console.log("Server bundle created at dist/server.bundle.cjs");
+			console.log("Server bundle created at dist/server/server.bundle.cjs");
 		},
 	};
 }

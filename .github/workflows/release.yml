@@ -76,15 +76,15 @@ jobs:
       - name: Verify build artifacts
         shell: pwsh
         run: |
-          if (!(Test-Path "dist/server.bundle.cjs")) {
-            Write-Error "dist/server.bundle.cjs MISSING"
+          if (!(Test-Path "dist/server/server.bundle.cjs")) {
+            Write-Error "dist/server/server.bundle.cjs MISSING"
             exit 1
           }
           if (!(Test-Path "dist/client/index.html")) {
             Write-Error "dist/client/index.html MISSING"
             exit 1
           }
-          $size = [math]::Round((Get-Item "dist/server.bundle.cjs").Length / 1MB, 1)
+          $size = [math]::Round((Get-Item "dist/server/server.bundle.cjs").Length / 1MB, 1)
           Write-Host "server.bundle.cjs: $size MB"
           # Verify ffmpeg-static downloaded the Windows binary
           if (Test-Path "node_modules/ffmpeg-static/ffmpeg.exe") {
@@ -209,9 +209,9 @@ jobs:
 
       - name: Verify build artifacts
         run: |
-          test -f dist/server.bundle.cjs || (echo "dist/server.bundle.cjs MISSING" && exit 1)
+          test -f dist/server/server.bundle.cjs || (echo "dist/server/server.bundle.cjs MISSING" && exit 1)
           test -f dist/client/index.html || (echo "dist/client/index.html MISSING" && exit 1)
-          SIZE=$(du -sh dist/server.bundle.cjs | cut -f1)
+          SIZE=$(du -sh dist/server/server.bundle.cjs | cut -f1)
           echo "server.bundle.cjs: $SIZE"
           if [ -f node_modules/ffmpeg-static/ffmpeg ]; then
             FFSIZE=$(du -sh node_modules/ffmpeg-static/ffmpeg | cut -f1)
