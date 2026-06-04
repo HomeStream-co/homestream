@@ -434,11 +434,16 @@ jobs:
         # Use 127.0.0.1 explicitly — on Windows, 'localhost' resolves to ::1 (IPv6)
         # but the server binds to 0.0.0.0 (IPv4 only), so the connection is refused.
 <<<<<<< HEAD
+<<<<<<< HEAD
         run: node scripts/smoke-test.mjs http://127.0.0.1:3000
 =======
         # Pass 120000ms wait timeout — Windows CI runners are slower than Linux.
         run: node scripts/smoke-test.mjs http://127.0.0.1:3000 120000
 >>>>>>> 20260604224605-9h9yrecco0
+=======
+        # Pass 120000ms wait timeout — Windows CI runners are slower than Linux.
+        run: node scripts/smoke-test.mjs http://127.0.0.1:3000 120000
+>>>>>>> 20260604231654-9h9yrecco0
 
       - name: Dump server logs on failure
         if: failure()
