@@ -414,6 +414,8 @@ jobs:
             -Environment @{
               NODE_ENV        = "production"
               PORT            = "3000"
+              HOST            = "127.0.0.1"
+              SERVER_HOST     = "127.0.0.1"
               HOMESTREAM_DATA = $dataDir
               ELECTRON_RESOURCES_PATH = "$env:INSTALL_DIR\resources"
               PATH            = $env:PATH
@@ -429,7 +431,9 @@ jobs:
           Write-Host "Server PID: $($proc.Id)"
 
       - name: Run smoke tests against installed bundle
-        run: node scripts/smoke-test.mjs http://localhost:3000
+        # Use 127.0.0.1 explicitly — on Windows, 'localhost' resolves to ::1 (IPv6)
+        # but the server binds to 0.0.0.0 (IPv4 only), so the connection is refused.
+        run: node scripts/smoke-test.mjs http://127.0.0.1:3000
 
       - name: Dump server logs on failure
         if: failure()
