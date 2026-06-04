@@ -326,9 +326,9 @@ jobs:
       - name: Verify NSIS installer was produced
         shell: pwsh
         run: |
-          $exe = Get-ChildItem dist-electron -Filter "HomeStream-Setup-*.exe" | Select-Object -First 1
+          $exe = Get-ChildItem dist-electron -Filter "HomeStream*.exe" -Exclude "*.blockmap" | Where-Object { $_.Name -notlike "*uninstaller*" } | Select-Object -First 1
           if (-not $exe) {
-            Write-Error "No HomeStream-Setup-*.exe found in dist-electron/"
+            Write-Error "No HomeStream*.exe installer found in dist-electron/"
             Get-ChildItem dist-electron | Format-Table Name, Length
             exit 1
           }
