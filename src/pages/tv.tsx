@@ -27,10 +27,32 @@ import { motion, AnimatePresence } from 'motion/react';
 import {
   Play, Search, X, Star, Clock, Tv2, Film,
   Home, List, Bookmark, Filter, Smartphone, QrCode,
+  User, Check,
 } from 'lucide-react';
 import { useMedia } from '@/context/MediaContext';
 import { useProfile } from '@/context/ProfileContext';
+import type { Profile } from '@/context/ProfileContext';
 import type { MediaItem } from '@/types/media';
+
+// ── Cookie helpers (TV profile persistence) ───────────────────────────────────
+// TV browsers often clear localStorage between sessions (Samsung Tizen, LG webOS).
+// We use a long-lived cookie as a fallback so the last-used profile is remembered.
+
+const TV_PROFILE_COOKIE = 'hs-tv-profile';
+const COOKIE_MAX_AGE    = 60 * 60 * 24 * 365; // 1 year
+
+function getTvProfileCookie(): string | null {
+  try {
+    const match = document.cookie.match(new RegExp('(?:^|; )' + TV_PROFILE_COOKIE + '=([^;]*)'));
+    return match ? decodeURIComponent(match[1]) : null;
+  } catch { return null; }
+}
+
+function setTvProfileCookie(profileId: string) {
+  try {
+    document.cookie = `${TV_PROFILE_COOKIE}=${encodeURIComponent(profileId)}; max-age=${COOKIE_MAX_AGE}; path=/; SameSite=Lax`;
+  } catch { /* ignore */ }
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -443,6 +465,113 @@ function TvNav({
   );
 }
 
+// ── TV Profile Picker Overlay ─────────────────────────────────────────────────
+// Full-screen overlay shown when no profile is active or user wants to switch.
+// Stays entirely within /tv — never navigates away.
+
+function TvProfilePicker({
+  visible,
+  onSelect,
+}: {
+  visible: boolean;
+  onSelect: (profile: Profile) => void;
+}) {
+  const { profiles, loading } = useProfile();
+  const [focused, setFocused] = useState(0);
+
+  // Reset focus when overlay opens
+  useEffect(() => { if (visible) setFocused(0); }, [visible]);
+
+  // D-pad navigation within the picker
+  useEffect(() => {
+    if (!visible) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+        e.preventDefault();
+        setFocused(f => Math.min(f + 1, profiles.length - 1));
+      } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        setFocused(f => Math.max(f - 1, 0));
+      } else if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        if (profiles[focused]) onSelect(profiles[focused]);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [visible, profiles, focused, onSelect]);
+
+  return (
+    <AnimatePresence>
+      {visible && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.25 }}
+          className="fixed inset-0 z-50 bg-black flex flex-col items-center justify-center gap-10"
+        >
+          {/* Logo */}
+          <div className="flex items-center gap-3 mb-2">
+            <div className="w-12 h-12 rounded-2xl bg-primary flex items-center justify-center">
+              <Play className="w-6 h-6 text-primary-foreground fill-primary-foreground ml-0.5" />
+            </div>
+            <span className="text-3xl font-bold text-white tracking-tight">HomeStream</span>
+          </div>
+
+          <div className="text-center">
+            <h2 className="text-4xl font-bold text-white mb-2">Who's watching?</h2>
+            <p className="text-white/50 text-lg">Select your profile to continue</p>
+          </div>
+
+          {loading ? (
+            <div className="w-10 h-10 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+          ) : (
+            <div className="flex flex-wrap justify-center gap-6 max-w-3xl px-8">
+              {profiles.map((profile, i) => (
+                <button
+                  key={profile.id}
+                  onClick={() => onSelect(profile)}
+                  className={`flex flex-col items-center gap-3 p-6 rounded-2xl transition-all duration-200 focus:outline-none min-w-[120px] ${
+                    focused === i
+                      ? 'ring-4 ring-white scale-110 bg-white/15'
+                      : 'bg-white/5 hover:bg-white/10 hover:scale-105'
+                  }`}
+                  onFocus={() => setFocused(i)}
+                >
+                  <div
+                    className={`w-20 h-20 rounded-2xl flex items-center justify-center text-4xl ${
+                      focused === i ? 'ring-4 ring-white/60' : ''
+                    }`}
+                    style={{ background: 'rgba(255,255,255,0.1)' }}
+                  >
+                    {profile.avatar}
+                  </div>
+                  <span className="text-white font-semibold text-base">{profile.name}</span>
+                  {profile.restricted && (
+                    <span className="text-xs text-white/40 bg-white/10 px-2 py-0.5 rounded-full">Kids</span>
+                  )}
+                  {focused === i && (
+                    <div className="flex items-center gap-1 text-primary text-xs font-semibold">
+                      <Check className="w-3.5 h-3.5" />
+                      Select
+                    </div>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+
+          <p className="text-white/30 text-sm mt-2">
+            Use <kbd className="bg-white/10 rounded px-1.5 py-0.5 font-mono text-xs">←→</kbd> to navigate,{' '}
+            <kbd className="bg-white/10 rounded px-1.5 py-0.5 font-mono text-xs">OK</kbd> to select
+          </p>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+
 // ── Not-connected splash ───────────────────────────────────────────────────────
 
 function TvNotConnected({ serverIP }: { serverIP: string }) {
@@ -703,8 +832,50 @@ function QrRemoteOverlay({
 function TvPageInner() {
   const navigate = useNavigate();
   const { library, watchlist: watchlistIds } = useMedia();
-  const { activeProfile } = useProfile();
+  const { activeProfile, profiles, switchProfile } = useProfile();
   const profileId = activeProfile?.id ?? 'adult';
+
+  // ── Profile picker state ──
+  // Show picker if no profile is active. Also shown when user clicks "Switch Profile".
+  const [showProfilePicker, setShowProfilePicker] = useState(false);
+  const profileAutoResumed = useRef(false);
+
+  // On mount: try to auto-resume the last TV profile from cookie or localStorage.
+  // This runs once after profiles have loaded so we have valid IDs to match against.
+  useEffect(() => {
+    if (profileAutoResumed.current) return;
+    if (profiles.length === 0) return; // wait for profiles to load
+    profileAutoResumed.current = true;
+
+    if (activeProfile) {
+      // Already have a profile — persist it to cookie for next session
+      setTvProfileCookie(activeProfile.id);
+      return;
+    }
+
+    // Try cookie first (survives TV browser session clears), then localStorage
+    const savedId = getTvProfileCookie()
+      ?? (() => { try { return localStorage.getItem('homestream-active-profile'); } catch { return null; } })();
+
+    if (savedId && profiles.find(p => p.id === savedId)) {
+      // Auto-resume silently — no picker needed
+      switchProfile(savedId).catch(() => setShowProfilePicker(true));
+    } else {
+      // No saved profile — show the picker
+      setShowProfilePicker(true);
+    }
+  }, [profiles, activeProfile, switchProfile]);
+
+  const handleProfileSelect = useCallback(async (profile: Profile) => {
+    try {
+      await switchProfile(profile.id);
+      setTvProfileCookie(profile.id);
+      setShowProfilePicker(false);
+    } catch {
+      // Fallback: still close picker and use the profile locally
+      setShowProfilePicker(false);
+    }
+  }, [switchProfile]);
 
   const [tab, setTab] = useState<NavTab>('home');
   const [search, setSearch] = useState('');
@@ -1062,6 +1233,12 @@ function TvPageInner() {
     <div className="min-h-screen bg-black text-white overflow-x-hidden">
       <title>HomeStream TV</title>
 
+      {/* TV Profile Picker — shown on first load (no profile) or on demand */}
+      <TvProfilePicker
+        visible={showProfilePicker}
+        onSelect={handleProfileSelect}
+      />
+
       {/* HTTPS warning — Samsung browser auto-upgrades http→https which breaks WS */}
       {typeof window !== 'undefined' && window.location.protocol === 'https:' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1' && (
         <div className="fixed top-0 left-0 right-0 z-50 bg-yellow-500 text-black text-center py-3 px-4 text-sm font-semibold">
@@ -1079,7 +1256,7 @@ function TvPageInner() {
           <span className="text-2xl font-bold tracking-tight">HomeStream</span>
         </div>
 
-        {/* Search */}
+        {/* Search + controls */}
         <div className="flex items-center gap-3">
           <AnimatePresence>
             {showSearch && (
@@ -1109,6 +1286,25 @@ function TvPageInner() {
             title={showSearch ? 'Close search' : 'Search'}
           >
             {showSearch ? <X className="w-5 h-5" /> : <Search className="w-5 h-5" />}
+          </button>
+
+          {/* Profile switcher button */}
+          <button
+            onClick={() => setShowProfilePicker(true)}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-sm font-medium transition-colors focus:outline-none focus:ring-4 focus:ring-white/40"
+            title="Switch profile"
+          >
+            {activeProfile ? (
+              <>
+                <span className="text-base leading-none">{activeProfile.avatar}</span>
+                <span className="max-w-[80px] truncate">{activeProfile.name}</span>
+              </>
+            ) : (
+              <>
+                <User className="w-4 h-4" />
+                Profile
+              </>
+            )}
           </button>
 
           <button
