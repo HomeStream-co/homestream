@@ -71,7 +71,7 @@ async function check(name, fn) {
 }
 
 // ─── Wait for server ──────────────────────────────────────────────────────────
-async function waitForServer(maxWaitMs = 30_000) {
+async function waitForServer(maxWaitMs = 60_000) {
   const start = Date.now();
   process.stdout.write(`\nWaiting for server at ${BASE_URL} `);
   while (Date.now() - start < maxWaitMs) {

@@ -405,6 +405,9 @@ jobs:
           New-Item -ItemType Directory -Force -Path $dataDir | Out-Null
           Write-Host "Starting server from: $bundle"
           Write-Host "Data dir: $dataDir"
+          # NOTE: -Environment replaces the entire environment for the child process.
+          # We must forward PATH (and other critical vars) explicitly, otherwise
+          # node cannot locate system DLLs and starts very slowly or fails.
           $proc = Start-Process node -ArgumentList $bundle -PassThru -NoNewWindow `
             -RedirectStandardOutput "$env:TEMP\hs-smoke-stdout.txt" `
             -RedirectStandardError  "$env:TEMP\hs-smoke-stderr.txt" `
@@ -413,6 +416,14 @@ jobs:
               PORT            = "3000"
               HOMESTREAM_DATA = $dataDir
               ELECTRON_RESOURCES_PATH = "$env:INSTALL_DIR\resources"
+              PATH            = $env:PATH
+              TEMP            = $env:TEMP
+              TMP             = $env:TMP
+              USERPROFILE     = $env:USERPROFILE
+              APPDATA         = $env:APPDATA
+              LOCALAPPDATA    = $env:LOCALAPPDATA
+              SystemRoot      = $env:SystemRoot
+              SystemDrive     = $env:SystemDrive
             }
           echo "SERVER_PID=$($proc.Id)" >> $env:GITHUB_ENV
           Write-Host "Server PID: $($proc.Id)"
