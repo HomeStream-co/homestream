@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { createRoot, Root } from "react-dom/client";
 import { safePostMessage, isOriginAllowed } from "../utils/postMessage";
+import { type BusTextUpdatePayload, send } from "../utils/eventBus";
 import {
   generatePreciseSelector,
   extractDevContext,
@@ -163,13 +164,15 @@ export function useTextEditing(isEditModeActive: boolean) {
 
         cleanupOverlay();
         const overlay = createFixedOverlay(element);
-        overlay.textContent = newText;
-        overlayRef.current = overlay;
+        if (overlay) {
+          overlay.textContent = newText;
+          overlayRef.current = overlay;
+        }
         commitCleanup();
         return;
       }
 
-      const payload: Record<string, unknown> = {
+      const payload: BusTextUpdatePayload = {
         selector,
         preciseSelector,
         oldText: originalText,
@@ -188,7 +191,7 @@ export function useTextEditing(isEditModeActive: boolean) {
         if (structured.rootAttributes) payload.newAttributes = structured.rootAttributes;
       }
 
-      safePostMessage(window.parent, {
+      send({
         type: "TEXT_UPDATED",
         data: payload,
       });
@@ -221,13 +224,15 @@ export function useTextEditing(isEditModeActive: boolean) {
           : null;
         const source = parsed?.body.firstElementChild as HTMLElement | null;
         const overlay = createFixedOverlay(element);
-        if (source) {
-          safeSetInnerHtml(overlay, normalizeHtml(source.innerHTML));
-          mergeRootAttrsOntoOverlay(overlay, source);
-        } else {
-          overlay.textContent = newText;
+        if (overlay) {
+          if (source) {
+            safeSetInnerHtml(overlay, normalizeHtml(source.innerHTML));
+            mergeRootAttrsOntoOverlay(overlay, source);
+          } else {
+            overlay.textContent = newText;
+          }
+          overlayRef.current = overlay;
         }
-        overlayRef.current = overlay;
         commitCleanup();
       }
     },
@@ -292,7 +297,7 @@ export function useTextEditing(isEditModeActive: boolean) {
 
       beginSave(parent, parentOriginalText);
 
-      safePostMessage(window.parent, {
+      send({
         type: "TEXT_UPDATED",
         data: {
           selector,
@@ -308,9 +313,11 @@ export function useTextEditing(isEditModeActive: boolean) {
 
       cleanupOverlay();
       const overlay = createFixedOverlay(parent);
-      safeSetInnerHtml(overlay, parentInnerHtml);
-      overlayRef.current = overlay;
-      parent.style.visibility = "hidden";
+      if (overlay) {
+        safeSetInnerHtml(overlay, parentInnerHtml);
+        overlayRef.current = overlay;
+        parent.style.visibility = "hidden";
+      }
 
       commitCleanup();
     },
