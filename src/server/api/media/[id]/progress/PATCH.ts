@@ -132,8 +132,18 @@ async function flushAllPending(): Promise<void> {
   }
 }
 
-process.once('SIGINT',  () => flushAllPending().finally(() => process.exit(0)));
-process.once('SIGTERM', () => flushAllPending().finally(() => process.exit(0)));
+// Guard against duplicate handler registration on Vite hot-reload.
+// Each SSR module reload re-executes this top-level code — without the guard,
+// every reload stacks another process.once() listener. On SIGINT all of them
+// fire, calling flushAllPending() and process.exit(0) multiple times.
+// The symbol is stored on the process object so it survives module cache
+// invalidation (process is a singleton across all module instances).
+const SIG_HANDLERS_KEY = Symbol.for('homestream.progressSignalHandlersRegistered');
+if (!(process as NodeJS.Process & Record<symbol, boolean>)[SIG_HANDLERS_KEY]) {
+  (process as NodeJS.Process & Record<symbol, boolean>)[SIG_HANDLERS_KEY] = true;
+  process.once('SIGINT',  () => flushAllPending().finally(() => process.exit(0)));
+  process.once('SIGTERM', () => flushAllPending().finally(() => process.exit(0)));
+}
 
 // Also export so /api/shutdown POST can call it directly before process.exit
 export { flushAllPending as flushProgressWrites };

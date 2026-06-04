@@ -174,10 +174,14 @@ export function writeConfig(updates: Partial<AppConfig>): AppConfig {
   const current = readConfig();
   const next: AppConfig = { ...current, ...updates };
 
-  // Auto-derive sub-directories using path.join for cross-platform correctness
+  // Auto-derive sub-directories using path.join for cross-platform correctness.
+  // FIX (🟡 Phase 8): Previously used `next.downloadsDir || path.join(...)` which
+  // meant changing mediaDir never updated downloadsDir if it had been set before —
+  // downloads silently went to the old path. Now we always re-derive both dirs
+  // when mediaDir is explicitly changed, so Settings → Media Folder works correctly.
   if (updates.mediaDir) {
-    next.downloadsDir = next.downloadsDir || path.join(updates.mediaDir, 'downloads');
-    next.libraryDir = next.libraryDir || path.join(updates.mediaDir, 'library');
+    next.downloadsDir = path.join(updates.mediaDir, 'downloads');
+    next.libraryDir   = path.join(updates.mediaDir, 'library');
   }
 
   // Invalidate cache before writing so any concurrent readConfig() call that

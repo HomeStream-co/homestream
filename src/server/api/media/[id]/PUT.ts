@@ -12,7 +12,7 @@ export default async function handler(req: Request, res: Response) {
     if (idx === -1) {
       return res.status(404).json({ error: 'Media item not found' });
     }
-    const updated = { ...data[idx], ...updates, id };
+    const updated = { ...data[idx], ...updates, id, updatedAt: new Date().toISOString() };
     await writeLibrary(lib => {
       const i = lib.findIndex(m => m.id === id);
       if (i !== -1) lib[i] = updated;

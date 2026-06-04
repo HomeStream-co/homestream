@@ -33,13 +33,23 @@ interface ProfileProgressEntry {
   watchedAt?: string;
 }
 
-/** Build a cheap ETag from item count + the most recent lastWatchedAt timestamp */
+/** Build a cheap ETag from item count + the most recent mutation timestamp.
+ *
+ * FIX (🟡 Phase 4): Previously only considered lastWatchedAt / addedAt, so a
+ * PUT /api/media/:id (title/poster edit) didn't change the ETag — the client
+ * got a stale 304 and never saw the update until something else changed the
+ * watch timestamp.  We now also include updatedAt (written by the PUT handler)
+ * so any metadata edit immediately busts the cache.
+ */
 function buildETag(library: Record<string, unknown>[], profileId: string): string {
   const count = library.length;
-  // Find the most recently touched item — either by lastWatchedAt or addedAt
+  // Pick the most recent of lastWatchedAt, updatedAt, or addedAt per item
   let latestTs = '';
   for (const item of library) {
-    const ts = (item.lastWatchedAt as string | undefined) || (item.addedAt as string | undefined) || '';
+    const ts = (item.updatedAt as string | undefined)
+      || (item.lastWatchedAt as string | undefined)
+      || (item.addedAt as string | undefined)
+      || '';
     if (ts > latestTs) latestTs = ts;
   }
   const raw = `${count}:${latestTs}:${profileId}`;

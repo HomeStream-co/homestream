@@ -180,13 +180,15 @@ describe('writeConfig() — mediaDir auto-derives subdirectories', () => {
     expect(result.libraryDir).toBe(path.join('/mnt/raid', 'library'));
   });
 
-  it('does NOT overwrite an existing downloadsDir when mediaDir changes', () => {
-    // First write sets custom downloadsDir
-    writeConfig({ mediaDir: '/old', downloadsDir: '/custom/downloads', libraryDir: '/custom/library' });
-    // Second write changes mediaDir — existing dirs should be preserved
+  it('always re-derives downloadsDir and libraryDir when mediaDir changes', () => {
+    // First write sets a custom downloadsDir under the old mediaDir
+    writeConfig({ mediaDir: '/old', downloadsDir: '/old/downloads', libraryDir: '/old/library' });
+    // Second write changes mediaDir — dirs MUST follow the new mediaDir.
+    // FIX (🟡 Phase 8): previously used `|| existing` which kept the stale path,
+    // silently sending downloads to the wrong folder after a Settings change.
     const result = writeConfig({ mediaDir: '/new' });
-    // The auto-derive only sets if downloadsDir is falsy — existing value is kept
-    expect(result.downloadsDir).toBe('/custom/downloads');
+    expect(result.downloadsDir).toBe('/new/downloads');
+    expect(result.libraryDir).toBe('/new/library');
   });
 
   it('uses path.join (cross-platform) for derived paths', () => {
