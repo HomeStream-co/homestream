@@ -311,11 +311,13 @@ async function runChecks() {
     });
 
     await check('GET /api/network (with auth) → 200 with lanIp field', async () => {
-      // Route is at /api/network/info
+      // Route is at /api/network/info; response shape: { primary, lanIPs, hostname, port }
       const { res, body } = await getJSON('/api/network/info', sessionCookie);
       if (res.status !== 200) return { ok: false, detail: `HTTP ${res.status}` };
-      if (!('lanIp' in body)) return { ok: false, detail: 'lanIp field missing' };
-      return { ok: true, detail: `lanIp=${body.lanIp}` };
+      // Accept either legacy lanIp or current primary/lanIPs shape
+      const ip = body.lanIp ?? body.primary ?? (Array.isArray(body.lanIPs) ? body.lanIPs[0] : undefined);
+      if (!ip) return { ok: false, detail: `no IP field in response: ${JSON.stringify(body).slice(0, 80)}` };
+      return { ok: true, detail: `ip=${ip}` };
     });
   } else {
     console.log(dim('  ℹ  No session cookie — authenticated route checks skipped'));
