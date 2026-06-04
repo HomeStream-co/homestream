@@ -115,3 +115,45 @@ jobs:
         env:
           # Suppress Vite's interactive prompts in CI
           CI: true
+
+  # -- Smoke test ---------------------------------------------------------------
+  # Starts the production build and hits the critical API endpoints to verify
+  # the server boots and responds correctly — catches wiring regressions that
+  # unit tests can't (missing route registrations, startup crashes, etc.)
+  smoke-test:
+    name: Smoke Test
+    runs-on: ubuntu-latest
+    needs: [build-check]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+        env:
+          CI: true
+
+      - name: Start server in background
+        run: |
+          node dist/server.bundle.mjs &
+          echo "SERVER_PID=$!" >> $GITHUB_ENV
+        env:
+          NODE_ENV: production
+          PORT: 3000
+          # Smoke test runs against a fresh install — setup is not complete,
+          # which is fine: /api/health and auth endpoints work regardless.
+          HOMESTREAM_DATA_DIR: /tmp/homestream-smoke
+
+      - name: Run smoke tests
+        run: node scripts/smoke-test.mjs http://localhost:3000
+
+      - name: Stop server
+        if: always()
+        run: kill $SERVER_PID 2>/dev/null || true
