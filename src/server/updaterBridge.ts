@@ -31,7 +31,10 @@
 
 export interface UpdaterStatus {
   state: 'idle' | 'checking' | 'available' | 'not-available' | 'downloading' | 'ready' | 'error';
+  /** The version of the available update (set when state is 'available', 'downloading', or 'ready') */
   version?: string;
+  /** The currently installed/running version — always set by Electron */
+  currentVersion?: string;
   percent?: number;
   bytesPerSecond?: number;
   error?: string;

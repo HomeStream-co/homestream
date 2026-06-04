@@ -34,7 +34,10 @@ export type UpdateState =
 
 export interface UpdateStatus {
   state: UpdateState;
+  /** Version of the available update */
   version?: string;
+  /** Currently installed/running version — always populated by Electron */
+  currentVersion?: string;
   percent?: number;
   bytesPerSecond?: number;
   error?: string;

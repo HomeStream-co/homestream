@@ -39,6 +39,7 @@ export default function handler(req: Request, res: Response) {
   const body = req.body as {
     state?: string;
     version?: string;
+    currentVersion?: string;
     percent?: number;
     bytesPerSecond?: number;
     error?: string;
@@ -52,6 +53,7 @@ export default function handler(req: Request, res: Response) {
   setUpdaterStatus({
     state: body.state as Parameters<typeof setUpdaterStatus>[0]['state'],
     version: body.version,
+    currentVersion: body.currentVersion,
     percent: body.percent,
     bytesPerSecond: body.bytesPerSecond,
     error: body.error,

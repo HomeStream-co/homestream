@@ -119,6 +119,8 @@ function pushStatus(state, extra = {}) {
   httpPost('/api/updater/push', {
     state,
     version: availableVersion,
+    // Always include the running version so the UI can show "v1.7.0 — up to date"
+    currentVersion: app.getVersion(),
     ...extra,
     isElectron: true,
     ...(linuxPackageFormat ? { linuxPackageFormat } : {}),

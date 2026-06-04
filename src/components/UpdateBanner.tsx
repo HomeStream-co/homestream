@@ -50,7 +50,9 @@ export default function UpdateBanner({ compact = false }: UpdateBannerProps) {
     return (
       <Banner compact={compact} color="neutral">
         <Loader2 className="w-4 h-4 animate-spin flex-shrink-0" />
-        <span className="flex-1 text-sm">Checking for updates…</span>
+        <span className="flex-1 text-sm">
+          Checking for updates{status.currentVersion ? ` — current: v${status.currentVersion}` : ''}…
+        </span>
       </Banner>
     );
   }
@@ -60,7 +62,9 @@ export default function UpdateBanner({ compact = false }: UpdateBannerProps) {
     return (
       <Banner compact={compact} color="green" onDismiss={dismiss}>
         <CheckCircle2 className="w-4 h-4 flex-shrink-0 text-green-400" />
-        <span className="flex-1 text-sm">HomeStream is up to date</span>
+        <span className="flex-1 text-sm">
+          HomeStream is up to date{status.currentVersion ? ` — v${status.currentVersion}` : ''}
+        </span>
       </Banner>
     );
   }
