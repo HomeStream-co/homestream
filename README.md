@@ -87,6 +87,7 @@ No subscriptions. No cloud. Your media, your rules.
 
 ## Installation
 
+<<<<<<< HEAD
 ### Windows
 
 Download the latest `HomeStream-Setup-*.exe` from [Releases](https://github.com/HomeStream-co/homestream/releases/latest) and run it. The installer includes auto-update support.
@@ -98,10 +99,71 @@ Download the latest `HomeStream-Setup-*.exe` from [Releases](https://github.com/
 wget https://github.com/HomeStream-co/homestream/releases/latest/download/HomeStream-*.AppImage
 
 # Make executable and run
+=======
+> **First time here?** Pick your operating system below and follow the steps in order. The whole process takes about 2 minutes.
+
+---
+
+### 🪟 Windows (Recommended — NSIS Installer)
+
+The installer handles everything: installs the app, creates a Start Menu shortcut, and sets up auto-updates so you always get the latest version automatically.
+
+**Step 1 — Download the installer**
+
+Go to the [**Latest Release**](https://github.com/HomeStream-co/homestream/releases/latest) page and download the file named:
+
+```
+HomeStream-Setup-X.X.X.exe
+```
+
+> If your browser warns "this file may be harmful", click **Keep** — it is a standard NSIS installer and is safe.
+
+**Step 2 — Run the installer**
+
+Double-click the downloaded `.exe` file. If Windows SmartScreen shows a blue warning popup:
+1. Click **More info**
+2. Click **Run anyway**
+
+Follow the on-screen prompts (Next → Install → Finish). HomeStream will launch automatically when the installer finishes.
+
+**Step 3 — Complete the setup wizard**
+
+See [Quick Start](#quick-start) below.
+
+---
+
+### 🐧 Linux — Choose your method
+
+#### Option A: AppImage (works on any Linux distro — recommended for beginners)
+
+No installation required. Download, make it executable, and run.
+
+**Step 1 — Download**
+
+Go to the [**Latest Release**](https://github.com/HomeStream-co/homestream/releases/latest) page and download the file named:
+
+```
+HomeStream-X.X.X.AppImage
+```
+
+Or use the terminal:
+
+```bash
+cd ~/Downloads
+wget $(curl -s https://api.github.com/repos/HomeStream-co/homestream/releases/latest \
+  | grep "browser_download_url.*AppImage" | grep -v arm64 | cut -d '"' -f 4)
+```
+
+**Step 2 — Make it executable and run**
+
+```bash
+cd ~/Downloads
+>>>>>>> 20260604002244-9h9yrecco0
 chmod +x HomeStream-*.AppImage
 ./HomeStream-*.AppImage
 ```
 
+<<<<<<< HEAD
 ### Linux (Debian/Ubuntu — .deb)
 
 ```bash
@@ -113,12 +175,42 @@ sudo dpkg -i homestream_*.deb
 
 ```bash
 yay -S homestream-bin
+=======
+> **Tip:** Right-click the AppImage → Properties → Permissions → check "Allow executing as program" if you prefer not to use the terminal.
+
+**Step 3 — Complete the setup wizard**
+
+See [Quick Start](#quick-start) below.
+
+---
+
+#### Option B: .deb package (Ubuntu, Debian, Linux Mint, Pop!_OS)
+
+```bash
+# Step 1 — Download
+cd ~/Downloads
+wget $(curl -s https://api.github.com/repos/HomeStream-co/homestream/releases/latest \
+  | grep "browser_download_url.*\.deb" | cut -d '"' -f 4)
+
+# Step 2 — Install
+sudo dpkg -i homestream_*.deb
+
+# Step 3 — Launch
+homestream
+```
+
+If `dpkg` reports missing dependencies, run:
+
+```bash
+sudo apt-get install -f
+>>>>>>> 20260604002244-9h9yrecco0
 ```
 
 > **Note:** The repo is currently private. Ask the owner to share access or make it public before installing from GitHub Releases.
 
 ---
 
+<<<<<<< HEAD
 ## Quick Start
 
 1. **Install** HomeStream using one of the methods above.
@@ -139,6 +231,80 @@ yay -S homestream-bin
 | OMDB | Optional | [omdbapi.com/apikey.aspx](http://www.omdbapi.com/apikey.aspx) |
 | Google AI (Gemini) | Optional | [aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey) |
 | Real-Debrid | Optional | [real-debrid.com/apitoken](https://real-debrid.com/apitoken) |
+=======
+#### Option C: pacman package (Arch Linux, CachyOS, Manjaro, EndeavourOS)
+
+```bash
+# Step 1 — Download
+cd ~/Downloads
+wget $(curl -s https://api.github.com/repos/HomeStream-co/homestream/releases/latest \
+  | grep "browser_download_url.*\.pkg\.tar\.zst" | cut -d '"' -f 4)
+
+# Step 2 — Install
+sudo pacman -U homestream-*.pkg.tar.zst
+
+# Step 3 — Launch
+homestream
+```
+
+---
+
+#### Option D: AUR (Arch-based — always gets the latest release automatically)
+
+```bash
+# Using yay
+yay -S homestream-bin
+
+# Or using paru
+paru -S homestream-bin
+```
+
+---
+
+### 📦 What each download file is
+
+| File | What it is | Who should use it |
+|------|-----------|-------------------|
+| `HomeStream-Setup-X.X.X.exe` | Windows installer (auto-updater included) | Windows users |
+| `HomeStream-X.X.X.exe` | Windows portable (no install needed, no auto-update) | USB / testing |
+| `HomeStream-X.X.X.AppImage` | Linux universal (x64) | Any Linux distro |
+| `HomeStream-X.X.X-arm64.AppImage` | Linux universal (ARM) | Raspberry Pi / ARM boards |
+| `homestream_X.X.X_amd64.deb` | Debian/Ubuntu package | Ubuntu, Mint, Pop!_OS |
+| `homestream-X.X.X.pkg.tar.zst` | Arch package | Arch, CachyOS, Manjaro |
+
+All files are on the [Releases page](https://github.com/HomeStream-co/homestream/releases/latest).
+
+---
+
+## Quick Start
+
+Once HomeStream is installed and running, a browser window opens at `http://localhost:3000`. You will be greeted by the **setup wizard** — it only runs once.
+
+### Setup Wizard (5 steps, ~2 minutes)
+
+| Step | What it does |
+|------|-------------|
+| 1. System Check | Verifies FFmpeg is available for transcoding |
+| 2. Media Folder | Point HomeStream at the folder where your movies/shows live |
+| 3. API Keys | Enter your TMDB key (required) and optional keys |
+| 4. Optional Services | Connect Real-Debrid, qBittorrent, VPN, or Prowlarr if you use them |
+| 5. Import Library | Scans your media folder and imports everything with metadata |
+
+After the wizard completes you land on the home screen. That's it — start watching.
+
+### API Keys
+
+You will need a free TMDB key for metadata and posters. The others are optional.
+
+| Key | Required | Free? | Get it here |
+|-----|----------|-------|-------------|
+| **TMDB** | ✅ Yes | ✅ Free | [themoviedb.org/settings/api](https://www.themoviedb.org/settings/api) — sign up, go to Settings → API, request a key |
+| OMDB | Optional | ✅ Free tier | [omdbapi.com/apikey.aspx](http://www.omdbapi.com/apikey.aspx) |
+| Google AI (Gemini) | Optional | ✅ Free tier | [aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey) — enables AI summaries and smart recommendations |
+| Real-Debrid | Optional | 💳 Paid (~€4/mo) | [real-debrid.com/apitoken](https://real-debrid.com/apitoken) — fastest download backend |
+
+> **Just want to stream files you already have?** You only need the TMDB key. Everything else is optional.
+>>>>>>> 20260604002244-9h9yrecco0
 
 ---
 
