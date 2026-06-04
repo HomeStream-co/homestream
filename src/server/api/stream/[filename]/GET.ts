@@ -20,6 +20,7 @@ import path from 'path';
 import { requireAuth } from '../../../authMiddleware.js';
 import { readLibrary } from '../../../libraryStore.js';
 import { dataDir } from '../../../dataDir.js';
+import { readConfig } from '../../../configStore.js';
 import { checkRating } from '../../../ratingGate.js';
 
 // Uploads live inside the data directory so they are writable in packaged
@@ -84,6 +85,41 @@ function resolveFilePath(filename: string): string | null {
   return null;
 }
 
+/**
+ * Verify that a resolved file path is inside one of the directories
+ * HomeStream is allowed to serve from. This is the last line of defence
+ * against a crafted/corrupted library entry pointing outside the media tree.
+ *
+ * Allowed roots:
+ *   - UPLOADS_DIR  (dataDir/uploads)
+ *   - cfg.mediaDir (user-configured media folder, e.g. /mnt/media)
+ *   - cfg.downloadsDir (derived from mediaDir/downloads)
+ *   - cfg.libraryDir  (derived from mediaDir/library)
+ *
+ * path.resolve() normalises away any ".." segments before the comparison,
+ * so "../../etc/passwd" can never pass this check.
+ */
+function isPathAllowed(resolvedPath: string): boolean {
+  const normalised = path.resolve(resolvedPath);
+
+  // Always allow the uploads directory
+  const allowedRoots: string[] = [path.resolve(UPLOADS_DIR)];
+
+  // Add the user-configured media directories
+  try {
+    const cfg = readConfig() as {
+      mediaDir?: string;
+      downloadsDir?: string;
+      libraryDir?: string;
+    };
+    if (cfg.mediaDir)     allowedRoots.push(path.resolve(cfg.mediaDir));
+    if (cfg.downloadsDir) allowedRoots.push(path.resolve(cfg.downloadsDir));
+    if (cfg.libraryDir)   allowedRoots.push(path.resolve(cfg.libraryDir));
+  } catch { /* config unreadable — only uploads dir is allowed */ }
+
+  return allowedRoots.some(root => normalised.startsWith(root + path.sep) || normalised === root);
+}
+
 export default function handler(req: Request, res: Response) {
   if (!requireAuth(req, res)) return;
   try {
@@ -102,6 +138,15 @@ export default function handler(req: Request, res: Response) {
 
     if (!filePath) {
       return res.status(404).json({ error: 'File not found', filename });
+    }
+
+    // ── Path traversal guard ──────────────────────────────────────────────────
+    // Verify the resolved path is inside an allowed media directory before
+    // opening the file. This catches corrupted or crafted library entries that
+    // point outside the media tree (e.g. /etc/passwd, /proc/self/environ).
+    if (!isPathAllowed(filePath)) {
+      console.warn(`[stream] BLOCKED path traversal attempt: ${filePath}`);
+      return res.status(403).json({ error: 'Access denied' });
     }
 
     const stat = fs.statSync(filePath);

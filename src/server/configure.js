@@ -210,10 +210,35 @@ export const serverBefore = (server) => {
         'X-Frame-Options': 'SAMEORIGIN',
         'X-XSS-Protection': '1; mode=block',
         'Referrer-Policy': 'strict-origin-when-cross-origin',
+        // Restrict browser feature access. HomeStream only needs:
+        //   autoplay      — video player
+        //   fullscreen    — player full-screen button
+        //   picture-in-picture — PiP mode
+        // Everything else (camera, mic, geolocation, payment, USB, etc.)
+        // is explicitly disabled so a compromised dependency can't silently
+        // request them.
+        'Permissions-Policy': [
+          'autoplay=(self)',
+          'fullscreen=(self)',
+          'picture-in-picture=(self)',
+          'camera=()',
+          'microphone=()',
+          'geolocation=()',
+          'payment=()',
+          'usb=()',
+          'bluetooth=()',
+          'serial=()',
+          'ambient-light-sensor=()',
+          'accelerometer=()',
+          'gyroscope=()',
+          'magnetometer=()',
+        ].join(', '),
         // Permissive CSP for local network — allows LAN IPs, localhost.
         // All TMDB poster/backdrop images are served locally from /tmdb-images/
         // so no external image.tmdb.org origin is needed.
         // connect-src still allows api.themoviedb.org for metadata fetches.
+        // frame-ancestors 'none' prevents HomeStream from being embedded in
+        // any iframe on any origin — clickjacking protection.
         'Content-Security-Policy': [
           "default-src 'self'",
           "script-src 'self' 'unsafe-inline' 'unsafe-eval'", // Vite HMR needs unsafe-eval in dev

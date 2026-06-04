@@ -5,6 +5,7 @@ import { createRequire } from 'module';
 import { readLibrary } from '../../../../libraryStore.js';
 import { requireAuth } from '../../../../authMiddleware.js';
 import { captionsDir } from '../../../../dataDir.js';
+import { checkRateLimit } from '../../../../rateLimiter.js';
 
 /**
  * POST /api/captions/:id/fetch
@@ -85,6 +86,21 @@ function stubVtt(lang: string): string {
 
 export default async function handler(req: Request, res: Response) {
   if (!requireAuth(req, res)) return;
+
+  // Rate-limit caption fetches: max 20 per IP per 10 minutes.
+  // Each fetch makes 2 outbound HTTP requests to OpenSubtitles (en + es).
+  // Without this, a single authenticated user could hammer the external API
+  // and get HomeStream's IP banned from OpenSubtitles.
+  const ip = req.socket.remoteAddress ?? 'unknown';
+  const rl = checkRateLimit('captions-fetch', ip, { maxAttempts: 20, windowMs: 10 * 60 * 1000 });
+  if (!rl.allowed) {
+    res.status(429).json({
+      error: 'Too many caption fetch requests',
+      retryAfterSecs: rl.retryAfterSecs,
+    });
+    return;
+  }
+
   const { id } = req.params;
 
   // Look up the media item to get its IMDB ID and title

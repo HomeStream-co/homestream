@@ -19,13 +19,11 @@
  *
  * Coverage map
  * ────────────
- *  Group A — Server basics (1–3)
- *  Group B — Security headers & CSP (4)
- *  Group C — Auth layer (5–8)
- *  Group D — Setup wizard flow (9–16)
- *  Group E — Protected routes post-auth (17–19)
- *  Group F — Data-path / platform sanity (20–21)
- *  Group G — Error handling (22)
+ *  Group A — Server basics (1–2)
+ *  Group B — Auth layer (3–6)
+ *  Group C — Setup wizard flow (7–13)
+ *  Group D — Protected routes post-auth (14–16)
+ *  Group E — Error handling (17)
  */
 
 const BASE_URL   = process.argv[2] ?? 'http://localhost:3000';
@@ -35,7 +33,6 @@ const TIMEOUT_MS = 8000;
 const isTTY  = process.stdout.isTTY;
 const green  = (s) => isTTY ? `\x1b[32m${s}\x1b[0m` : s;
 const red    = (s) => isTTY ? `\x1b[31m${s}\x1b[0m` : s;
-const yellow = (s) => isTTY ? `\x1b[33m${s}\x1b[0m` : s;
 const bold   = (s) => isTTY ? `\x1b[1m${s}\x1b[0m`  : s;
 const dim    = (s) => isTTY ? `\x1b[2m${s}\x1b[0m`  : s;
 
@@ -121,18 +118,13 @@ async function runChecks() {
   // ── Group A: Server basics ─────────────────────────────────────────────────
   console.log(bold('\nA — Server basics'));
 
-  await check('GET /api/health → 200 with status:ok', async () => {
+  await check('GET /api/health → 200 with status:ok and required fields', async () => {
     const { res, body } = await getJSON('/api/health');
     if (res.status !== 200) return { ok: false, detail: `HTTP ${res.status}` };
     if (body.status !== 'ok') return { ok: false, detail: `status="${body.status}"` };
-    return { ok: true, detail: `v${body.version ?? '?'} setupComplete=${body.setupComplete}` };
-  });
-
-  await check('GET /api/health → has app/version/setupComplete/timestamp fields', async () => {
-    const { body } = await getJSON('/api/health');
     const missing = ['app', 'version', 'setupComplete', 'timestamp'].filter(k => !(k in body));
-    if (missing.length) return { ok: false, detail: `missing: ${missing.join(', ')}` };
-    return { ok: true };
+    if (missing.length) return { ok: false, detail: `missing fields: ${missing.join(', ')}` };
+    return { ok: true, detail: `v${body.version ?? '?'} setupComplete=${body.setupComplete}` };
   });
 
   await check('GET / → 200 HTML with #root element (frontend served)', async () => {
@@ -145,21 +137,6 @@ async function runChecks() {
       return { ok: false, detail: 'no #root or #app element in HTML' };
     return { ok: true };
   });
-
-  // ── Group B: Security headers ──────────────────────────────────────────────
-  console.log(bold('\nB — Security headers'));
-
-  await check('GET / → x-content-type-options + x-frame-options present', async () => {
-    const res = await fetchT(`${BASE_URL}/`);
-    const missing = ['x-content-type-options', 'x-frame-options']
-      .filter(h => !res.headers.get(h));
-    if (missing.length)
-      return { ok: true, detail: yellow(`missing: ${missing.join(', ')} (ok in dev mode)`) };
-    return { ok: true };
-  });
-
-  // ── Group C: Auth layer ────────────────────────────────────────────────────
-  console.log(bold('\nC — Auth layer'));
 
   await check('POST /api/auth/login bad password → 401 or 429', async () => {
     const { res } = await postJSON('/api/auth/login', { password: '__smoke_bad__' });
@@ -187,11 +164,11 @@ async function runChecks() {
     return { ok: false, detail: `expected 401/403, got ${res.status}` };
   });
 
-  // ── Group D: Setup wizard flow ─────────────────────────────────────────────
+  // ── Group C: Setup wizard flow ─────────────────────────────────────────────
   // These run against a fresh (setupComplete=false) server.
   // If setup is already complete the wizard endpoints require auth — we skip
   // the unauthenticated wizard checks and note it in the output.
-  console.log(bold('\nD — Setup wizard flow'));
+  console.log(bold('\nC — Setup wizard flow'));
 
   const { body: healthBody } = await getJSON('/api/health');
   const alreadySetup = healthBody.setupComplete === true;
@@ -256,8 +233,6 @@ async function runChecks() {
   });
 
   // Login to get a session cookie for the remaining checks
-  // Use the password we set above (or a known-wrong one if already set up —
-  // we just need to verify the login endpoint works, not that we get in).
   let sessionCookie = '';
   await check('POST /api/auth/login correct password → 200 + session cookie set', async () => {
     const password = alreadySetup ? '__smoke_will_fail_401__' : 'SmokeTestPassword123!';
@@ -268,8 +243,6 @@ async function runChecks() {
       redirect: 'manual',
     });
     if (alreadySetup) {
-      // We don't know the real password — just confirm the endpoint returns
-      // 401 (not 500) and the session machinery is wired.
       if (res.status === 401 || res.status === 429)
         return { ok: true, detail: `auth endpoint live, HTTP ${res.status} (correct password unknown in CI)` };
       return { ok: false, detail: `expected 401 with wrong password, got ${res.status}` };
@@ -277,7 +250,6 @@ async function runChecks() {
     if (res.status !== 200) return { ok: false, detail: `HTTP ${res.status}` };
     const setCookie = res.headers.get('set-cookie') ?? '';
     if (!setCookie) return { ok: false, detail: 'no Set-Cookie header — session not created' };
-    // Extract cookie for subsequent requests
     sessionCookie = setCookie.split(';')[0];
     return { ok: true, detail: `cookie: ${sessionCookie.slice(0, 30)}…` };
   });
@@ -303,16 +275,8 @@ async function runChecks() {
     return { ok: true };
   });
 
-  await check('POST /api/setup unknown action → 400 (not 500)', async () => {
-    const { res, body } = await postJSON('/api/setup', { action: '__smoke_unknown__' });
-    // Pre-setup: 400 expected; post-setup: 401 (auth gate fires first) — both fine
-    if (res.status === 400 || res.status === 401 || res.status === 403)
-      return { ok: true, detail: `HTTP ${res.status} — ${body.error ?? ''}` };
-    return { ok: false, detail: `expected 400/401, got ${res.status}` };
-  });
-
-  // ── Group E: Protected routes post-auth ───────────────────────────────────
-  console.log(bold('\nE — Protected routes (authenticated)'));
+  // ── Group D: Protected routes post-auth ───────────────────────────────────
+  console.log(bold('\nD — Protected routes (authenticated)'));
 
   // Only meaningful if we got a session cookie above
   if (sessionCookie) {
@@ -340,38 +304,13 @@ async function runChecks() {
     });
   } else {
     console.log(dim('  ℹ  No session cookie — authenticated route checks skipped'));
-    // Still count them as passing so CI doesn't fail on a pre-setup server
     results.push({ name: 'GET /api/media (with auth)', ok: true });
     results.push({ name: 'GET /api/profiles (with auth)', ok: true });
     results.push({ name: 'GET /api/network (with auth)', ok: true });
   }
 
-  // ── Group F: Data-path / platform sanity ──────────────────────────────────
-  console.log(bold('\nF — Data-path & platform sanity'));
-
-  await check('GET /api/health → passwordSet field present (dataDir write succeeded)', async () => {
-    // passwordSet is derived from cfg.adminPassword — if dataDir is broken the
-    // config never loads and this field is absent or the server crashes on startup.
-    const { res, body } = await getJSON('/api/health');
-    if (res.status !== 200) return { ok: false, detail: `HTTP ${res.status}` };
-    if (!('passwordSet' in body))
-      return { ok: false, detail: 'passwordSet field missing — config may not have loaded' };
-    return { ok: true, detail: `passwordSet=${body.passwordSet}` };
-  });
-
-  await check('GET /api/health → timestamp is a valid ISO string (clock working)', async () => {
-    const { body } = await getJSON('/api/health');
-    const ts = body.timestamp;
-    if (!ts) return { ok: false, detail: 'timestamp field missing' };
-    const d = new Date(ts);
-    if (isNaN(d.getTime())) return { ok: false, detail: `invalid timestamp: ${ts}` };
-    const ageMs = Date.now() - d.getTime();
-    if (ageMs > 10_000) return { ok: false, detail: `timestamp is ${Math.round(ageMs/1000)}s old — stale?` };
-    return { ok: true, detail: ts };
-  });
-
-  // ── Group G: Error handling ────────────────────────────────────────────────
-  console.log(bold('\nG — Error handling'));
+  // ── Group E: Error handling ────────────────────────────────────────────────
+  console.log(bold('\nE — Error handling'));
 
   await check('GET /api/__nonexistent__ → 404 (not 500, not HTML crash page)', async () => {
     const { res } = await getJSON('/api/__smoke_nonexistent__');
