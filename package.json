@@ -1,10 +1,6 @@
 {
   "name": "homestream",
-<<<<<<< HEAD
-  "version": "1.0.0",
-=======
   "version": "2.0.0",
->>>>>>> 20260604002244-9h9yrecco0
   "description": "Self-hosted Netflix-style family media streaming app",
   "author": "HomeStream",
   "repository": {
@@ -27,6 +23,7 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "type-check": "tsc --noEmit",
+    "smoke-test": "node scripts/smoke-test.mjs",
     "format": "prettier --write \"src/**/*.{ts,tsx,json,md}\"",
     "clean": "rm -rf dist node_modules/.vite",
     "reset": "npm run clean && npm install",
