@@ -11,8 +11,8 @@
 #
 # After build-check, three smoke-test jobs run in parallel:
 #   smoke-test              - 17-check API smoke test on ubuntu-latest
-#   smoke-test-linux        - same smoke test on 5 distro containers
-#                             (ubuntu-22.04, ubuntu-24.04, debian-12, fedora-40, arch)
+#   smoke-test-linux        - same smoke test on 6 distro containers
+#                             (ubuntu-22.04, ubuntu-24.04, debian-12, fedora-40, arch, cachyos)
 #   smoke-test-windows      - NSIS installer build + silent install + API smoke
 #                             (main/develop branches only — windows-latest is expensive)
 
@@ -174,7 +174,8 @@ jobs:
   #   ubuntu:24.04   — Ubuntu 24.04 LTS (current LTS)
   #   debian:12      — Debian 12 Bookworm (.deb package target)
   #   fedora:40      — Fedora 40 (RPM users, modern glibc)
-  #   archlinux      — Arch Linux / CachyOS / Manjaro (pacman target)
+  #   archlinux      — Arch Linux / Manjaro (pacman target)
+  #   cachyos/cachyos-v3 — CachyOS (pacman target, x86-64-v3 optimised)
   #
   # The server bundle is fully self-contained (esbuild inlines all node_modules)
   # so no npm install is needed inside the container — just Node.js + the bundle.
@@ -200,6 +201,9 @@ jobs:
             pkg_install: dnf install -y nodejs --setopt=install_weak_deps=False
           - distro: arch
             image: archlinux:latest
+            pkg_install: pacman -Sy --noconfirm nodejs
+          - distro: cachyos
+            image: cachyos/cachyos-v3:latest
             pkg_install: pacman -Sy --noconfirm nodejs
 
     container:
@@ -326,7 +330,14 @@ jobs:
       - name: Verify NSIS installer was produced
         shell: pwsh
         run: |
-          $exe = Get-ChildItem dist-electron -Filter "HomeStream*.exe" -Exclude "*.blockmap" | Where-Object { $_.Name -notlike "*uninstaller*" } | Select-Object -First 1
+          # NOTE: -Exclude is silently ignored when -Filter is also used in PowerShell.
+          # Use Where-Object only to reliably filter out the uninstaller and blockmap.
+          $exe = Get-ChildItem dist-electron | Where-Object {
+            $_.Extension -eq ".exe" -and
+            $_.Name -like "HomeStream*" -and
+            $_.Name -notlike "*uninstaller*" -and
+            $_.Name -notlike "*.__uninstaller*"
+          } | Select-Object -First 1
           if (-not $exe) {
             Write-Error "No HomeStream*.exe installer found in dist-electron/"
             Get-ChildItem dist-electron | Format-Table Name, Length
