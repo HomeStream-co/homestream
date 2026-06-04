@@ -10,7 +10,7 @@
 # Vite production build to catch any bundler-level errors.
 #
 # After build-check, three smoke-test jobs run in parallel:
-#   smoke-test              - 22-check API smoke test on ubuntu-latest
+#   smoke-test              - 17-check API smoke test on ubuntu-latest
 #   smoke-test-linux        - same smoke test on 5 distro containers
 #                             (ubuntu-22.04, ubuntu-24.04, debian-12, fedora-40, arch)
 #   smoke-test-windows      - NSIS installer build + silent install + API smoke

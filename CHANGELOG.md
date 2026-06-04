@@ -7,6 +7,36 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [2.0.1] - 2026-06-04
+
+### Security
+- **Path traversal guard on `/api/stream/:filename`** — resolved file paths are now
+  verified against the allowed media directories (`mediaDir`, `downloadsDir`, `libraryDir`,
+  `uploads`) before the file is opened. A corrupted or crafted library entry pointing
+  outside the media tree (e.g. `/etc/passwd`) now returns 403 instead of being served.
+- **Caption language whitelist expanded to full ISO 639-1** — the previous `['en', 'es']`
+  allowlist was the path traversal guard for `/api/captions/:id/:lang`. Replaced with all
+  180 ISO 639-1 two-letter codes in a `Set` for O(1) lookup. Non-English/Spanish subtitles
+  now work correctly.
+- **`Permissions-Policy` header added** — explicitly allows only `autoplay`, `fullscreen`,
+  and `picture-in-picture` (required by the player). Camera, microphone, geolocation,
+  payment, USB, Bluetooth, serial, and all sensors are denied.
+- **Rate limit on `/api/captions/:id/fetch`** — capped at 20 requests per IP per 10 minutes
+  using the existing `checkRateLimit` infrastructure. Prevents a single session from
+  hammering the OpenSubtitles API and getting HomeStream's IP banned.
+
+### Changed
+- **Smoke test trimmed from 22 → 17 checks** — removed five checks that were either
+  duplicates, always-passing no-ops, or testing Node.js internals rather than app logic:
+  - Check 2 (health fields) merged into check 1
+  - Check 4 (security headers) always passed regardless of result
+  - Check 16 (unknown setup action) unit-test territory
+  - Check 20 (`passwordSet` field) false-fails on fresh installs
+  - Check 21 (ISO timestamp) tests `new Date()`, not app code
+- **CI comment updated** to reflect 17-check smoke test count
+
+---
+
 ## [2.0.0] - 2026-06-04
 
 ### Added
