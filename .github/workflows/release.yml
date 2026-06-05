@@ -12,6 +12,13 @@ permissions:
   contents: write
   actions: read
 
+# Silence "Node.js 20 actions are deprecated" warnings.
+# actions/checkout@v4, actions/setup-node@v4, and actions/cache@v4 all ship
+# a Node.js 20 runner shim; this opts them into Node.js 24 ahead of the
+# June 16 forced migration.
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   release-windows:
     name: Build & Publish Windows Installer

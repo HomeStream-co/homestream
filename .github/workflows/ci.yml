@@ -38,6 +38,13 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+# Silence "Node.js 20 actions are deprecated" warnings across every job.
+# actions/checkout@v4, actions/setup-node@v4, actions/cache@v4, and
+# actions/upload-artifact@v4 all ship a Node.js 20 runner shim; setting this
+# env var opts them into Node.js 24 ahead of the June 16 forced migration.
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   # -- Type checking ------------------------------------------------------------
   type-check:
@@ -100,6 +107,7 @@ jobs:
           name: coverage
           path: coverage/
           retention-days: 7
+          if-no-files-found: ignore
 
   # -- Production build check ---------------------------------------------------
   build-check:
@@ -502,6 +510,43 @@ jobs:
             }
           echo "SERVER_PID=$($proc.Id)" >> $env:GITHUB_ENV
           Write-Host "Server PID: $($proc.Id)"
+
+      # Wait for the server to print "Ready at" before handing off to the
+      # smoke test. The pre-warm step ensures Defender has already scanned
+      # all requires, so this should complete in a few seconds — but on
+      # slower runners it can take longer. Waiting here means the smoke
+      # test's 360-second window is spent on actual API checks, not startup.
+      - name: Wait for packaged server to be ready
+        shell: pwsh
+        run: |
+          $deadline = (Get-Date).AddSeconds(300)
+          $ready = $false
+          Write-Host "Waiting for server (PID $env:SERVER_PID) to print 'Ready at'..."
+          while ((Get-Date) -lt $deadline) {
+            Start-Sleep -Seconds 2
+            if (Test-Path "$env:TEMP\hs-smoke-stdout.txt") {
+              $out = Get-Content "$env:TEMP\hs-smoke-stdout.txt" -Raw -ErrorAction SilentlyContinue
+              if ($out -match "Ready at") {
+                Write-Host "Server is ready."
+                $ready = $true
+                break
+              }
+            }
+            # Check if the process died
+            $proc = Get-Process -Id $env:SERVER_PID -ErrorAction SilentlyContinue
+            if (-not $proc) {
+              Write-Error "Server process exited before becoming ready."
+              if (Test-Path "$env:TEMP\hs-smoke-stdout.txt") { Get-Content "$env:TEMP\hs-smoke-stdout.txt" }
+              if (Test-Path "$env:TEMP\hs-smoke-stderr.txt") { Get-Content "$env:TEMP\hs-smoke-stderr.txt" }
+              exit 1
+            }
+          }
+          if (-not $ready) {
+            Write-Error "Server did not print 'Ready at' within 300 seconds."
+            if (Test-Path "$env:TEMP\hs-smoke-stdout.txt") { Get-Content "$env:TEMP\hs-smoke-stdout.txt" }
+            if (Test-Path "$env:TEMP\hs-smoke-stderr.txt") { Get-Content "$env:TEMP\hs-smoke-stderr.txt" }
+            exit 1
+          }
 
       - name: Run smoke tests against installed bundle
         # Use 127.0.0.1 explicitly — on Windows, 'localhost' resolves to ::1 (IPv6)
