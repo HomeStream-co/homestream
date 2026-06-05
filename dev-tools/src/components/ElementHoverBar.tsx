@@ -194,9 +194,8 @@ export default function ElementHoverBar({
     onQuickEditModeChange?.(toolbarMode || quickEditMode);
   }, [toolbarMode, quickEditMode, onQuickEditModeChange]);
 
-  // Toolbar-view impression: fires once per appearance. The element prop is
-  // frozen by DevelopmentMode while toolbarMode is true, so deps can be just
-  // [toolbarMode].
+  // Toolbar-view impression: fires once per appearance. Deps are [toolbarMode]
+  // so this fires on open, not on element retarget within an open toolbar.
   useEffect(() => {
     if (!toolbarMode) return;
     trackEventBus.impression("devtools.toolbar.view", { surface: isImage ? "image" : "text" });
@@ -576,7 +575,6 @@ export default function ElementHoverBar({
         onClick={handleReference}
         title={t("devtools_reference_title", "Add as reference")}
         icon={<Bookmark width={15} height={15} />}
-        label={t("devtools_reference", "Reference")}
       />
       {elementIsClickable && (
         <HoverBarButton
