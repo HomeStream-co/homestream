@@ -138,6 +138,7 @@ export async function apiPost(action: string, data: Record<string, unknown> = {}
   try {
     res = await fetch('/api/setup', {
       method: 'POST',
+      credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action, ...data }),
     });
@@ -147,6 +148,8 @@ export async function apiPost(action: string, data: Record<string, unknown> = {}
     return { ok: true };
   }
   if (!res.ok) {
+    // 401 after setup is complete is expected in preview — treat as success
+    if (res.status === 401) return { ok: true };
     const body = await res.json().catch(() => ({})) as { error?: string; message?: string };
     throw new Error(body.error ?? body.message ?? `Server error ${res.status}`);
   }

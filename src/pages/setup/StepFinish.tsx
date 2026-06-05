@@ -62,10 +62,15 @@ export default function StepFinish({
     const RETRY_DELAY_MS = 1500;
 
     function tryFetch() {
-      fetch('/api/remote/qr')
-        .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
-        .then((d: { url?: string; qr?: string; lanIP?: string; mdnsUrl?: string; ipUrl?: string; port?: string }) => {
-          if (cancelled) return;
+      fetch('/api/remote/qr', { credentials: 'include' })
+        .then(r => {
+          // 401 = setup just completed, auth cookie not yet set — treat as no-QR gracefully
+          if (r.status === 401) { if (!cancelled) setQrError(true); return null; }
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          return r.json();
+        })
+        .then((d: { url?: string; qr?: string; lanIP?: string; mdnsUrl?: string; ipUrl?: string; port?: string } | null) => {
+          if (cancelled || !d) return;
           if (d?.url && d?.qr) setQrData({ url: d.url, qr: d.qr, lanIP: d.lanIP, mdnsUrl: d.mdnsUrl, ipUrl: d.ipUrl, port: d.port });
           else setQrError(true);
         })

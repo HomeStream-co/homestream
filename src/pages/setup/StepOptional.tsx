@@ -178,26 +178,21 @@ export default function StepOptional({
     setSaving(true);
     setStatus(s => ({ ...s, qbit: s.qbit === 'ok' ? 'ok' : 'idle' }));
     try {
-      await fetch('/api/setup', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'save',
-          qbitUrl: form.qbitUrl,
-          qbitUsername: form.qbitUsername,
-          qbitPassword: form.qbitPassword,
-          jellyfinUrl: form.jellyfinUrl,
-          jellyfinApiKey: form.jellyfinApiKey,
-          prowlarrUrl: form.prowlarrUrl,
-          prowlarrApiKey: form.prowlarrApiKey,
-        }),
-      }).then(r => { if (!r.ok) throw new Error(`Server error ${r.status}`); });
-    } catch (err) {
-      // Network failure in preview is expected — don't warn the user
-      const isNetworkError = err instanceof TypeError && (err.message.includes('fetch') || err.message.includes('network'));
-      if (!isNetworkError) {
-        toast.warning('Optional settings may not have saved — you can re-enter them in Settings later.');
-      }
+      // Use apiPost — it silently succeeds on network failure (preview mode)
+      // so the wizard always advances without a spurious warning toast.
+      const { apiPost } = await import('./types');
+      await apiPost('save', {
+        qbitUrl: form.qbitUrl,
+        qbitUsername: form.qbitUsername,
+        qbitPassword: form.qbitPassword,
+        jellyfinUrl: form.jellyfinUrl,
+        jellyfinApiKey: form.jellyfinApiKey,
+        prowlarrUrl: form.prowlarrUrl,
+        prowlarrApiKey: form.prowlarrApiKey,
+      });
+    } catch {
+      // Non-network server error (e.g. 500) — warn but still advance.
+      toast.warning('Optional settings may not have saved — you can re-enter them in Settings later.');
     } finally {
       setSaving(false);
     }

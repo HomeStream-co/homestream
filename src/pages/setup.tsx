@@ -142,15 +142,25 @@ export default function SetupPage() {
 
   // ── Redirect if already set up ──
   useEffect(() => {
-    fetch('/api/setup').then(r => r.json()).then((data: { setupComplete?: boolean; config?: { tmdbApiKey?: string } }) => {
-      if (data.setupComplete) navigate('/');
-      // Auto-populate TMDB key if the server already has it (env var or prior save),
-      // but only if the user hasn't already typed something (use functional update to
-      // read current state rather than the stale closure value).
-      if (data.config?.tmdbApiKey) {
-        setForm(f => f.tmdbApiKey ? f : { ...f, tmdbApiKey: data.config!.tmdbApiKey! });
-      }
-    }).catch(() => {}); // non-fatal — ignore
+    // Use /api/health — it's always unauthenticated and tells us setupComplete.
+    // /api/setup returns 401 after setup is complete (requires auth), so we
+    // can't use it here to check whether to redirect.
+    fetch('/api/health')
+      .then(r => r.json())
+      .then((data: { setupComplete?: boolean }) => {
+        if (data.setupComplete) navigate('/');
+      })
+      .catch(() => {}); // non-fatal — ignore
+    // Separately, try to pre-populate TMDB key if server already has it.
+    // This requires auth so it may 401 — that's fine, just ignore it.
+    fetch('/api/setup', { credentials: 'include' })
+      .then(r => r.ok ? r.json() : null)
+      .then((data: { config?: { tmdbApiKey?: string } } | null) => {
+        if (data?.config?.tmdbApiKey) {
+          setForm(f => f.tmdbApiKey ? f : { ...f, tmdbApiKey: data!.config!.tmdbApiKey! });
+        }
+      })
+      .catch(() => {}); // non-fatal — ignore
   }, [navigate]);
 
   // ── Fetch platform-aware default media directory from Electron ──
@@ -186,6 +196,7 @@ export default function SetupPage() {
     try {
       const res = await fetch('/api/setup', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'scan_existing', mediaDir: dir }),
       });

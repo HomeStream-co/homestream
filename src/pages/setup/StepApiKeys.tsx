@@ -32,6 +32,7 @@ export default function StepApiKeys({
     try {
       const res = await fetch('/api/setup/test-keys', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ key, value: value.trim() }),
       });
