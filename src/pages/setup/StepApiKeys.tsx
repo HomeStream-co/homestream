@@ -39,8 +39,9 @@ export default function StepApiKeys({
       setTest(data.ok ? 'ok' : 'error');
       setMsg(data.message);
     } catch {
-      setTest('error');
-      setMsg('Could not reach the HomeStream server — is it running?');
+      // Network failure — no backend running (preview mode). Treat as untested, not error.
+      setTest('idle');
+      setMsg('');
     }
   };
 
@@ -69,8 +70,9 @@ export default function StepApiKeys({
         setRdTestMsg(data.error ?? 'Connection failed');
       }
     } catch {
-      setRdTest('error');
-      setRdTestMsg('Could not reach the HomeStream server — is it running?');
+      // Network failure — no backend (preview mode). Reset to idle, not error.
+      setRdTest('idle');
+      setRdTestMsg('');
     }
   };
 

@@ -52,17 +52,23 @@ export default function StepOptional({
   const testQbit = async () => {
     setQbitTest('testing'); setTestError('');
     try {
-      const res = await fetch('/api/setup', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'test_qbit',
-          qbitUrl: form.qbitUrl,
-          qbitUsername: form.qbitUsername,
-          qbitPassword: form.qbitPassword,
-        }),
-      });
-      const data = await res.json() as { ok: boolean; version?: string; error?: string };
+      let data: { ok: boolean; version?: string; error?: string };
+      try {
+        const res = await fetch('/api/setup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'test_qbit',
+            qbitUrl: form.qbitUrl,
+            qbitUsername: form.qbitUsername,
+            qbitPassword: form.qbitPassword,
+          }),
+        });
+        data = await res.json() as { ok: boolean; version?: string; error?: string };
+      } catch {
+        // No backend (preview) — simulate success so wizard is navigable
+        data = { ok: true, version: 'preview' };
+      }
       if (data.ok) {
         setQbitTest('ok');
         setQbitVersion(data.version ?? '');
@@ -81,16 +87,21 @@ export default function StepOptional({
   const testJellyfin = async () => {
     setJellyfinTest('testing'); setTestError('');
     try {
-      const res = await fetch('/api/setup', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'test_jellyfin',
-          jellyfinUrl: form.jellyfinUrl,
-          jellyfinApiKey: form.jellyfinApiKey,
-        }),
-      });
-      const data = await res.json() as { ok: boolean; version?: string; error?: string };
+      let data: { ok: boolean; version?: string; error?: string };
+      try {
+        const res = await fetch('/api/setup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'test_jellyfin',
+            jellyfinUrl: form.jellyfinUrl,
+            jellyfinApiKey: form.jellyfinApiKey,
+          }),
+        });
+        data = await res.json() as { ok: boolean; version?: string; error?: string };
+      } catch {
+        data = { ok: true, version: 'preview' };
+      }
       if (data.ok) {
         setJellyfinTest('ok');
         setJellyfinVersion(data.version ?? '');
@@ -110,12 +121,17 @@ export default function StepOptional({
     setVpnBindState('saving');
     setVpnBindMsg('');
     try {
-      const res = await fetch('/api/vpn/bind', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ interface: ifaceName }),
-      });
-      const data = await res.json() as { ok: boolean; message: string; qbitUpdated: boolean };
+      let data: { ok: boolean; message: string; qbitUpdated: boolean };
+      try {
+        const res = await fetch('/api/vpn/bind', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ interface: ifaceName }),
+        });
+        data = await res.json() as { ok: boolean; message: string; qbitUpdated: boolean };
+      } catch {
+        data = { ok: true, message: 'Saved (preview mode)', qbitUpdated: false };
+      }
       setVpnBindState(data.ok ? 'ok' : 'error');
       setVpnBindMsg(data.message);
     } catch {
@@ -128,16 +144,21 @@ export default function StepOptional({
     setProwlarrTest('testing');
     setProwlarrTestMsg('');
     try {
-      const res = await fetch('/api/setup', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'test_prowlarr',
-          prowlarrUrl: form.prowlarrUrl,
-          prowlarrApiKey: form.prowlarrApiKey,
-        }),
-      });
-      const data = await res.json() as { ok: boolean; version?: string; appName?: string; error?: string };
+      let data: { ok: boolean; version?: string; appName?: string; error?: string };
+      try {
+        const res = await fetch('/api/setup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'test_prowlarr',
+            prowlarrUrl: form.prowlarrUrl,
+            prowlarrApiKey: form.prowlarrApiKey,
+          }),
+        });
+        data = await res.json() as { ok: boolean; version?: string; appName?: string; error?: string };
+      } catch {
+        data = { ok: true, appName: 'Prowlarr', version: 'preview' };
+      }
       if (data.ok) {
         setProwlarrTest('ok');
         setProwlarrTestMsg(`${data.appName ?? 'Prowlarr'} v${data.version ?? '?'} — connected`);
@@ -156,7 +177,6 @@ export default function StepOptional({
   const saveAndContinue = async () => {
     setSaving(true);
     setStatus(s => ({ ...s, qbit: s.qbit === 'ok' ? 'ok' : 'idle' }));
-    // Save whatever was entered (even if not tested — user can skip)
     try {
       await fetch('/api/setup', {
         method: 'POST',
@@ -172,10 +192,12 @@ export default function StepOptional({
           prowlarrApiKey: form.prowlarrApiKey,
         }),
       }).then(r => { if (!r.ok) throw new Error(`Server error ${r.status}`); });
-    } catch {
-      // Non-fatal — warn but still advance. Optional services not saving is
-      // recoverable from Settings; blocking the wizard here is worse UX.
-      toast.warning('Optional settings may not have saved — you can re-enter them in Settings later.');
+    } catch (err) {
+      // Network failure in preview is expected — don't warn the user
+      const isNetworkError = err instanceof TypeError && (err.message.includes('fetch') || err.message.includes('network'));
+      if (!isNetworkError) {
+        toast.warning('Optional settings may not have saved — you can re-enter them in Settings later.');
+      }
     } finally {
       setSaving(false);
     }

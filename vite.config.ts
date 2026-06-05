@@ -124,7 +124,7 @@ function serverBundlePlugin(): Plugin {
 	};
 }
 
-const allowedHosts = ["all"];
+const allowedHosts = true;
 const corsOrigins = ["*"];
 
 export default defineConfig(({ mode: _mode }) => ({

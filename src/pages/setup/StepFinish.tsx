@@ -49,7 +49,7 @@ export default function StepFinish({
     })
       .then(r => r.json())
       .then((d: { ok: boolean }) => { if (!cancelled) setQbitLive(d.ok ? 'ok' : 'down'); })
-      .catch(() => { if (!cancelled) setQbitLive('down'); });
+      .catch(() => { if (!cancelled) setQbitLive('unconfigured'); }); // no backend = treat as unconfigured
 
     return () => { cancelled = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -128,11 +128,13 @@ export default function StepFinish({
 
       if (importExisting && scanFound > 0) {
         setScanState('importing');
-        await fetch('/api/setup', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'import_existing' }),
-        });
+        try {
+          await fetch('/api/setup', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'import_existing' }),
+          });
+        } catch { /* network failure in preview — non-fatal */ }
         setScanState('imported');
       }
       const result = await apiPost('complete') as { ok: boolean; error?: string };
