@@ -72,19 +72,7 @@ async function check(name, fn) {
 }
 
 // ─── Wait for server ──────────────────────────────────────────────────────────
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-async function waitForServer(maxWaitMs = 60_000) {
-=======
 async function waitForServer(maxWaitMs = WAIT_MS) {
->>>>>>> 20260604224605-9h9yrecco0
-=======
-async function waitForServer(maxWaitMs = WAIT_MS) {
->>>>>>> 20260604231654-9h9yrecco0
-=======
-async function waitForServer(maxWaitMs = WAIT_MS) {
->>>>>>> deploy-setup-redesign
   const start = Date.now();
   process.stdout.write(`\nWaiting for server at ${BASE_URL} `);
   while (Date.now() - start < maxWaitMs) {

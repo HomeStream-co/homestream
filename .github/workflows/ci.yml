@@ -356,13 +356,28 @@ jobs:
         shell: pwsh
         run: |
           Write-Host "Installing: $env:INSTALLER_PATH"
-          # /S = silent install, /D = install directory (must be last arg, no quotes)
-          $installDir = "$env:LOCALAPPDATA\HomeStream-SmokeTest"
-          Start-Process -FilePath $env:INSTALLER_PATH -ArgumentList "/S", "/D=$installDir" -Wait -NoNewWindow
+          # NSIS /D= requires a path with NO spaces and NO quotes, passed as a
+          # single unquoted token. PowerShell Start-Process -ArgumentList array
+          # wraps each element in quotes, which breaks /D= parsing on Windows
+          # Server 2025. Use cmd /c with a single string instead, and a short
+          # path (C:\HS-CI) that has no spaces.
+          $installDir = "C:\HS-CI"
+          $installer  = $env:INSTALLER_PATH
+          Write-Host "Install dir: $installDir"
+          # cmd /c passes the whole string to the shell as-is; NSIS sees /S /D=C:\HS-CI
+          $proc = Start-Process cmd -ArgumentList "/c", ('"' + $installer + '" /S /D=' + $installDir) -Wait -PassThru -NoNewWindow
+          Write-Host "Installer exit code: $($proc.ExitCode)"
           echo "INSTALL_DIR=$installDir" >> $env:GITHUB_ENV
           if (!(Test-Path "$installDir\HomeStream.exe")) {
             Write-Error "HomeStream.exe not found after install at $installDir"
-            Get-ChildItem $installDir -Recurse | Select-Object FullName | Format-Table
+            if (Test-Path $installDir) {
+              Get-ChildItem $installDir -Recurse | Select-Object FullName | Format-Table
+            } else {
+              Write-Host "Install dir does not exist at all — checking default locations:"
+              @("$env:LOCALAPPDATA\HomeStream", "$env:PROGRAMFILES\HomeStream", "C:\HomeStream") | ForEach-Object {
+                if (Test-Path $_) { Write-Host "Found at: $_"; Get-ChildItem $_ | Format-Table Name }
+              }
+            }
             exit 1
           }
           Write-Host "Installed to: $installDir"
@@ -397,12 +412,67 @@ jobs:
       # test. This is faster and more reliable than launching the full Electron
       # app in a headless CI environment, and it tests the exact binary that
       # ships inside the installer.
-      - name: Start packaged server bundle
+      - name: Pre-warm bundle + start packaged server
         shell: pwsh
         run: |
           $bundle = "$env:INSTALL_DIR\resources\server\server.bundle.cjs"
           $dataDir = "$env:APPDATA\HomeStream-SmokeTest"
           New-Item -ItemType Directory -Force -Path $dataDir | Out-Null
+
+          # ── Windows Defender pre-warm ──────────────────────────────────────
+          # Defender scans new .cjs files on first execution, blocking Node for
+          # up to 5 minutes on GitHub-hosted runners. Running `node --check`
+          # forces a synchronous scan in THIS step so the scan is complete
+          # before Start-Process spawns the server. The exclusion is added first
+          # as a belt-and-suspenders measure for any other files Node loads.
+          Add-MpPreference -ExclusionPath "$env:INSTALL_DIR" -ErrorAction SilentlyContinue
+          Add-MpPreference -ExclusionPath $dataDir -ErrorAction SilentlyContinue
+          Write-Host "Defender exclusions added. Pre-warming bundle (triggers AV scan synchronously)..."
+          # node --check only syntax-parses — it does NOT call require(), so Defender
+          # never scans the dependency tree. We must actually execute the bundle,
+          # wait for "Ready at" (all requires done = Defender scanned everything),
+          # kill it, then respawn on the real port. Second spawn is instant.
+          $warmEnv = @{
+            NODE_ENV        = "production"
+            PORT            = "3001"
+            HOST            = "127.0.0.1"
+            SERVER_HOST     = "127.0.0.1"
+            HOMESTREAM_DATA = $dataDir
+            ELECTRON_RESOURCES_PATH = "$env:INSTALL_DIR\resources"
+            PATH            = $env:PATH
+            TEMP            = $env:TEMP
+            TMP             = $env:TMP
+            USERPROFILE     = $env:USERPROFILE
+            APPDATA         = $env:APPDATA
+            LOCALAPPDATA    = $env:LOCALAPPDATA
+            SystemRoot      = $env:SystemRoot
+            SystemDrive     = $env:SystemDrive
+          }
+          $warmProc = Start-Process node -ArgumentList $bundle -PassThru -NoNewWindow `
+            -RedirectStandardOutput "$env:TEMP\hs-warm-out.txt" `
+            -RedirectStandardError  "$env:TEMP\hs-warm-err.txt" `
+            -Environment $warmEnv
+          Write-Host "Pre-warm PID: $($warmProc.Id) — waiting for Ready at (Defender scan in progress)..."
+          $deadline = (Get-Date).AddSeconds(420)
+          $ready = $false
+          while ((Get-Date) -lt $deadline) {
+            Start-Sleep -Seconds 3
+            if (Test-Path "$env:TEMP\hs-warm-out.txt") {
+              $out = Get-Content "$env:TEMP\hs-warm-out.txt" -Raw -ErrorAction SilentlyContinue
+              if ($out -match "Ready at") { $ready = $true; break }
+            }
+            if ($warmProc.HasExited) { Write-Host "Pre-warm exited early."; break }
+          }
+          Stop-Process -Id $warmProc.Id -Force -ErrorAction SilentlyContinue
+          Start-Sleep -Seconds 2
+          if ($ready) {
+            Write-Host "Pre-warm complete — Defender scanned all requires. Real server will start instantly."
+          } else {
+            Write-Warning "Pre-warm timed out — proceeding anyway."
+            if (Test-Path "$env:TEMP\hs-warm-out.txt") { Get-Content "$env:TEMP\hs-warm-out.txt" }
+          }
+
+          # ── Start server ───────────────────────────────────────────────────
           Write-Host "Starting server from: $bundle"
           Write-Host "Data dir: $dataDir"
           # NOTE: -Environment replaces the entire environment for the child process.
@@ -433,22 +503,8 @@ jobs:
       - name: Run smoke tests against installed bundle
         # Use 127.0.0.1 explicitly — on Windows, 'localhost' resolves to ::1 (IPv6)
         # but the server binds to 0.0.0.0 (IPv4 only), so the connection is refused.
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-        run: node scripts/smoke-test.mjs http://127.0.0.1:3000
-=======
-        # Pass 120000ms wait timeout — Windows CI runners are slower than Linux.
-        run: node scripts/smoke-test.mjs http://127.0.0.1:3000 120000
->>>>>>> 20260604224605-9h9yrecco0
-=======
-        # Pass 120000ms wait timeout — Windows CI runners are slower than Linux.
-        run: node scripts/smoke-test.mjs http://127.0.0.1:3000 120000
->>>>>>> 20260604231654-9h9yrecco0
-=======
-        # Pass 120000ms wait timeout — Windows CI runners are slower than Linux.
-        run: node scripts/smoke-test.mjs http://127.0.0.1:3000 120000
->>>>>>> deploy-setup-redesign
+        # Pass 360000ms wait timeout — generous safety net; pre-warm should make this fast.
+        run: node scripts/smoke-test.mjs http://127.0.0.1:3000 360000
 
       - name: Dump server logs on failure
         if: failure()
