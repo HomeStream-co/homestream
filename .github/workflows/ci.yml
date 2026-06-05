@@ -271,7 +271,10 @@ jobs:
   # burning expensive windows-latest minutes on every commit.
   smoke-test-windows:
     name: Smoke Test Windows NSIS Installer
-    runs-on: windows-latest
+    # Pin to windows-2022 (Server 2022). windows-latest now maps to Server 2025
+    # where NSIS installers built by electron-builder 26.x crash with exit code
+    # 0xC0000005 (Access Violation) during silent install. Server 2022 is stable.
+    runs-on: windows-2022
     needs: [build-check]
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
     timeout-minutes: 30
