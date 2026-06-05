@@ -158,14 +158,22 @@ describe('SetupPage', () => {
   });
 
   it('[SETUP_PAGE_TMDB_AUTOFILL] auto-populates TMDB key from server response', async () => {
-    // The server returns a masked TMDB key — SetupPage should pre-fill the form
-    mockFetch({
-      setupComplete: false,
-      config: { tmdbApiKey: 'tmdb-key-from-server' },
-    });
+    // SetupPage now calls /api/health first (redirect check), then /api/setup
+    // with credentials (TMDB autofill), then /api/electron (platform defaults).
+    vi.spyOn(global, 'fetch')
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ setupComplete: false }),
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ setupComplete: false, config: { tmdbApiKey: 'tmdb-key-from-server' } }),
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ defaultMediaDir: '' }),
+      } as Response);
 
-    // We can't directly inspect form state, but we can verify the fetch was called
-    // and the component rendered without crashing (the key is set via setForm)
     renderSetupPage();
 
     await waitFor(() => {
@@ -173,8 +181,10 @@ describe('SetupPage', () => {
       expect(screen.getByTestId('step-sysreqs')).toBeInTheDocument();
     });
 
-    // Verify fetch was called with /api/setup
-    expect(global.fetch).toHaveBeenCalledWith('/api/setup');
+    // Verify /api/health was called for redirect check
+    expect(global.fetch).toHaveBeenCalledWith('/api/health');
+    // Verify /api/setup was called with credentials for TMDB autofill
+    expect(global.fetch).toHaveBeenCalledWith('/api/setup', { credentials: 'include' });
   });
 
   it('[SETUP_PAGE_NO_REDIRECT] handles fetch error gracefully (no crash, no redirect)', async () => {
@@ -191,10 +201,12 @@ describe('SetupPage', () => {
   });
 
   it('[SETUP_PAGE_INDICATOR] calls /api/electron on mount to get platform defaults', async () => {
-    mockFetch({ setupComplete: false });
-
-    // Also mock the /api/electron call
+    // SetupPage calls: /api/health → /api/setup (credentials) → /api/electron
     vi.spyOn(global, 'fetch')
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ setupComplete: false }),
+      } as Response)
       .mockResolvedValueOnce({
         ok: true,
         json: () => Promise.resolve({ setupComplete: false }),
@@ -207,8 +219,11 @@ describe('SetupPage', () => {
     renderSetupPage();
 
     await waitFor(() => {
-      // Both /api/setup and /api/electron should have been called
-      expect(global.fetch).toHaveBeenCalledWith('/api/setup');
+      // /api/health for redirect check
+      expect(global.fetch).toHaveBeenCalledWith('/api/health');
+      // /api/setup with credentials for TMDB autofill
+      expect(global.fetch).toHaveBeenCalledWith('/api/setup', { credentials: 'include' });
+      // /api/electron for platform defaults
       expect(global.fetch).toHaveBeenCalledWith('/api/electron');
     });
   });
