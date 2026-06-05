@@ -4,12 +4,15 @@
  * Tests for the SetupGuard component extracted from RootLayout.
  *
  * SetupGuard behaviour:
- *   - Renders null (loading) while the /api/setup fetch is in flight
+ *   - Renders null (loading) while the /api/health fetch is in flight
  *   - Redirects to /setup when setupComplete is false
  *   - Renders children when setupComplete is true
  *   - Renders children on fetch error (fail-open so a network blip doesn't
  *     lock users out of the app)
  *   - Skips the fetch entirely when already on /setup (avoids redirect loop)
+ *
+ * Uses /api/health (always unauthenticated) — NOT /api/setup which returns
+ * 401 after setup is complete and would cause an infinite redirect loop.
  *
  * Error codes produced when these tests fail:
  *   SETUP_GUARD_REDIRECT  — guard didn't redirect to /setup when it should have
@@ -40,7 +43,7 @@ function SetupGuard({ children }: { children: ReactElement }) {
       setReady(true);
       return;
     }
-    fetch('/api/setup')
+    fetch('/api/health')
       .then(r => r.json())
       .then((data: { setupComplete?: boolean }) => {
         if (!data.setupComplete) {

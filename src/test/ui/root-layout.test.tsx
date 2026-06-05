@@ -49,7 +49,7 @@ function SetupGuard({ children }: { children: ReactElement }) {
 
   useEffect(() => {
     if (location.pathname === '/setup') { setReady(true); return; }
-    fetch('/api/setup')
+    fetch('/api/health')
       .then(r => r.json())
       .then((d: { setupComplete?: boolean }) => {
         if (!d.setupComplete) navigate('/setup', { replace: true });
