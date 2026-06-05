@@ -192,7 +192,7 @@ describe('SetupGuard', () => {
     expect(container.querySelector('[data-testid="children"]')).toBeNull();
   });
 
-  it('[SETUP_GUARD_PASSTHRU] calls /api/setup exactly once on mount', async () => {
+  it('[SETUP_GUARD_PASSTHRU] calls /api/health exactly once on mount', async () => {
     const spy = mockFetch({ setupComplete: true });
 
     renderGuard('/');
@@ -202,6 +202,6 @@ describe('SetupGuard', () => {
     });
 
     expect(spy).toHaveBeenCalledTimes(1);
-    expect(spy).toHaveBeenCalledWith('/api/setup');
+    expect(spy).toHaveBeenCalledWith('/api/health');
   });
 });
