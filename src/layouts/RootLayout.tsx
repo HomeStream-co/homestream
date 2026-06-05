@@ -26,9 +26,10 @@ const ALWAYS_ACCESSIBLE = ['/remote', '/tv', '/samsung-tv'];
 
 /**
  * SetupGuard — redirects to /setup if the server hasn't been configured yet.
- * Runs a single GET /api/setup check on mount. Skips the check when already
- * on /setup (redirect loop) or on always-accessible routes (/remote, /tv,
- * /samsung-tv) which must render before setup is complete.
+ * Uses GET /api/health (always unauthenticated) to check setupComplete.
+ * /api/setup returns 401 after setup is complete, so we can't use it here —
+ * that would cause an infinite redirect loop (401 → no setupComplete → /setup
+ * → health says complete → / → 401 again).
  */
 function SetupGuard({ children }: { children: ReactElement }) {
   const navigate = useNavigate();
@@ -43,7 +44,7 @@ function SetupGuard({ children }: { children: ReactElement }) {
       setReady(true);
       return;
     }
-    fetch('/api/setup')
+    fetch('/api/health')
       .then(r => r.json())
       .then((data: { setupComplete?: boolean }) => {
         if (!data.setupComplete) {
