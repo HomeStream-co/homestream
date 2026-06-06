@@ -1,56 +1,47 @@
-/**
- * POST /api/shutdown
- *
- * Graceful shutdown endpoint called by the Electron main process before
- * killing the server child process. Gives the server a chance to:
- *   1. Stop all active HLS transcoding jobs
- *   2. Clean up HLS temp segments (os.tmpdir()/homestream-hls/)
- *   3. Flush any pending writes
- *
- * POST (not GET) to prevent CSRF — a malicious page cannot trigger shutdown
- * via <img src="/api/shutdown"> or similar cross-origin GET requests.
- *
- * This is needed on Windows because SIGTERM is mapped to an immediate kill
- * (no graceful shutdown signal), so we use HTTP instead.
- *
- * Only accessible from localhost — not exposed to the network.
- */
 import type { Request, Response } from 'express';
+import { addMagnet, isReachable } from '../../../qbittorrentClient.js';
+import { readConfig } from '../../../configStore.js';
+import { requireAuth } from '../../../authMiddleware.js';
 
+/**
+ * POST /api/stremio/magnet
+ *
+ * Accepts a raw magnet link pasted by the user and sends it directly to
+ * qBittorrent. No stream-source lookup — the user already has the magnet.
+ *
+ * Body: { magnet: string }
+ * Returns: { ok: true, hash: string } | { ok: false, error: string }
+ */
 export default async function handler(req: Request, res: Response) {
-  // Only allow from localhost
-  const ip = req.socket.remoteAddress ?? '';
-  if (!ip.includes('127.0.0.1') && !ip.includes('::1') && !ip.includes('localhost')) {
-    res.status(403).json({ error: 'Forbidden' });
-    return;
-  }
+  const authError = requireAuth(req, res);
+  if (authError) return;
 
-  // Acknowledge immediately so Electron doesn't time out
-  res.json({ ok: true, message: 'Shutting down gracefully' });
-
-  // Flush any pending debounced progress writes so the last seek position
-  // is never lost when the server shuts down mid-playback.
   try {
-    const { flushProgressWrites } = await import('../../api/media/[id]/progress/PATCH.js');
-    await flushProgressWrites();
-    console.log('[shutdown] Flushed pending progress writes');
-  } catch (err) {
-    console.warn('[shutdown] Progress flush failed (non-fatal):', err);
-  }
+    const { magnet } = req.body as { magnet?: string };
 
-  // Clean up HLS temp segments
-  try {
-    const { stopAllHlsJobs, HLS_BASE_DIR } = await import('../../hlsTranscoder.js');
-    stopAllHlsJobs();
-    const fs = await import('node:fs');
-    if (fs.existsSync(HLS_BASE_DIR)) {
-      fs.rmSync(HLS_BASE_DIR, { recursive: true, force: true });
-      console.log('[shutdown] Cleaned up HLS temp segments');
+    if (!magnet || typeof magnet !== 'string') {
+      res.status(400).json({ ok: false, error: 'magnet is required' });
+      return;
     }
-  } catch (err) {
-    console.warn('[shutdown] HLS cleanup failed (non-fatal):', err);
-  }
 
-  // Give response time to flush, then exit
-  setTimeout(() => process.exit(0), 500);
+    const trimmed = magnet.trim();
+    if (!trimmed.startsWith('magnet:')) {
+      res.status(400).json({ ok: false, error: 'Invalid magnet link — must start with magnet:' });
+      return;
+    }
+
+    const qbitOnline = await isReachable();
+    if (!qbitOnline) {
+      res.status(503).json({ ok: false, error: 'qBittorrent is not reachable. Make sure it is running.' });
+      return;
+    }
+
+    const cfg = readConfig();
+    const savepath = cfg.downloadsDir || cfg.mediaDir || undefined;
+    const hash = await addMagnet(trimmed, savepath ? { savepath } : {});
+
+    res.json({ ok: true, hash });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: String(err) });
+  }
 }
