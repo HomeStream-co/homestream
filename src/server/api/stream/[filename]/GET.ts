@@ -125,37 +125,40 @@ function isPathAllowed(resolvedPath: string): boolean {
 // a known prefix. Rather than 404-ing, we redirect to a real playable MP4 so
 // the player, controls, seek bar, and autoplay flow all work in the preview.
 //
-// Videos are hosted by the Blender Foundation and are CC-licensed:
-//   Big Buck Bunny  — https://peach.blender.org/
-//   Elephants Dream — https://orange.blender.org/
-//   Tears of Steel  — https://mango.blender.org/
-//   Sintel          — https://durian.blender.org/
-// All URLs verified live — test-videos.co.uk hosts royalty-free H.264 MP4 clips
-// specifically for player/streaming demos. w3schools hosts a short BBB clip too.
-// Using 4 distinct clips so different titles feel varied in the preview.
-const CLIP_A = 'https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/1080/Big_Buck_Bunny_1080_10s_5MB.mp4';
-const CLIP_B = 'https://test-videos.co.uk/vids/jellyfish/mp4/h264/1080/Jellyfish_1080_10s_1MB.mp4';
-const CLIP_C = 'https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/720/Big_Buck_Bunny_720_10s_1MB.mp4';
-const CLIP_D = 'https://test-videos.co.uk/vids/jellyfish/mp4/h264/720/Jellyfish_720_10s_1MB.mp4';
-const CLIP_W = 'https://www.w3schools.com/html/mov_bbb.mp4'; // short BBB clip, very fast
+// All clips are CC-licensed Blender Foundation open movies.
+// Using full-length clips (9–10 min) so the seek bar has meaningful range
+// and scrubbing / progress tracking behave exactly like real media.
+//
+//   Big Buck Bunny (9m 56s, 720p H.264) — CC BY 3.0
+//     https://peach.blender.org/
+//   Big Buck Bunny (9m 56s, 320x180 H.264) — same film, smaller file
+//
+// Verified live URLs (June 2026):
+//   download.blender.org/peach/bigbuckbunny_movies/BigBuckBunny_320x180.mp4  ✓
+//   archive.org/download/BigBuckBunny_124/Content/big_buck_bunny_720p_surround.mp4  ✓
+
+// 9m 56s — 320×180, ~30 MB, fast to start (good for preview)
+const CLIP_BBB_SM = 'https://download.blender.org/peach/bigbuckbunny_movies/BigBuckBunny_320x180.mp4';
+// 9m 56s — 720p, ~150 MB, higher quality
+const CLIP_BBB_HD = 'https://archive.org/download/BigBuckBunny_124/Content/big_buck_bunny_720p_surround.mp4';
 
 const DEMO_VIDEO_MAP: Record<string, string> = {
-  // Movies
-  'Avengers.Endgame':    CLIP_A,
-  'Inception':           CLIP_B,
-  'Interstellar':        CLIP_C,
-  'The.Dark.Knight':     CLIP_D,
-  'Parasite':            CLIP_A,
-  'Pulp.Fiction':        CLIP_B,
-  'Spirited.Away':       CLIP_W,
-  'Django.Unchained':    CLIP_C,
-  'The.Conjuring':       CLIP_D,
-  'Forrest.Gump':        CLIP_B,
-  // TV shows — each show gets its own clip
-  'Breaking.Bad':        CLIP_C,
-  'Stranger.Things':     CLIP_D,
-  'Game.of.Thrones':     CLIP_B,
-  'Rick.and.Morty':      CLIP_W,
+  // Movies — alternate between the two clips for variety
+  'Avengers.Endgame':    CLIP_BBB_HD,
+  'Inception':           CLIP_BBB_SM,
+  'Interstellar':        CLIP_BBB_HD,
+  'The.Dark.Knight':     CLIP_BBB_SM,
+  'Parasite':            CLIP_BBB_HD,
+  'Pulp.Fiction':        CLIP_BBB_SM,
+  'Spirited.Away':       CLIP_BBB_HD,
+  'Django.Unchained':    CLIP_BBB_SM,
+  'The.Conjuring':       CLIP_BBB_HD,
+  'Forrest.Gump':        CLIP_BBB_SM,
+  // TV shows
+  'Breaking.Bad':        CLIP_BBB_HD,
+  'Stranger.Things':     CLIP_BBB_SM,
+  'Game.of.Thrones':     CLIP_BBB_HD,
+  'Rick.and.Morty':      CLIP_BBB_SM,
 };
 
 function getDemoVideoUrl(filename: string): string | null {

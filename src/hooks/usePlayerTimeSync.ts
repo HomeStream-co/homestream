@@ -4,23 +4,24 @@
  * Responsibilities (all zero-React-state):
  *   1. Write video.currentTime → currentTimeRef
  *   2. Write video.buffered   → bufferedRef
- *   3. Mutate seekBarRef DOM  (value + gradient fill)
+ *   3. Mutate seekBarRef DOM  (value + gradient fill) via rAF loop at 60fps
  *   4. Mutate bufferedBarRef  (width)
  *   5. Mutate timeDisplayRef  (textContent)
  *   6. Throttled remote-state broadcast (≤ once per 2 s, wall-clock)
  *
- * Returns a stable `onTimeUpdate` callback (useCallback with no deps that
- * change at playback frequency) suitable for passing directly to
- * <video onTimeUpdate={onTimeUpdate}>.
+ * The seek-bar thumb and gradient are driven by a requestAnimationFrame loop
+ * (not by onTimeUpdate) so they update at 60fps and never lag the playhead.
+ * onTimeUpdate is kept only for the buffered bar, time display, and remote
+ * broadcast — all of which are fine at the browser's native ~4Hz rate.
  *
  * PERFORMANCE CONTRACT
  * --------------------
- * This callback MUST NOT call any React setState.  Every update here goes
- * through refs or direct DOM mutation.  The 500 ms interval in player.tsx
- * handles the infrequent state transitions (watch-complete, skip-intro).
+ * This hook MUST NOT call any React setState.  Every update goes through
+ * refs or direct DOM mutation.  The 500 ms interval in player.tsx handles
+ * the infrequent state transitions (watch-complete, skip-intro).
  */
 
-import { useCallback, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import type { PlayerStatePayload } from './useRemoteControl';
 
 function formatTime(seconds: number): string {
@@ -73,8 +74,7 @@ export function usePlayerTimeSync({
   sendState,
   getRemoteContext,
 }: UsePlayerTimeSyncOptions) {
-  // Keep a ref to playerAccent so the callback never needs to be recreated
-  // when the accent colour changes (rare, but possible on theme switch).
+  // Keep a ref to playerAccent so the rAF loop never needs to be recreated.
   const accentRef = useRef(playerAccent);
   accentRef.current = playerAccent;
 
@@ -86,11 +86,50 @@ export function usePlayerTimeSync({
   const sendStateRef = useRef(sendState);
   sendStateRef.current = sendState;
 
+  // rAF handle so we can cancel on unmount.
+  const rafRef = useRef<number>(0);
+
+  /**
+   * requestAnimationFrame loop — runs at 60fps while the component is mounted.
+   *
+   * Drives the seek-bar thumb and gradient fill directly from
+   * video.currentTime so the dot tracks the playhead with zero perceptible lag.
+   * Skips DOM writes while the user is scrubbing so the thumb follows the
+   * pointer instead of being overwritten by the video clock.
+   */
+  useEffect(() => {
+    function tick() {
+      const video = videoRef.current;
+      const seekBar = seekBarRef.current;
+
+      if (video && seekBar && !isScrubbingRef.current) {
+        const dur = video.duration;
+        if (dur > 0 && isFinite(dur)) {
+          const pct = (video.currentTime / dur) * 100;
+          seekBar.value = String(video.currentTime);
+          seekBar.style.background =
+            `linear-gradient(to right, ${accentRef.current} ${pct}%, rgba(255,255,255,0.2) 0%)`;
+        }
+      }
+
+      rafRef.current = requestAnimationFrame(tick);
+    }
+
+    rafRef.current = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafRef.current);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // intentionally empty — all values accessed via refs
+
   /**
    * onTimeUpdate — attach directly to <video onTimeUpdate={onTimeUpdate}>.
    *
-   * Stable reference: deps array is empty because every value is accessed
-   * through a ref.  React will never recreate this function.
+   * Now only responsible for:
+   *   1. Updating currentTimeRef / bufferedRef
+   *   2. Updating the buffered bar width
+   *   3. Updating the time display text
+   *   4. Throttled remote broadcast
+   *
+   * The seek-bar gradient is handled by the rAF loop above at 60fps.
    */
   const onTimeUpdate = useCallback(() => {
     const video = videoRef.current;
@@ -102,33 +141,20 @@ export function usePlayerTimeSync({
     const dur = video.duration || 0;
     if (buf.length > 0) bufferedRef.current = buf.end(buf.length - 1);
 
-    // ── 2. Seek bar: value + gradient fill ───────────────────────────────
-    // Skip DOM writes while the user is dragging — the input's own value
-    // is already correct and overwriting it causes the thumb to jump back.
-    if (!isScrubbingRef.current) {
-      const seekBar = seekBarRef.current;
-      if (seekBar && dur > 0) {
-        const pct = (video.currentTime / dur) * 100;
-        seekBar.value = String(video.currentTime);
-        seekBar.style.background =
-          `linear-gradient(to right, ${accentRef.current} ${pct}%, rgba(255,255,255,0.2) 0%)`;
-      }
-    }
-
-    // ── 3. Buffered bar: width ────────────────────────────────────────────
+    // ── 2. Buffered bar: width ────────────────────────────────────────────
     const bufferedBar = bufferedBarRef.current;
     if (bufferedBar && dur > 0) {
       bufferedBar.style.width = `${(bufferedRef.current / dur) * 100}%`;
     }
 
-    // ── 4. Time display: textContent ─────────────────────────────────────
+    // ── 3. Time display: textContent ─────────────────────────────────────
     const timeDisplay = timeDisplayRef.current;
     if (timeDisplay && dur > 0) {
       timeDisplay.textContent =
         `${formatTime(video.currentTime)} / ${formatTime(dur)}`;
     }
 
-    // ── 5. Remote broadcast — throttled to ≤ 1 per 2 s ──────────────────
+    // ── 4. Remote broadcast — throttled to ≤ 1 per 2 s ──────────────────
     const now = Date.now();
     if (now - lastRemoteSendRef.current >= 2000) {
       lastRemoteSendRef.current = now;
