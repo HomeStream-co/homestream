@@ -116,6 +116,12 @@ export default function HomePage() {
     [visibleLibrary],
   );
 
+  // Unique show count — deduplicated by title, matching the Library page logic
+  const uniqueShowCount = useMemo(
+    () => new Set(series.map(m => m.title.trim().toLowerCase())).size,
+    [series],
+  );
+
   const topRated = useMemo(() =>
     [...visibleLibrary]
       .filter(m => m.imdbRating !== 'N/A' && parseFloat(m.imdbRating) > 0)
@@ -379,7 +385,7 @@ export default function HomePage() {
               {([
                 { id: 'all',    label: 'All',      count: visibleLibrary.length },
                 { id: 'movie',  label: 'Movies',   count: movies.length },
-                { id: 'series', label: 'TV Shows', count: series.length },
+                { id: 'series', label: 'TV Shows', count: uniqueShowCount },
               ] as const).map(tab => (
                 <button
                   key={tab.id}
