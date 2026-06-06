@@ -130,6 +130,8 @@ export interface SetupStepProps {
    * platformUtils.ts for platform-conditional UI — never rely on navigator.userAgent alone.
    */
   serverPlatform: string | undefined;
+  /** True when running inside the Electron shell — enables native folder picker */
+  isElectron?: boolean;
 }
 
 /** Helper used by all steps — throws on non-2xx so callers can catch properly */

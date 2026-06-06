@@ -111,6 +111,8 @@ import securityScanPost from "./api/security/scan/POST";
 import setupGet from "./api/setup/GET";
 import setupPost from "./api/setup/POST";
 import setupTestKeysPost from "./api/setup/test-keys/POST";
+import setupBrowseFolderGet from "./api/setup/browse-folder/GET";
+import setupOpenDialogPost from "./api/setup/open-dialog/POST";
 // shutdown
 import shutdownPost from "./api/shutdown/POST";
 // stats
@@ -299,6 +301,8 @@ app.post("/api/security/scan", securityScanPost);
 app.get("/api/setup", setupGet);
 app.post("/api/setup", setupPost);
 app.post("/api/setup/test-keys", setupTestKeysPost);
+app.get("/api/setup/browse-folder", setupBrowseFolderGet);
+app.post("/api/setup/open-dialog", setupOpenDialogPost);
 // shutdown
 app.post("/api/shutdown", shutdownPost);
 // stats

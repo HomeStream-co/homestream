@@ -136,9 +136,8 @@ export default function SetupPage() {
   const [platformDefaultsReady, setPlatformDefaultsReady] = useState(false);
   // Available fixed drives on Windows (e.g. ["C:\\", "D:\\"]). Empty on macOS/Linux.
   const [availableDrives, setAvailableDrives] = useState<string[]>([]);
-  // Server platform string ('win32' | 'linux' | 'darwin') — authoritative source
-  // for platform-specific UI in step components. Undefined until /api/electron responds.
   const [serverPlatform, setServerPlatform] = useState<string | undefined>(undefined);
+  const [isElectron, setIsElectron] = useState(false);
 
   // ── Redirect if already set up ──
   useEffect(() => {
@@ -167,7 +166,7 @@ export default function SetupPage() {
   useEffect(() => {
     fetch('/api/electron')
       .then(r => r.json())
-      .then((data: { defaultMediaDir?: string; availableDrives?: string[]; platform?: string }) => {
+      .then((data: { defaultMediaDir?: string; availableDrives?: string[]; platform?: string; isElectron?: boolean }) => {
         if (data.defaultMediaDir) {
           setForm(f => ({ ...f, mediaDir: data.defaultMediaDir! }));
         }
@@ -176,6 +175,9 @@ export default function SetupPage() {
         }
         if (data.platform) {
           setServerPlatform(data.platform);
+        }
+        if (data.isElectron) {
+          setIsElectron(true);
         }
       })
       .catch(() => {/* non-fatal — keep the optimistic default */})
@@ -265,6 +267,7 @@ export default function SetupPage() {
     platformDefaultsReady,
     availableDrives,
     serverPlatform,
+    isElectron,
   };
 
   const currentStep = STEPS[step];

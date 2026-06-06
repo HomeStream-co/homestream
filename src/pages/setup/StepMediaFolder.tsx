@@ -2,16 +2,20 @@
  * Setup Step 2 — Media Folder
  * Set the media directory, download quality, and auto-import preferences.
  */
+import { useState } from 'react';
 import { HardDrive, FolderOpen, ChevronLeft, ChevronRight, Loader2, Info } from 'lucide-react';
 import type { SetupStepProps } from './types';
 import { apiPost } from './types';
 import { getIsLinux } from './platformUtils';
+import FolderBrowser from './FolderBrowser';
 
 export default function StepMediaFolder({
   form, set, status, setStatus, onNext, onBack,
   platformDefaultsReady, availableDrives, serverPlatform,
+  isElectron,
 }: SetupStepProps) {
   const isLinux = getIsLinux(serverPlatform);
+  const [showBrowser, setShowBrowser] = useState(false);
 
   const saveMediaDir = async () => {
     setStatus(s => ({ ...s, mediaDir: 'saving' }));
@@ -78,16 +82,48 @@ export default function StepMediaFolder({
       {/* Path input */}
       <div>
         <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Path to your media folder</label>
-        <div className="relative">
-          <FolderOpen className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
-          <input
-            type="text"
-            value={form.mediaDir}
-            onChange={e => set('mediaDir', e.target.value)}
-            placeholder={isLinux ? '/home/you/Videos/HomeStream' : 'D:\\HomeStream'}
-            className="w-full bg-background border border-border rounded-xl pl-9 pr-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary font-mono transition-colors"
-          />
+        <div className="relative flex gap-2">
+          <div className="relative flex-1">
+            <FolderOpen className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+            <input
+              type="text"
+              value={form.mediaDir}
+              onChange={e => set('mediaDir', e.target.value)}
+              placeholder={isLinux ? '/home/you/Videos/HomeStream' : 'D:\\HomeStream'}
+              className="w-full bg-background border border-border rounded-xl pl-9 pr-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary font-mono transition-colors"
+            />
+          </div>
+          {/* Browse button */}
+          <button
+            type="button"
+            onClick={() => setShowBrowser(v => !v)}
+            title="Browse filesystem"
+            className={`flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl border text-sm font-medium transition-colors flex-shrink-0 ${
+              showBrowser
+                ? 'bg-primary border-primary text-primary-foreground'
+                : 'bg-background border-border text-muted-foreground hover:border-primary/60 hover:text-foreground'
+            }`}
+          >
+            <FolderOpen className="w-4 h-4" />
+            <span className="hidden sm:inline">Browse</span>
+          </button>
         </div>
+
+        {/* Inline folder browser */}
+        {showBrowser && (
+          <div className="mt-2">
+            <FolderBrowser
+              initialPath={form.mediaDir || (isLinux ? '/home' : 'C:\\')}
+              isElectron={!!isElectron}
+              onSelect={p => {
+                set('mediaDir', p);
+                setShowBrowser(false);
+              }}
+              onClose={() => setShowBrowser(false)}
+            />
+          </div>
+        )}
+
         <div className="flex items-start gap-1.5 mt-2">
           <Info className="w-3 h-3 text-muted-foreground mt-0.5 flex-shrink-0" />
           <p className="text-[11px] text-muted-foreground leading-relaxed">
