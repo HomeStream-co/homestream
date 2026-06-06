@@ -1,0 +1,582 @@
+# HomeStream CI
+#
+# Runs on every push and pull request to main/develop.
+# Three jobs run in parallel:
+#   type-check  - tsc --noEmit
+#   lint        - eslint
+#   test        - vitest (1369 unit tests)
+#
+# A fourth job (build-check) depends on all three and does a full
+# Vite production build to catch any bundler-level errors.
+#
+# After build-check, three smoke-test jobs run in parallel:
+#   smoke-test              - 17-check API smoke test on ubuntu-latest
+#   smoke-test-linux        - same smoke test on 6 distro containers
+#                             (ubuntu-22.04, ubuntu-24.04, debian-12, fedora-40, arch, cachyos)
+#   smoke-test-windows      - NSIS installer build + silent install + API smoke
+#                             (main/develop branches only — windows-latest is expensive)
+
+name: CI
+
+on:
+  push:
+    branches: [main, develop, 'feature/**', 'fix/**']
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.github/RELEASE.md'
+      - 'CHANGELOG.md'
+      - 'INSTALL.md'
+      - 'README.md'
+  pull_request:
+    branches: [main, develop]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# Silence "Node.js 20 actions are deprecated" warnings across every job.
+# actions/checkout@v4, actions/setup-node@v4, actions/cache@v4, and
+# actions/upload-artifact@v4 all ship a Node.js 20 runner shim; setting this
+# env var opts them into Node.js 24 ahead of the June 16 forced migration.
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  # -- Type checking ------------------------------------------------------------
+  type-check:
+    name: TypeScript
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npm run type-check
+
+  # -- Linting ------------------------------------------------------------------
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+  # -- Tests --------------------------------------------------------------------
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test -- --run
+
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage/
+          retention-days: 7
+          if-no-files-found: ignore
+
+  # -- Production build check ---------------------------------------------------
+  build-check:
+    name: Build
+    runs-on: ubuntu-latest
+    needs: [type-check, lint, test]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+        env:
+          # Suppress Vite's interactive prompts in CI
+          CI: true
+
+  # -- Smoke test ---------------------------------------------------------------
+  # Starts the production build and hits the critical API endpoints to verify
+  # the server boots and responds correctly — catches wiring regressions that
+  # unit tests can't (missing route registrations, startup crashes, etc.)
+  smoke-test:
+    name: Smoke Test
+    runs-on: ubuntu-latest
+    needs: [build-check]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+        env:
+          CI: true
+
+      - name: Start server in background
+        run: |
+          node dist/server/server.bundle.cjs &
+          echo "SERVER_PID=$!" >> $GITHUB_ENV
+        env:
+          NODE_ENV: production
+          PORT: 3000
+          # Smoke test runs against a fresh install — setup is not complete,
+          # which is fine: /api/health and auth endpoints work regardless.
+          HOMESTREAM_DATA: /tmp/homestream-smoke
+
+      - name: Run smoke tests
+        run: node scripts/smoke-test.mjs http://localhost:3000
+
+      - name: Stop server
+        if: always()
+        run: kill $SERVER_PID 2>/dev/null || true
+
+  # -- Linux distro matrix smoke test ------------------------------------------
+  # Verifies the server bundle starts and passes all smoke checks on every
+  # supported Linux distro. Each container is the closest public image to what
+  # end-users actually run:
+  #
+  #   ubuntu:22.04   — Ubuntu 22.04 LTS (most common desktop/server)
+  #   ubuntu:24.04   — Ubuntu 24.04 LTS (current LTS)
+  #   debian:12      — Debian 12 Bookworm (.deb package target)
+  #   fedora:40      — Fedora 40 (RPM users, modern glibc)
+  #   archlinux      — Arch Linux / Manjaro (pacman target)
+  #   cachyos/cachyos-v3 — CachyOS (pacman target, x86-64-v3 optimised)
+  #
+  # The server bundle is fully self-contained (esbuild inlines all node_modules)
+  # so no npm install is needed inside the container — just Node.js + the bundle.
+  smoke-test-linux:
+    name: Smoke Test Linux (${{ matrix.distro }})
+    runs-on: ubuntu-latest
+    needs: [build-check]
+    strategy:
+      fail-fast: false          # run all distros even if one fails
+      matrix:
+        include:
+          - distro: ubuntu-22.04
+            image: ubuntu:22.04
+            pkg_install: apt-get update -qq && apt-get install -y nodejs
+          - distro: ubuntu-24.04
+            image: ubuntu:24.04
+            pkg_install: apt-get update -qq && apt-get install -y nodejs
+          - distro: debian-12
+            image: debian:12
+            pkg_install: apt-get update -qq && apt-get install -y nodejs
+          - distro: fedora-40
+            image: fedora:40
+            pkg_install: dnf install -y nodejs --setopt=install_weak_deps=False
+          - distro: arch
+            image: archlinux:latest
+            pkg_install: pacman -Sy --noconfirm nodejs
+          - distro: cachyos
+            image: cachyos/cachyos-v3:latest
+            pkg_install: pacman -Sy --noconfirm nodejs
+
+    container:
+      image: ${{ matrix.image }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Node.js on distro
+        run: ${{ matrix.pkg_install }}
+
+      # Download the pre-built server bundle from the build-check artifact
+      # rather than re-running npm ci + npm run build inside every container.
+      # This keeps the matrix fast and tests the exact artifact users receive.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          # setup-node is used here only for its cache — the distro Node is
+          # used to actually run the bundle (tests glibc compatibility).
+
+      - name: Install dependencies (for build only)
+        run: npm ci
+        env:
+          npm_config_optional: true
+
+      - name: Build server bundle
+        run: npm run build
+        env:
+          CI: true
+
+      - name: Verify server bundle exists
+        run: |
+          test -f dist/server/server.bundle.cjs || (echo "MISSING: dist/server/server.bundle.cjs" && exit 1)
+          echo "Bundle size: $(du -sh dist/server/server.bundle.cjs | cut -f1)"
+
+      - name: Start server in background
+        run: |
+          node dist/server/server.bundle.cjs &
+          echo "SERVER_PID=$!" >> $GITHUB_ENV
+        env:
+          NODE_ENV: production
+          PORT: 3000
+          HOMESTREAM_DATA: /tmp/homestream-smoke-${{ matrix.distro }}
+
+      - name: Run smoke tests
+        run: node scripts/smoke-test.mjs http://localhost:3000
+
+      - name: Stop server
+        if: always()
+        run: kill $SERVER_PID 2>/dev/null || true
+
+  # -- Windows NSIS installer smoke test ----------------------------------------
+  # Builds the NSIS installer, installs it silently, starts the packaged
+  # Electron app in headless mode, and runs the API smoke test against it.
+  #
+  # This catches:
+  #   - NSIS installer build failures (missing icon, bad NSIS script, etc.)
+  #   - server.bundle.cjs missing from resources/ after packaging
+  #   - ffmpeg.exe missing from resources/ffmpeg/ (transcoding broken)
+  #   - HOMESTREAM_DATA path wrong on Windows (%APPDATA%\HomeStream)
+  #   - Port binding failures on Windows (EACCES, EADDRINUSE)
+  #   - API routes not responding after Electron spawns the server child
+  #
+  # Runs only on pushes to main/develop (not every feature branch) to avoid
+  # burning expensive windows-latest minutes on every commit.
+  smoke-test-windows:
+    name: Smoke Test Windows NSIS Installer
+    # Pin to windows-2022 (Server 2022). windows-latest now maps to Server 2025
+    # where NSIS installers built by electron-builder 26.x crash with exit code
+    # 0xC0000005 (Access Violation) during silent install. Server 2022 is stable.
+    runs-on: windows-2022
+    needs: [build-check]
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Cache node_modules (Windows)
+        id: cache-win
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: Windows-node22-modules-${{ hashFiles('package-lock.json') }}
+
+      - name: Install dependencies
+        if: steps.cache-win.outputs.cache-hit != 'true'
+        run: npm ci
+        env:
+          npm_config_optional: true
+
+      - name: Build app
+        run: npm run build
+        env:
+          CI: true
+
+      - name: Verify build artifacts (Windows)
+        shell: pwsh
+        run: |
+          if (!(Test-Path "dist/server/server.bundle.cjs")) {
+            Write-Error "dist/server/server.bundle.cjs MISSING"; exit 1
+          }
+          if (!(Test-Path "dist/client/index.html")) {
+            Write-Error "dist/client/index.html MISSING"; exit 1
+          }
+          $size = [math]::Round((Get-Item "dist/server/server.bundle.cjs").Length / 1MB, 1)
+          Write-Host "server.bundle.cjs: $size MB"
+          if (Test-Path "node_modules/ffmpeg-static/ffmpeg.exe") {
+            $ff = [math]::Round((Get-Item "node_modules/ffmpeg-static/ffmpeg.exe").Length / 1MB, 1)
+            Write-Host "ffmpeg.exe: $ff MB - OK"
+          } else {
+            Write-Warning "ffmpeg.exe NOT FOUND in node_modules/ffmpeg-static/"
+          }
+
+      # Build the NSIS installer (same target as release.yml).
+      # --publish never so we don't need GH_TOKEN and don't create a release.
+      - name: Build NSIS installer
+        run: npx electron-builder --win --config electron/electron-builder.yml --config.win.target=nsis --publish never
+        env:
+          # Disable code signing — no cert in CI
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+
+      - name: Verify NSIS installer was produced
+        shell: pwsh
+        run: |
+          # NOTE: -Exclude is silently ignored when -Filter is also used in PowerShell.
+          # Use Where-Object only to reliably filter out the uninstaller and blockmap.
+          $exe = Get-ChildItem dist-electron | Where-Object {
+            $_.Extension -eq ".exe" -and
+            $_.Name -like "HomeStream*" -and
+            $_.Name -notlike "*uninstaller*" -and
+            $_.Name -notlike "*.__uninstaller*"
+          } | Select-Object -First 1
+          if (-not $exe) {
+            Write-Error "No HomeStream*.exe installer found in dist-electron/"
+            Get-ChildItem dist-electron | Format-Table Name, Length
+            exit 1
+          }
+          $sizeMB = [math]::Round($exe.Length / 1MB, 1)
+          Write-Host "Installer: $($exe.Name) ($sizeMB MB)"
+          # Sanity-check: a real NSIS installer is always > 50 MB
+          if ($exe.Length -lt 50MB) {
+            Write-Error "Installer is suspiciously small ($sizeMB MB) — packaging may have failed"
+            exit 1
+          }
+          echo "INSTALLER_PATH=$($exe.FullName)" >> $env:GITHUB_ENV
+
+      - name: Install silently (NSIS /S flag)
+        shell: pwsh
+        run: |
+          Write-Host "Installing: $env:INSTALLER_PATH"
+          # NSIS /D= requires a path with NO spaces and NO quotes, passed as a
+          # single unquoted token. PowerShell Start-Process -ArgumentList array
+          # wraps each element in quotes, which breaks /D= parsing on Windows
+          # Server 2025. Use cmd /c with a single string instead, and a short
+          # path (C:\HS-CI) that has no spaces.
+          $installDir = "C:\HS-CI"
+          $installer  = $env:INSTALLER_PATH
+          Write-Host "Install dir: $installDir"
+          # cmd /c passes the whole string to the shell as-is; NSIS sees /S /D=C:\HS-CI
+          $proc = Start-Process cmd -ArgumentList "/c", ('"' + $installer + '" /S /D=' + $installDir) -Wait -PassThru -NoNewWindow
+          Write-Host "Installer exit code: $($proc.ExitCode)"
+          echo "INSTALL_DIR=$installDir" >> $env:GITHUB_ENV
+          if (!(Test-Path "$installDir\HomeStream.exe")) {
+            Write-Error "HomeStream.exe not found after install at $installDir"
+            if (Test-Path $installDir) {
+              Get-ChildItem $installDir -Recurse | Select-Object FullName | Format-Table
+            } else {
+              Write-Host "Install dir does not exist at all — checking default locations:"
+              @("$env:LOCALAPPDATA\HomeStream", "$env:PROGRAMFILES\HomeStream", "C:\HomeStream") | ForEach-Object {
+                if (Test-Path $_) { Write-Host "Found at: $_"; Get-ChildItem $_ | Format-Table Name }
+              }
+            }
+            exit 1
+          }
+          Write-Host "Installed to: $installDir"
+
+      - name: Verify packaged resources
+        shell: pwsh
+        run: |
+          $res = "$env:INSTALL_DIR\resources"
+          Write-Host "Checking resources at: $res"
+          # server bundle must be present
+          if (!(Test-Path "$res\server\server.bundle.cjs")) {
+            Write-Error "MISSING: resources\server\server.bundle.cjs"
+            exit 1
+          }
+          $sz = [math]::Round((Get-Item "$res\server\server.bundle.cjs").Length / 1MB, 1)
+          Write-Host "server.bundle.cjs: $sz MB - OK"
+          # client index.html must be present
+          if (!(Test-Path "$res\client\index.html")) {
+            Write-Error "MISSING: resources\client\index.html"
+            exit 1
+          }
+          Write-Host "client/index.html - OK"
+          # ffmpeg.exe must be present (transcoding)
+          if (!(Test-Path "$res\ffmpeg\ffmpeg.exe")) {
+            Write-Warning "MISSING: resources\ffmpeg\ffmpeg.exe — transcoding will be broken"
+          } else {
+            $ff = [math]::Round((Get-Item "$res\ffmpeg\ffmpeg.exe").Length / 1MB, 1)
+            Write-Host "ffmpeg.exe: $ff MB - OK"
+          }
+
+      # Start the server bundle directly (not via Electron) for the API smoke
+      # test. This is faster and more reliable than launching the full Electron
+      # app in a headless CI environment, and it tests the exact binary that
+      # ships inside the installer.
+      - name: Pre-warm bundle + start packaged server
+        shell: pwsh
+        run: |
+          $bundle = "$env:INSTALL_DIR\resources\server\server.bundle.cjs"
+          $dataDir = "$env:APPDATA\HomeStream-SmokeTest"
+          New-Item -ItemType Directory -Force -Path $dataDir | Out-Null
+
+          # ── Windows Defender pre-warm ──────────────────────────────────────
+          # Defender scans new .cjs files on first execution, blocking Node for
+          # up to 5 minutes on GitHub-hosted runners. Running `node --check`
+          # forces a synchronous scan in THIS step so the scan is complete
+          # before Start-Process spawns the server. The exclusion is added first
+          # as a belt-and-suspenders measure for any other files Node loads.
+          Add-MpPreference -ExclusionPath "$env:INSTALL_DIR" -ErrorAction SilentlyContinue
+          Add-MpPreference -ExclusionPath $dataDir -ErrorAction SilentlyContinue
+          Write-Host "Defender exclusions added. Pre-warming bundle (triggers AV scan synchronously)..."
+          # node --check only syntax-parses — it does NOT call require(), so Defender
+          # never scans the dependency tree. We must actually execute the bundle,
+          # wait for "Ready at" (all requires done = Defender scanned everything),
+          # kill it, then respawn on the real port. Second spawn is instant.
+          $warmEnv = @{
+            NODE_ENV        = "production"
+            PORT            = "3001"
+            HOST            = "127.0.0.1"
+            SERVER_HOST     = "127.0.0.1"
+            HOMESTREAM_DATA = $dataDir
+            ELECTRON_RESOURCES_PATH = "$env:INSTALL_DIR\resources"
+            PATH            = $env:PATH
+            TEMP            = $env:TEMP
+            TMP             = $env:TMP
+            USERPROFILE     = $env:USERPROFILE
+            APPDATA         = $env:APPDATA
+            LOCALAPPDATA    = $env:LOCALAPPDATA
+            SystemRoot      = $env:SystemRoot
+            SystemDrive     = $env:SystemDrive
+          }
+          $warmProc = Start-Process node -ArgumentList $bundle -PassThru -NoNewWindow `
+            -RedirectStandardOutput "$env:TEMP\hs-warm-out.txt" `
+            -RedirectStandardError  "$env:TEMP\hs-warm-err.txt" `
+            -Environment $warmEnv
+          Write-Host "Pre-warm PID: $($warmProc.Id) — waiting for Ready at (Defender scan in progress)..."
+          $deadline = (Get-Date).AddSeconds(420)
+          $ready = $false
+          while ((Get-Date) -lt $deadline) {
+            Start-Sleep -Seconds 3
+            if (Test-Path "$env:TEMP\hs-warm-out.txt") {
+              $out = Get-Content "$env:TEMP\hs-warm-out.txt" -Raw -ErrorAction SilentlyContinue
+              if ($out -match "Ready at") { $ready = $true; break }
+            }
+            if ($warmProc.HasExited) { Write-Host "Pre-warm exited early."; break }
+          }
+          Stop-Process -Id $warmProc.Id -Force -ErrorAction SilentlyContinue
+          Start-Sleep -Seconds 2
+          if ($ready) {
+            Write-Host "Pre-warm complete — Defender scanned all requires. Real server will start instantly."
+          } else {
+            Write-Warning "Pre-warm timed out — proceeding anyway."
+            if (Test-Path "$env:TEMP\hs-warm-out.txt") { Get-Content "$env:TEMP\hs-warm-out.txt" }
+          }
+
+          # ── Start server ───────────────────────────────────────────────────
+          Write-Host "Starting server from: $bundle"
+          Write-Host "Data dir: $dataDir"
+          # NOTE: -Environment replaces the entire environment for the child process.
+          # We must forward PATH (and other critical vars) explicitly, otherwise
+          # node cannot locate system DLLs and starts very slowly or fails.
+          $proc = Start-Process node -ArgumentList $bundle -PassThru -NoNewWindow `
+            -RedirectStandardOutput "$env:TEMP\hs-smoke-stdout.txt" `
+            -RedirectStandardError  "$env:TEMP\hs-smoke-stderr.txt" `
+            -Environment @{
+              NODE_ENV        = "production"
+              PORT            = "3000"
+              HOST            = "127.0.0.1"
+              SERVER_HOST     = "127.0.0.1"
+              HOMESTREAM_DATA = $dataDir
+              ELECTRON_RESOURCES_PATH = "$env:INSTALL_DIR\resources"
+              PATH            = $env:PATH
+              TEMP            = $env:TEMP
+              TMP             = $env:TMP
+              USERPROFILE     = $env:USERPROFILE
+              APPDATA         = $env:APPDATA
+              LOCALAPPDATA    = $env:LOCALAPPDATA
+              SystemRoot      = $env:SystemRoot
+              SystemDrive     = $env:SystemDrive
+            }
+          echo "SERVER_PID=$($proc.Id)" >> $env:GITHUB_ENV
+          Write-Host "Server PID: $($proc.Id)"
+
+      # Wait for the server to print "Ready at" before handing off to the
+      # smoke test. The pre-warm step ensures Defender has already scanned
+      # all requires, so this should complete in a few seconds — but on
+      # slower runners it can take longer. Waiting here means the smoke
+      # test's 360-second window is spent on actual API checks, not startup.
+      - name: Wait for packaged server to be ready
+        shell: pwsh
+        run: |
+          $deadline = (Get-Date).AddSeconds(300)
+          $ready = $false
+          Write-Host "Waiting for server (PID $env:SERVER_PID) to print 'Ready at'..."
+          while ((Get-Date) -lt $deadline) {
+            Start-Sleep -Seconds 2
+            if (Test-Path "$env:TEMP\hs-smoke-stdout.txt") {
+              $out = Get-Content "$env:TEMP\hs-smoke-stdout.txt" -Raw -ErrorAction SilentlyContinue
+              if ($out -match "Ready at") {
+                Write-Host "Server is ready."
+                $ready = $true
+                break
+              }
+            }
+            # Check if the process died
+            $proc = Get-Process -Id $env:SERVER_PID -ErrorAction SilentlyContinue
+            if (-not $proc) {
+              Write-Error "Server process exited before becoming ready."
+              if (Test-Path "$env:TEMP\hs-smoke-stdout.txt") { Get-Content "$env:TEMP\hs-smoke-stdout.txt" }
+              if (Test-Path "$env:TEMP\hs-smoke-stderr.txt") { Get-Content "$env:TEMP\hs-smoke-stderr.txt" }
+              exit 1
+            }
+          }
+          if (-not $ready) {
+            Write-Error "Server did not print 'Ready at' within 300 seconds."
+            if (Test-Path "$env:TEMP\hs-smoke-stdout.txt") { Get-Content "$env:TEMP\hs-smoke-stdout.txt" }
+            if (Test-Path "$env:TEMP\hs-smoke-stderr.txt") { Get-Content "$env:TEMP\hs-smoke-stderr.txt" }
+            exit 1
+          }
+
+      - name: Run smoke tests against installed bundle
+        # Use 127.0.0.1 explicitly — on Windows, 'localhost' resolves to ::1 (IPv6)
+        # but the server binds to 0.0.0.0 (IPv4 only), so the connection is refused.
+        # Pass 360000ms wait timeout — generous safety net; pre-warm should make this fast.
+        run: node scripts/smoke-test.mjs http://127.0.0.1:3000 360000
+
+      - name: Dump server logs on failure
+        if: failure()
+        shell: pwsh
+        run: |
+          Write-Host "=== STDOUT ==="
+          if (Test-Path "$env:TEMP\hs-smoke-stdout.txt") { Get-Content "$env:TEMP\hs-smoke-stdout.txt" }
+          Write-Host "=== STDERR ==="
+          if (Test-Path "$env:TEMP\hs-smoke-stderr.txt") { Get-Content "$env:TEMP\hs-smoke-stderr.txt" }
+
+      - name: Stop server
+        if: always()
+        shell: pwsh
+        run: |
+          if ($env:SERVER_PID) {
+            Stop-Process -Id $env:SERVER_PID -Force -ErrorAction SilentlyContinue
+          }
+
+      - name: Uninstall (cleanup)
+        if: always()
+        shell: pwsh
+        run: |
+          $uninstaller = "$env:INSTALL_DIR\Uninstall HomeStream.exe"
+          if (Test-Path $uninstaller) {
+            Start-Process -FilePath $uninstaller -ArgumentList "/S" -Wait -NoNewWindow
+            Write-Host "Uninstalled."
+          }

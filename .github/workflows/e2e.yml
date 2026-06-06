@@ -1,0 +1,79 @@
+name: E2E Tests (Playwright)
+
+# Runs on every push/PR to main.
+# Playwright starts the Vite dev server automatically via the webServer config
+# in playwright.config.ts - no manual pre-flight step needed.
+#
+# Auth behaviour in CI:
+#   - SETUP_COMPLETE=true  - isSetupComplete() returns true (wizard skipped)
+#   - No ADMIN_PASSWORD    - readConfig().adminPassword is '' - open mode
+#                            (requireAuth always passes, login gate never shows)
+#   - E2E_PASSWORD         - used by helpers.ts TEST_PASSWORD as a fallback;
+#                            set to '' here so the || 'homestream' fallback fires
+#                            when the repo secret is not configured.
+
+on:
+  # Run E2E on PRs to main (catches regressions before merge)
+  pull_request:
+    branches: [main]
+  # Allow manual trigger from the Actions tab for ad-hoc runs
+  workflow_dispatch:
+
+# Cancel stale E2E runs when new commits are pushed to the same PR
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e:
+    name: Playwright E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    env:
+      CI: 'true'
+      NODE_ENV: test
+      # Setup wizard bypass - must be set before Vite starts
+      SETUP_COMPLETE: 'true'
+      # Auth - no ADMIN_PASSWORD means open mode (requireAuth always passes).
+      # E2E_PASSWORD is used by helpers.ts; '' triggers the || 'homestream' fallback.
+      E2E_PASSWORD: ${{ secrets.E2E_PASSWORD || '' }}
+      # Playwright base URL - matches the webServer port in playwright.config.ts
+      E2E_BASE_URL: 'http://localhost:5173'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install chromium --with-deps
+
+      # playwright.config.ts webServer block starts Vite automatically before
+      # running tests and tears it down after. No separate pre-flight needed.
+      - name: Run E2E tests
+        run: npm run test:e2e
+
+      - name: Upload Playwright report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 14
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-results
+          path: playwright-results/
+          retention-days: 7

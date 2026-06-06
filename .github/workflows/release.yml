@@ -1,136 +1,360 @@
-name: Build & Release
+name: Release
 
 on:
   push:
     tags:
-      - 'v*.*.*'
+      - 'v*'
 
+# Required for electron-builder to create and upload GitHub Releases.
+# contents: write  -- create releases, upload assets
+# actions: read    -- read workflow run context
 permissions:
   contents: write
+  actions: read
+
+# Silence "Node.js 20 actions are deprecated" warnings.
+# actions/checkout@v4, actions/setup-node@v4, and actions/cache@v4 all ship
+# a Node.js 20 runner shim; this opts them into Node.js 24 ahead of the
+# June 16 forced migration.
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
-  build-linux:
-    name: Build (Linux)
-    runs-on: ubuntu-latest
+  release-windows:
+    name: Build & Publish Windows Installer
+    # Pin to windows-2022 (Server 2022). windows-latest now maps to Server 2025
+    # where NSIS installers built by electron-builder 26.x crash with exit code
+    # 0xC0000005 (Access Violation) during silent install. Server 2022 is stable.
+    runs-on: windows-2022
+    timeout-minutes: 60
+
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
+          node-version: '22'
 
+      # Windows-specific cache key - never restores a Linux cache onto Windows
+      - name: Cache node_modules
+        id: cache-node-modules
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: Windows-node22-modules-${{ hashFiles('package-lock.json') }}
+
+      # Do NOT use --ignore-scripts here - ffmpeg-static's postinstall script
+      # downloads the platform-specific FFmpeg binary (ffmpeg.exe on Windows).
+      # Without it, node_modules/ffmpeg-static/ffmpeg.exe is never created and
+      # the packaged app ships with no FFmpeg, breaking transcoding and HLS.
+      # npmRebuild: false in electron-builder.yml already prevents native addon
+      # recompilation, so --ignore-scripts is not needed for that purpose.
       - name: Install dependencies
+        if: steps.cache-node-modules.outputs.cache-hit != 'true'
         run: npm ci
+        env:
+          npm_config_optional: true
 
-      - name: Build
-        run: npm run build
-
-      - name: Package Linux archive
-        run: |
-          mkdir -p release
-          tar -czf release/homestream-${{ github.ref_name }}-linux.tar.gz \
-            dist/ \
-            package.json \
-            package-lock.json \
-            README.md 2>/dev/null || true
-
-      - name: Upload Linux artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: linux-build
-          path: release/homestream-${{ github.ref_name }}-linux.tar.gz
-
-  build-windows:
-    name: Build (Windows)
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build
-        run: npm run build
-
-      - name: Package Windows archive
-        run: |
-          mkdir release
-          Compress-Archive -Path dist, package.json, package-lock.json -DestinationPath release/homestream-${{ github.ref_name }}-windows.zip
+      # Delete any existing GitHub Release for this tag so electron-builder
+      # can create it fresh. Uses PowerShell - native on windows-latest.
+      - name: Delete existing GitHub Release (if any)
         shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: |
+          $tag = "${{ github.ref_name }}"
+          $headers = @{ Authorization = "token $env:GH_TOKEN"; Accept = "application/vnd.github+json" }
+          $uri = "https://api.github.com/repos/${{ github.repository }}/releases/tags/$tag"
+          try {
+            $release = Invoke-RestMethod -Uri $uri -Headers $headers -ErrorAction Stop
+            $id = $release.id
+            if ($id) {
+              Write-Host "Deleting existing release id=$id for tag $tag"
+              Invoke-RestMethod -Method Delete -Uri "https://api.github.com/repos/${{ github.repository }}/releases/$id" -Headers $headers
+              Write-Host "Deleted."
+            }
+          } catch {
+            Write-Host "No existing release found for $tag - proceeding"
+          }
 
-      - name: Upload Windows artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: windows-build
-          path: release/homestream-${{ github.ref_name }}-windows.zip
+      - name: Build app (Vite + server bundle)
+        run: npm run build
+        env:
+          CI: true
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
 
-  release:
-    name: Create GitHub Release
-    needs: [build-linux, build-windows]
+      - name: Verify build artifacts
+        shell: pwsh
+        run: |
+          if (!(Test-Path "dist/server/server.bundle.cjs")) {
+            Write-Error "dist/server/server.bundle.cjs MISSING"
+            exit 1
+          }
+          if (!(Test-Path "dist/client/index.html")) {
+            Write-Error "dist/client/index.html MISSING"
+            exit 1
+          }
+          $size = [math]::Round((Get-Item "dist/server/server.bundle.cjs").Length / 1MB, 1)
+          Write-Host "server.bundle.cjs: $size MB"
+          # Verify ffmpeg-static downloaded the Windows binary
+          if (Test-Path "node_modules/ffmpeg-static/ffmpeg.exe") {
+            $ffSize = [math]::Round((Get-Item "node_modules/ffmpeg-static/ffmpeg.exe").Length / 1MB, 1)
+            Write-Host "ffmpeg-static/ffmpeg.exe: $ffSize MB - OK"
+          } else {
+            Write-Warning "ffmpeg-static/ffmpeg.exe NOT FOUND - transcoding will be broken in packaged app"
+          }
+          Write-Host "Build artifacts verified."
+
+      # Sync package.json version from the git tag so electron-builder creates
+      # a GitHub Release tagged v1.x.x (matching the pushed tag), not the
+      # stale version baked into package.json.
+      # Also injects build metadata so updater.cjs can read ghToken at runtime.
+      - name: Inject build metadata into package.json
+        shell: pwsh
+        run: |
+          $ver = "${{ github.ref_name }}".TrimStart('v')
+          $pkg = Get-Content package.json -Raw | ConvertFrom-Json
+          $pkg.version = $ver
+          if (-not $pkg.PSObject.Properties['build']) {
+            $pkg | Add-Member -NotePropertyName build -NotePropertyValue ([PSCustomObject]@{})
+          }
+          $pkg.build | Add-Member -NotePropertyName ghToken -NotePropertyValue "${{ secrets.GH_TOKEN }}" -Force
+          $pkg.build | Add-Member -NotePropertyName ghOwner -NotePropertyValue "HomeStream-co" -Force
+          $pkg.build | Add-Member -NotePropertyName ghRepo  -NotePropertyValue "homestream" -Force
+          $pkg | ConvertTo-Json -Depth 10 | Set-Content package.json
+          Write-Host "package.json version set to $ver with build metadata"
+
+      # NSIS installer - the only build that supports auto-updater.
+      # Publishes latest.yml + HomeStream-Setup-*.exe to the GitHub Release.
+      - name: Package & publish NSIS installer
+        run: npx electron-builder --win --config electron/electron-builder.yml --config.win.target=nsis --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          DEBUG: electron-builder
+
+      # Portable - NO auto-updater support. For smoke testing only.
+      # Only runs if NSIS succeeded - avoids burning windows-latest minutes on a broken build.
+      - name: Package portable .exe
+        if: success()
+        run: npx electron-builder --win --config electron/electron-builder.yml --config.win.target=portable --publish never
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+
+      # electron-builder sometimes leaves the release as a draft even with
+      # releaseType: release. Explicitly un-draft and mark as latest so
+      # electron-updater's latest.yml points at the correct release.
+      - name: Publish release (un-draft + mark latest)
+        if: success()
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: |
+          $tag = "${{ github.ref_name }}"
+          $headers = @{ Authorization = "token $env:GH_TOKEN"; Accept = "application/vnd.github+json"; "Content-Type" = "application/json" }
+          # /releases/tags/:tag only returns published releases - drafts are invisible there.
+          # Use the list endpoint instead and filter by tag_name so we find drafts too.
+          $releases = Invoke-RestMethod -Uri "https://api.github.com/repos/${{ github.repository }}/releases?per_page=20" -Headers $headers
+          $release = $releases | Where-Object { $_.tag_name -eq $tag } | Select-Object -First 1
+          if (-not $release) {
+            Write-Error "Could not find any release (draft or published) for tag $tag"
+            exit 1
+          }
+          $id = $release.id
+          Write-Host "Un-drafting release id=$id tag=$tag (was draft=$($release.draft))"
+          $body = '{"draft":false,"prerelease":false,"make_latest":"true"}'
+          Invoke-RestMethod -Method Patch -Uri "https://api.github.com/repos/${{ github.repository }}/releases/$id" -Headers $headers -Body $body
+          Write-Host "Release $tag is now published and marked as latest."
+
+  # -- Linux build --------------------------------------------------------------
+  # Produces:
+  #   AppImage (x64 + arm64) - universal, no install needed
+  #   .deb     (x64)         - Debian / Ubuntu
+  #   .pkg.tar.zst (x64)     - Arch Linux / Manjaro / CachyOS (pacman)
+  #
+  # Runs on ubuntu-latest (glibc 2.35+). The AppImage bundles all libs so it
+  # runs on older glibc too. The pacman package requires Arch's glibc (always
+  # current), which is fine for CachyOS.
+  release-linux:
+    name: Build & Publish Linux Packages
     runs-on: ubuntu-latest
+    timeout-minutes: 60
+    # Runs in parallel with release-windows - no dependency between them.
+    # Both jobs upload to the same GitHub Release; electron-builder handles
+    # concurrent uploads safely via the GitHub Releases API.
+
     steps:
       - uses: actions/checkout@v4
 
-      - name: Download Linux artifact
-        uses: actions/download-artifact@v4
+      - uses: actions/setup-node@v4
         with:
-          name: linux-build
-          path: release/
+          node-version: '22'
 
-      - name: Download Windows artifact
-        uses: actions/download-artifact@v4
+      - name: Cache node_modules
+        id: cache-node-modules
+        uses: actions/cache@v4
         with:
-          name: windows-build
-          path: release/
+          path: node_modules
+          key: Linux-node22-modules-${{ hashFiles('package-lock.json') }}
 
-      - name: Create Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.ref_name }}
-          name: HomeStream ${{ github.ref_name }}
-          body: |
-            ## HomeStream ${{ github.ref_name }}
+      - name: Install dependencies
+        if: steps.cache-node-modules.outputs.cache-hit != 'true'
+        run: npm ci
+        env:
+          npm_config_optional: true
 
-            ### What's New
-            - Bundled TMDB & OMDB API keys — no setup required
-            - Simplified setup wizard (Step 4 only asks for Admin Password, AI key, Real-Debrid)
-            - Local AI Taste Engine with match % badges
-            - RD → transcode → HLS pipeline
-            - qBittorrent completion watcher
-            - Jackett, Torznab, RSS custom torrent sources
+      # fpm + zstd are required by electron-builder for the pacman .pkg.tar.zst target.
+      # libarchive-tools provides bsdtar which fpm uses to create the .tar.zst archive.
+      - name: Install fpm (required for pacman .pkg.tar.zst)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ruby-dev build-essential rpm zstd libarchive-tools
+          sudo gem install fpm --no-document
+          fpm --version
 
-            ### Installation
+      - name: Build app (Vite + server bundle)
+        run: npm run build
+        env:
+          CI: true
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
 
-            #### Linux
-            ```bash
-            tar -xzf homestream-${{ github.ref_name }}-linux.tar.gz
-            npm install --omit=dev
-            npm start
-            ```
-            Requires: Node.js 18+, FFmpeg, MySQL
+      - name: Verify build artifacts
+        run: |
+          test -f dist/server/server.bundle.cjs || (echo "dist/server/server.bundle.cjs MISSING" && exit 1)
+          test -f dist/client/index.html || (echo "dist/client/index.html MISSING" && exit 1)
+          SIZE=$(du -sh dist/server/server.bundle.cjs | cut -f1)
+          echo "server.bundle.cjs: $SIZE"
+          if [ -f node_modules/ffmpeg-static/ffmpeg ]; then
+            FFSIZE=$(du -sh node_modules/ffmpeg-static/ffmpeg | cut -f1)
+            echo "ffmpeg-static/ffmpeg: $FFSIZE - OK"
+          else
+            echo "WARNING: ffmpeg-static/ffmpeg NOT FOUND - transcoding will be broken"
+          fi
+          echo "Build artifacts verified."
 
-            #### Windows
-            ```powershell
-            Expand-Archive homestream-${{ github.ref_name }}-windows.zip
-            npm install --omit=dev
-            npm start
-            ```
-            Requires: Node.js 18+, FFmpeg (add to PATH), MySQL 8+
+      # Sync package.json version from the git tag (same as Windows job).
+      - name: Inject build metadata into package.json
+        run: |
+          VER="${{ github.ref_name }}"
+          VER="${VER#v}"
+          node -e "
+            const fs = require('fs');
+            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+            pkg.version = '${VER}';
+            pkg.build = pkg.build || {};
+            pkg.build.ghToken = '${{ secrets.GH_TOKEN }}';
+            pkg.build.ghOwner = 'HomeStream-co';
+            pkg.build.ghRepo  = 'homestream';
+            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+            console.log('package.json version set to ${VER} with build metadata');
+          "
 
-            ### Upgrading
-            ```bash
-            git pull origin main && npm install && npm run build && npm start
-            ```
-          files: |
-            release/homestream-${{ github.ref_name }}-linux.tar.gz
-            release/homestream-${{ github.ref_name }}-windows.zip
-          draft: false
-          prerelease: false
+      # Build and publish each Linux target separately so a single target failure
+      # doesn't block the others. AppImage is the most important (universal).
+      - name: Package & publish AppImage (x64)
+        run: npx electron-builder --linux AppImage --config electron/electron-builder.yml --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+
+      - name: Package & publish AppImage (arm64)
+        run: npx electron-builder --linux AppImage --arm64 --config electron/electron-builder.yml --publish always
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+
+      - name: Package & publish .deb (x64)
+        run: npx electron-builder --linux deb --config electron/electron-builder.yml --publish always
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+
+      - name: Package & publish pacman .pkg.tar.zst (x64)
+        run: npx electron-builder --linux pacman --config electron/electron-builder.yml --publish always
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+
+  # -- AUR publish --------------------------------------------------------------
+  # Bumps homestream-bin on the AUR so `yay -Syu` picks up the new version.
+  #
+  # Prerequisites (one-time setup):
+  #   1. Generate a dedicated SSH key:  ssh-keygen -t ed25519 -C "homestream-aur-ci" -f aur_key
+  #   2. Add the PUBLIC key to your AUR account at https://aur.archlinux.org/account/<you>/edit
+  #   3. Add the PRIVATE key as a GitHub secret named AUR_SSH_PRIVATE_KEY
+  #      (Settings -> Secrets -> Actions -> New repository secret)
+  #
+  # If AUR_SSH_PRIVATE_KEY is not set, this job is skipped silently - the
+  # rest of the release still completes normally.
+  publish-aur:
+    name: Publish to AUR
+    runs-on: ubuntu-latest
+    needs: [release-windows, release-linux]
+    # Run whenever linux build succeeded (windows failure is non-blocking).
+    # The steps below check for AUR_SSH_PRIVATE_KEY and exit 0 if not set.
+    if: always() && needs.release-linux.result == 'success'
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract version from tag
+        id: version
+        run: echo "ver=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up SSH for AUR
+        env:
+          AUR_KEY: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+        run: |
+          if [[ -z "$AUR_KEY" ]]; then
+            echo "AUR_SSH_PRIVATE_KEY not set - skipping AUR publish."
+            echo "See aur/README.md for one-time setup instructions."
+            exit 0
+          fi
+          mkdir -p ~/.ssh
+          printf '%s\n' "$AUR_KEY" > ~/.ssh/aur_key
+          chmod 600 ~/.ssh/aur_key
+          ssh-keyscan -H aur.archlinux.org >> ~/.ssh/known_hosts
+          printf 'Host aur.archlinux.org\n  IdentityFile ~/.ssh/aur_key\n  User aur\n' >> ~/.ssh/config
+          echo "AUR_KEY_CONFIGURED=true" >> "$GITHUB_ENV"
+
+      - name: Configure git
+        if: env.AUR_KEY_CONFIGURED == 'true'
+        run: |
+          git config --global user.name  "HomeStream CI"
+          git config --global user.email "homestream-ci@users.noreply.github.com"
+
+      - name: Clone AUR repo
+        if: env.AUR_KEY_CONFIGURED == 'true'
+        run: |
+          # If the AUR package hasn't been submitted yet (first-time setup),
+          # the clone will fail. We catch that and skip gracefully - the
+          # release still completes, the AUR just needs the one-time manual
+          # submission described in aur/README.md.
+          if git clone ssh://aur@aur.archlinux.org/homestream-bin.git /tmp/homestream-aur 2>&1; then
+            echo "AUR_CLONED=true" >> "$GITHUB_ENV"
+          else
+            echo "AUR clone failed - package may not exist yet on AUR."
+            echo "Complete the one-time manual submission described in aur/README.md."
+            echo "AUR_CLONED=false" >> "$GITHUB_ENV"
+          fi
+
+      - name: Bump version in PKGBUILD and .SRCINFO
+        if: env.AUR_KEY_CONFIGURED == 'true' && env.AUR_CLONED == 'true'
+        run: |
+          VER="${{ steps.version.outputs.ver }}"
+          sed -i "s/^pkgver=.*/pkgver=${VER}/" aur/PKGBUILD
+          sed -i "s/^pkgrel=.*/pkgrel=1/"      aur/PKGBUILD
+          sed -i "s/pkgver = .*/pkgver = ${VER}/" aur/.SRCINFO
+          OLD_VER=$(grep -oP 'HomeStream-\K[\d.]+(?=\.AppImage)' aur/.SRCINFO | head -1)
+          if [[ -n "$OLD_VER" ]]; then
+            sed -i "s/${OLD_VER}/${VER}/g" aur/.SRCINFO
+          fi
+
+      - name: Copy files to AUR clone and push
+        if: env.AUR_KEY_CONFIGURED == 'true' && env.AUR_CLONED == 'true'
+        run: |
+          cp aur/PKGBUILD aur/.SRCINFO aur/homestream.desktop /tmp/homestream-aur/
+          cd /tmp/homestream-aur
+          git add PKGBUILD .SRCINFO homestream.desktop
+          git diff --cached --stat
+          git commit -m "upgpkg: homestream-bin ${{ steps.version.outputs.ver }}"
+          git push
