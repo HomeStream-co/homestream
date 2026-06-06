@@ -30,3 +30,9 @@ export function writeLibrary(updater: (lib: LibraryItem[]) => LibraryItem[]): Pr
   });
   return writeQueue;
 }
+
+/** Direct write variant — used by startupCleanup to flush a full replacement. */
+export async function writeLibraryDirect(data: LibraryItem[]): Promise<void> {
+  return writeLibrary(() => data);
+}
+

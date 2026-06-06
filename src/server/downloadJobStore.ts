@@ -63,6 +63,10 @@ export function updateJobStatus(jobId: string, status: string, completedAt?: str
   }).catch(err => console.error('[downloadJobStore] Write failed:', err));
 }
 
+export function markJobInterrupted(jobId: string): void {
+  updateJobStatus(jobId, 'error');
+}
+
 export function deleteJob(jobId: string): void {
   writeQueue = writeQueue.then(() => {
     const store = readStore();

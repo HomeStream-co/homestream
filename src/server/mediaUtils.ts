@@ -34,3 +34,9 @@ export async function fetchOMDB(title: string, year?: string): Promise<OMDBResul
     return null;
   }
 }
+
+export async function retryMissingMetadata(): Promise<void> {
+  // Stub: scans library for items with needsMetadata: true and retries OMDB fetch.
+  console.log('[mediaUtils] retryMissingMetadata: no-op stub');
+}
+
