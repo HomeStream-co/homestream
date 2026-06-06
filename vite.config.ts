@@ -1,4 +1,14 @@
 import { defineConfig, type Plugin, type ViteDevServer } from "vite";
+import { readFileSync } from "fs";
+
+function getAppVersion(): string {
+  try {
+    const pkg = JSON.parse(readFileSync("./package.json", "utf-8")) as { version?: string };
+    return pkg.version ?? "0.0.0";
+  } catch {
+    return "0.0.0";
+  }
+}
 import react from "@vitejs/plugin-react";
 import path from "path";
 import sourceMapperPlugin from "./source-mapper/src/index";
@@ -64,6 +74,10 @@ if (corsOrigins.length === 0) {
 
 export default defineConfig(({ mode, isSsrBuild }) => ({
 	envPrefix: ["VITE_", "SITE_"],
+
+	define: {
+		__APP_VERSION__: JSON.stringify(getAppVersion()),
+	},
 
 	plugins: [
 		react({
