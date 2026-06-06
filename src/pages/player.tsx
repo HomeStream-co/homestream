@@ -391,8 +391,8 @@ export default function PlayerPage() {
         ps.setAutoplayCancelled(false);
       }
 
-      // Skip-intro button visibility + auto-skip
-      const inIntro = ct > 30 && ct < SKIP_INTRO_END && playing;
+      // Skip-intro button — only for TV series, between 30s and 4 min mark
+      const inIntro = item?.type === 'series' && ct > 30 && ct < SKIP_INTRO_END && playing;
       ps.setShowSkipIntro(inIntro);
       if (inIntro && appSettings.autoSkipIntro && !autoSkipFiredRef.current) {
         autoSkipFiredRef.current = true;
