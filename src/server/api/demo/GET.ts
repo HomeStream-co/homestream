@@ -4,6 +4,10 @@
  * Returns a set of realistic mock MediaItem objects so the Airo builder
  * preview can render the full HomeStream UI without a real media library.
  *
+ * Includes:
+ *  - 10 movies across Action, Sci-Fi, Crime, Drama, Horror, Romance, Comedy, Animation genres
+ *  - 3 TV shows with full S01 episode lists so the player "next episode" flow works
+ *
  * This endpoint is ONLY used by the builder preview — production installs
  * with a real library never call it (MediaContext skips it when library > 0).
  */
@@ -13,6 +17,8 @@ const daysAgo = (n: number) => new Date(Date.now() - n * 86400000).toISOString()
 
 const DEMO_ITEMS = [
   // ── Movies ────────────────────────────────────────────────────────────────
+
+  // Action / Adventure
   {
     id: 'demo-1',
     imdbId: 'tt4154796',
@@ -36,6 +42,8 @@ const DEMO_ITEMS = [
     lastWatchedAt: daysAgo(1),
     fileSize: 12884901888,
   },
+
+  // Sci-Fi / Thriller
   {
     id: 'demo-2',
     imdbId: 'tt1375666',
@@ -59,6 +67,8 @@ const DEMO_ITEMS = [
     watchedAt: daysAgo(3),
     fileSize: 9663676416,
   },
+
+  // Adventure / Drama / Sci-Fi
   {
     id: 'demo-3',
     imdbId: 'tt0816692',
@@ -81,6 +91,8 @@ const DEMO_ITEMS = [
     totalSeconds: 10140,
     fileSize: 21474836480,
   },
+
+  // Action / Crime / Drama
   {
     id: 'demo-4',
     imdbId: 'tt0468569',
@@ -104,6 +116,8 @@ const DEMO_ITEMS = [
     lastWatchedAt: daysAgo(4),
     fileSize: 10737418240,
   },
+
+  // Comedy / Drama / Thriller
   {
     id: 'demo-5',
     imdbId: 'tt6751668',
@@ -126,6 +140,8 @@ const DEMO_ITEMS = [
     totalSeconds: 7920,
     fileSize: 8053063680,
   },
+
+  // Crime / Drama
   {
     id: 'demo-6',
     imdbId: 'tt0110912',
@@ -149,6 +165,8 @@ const DEMO_ITEMS = [
     watchedAt: daysAgo(10),
     fileSize: 9126805504,
   },
+
+  // Animation / Family
   {
     id: 'demo-7',
     imdbId: 'tt0245429',
@@ -171,6 +189,8 @@ const DEMO_ITEMS = [
     totalSeconds: 7500,
     fileSize: 7516192768,
   },
+
+  // Drama / Western
   {
     id: 'demo-8',
     imdbId: 'tt1853728',
@@ -193,55 +213,168 @@ const DEMO_ITEMS = [
     totalSeconds: 9900,
     fileSize: 11274289152,
   },
-  // ── TV Shows ──────────────────────────────────────────────────────────────
+
+  // Horror
   {
-    id: 'demo-9',
+    id: 'demo-13',
+    imdbId: 'tt1457767',
+    filename: 'The.Conjuring.2013.1080p.mkv',
+    filepath: '/demo/The.Conjuring.2013.1080p.mkv',
+    title: 'The Conjuring',
+    year: '2013',
+    genre: ['Horror', 'Mystery', 'Thriller'],
+    plot: 'Paranormal investigators Ed and Lorraine Warren work to help a family terrorized by a dark presence in their farmhouse.',
+    director: 'James Wan',
+    actors: 'Patrick Wilson, Vera Farmiga, Ron Livingston, Lili Taylor',
+    imdbRating: '7.5',
+    poster: 'https://image.tmdb.org/t/p/w500/wVYREutTvI2tmxr6ujrHT704wGF.jpg',
+    type: 'movie',
+    runtime: '112 min',
+    rated: 'R',
+    addedAt: daysAgo(18),
+    watchProgress: 0,
+    watchedSeconds: 0,
+    totalSeconds: 6720,
+    fileSize: 7000000000,
+  },
+
+  // Romance / Drama
+  {
+    id: 'demo-14',
+    imdbId: 'tt0109830',
+    filename: 'Forrest.Gump.1994.1080p.mkv',
+    filepath: '/demo/Forrest.Gump.1994.1080p.mkv',
+    title: 'Forrest Gump',
+    year: '1994',
+    genre: ['Drama', 'Romance'],
+    plot: 'The presidencies of Kennedy and Johnson, the Vietnam War, the Watergate scandal and other historical events unfold from the perspective of an Alabama man with an IQ of 75.',
+    director: 'Robert Zemeckis',
+    actors: 'Tom Hanks, Robin Wright, Gary Sinise, Sally Field',
+    imdbRating: '8.8',
+    poster: 'https://image.tmdb.org/t/p/w500/arw2vcBveWOVZr6pxd9XTd1TdQa.jpg',
+    type: 'movie',
+    runtime: '142 min',
+    rated: 'PG-13',
+    addedAt: daysAgo(22),
+    watchProgress: 0,
+    watchedSeconds: 0,
+    totalSeconds: 8520,
+    fileSize: 8500000000,
+  },
+
+  // ── TV Shows — Breaking Bad (S01, 7 episodes) ─────────────────────────────
+  // The player's next-episode logic matches by title prefix + SxxExx in filename.
+  // Having all 7 S01 episodes lets the "Up Next" / autoplay flow work end-to-end.
+
+  {
+    id: 'demo-bb-s01e01',
     imdbId: 'tt0903747',
     filename: 'Breaking.Bad.S01E01.1080p.mkv',
     filepath: '/demo/Breaking.Bad.S01E01.1080p.mkv',
     title: 'Breaking Bad',
     year: '2008',
     genre: ['Crime', 'Drama', 'Thriller'],
-    plot: 'A chemistry teacher diagnosed with inoperable lung cancer turns to manufacturing and selling methamphetamine with a former student to secure his family\'s future.',
+    plot: 'Chemistry teacher Walter White teams up with former student Jesse Pinkman to cook and sell crystal meth after being diagnosed with inoperable lung cancer.',
     director: 'Vince Gilligan',
     actors: 'Bryan Cranston, Aaron Paul, Anna Gunn, Dean Norris',
     imdbRating: '9.5',
     poster: 'https://image.tmdb.org/t/p/w500/ggFHVNu6YYI5L9pCfOacjizRGt.jpg',
     type: 'series',
-    runtime: '47 min',
+    runtime: '58 min',
+    rated: 'TV-MA',
+    addedAt: daysAgo(3),
+    watchProgress: 100,
+    watchedSeconds: 3480,
+    totalSeconds: 3480,
+    watchedAt: daysAgo(2),
+    lastWatchedAt: daysAgo(2),
+    fileSize: 3221225472,
+    totalSeasons: 5,
+    episodes: [
+      { id: 'bb-s01e01', season: 1, episode: 1, title: 'Pilot', watched: true, watchedAt: daysAgo(2), runtime: '58 min', plot: 'Walter White, a struggling high school chemistry teacher, is diagnosed with inoperable lung cancer.' },
+      { id: 'bb-s01e02', season: 1, episode: 2, title: 'Cat\'s in the Bag', watched: true, watchedAt: daysAgo(2), runtime: '48 min', plot: 'Walt and Jesse try to dispose of the bodies of Emilio and Krazy-8.' },
+      { id: 'bb-s01e03', season: 1, episode: 3, title: 'And the Bag\'s in the River', watched: false, runtime: '48 min', plot: 'Walt must decide what to do with the captive Krazy-8.' },
+      { id: 'bb-s01e04', season: 1, episode: 4, title: 'Cancer Man', watched: false, runtime: '48 min', plot: 'Walt tells his family about his cancer diagnosis.' },
+      { id: 'bb-s01e05', season: 1, episode: 5, title: 'Gray Matter', watched: false, runtime: '48 min', plot: 'Walt and Skyler attend a party thrown by his former colleagues.' },
+      { id: 'bb-s01e06', season: 1, episode: 6, title: 'Crazy Handful of Nothin\'', watched: false, runtime: '48 min', plot: 'Walt undergoes chemotherapy and Jesse tries to make a new drug connection.' },
+      { id: 'bb-s01e07', season: 1, episode: 7, title: 'A No-Rough-Stuff-Type Deal', watched: false, runtime: '48 min', plot: 'Walt and Jesse try to steal methylamine from a warehouse.' },
+    ],
+  },
+  {
+    id: 'demo-bb-s01e02',
+    imdbId: 'tt0903747',
+    filename: 'Breaking.Bad.S01E02.1080p.mkv',
+    filepath: '/demo/Breaking.Bad.S01E02.1080p.mkv',
+    title: 'Breaking Bad',
+    year: '2008',
+    genre: ['Crime', 'Drama', 'Thriller'],
+    plot: 'Walt and Jesse try to dispose of the bodies of Emilio and Krazy-8 while keeping their operation secret.',
+    director: 'Adam Bernstein',
+    actors: 'Bryan Cranston, Aaron Paul, Anna Gunn, Dean Norris',
+    imdbRating: '9.5',
+    poster: 'https://image.tmdb.org/t/p/w500/ggFHVNu6YYI5L9pCfOacjizRGt.jpg',
+    type: 'series',
+    runtime: '48 min',
     rated: 'TV-MA',
     addedAt: daysAgo(3),
     watchProgress: 45,
-    watchedSeconds: 1270,
-    totalSeconds: 2820,
+    watchedSeconds: 1296,
+    totalSeconds: 2880,
     lastWatchedAt: daysAgo(1),
-    fileSize: 3221225472,
+    fileSize: 2684354560,
+    totalSeasons: 5,
   },
   {
-    id: 'demo-10',
-    imdbId: 'tt0944947',
-    filename: 'Game.of.Thrones.S01E01.1080p.mkv',
-    filepath: '/demo/Game.of.Thrones.S01E01.1080p.mkv',
-    title: 'Game of Thrones',
-    year: '2011',
-    genre: ['Action', 'Adventure', 'Drama'],
-    plot: 'Nine noble families fight for control over the lands of Westeros, while an ancient enemy returns after being dormant for millennia.',
-    director: 'David Benioff, D.B. Weiss',
-    actors: 'Emilia Clarke, Peter Dinklage, Kit Harington, Lena Headey',
-    imdbRating: '9.2',
-    poster: 'https://image.tmdb.org/t/p/w500/1XS1oqL89opfnbLl8WnZY1O1uJx.jpg',
+    id: 'demo-bb-s01e03',
+    imdbId: 'tt0903747',
+    filename: 'Breaking.Bad.S01E03.1080p.mkv',
+    filepath: '/demo/Breaking.Bad.S01E03.1080p.mkv',
+    title: 'Breaking Bad',
+    year: '2008',
+    genre: ['Crime', 'Drama', 'Thriller'],
+    plot: 'Walt must make a life-or-death decision about the captive Krazy-8 while Jesse deals with the aftermath.',
+    director: 'Adam Bernstein',
+    actors: 'Bryan Cranston, Aaron Paul, Anna Gunn, Dean Norris',
+    imdbRating: '9.5',
+    poster: 'https://image.tmdb.org/t/p/w500/ggFHVNu6YYI5L9pCfOacjizRGt.jpg',
     type: 'series',
-    runtime: '57 min',
+    runtime: '48 min',
     rated: 'TV-MA',
-    addedAt: daysAgo(8),
-    watchProgress: 100,
-    watchedSeconds: 3420,
-    totalSeconds: 3420,
-    watchedAt: daysAgo(5),
-    fileSize: 4294967296,
+    addedAt: daysAgo(3),
+    watchProgress: 0,
+    watchedSeconds: 0,
+    totalSeconds: 2880,
+    fileSize: 2684354560,
+    totalSeasons: 5,
   },
   {
-    id: 'demo-11',
+    id: 'demo-bb-s01e04',
+    imdbId: 'tt0903747',
+    filename: 'Breaking.Bad.S01E04.1080p.mkv',
+    filepath: '/demo/Breaking.Bad.S01E04.1080p.mkv',
+    title: 'Breaking Bad',
+    year: '2008',
+    genre: ['Crime', 'Drama', 'Thriller'],
+    plot: 'Walt tells his family about his cancer diagnosis while Jesse reconnects with his parents.',
+    director: 'Jim McKay',
+    actors: 'Bryan Cranston, Aaron Paul, Anna Gunn, Dean Norris',
+    imdbRating: '9.5',
+    poster: 'https://image.tmdb.org/t/p/w500/ggFHVNu6YYI5L9pCfOacjizRGt.jpg',
+    type: 'series',
+    runtime: '48 min',
+    rated: 'TV-MA',
+    addedAt: daysAgo(3),
+    watchProgress: 0,
+    watchedSeconds: 0,
+    totalSeconds: 2880,
+    fileSize: 2684354560,
+    totalSeasons: 5,
+  },
+
+  // ── TV Shows — Stranger Things (S01, 8 episodes) ──────────────────────────
+
+  {
+    id: 'demo-st-s01e01',
     imdbId: 'tt4574334',
     filename: 'Stranger.Things.S01E01.1080p.mkv',
     filepath: '/demo/Stranger.Things.S01E01.1080p.mkv',
@@ -254,15 +387,135 @@ const DEMO_ITEMS = [
     imdbRating: '8.7',
     poster: 'https://image.tmdb.org/t/p/w500/49WJfeN0moxb9IPfGn8AIqMGskD.jpg',
     type: 'series',
-    runtime: '51 min',
+    runtime: '47 min',
+    rated: 'TV-14',
+    addedAt: daysAgo(12),
+    watchProgress: 100,
+    watchedSeconds: 2820,
+    totalSeconds: 2820,
+    watchedAt: daysAgo(10),
+    lastWatchedAt: daysAgo(10),
+    fileSize: 3758096384,
+    totalSeasons: 4,
+    episodes: [
+      { id: 'st-s01e01', season: 1, episode: 1, title: 'The Vanishing of Will Byers', watched: true, watchedAt: daysAgo(10), runtime: '47 min', plot: 'On his way home from a friend\'s house, young Will sees something terrifying.' },
+      { id: 'st-s01e02', season: 1, episode: 2, title: 'The Weirdo on Maple Street', watched: true, watchedAt: daysAgo(9), runtime: '55 min', plot: 'Lucas, Mike and Dustin try to talk to the girl they found in the woods.' },
+      { id: 'st-s01e03', season: 1, episode: 3, title: 'Holly, Jolly', watched: false, runtime: '51 min', plot: 'An increasingly concerned Joyce makes a startling discovery.' },
+      { id: 'st-s01e04', season: 1, episode: 4, title: 'The Body', watched: false, runtime: '55 min', plot: 'Refusing to believe Will is dead, Joyce tries to connect with her son.' },
+      { id: 'st-s01e05', season: 1, episode: 5, title: 'The Flea and the Acrobat', watched: false, runtime: '52 min', plot: 'Hopper breaks into the lab while Nancy and Jonathan devise a plan.' },
+      { id: 'st-s01e06', season: 1, episode: 6, title: 'The Monster', watched: false, runtime: '46 min', plot: 'Eleven\'s past is revealed. Nancy and Jonathan are in danger.' },
+      { id: 'st-s01e07', season: 1, episode: 7, title: 'The Bathtub', watched: false, runtime: '41 min', plot: 'Eleven tries to contact Will and Barbara in the Upside Down.' },
+      { id: 'st-s01e08', season: 1, episode: 8, title: 'The Upside Down', watched: false, runtime: '54 min', plot: 'Dr. Brenner\'s men close in on the lab. Joyce and Hopper enter the Upside Down.' },
+    ],
+  },
+  {
+    id: 'demo-st-s01e02',
+    imdbId: 'tt4574334',
+    filename: 'Stranger.Things.S01E02.1080p.mkv',
+    filepath: '/demo/Stranger.Things.S01E02.1080p.mkv',
+    title: 'Stranger Things',
+    year: '2016',
+    genre: ['Drama', 'Fantasy', 'Horror'],
+    plot: 'Lucas, Mike and Dustin try to talk to the mysterious girl they found in the woods. Joyce receives a call from Will.',
+    director: 'Matt Duffer, Ross Duffer',
+    actors: 'Millie Bobby Brown, Finn Wolfhard, Winona Ryder, David Harbour',
+    imdbRating: '8.7',
+    poster: 'https://image.tmdb.org/t/p/w500/49WJfeN0moxb9IPfGn8AIqMGskD.jpg',
+    type: 'series',
+    runtime: '55 min',
     rated: 'TV-14',
     addedAt: daysAgo(12),
     watchProgress: 20,
-    watchedSeconds: 612,
-    totalSeconds: 3060,
+    watchedSeconds: 660,
+    totalSeconds: 3300,
     lastWatchedAt: daysAgo(6),
-    fileSize: 3758096384,
+    fileSize: 3900000000,
+    totalSeasons: 4,
   },
+  {
+    id: 'demo-st-s01e03',
+    imdbId: 'tt4574334',
+    filename: 'Stranger.Things.S01E03.1080p.mkv',
+    filepath: '/demo/Stranger.Things.S01E03.1080p.mkv',
+    title: 'Stranger Things',
+    year: '2016',
+    genre: ['Drama', 'Fantasy', 'Horror'],
+    plot: 'An increasingly concerned Joyce makes a startling discovery about Will. Hopper investigates the lab.',
+    director: 'Matt Duffer, Ross Duffer',
+    actors: 'Millie Bobby Brown, Finn Wolfhard, Winona Ryder, David Harbour',
+    imdbRating: '8.7',
+    poster: 'https://image.tmdb.org/t/p/w500/49WJfeN0moxb9IPfGn8AIqMGskD.jpg',
+    type: 'series',
+    runtime: '51 min',
+    rated: 'TV-14',
+    addedAt: daysAgo(12),
+    watchProgress: 0,
+    watchedSeconds: 0,
+    totalSeconds: 3060,
+    fileSize: 3600000000,
+    totalSeasons: 4,
+  },
+
+  // ── TV Shows — Game of Thrones (S01, 3 episodes for variety) ─────────────
+
+  {
+    id: 'demo-got-s01e01',
+    imdbId: 'tt0944947',
+    filename: 'Game.of.Thrones.S01E01.1080p.mkv',
+    filepath: '/demo/Game.of.Thrones.S01E01.1080p.mkv',
+    title: 'Game of Thrones',
+    year: '2011',
+    genre: ['Action', 'Adventure', 'Drama'],
+    plot: 'Nine noble families fight for control over the lands of Westeros, while an ancient enemy returns after being dormant for millennia.',
+    director: 'David Benioff, D.B. Weiss',
+    actors: 'Emilia Clarke, Peter Dinklage, Kit Harington, Lena Headey',
+    imdbRating: '9.2',
+    poster: 'https://image.tmdb.org/t/p/w500/1XS1oqL89opfnbLl8WnZY1O1uJx.jpg',
+    type: 'series',
+    runtime: '62 min',
+    rated: 'TV-MA',
+    addedAt: daysAgo(8),
+    watchProgress: 100,
+    watchedSeconds: 3720,
+    totalSeconds: 3720,
+    watchedAt: daysAgo(5),
+    lastWatchedAt: daysAgo(5),
+    fileSize: 4294967296,
+    totalSeasons: 8,
+    episodes: [
+      { id: 'got-s01e01', season: 1, episode: 1, title: 'Winter Is Coming', watched: true, watchedAt: daysAgo(5), runtime: '62 min', plot: 'Lord Eddard Stark is asked by the King to serve as the Hand of the King.' },
+      { id: 'got-s01e02', season: 1, episode: 2, title: 'The Kingsroad', watched: false, runtime: '56 min', plot: 'The Starks head south as Daenerys tries to adjust to her new life.' },
+      { id: 'got-s01e03', season: 1, episode: 3, title: 'Lord Snow', watched: false, runtime: '58 min', plot: 'Jon Snow arrives at the Wall. Ned discovers a disturbing secret.' },
+      { id: 'got-s01e04', season: 1, episode: 4, title: 'Cripples, Bastards, and Broken Things', watched: false, runtime: '56 min', plot: 'Ned investigates Jon Arryn\'s death. Tyrion visits the Wall.' },
+      { id: 'got-s01e05', season: 1, episode: 5, title: 'The Wolf and the Lion', watched: false, runtime: '55 min', plot: 'Catelyn has captured Tyrion. Ned discovers the truth about Jon Arryn.' },
+    ],
+  },
+  {
+    id: 'demo-got-s01e02',
+    imdbId: 'tt0944947',
+    filename: 'Game.of.Thrones.S01E02.1080p.mkv',
+    filepath: '/demo/Game.of.Thrones.S01E02.1080p.mkv',
+    title: 'Game of Thrones',
+    year: '2011',
+    genre: ['Action', 'Adventure', 'Drama'],
+    plot: 'The Stark family heads south while Daenerys tries to adjust to life with the Dothraki.',
+    director: 'Tim Van Patten',
+    actors: 'Emilia Clarke, Peter Dinklage, Kit Harington, Lena Headey',
+    imdbRating: '9.2',
+    poster: 'https://image.tmdb.org/t/p/w500/1XS1oqL89opfnbLl8WnZY1O1uJx.jpg',
+    type: 'series',
+    runtime: '56 min',
+    rated: 'TV-MA',
+    addedAt: daysAgo(8),
+    watchProgress: 0,
+    watchedSeconds: 0,
+    totalSeconds: 3360,
+    fileSize: 4000000000,
+    totalSeasons: 8,
+  },
+
+  // ── TV Shows — Rick and Morty (single entry, no next-ep needed) ───────────
+
   {
     id: 'demo-12',
     imdbId: 'tt2861424',
@@ -284,6 +537,12 @@ const DEMO_ITEMS = [
     watchedSeconds: 0,
     totalSeconds: 1380,
     fileSize: 1073741824,
+    totalSeasons: 7,
+    episodes: [
+      { id: 'rm-s01e01', season: 1, episode: 1, title: 'Pilot', watched: false, runtime: '23 min', plot: 'Rick moves in with his daughter\'s family and takes Morty on an adventure.' },
+      { id: 'rm-s01e02', season: 1, episode: 2, title: 'Lawnmower Dog', watched: false, runtime: '22 min', plot: 'Rick and Morty enter people\'s dreams. Snuffles the dog gains intelligence.' },
+      { id: 'rm-s01e03', season: 1, episode: 3, title: 'Anatomy Park', watched: false, runtime: '22 min', plot: 'Rick and Morty go inside a homeless man\'s body to save a theme park.' },
+    ],
   },
 ];
 
