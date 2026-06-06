@@ -23,7 +23,7 @@ import type { Request, Response } from 'express';
 import { requireAuth } from '../../../authMiddleware.js';
 import { readConfig, isSetupComplete } from '../../../configStore.js';
 import { isDeveloperLocked } from '../../../ownershipSeed.js';
-import { getSessionCount } from '../../../sessionStore.js';
+import { getSessionCount } from '../../auth/login/POST.js';
 
 export default function handler(req: Request, res: Response) {
   if (!requireAuth(req, res)) return;

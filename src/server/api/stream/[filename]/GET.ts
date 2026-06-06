@@ -123,7 +123,7 @@ function isPathAllowed(resolvedPath: string): boolean {
 export default function handler(req: Request, res: Response) {
   if (!requireAuth(req, res)) return;
   try {
-    const filename = req.params.filename as string;
+    const { filename } = req.params;
 
     // ── Rating gate — look up the item's rating and check against active profile ──
     try {

@@ -1,10 +1,20 @@
 // @refresh reset
 /* eslint-disable react-refresh/only-export-components */
+/**
+ * TMDBContext — fetches TMDB data once per app session.
+ *
+ * Previously useTMDB was called inside the home page, meaning every
+ * navigation back to "/" re-evaluated the hook. Now the data lives here
+ * at the app root so it is fetched exactly once and shared everywhere.
+ *
+ * Consumers: home page (hero banner, Discover section), Settings panel (refresh).
+ */
+
 import {
   createContext, useContext, useState, useEffect, useCallback, useRef,
   type ReactNode,
 } from 'react';
-import type { TMDBMovie } from '@/types/tmdb';
+import type { TMDBMovie } from '@/server/tmdbCache';
 
 export interface TMDBState {
   upcoming: TMDBMovie[];
@@ -21,6 +31,7 @@ export interface TMDBState {
   refresh: () => void;
 }
 
+// Bump SESSION_VERSION whenever the session shape changes to bust stale caches.
 const SESSION_VERSION = 3;
 const SESSION_KEY = 'homestream-tmdb-session';
 
@@ -42,7 +53,9 @@ function loadSession() {
     const raw = sessionStorage.getItem(SESSION_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
+    // Invalidate sessions from before trendingShows was added
     if ((parsed._v ?? 1) < SESSION_VERSION) return null;
+    // Invalidate empty caches — likely from a session before the TMDB key was configured
     if (!parsed.upcoming?.length && !parsed.trending?.length) return null;
     return parsed;
   } catch { return null; }
@@ -56,6 +69,7 @@ const TMDBContext = createContext<TMDBState | null>(null);
 
 interface TMDBProviderProps {
   children: ReactNode;
+  /** Pass library genres so the backend can personalise recommendations */
   libraryGenres?: string[];
 }
 
@@ -67,7 +81,7 @@ export function TMDBProvider({ children, libraryGenres = [] }: TMDBProviderProps
     trending: cached?.trending ?? [],
     trendingShows: cached?.trendingShows ?? [],
     topRatedShows: cached?.topRatedShows ?? [],
-    popularShows: cached?.popularShows ?? [],
+    popularShows:  cached?.popularShows  ?? [],
     recommended: cached?.recommended ?? [],
     fetchedAt: cached?.fetchedAt ?? 0,
     stale: cached?.stale ?? false,
@@ -96,7 +110,7 @@ export function TMDBProvider({ children, libraryGenres = [] }: TMDBProviderProps
         trending: data.trending ?? [],
         trendingShows: data.trendingShows ?? [],
         topRatedShows: data.topRatedShows ?? [],
-        popularShows: data.popularShows ?? [],
+        popularShows:  data.popularShows  ?? [],
         recommended: data.recommended ?? [],
         fetchedAt: data.fetchedAt,
         stale: data.stale ?? false,
@@ -116,6 +130,7 @@ export function TMDBProvider({ children, libraryGenres = [] }: TMDBProviderProps
     if (hasFetched.current) return;
     hasFetched.current = true;
     const s = loadSession();
+    // Session is good only if it has both movies AND shows (v2+ shape)
     if (s && s.upcoming?.length > 0 && s.trendingShows?.length > 0) return;
     fetchData(false);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -136,4 +151,5 @@ export function useTMDBContext(): TMDBState {
   return ctx;
 }
 
+// Re-export context for consumers that need raw access
 export { TMDBContext };

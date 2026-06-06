@@ -1,7 +1,23 @@
 /**
  * CaptionManager
+ * ──────────────
  * Shown on every library card below the CC pill.
- * Re-fetch CC from OpenSubtitles or upload your own .srt/.vtt.
+ * Provides two actions:
+ *
+ *  1. Re-fetch CC  — hits POST /api/captions/:id/fetch again to re-download
+ *                    subtitles from OpenSubtitles. Useful when the first
+ *                    attempt failed or returned stubs.
+ *
+ *  2. Upload SRT/VTT — lets the user drop their own subtitle file.
+ *                      Accepts .srt and .vtt for EN or ES.
+ *                      Hits POST /api/captions/:id/upload with the file + lang.
+ *
+ * Props:
+ *   mediaId   — library item id
+ *   title     — movie/show title (shown in toasts)
+ *   captions  — current caption state from the library item
+ *   onUpdated — called after a successful fetch or upload so the parent
+ *               can refresh the library
  */
 
 import { useState, useRef } from 'react';
@@ -11,6 +27,8 @@ import {
   CheckCircle2, AlertCircle, Loader2, X, FileText,
 } from 'lucide-react';
 import { toast } from 'sonner';
+
+// ── Types ─────────────────────────────────────────────────────────────────────
 
 type LangStatus = 'downloaded' | 'stub' | 'exists' | 'error' | undefined;
 
@@ -29,6 +47,8 @@ interface CaptionManagerProps {
 type FetchStatus = 'idle' | 'fetching' | 'done' | 'error';
 type UploadStatus = 'idle' | 'uploading' | 'done' | 'error';
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
 function ccPillColor(status: LangStatus): string {
   if (status === 'downloaded' || status === 'exists') return 'text-primary bg-primary/10 border-primary/20';
   if (status === 'stub') return 'text-yellow-500 bg-yellow-500/10 border-yellow-500/20';
@@ -44,14 +64,20 @@ function ccLabel(status: LangStatus): string {
   return '— None';
 }
 
+// ── Component ─────────────────────────────────────────────────────────────────
+
 export default function CaptionManager({ mediaId, title, captions, onUpdated }: CaptionManagerProps) {
   const [expanded, setExpanded] = useState(false);
   const [fetchStatus, setFetchStatus] = useState<FetchStatus>('idle');
   const [fetchResult, setFetchResult] = useState<{ en?: string; es?: string } | null>(null);
+
+  // Per-language upload state
   const [uploadStatus, setUploadStatus] = useState<Record<string, UploadStatus>>({ en: 'idle', es: 'idle' });
   const [uploadLang, setUploadLang] = useState<'en' | 'es'>('en');
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // ── Re-fetch from OpenSubtitles ───────────────────────────────────────────
 
   const handleRefetch = async () => {
     setFetchStatus('fetching');
@@ -81,16 +107,21 @@ export default function CaptionManager({ mediaId, title, captions, onUpdated }: 
     }
   };
 
+  // ── Upload a subtitle file ────────────────────────────────────────────────
+
   const uploadFile = async (file: File, lang: 'en' | 'es') => {
     const ext = file.name.split('.').pop()?.toLowerCase();
     if (!ext || !['srt', 'vtt'].includes(ext)) {
       toast.error('Only .srt and .vtt files are supported');
       return;
     }
+
     setUploadStatus(prev => ({ ...prev, [lang]: 'uploading' }));
+
     const formData = new FormData();
     formData.append('subtitle', file);
     formData.append('lang', lang);
+
     try {
       const res = await fetch(`/api/captions/${mediaId}/upload`, {
         method: 'POST',
@@ -102,6 +133,7 @@ export default function CaptionManager({ mediaId, title, captions, onUpdated }: 
         setUploadStatus(prev => ({ ...prev, [lang]: 'done' }));
         toast.success(`${lang.toUpperCase()} subtitles uploaded for "${title}"`);
         onUpdated();
+        // Reset after 3s
         setTimeout(() => setUploadStatus(prev => ({ ...prev, [lang]: 'idle' })), 3000);
       } else {
         setUploadStatus(prev => ({ ...prev, [lang]: 'error' }));
@@ -123,15 +155,22 @@ export default function CaptionManager({ mediaId, title, captions, onUpdated }: 
   const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) uploadFile(file, uploadLang);
+    // Reset input so same file can be re-selected
     e.target.value = '';
   };
 
+  // ── Current CC summary pill ───────────────────────────────────────────────
+
   const hasAny = captions?.en === 'downloaded' || captions?.en === 'exists'
     || captions?.es === 'downloaded' || captions?.es === 'exists';
+
   const hasStubOnly = !hasAny && (captions?.en === 'stub' || captions?.es === 'stub');
+
+  // ── Render ────────────────────────────────────────────────────────────────
 
   return (
     <div className="mt-1.5">
+      {/* ── Summary row + expand toggle ── */}
       <button
         onClick={() => setExpanded(e => !e)}
         className="w-full flex items-center justify-between gap-1 group/cc"
@@ -152,6 +191,7 @@ export default function CaptionManager({ mediaId, title, captions, onUpdated }: 
         </span>
       </button>
 
+      {/* ── Expanded panel ── */}
       <AnimatePresence>
         {expanded && (
           <motion.div
@@ -162,11 +202,16 @@ export default function CaptionManager({ mediaId, title, captions, onUpdated }: 
             className="overflow-hidden"
           >
             <div className="mt-2 p-2.5 rounded-xl border border-border bg-card space-y-3">
+
+              {/* ── Per-language status ── */}
               <div className="grid grid-cols-2 gap-1.5">
                 {(['en', 'es'] as const).map(lang => {
                   const status = captions?.[lang];
                   return (
-                    <div key={lang} className={`flex items-center gap-1 px-2 py-1 rounded-lg border text-[9px] font-medium ${ccPillColor(status)}`}>
+                    <div
+                      key={lang}
+                      className={`flex items-center gap-1 px-2 py-1 rounded-lg border text-[9px] font-medium ${ccPillColor(status)}`}
+                    >
                       <span className="uppercase font-bold">{lang}</span>
                       <span className="truncate">{ccLabel(status)}</span>
                     </div>
@@ -174,21 +219,28 @@ export default function CaptionManager({ mediaId, title, captions, onUpdated }: 
                 })}
               </div>
 
+              {/* ── Re-fetch button ── */}
               <button
                 onClick={handleRefetch}
                 disabled={fetchStatus === 'fetching'}
                 className="w-full flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-semibold border transition-colors bg-primary/8 hover:bg-primary/15 border-primary/20 text-primary disabled:opacity-50"
               >
-                {fetchStatus === 'fetching' ? <Loader2 className="w-3 h-3 animate-spin" /> :
-                 fetchStatus === 'done' ? <CheckCircle2 className="w-3 h-3" /> :
-                 fetchStatus === 'error' ? <AlertCircle className="w-3 h-3" /> :
-                 <RefreshCw className="w-3 h-3" />}
+                {fetchStatus === 'fetching' ? (
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                ) : fetchStatus === 'done' ? (
+                  <CheckCircle2 className="w-3 h-3" />
+                ) : fetchStatus === 'error' ? (
+                  <AlertCircle className="w-3 h-3" />
+                ) : (
+                  <RefreshCw className="w-3 h-3" />
+                )}
                 {fetchStatus === 'fetching' ? 'Fetching…' :
                  fetchStatus === 'done' ? 'Fetched!' :
                  fetchStatus === 'error' ? 'Retry fetch' :
                  'Re-fetch CC from OpenSubtitles'}
               </button>
 
+              {/* Fetch result summary */}
               {fetchResult && fetchStatus === 'done' && (
                 <div className="grid grid-cols-2 gap-1">
                   {Object.entries(fetchResult).map(([lang, status]) => (
@@ -199,12 +251,14 @@ export default function CaptionManager({ mediaId, title, captions, onUpdated }: 
                 </div>
               )}
 
+              {/* ── Upload divider ── */}
               <div className="flex items-center gap-2">
                 <div className="flex-1 h-px bg-border" />
                 <span className="text-[9px] text-muted-foreground">or upload your own</span>
                 <div className="flex-1 h-px bg-border" />
               </div>
 
+              {/* ── Language selector ── */}
               <div className="flex gap-1.5">
                 {(['en', 'es'] as const).map(lang => (
                   <button
@@ -221,16 +275,26 @@ export default function CaptionManager({ mediaId, title, captions, onUpdated }: 
                 ))}
               </div>
 
+              {/* ── Drop zone ── */}
               <div
                 onDragOver={e => { e.preventDefault(); setDragOver(true); }}
                 onDragLeave={() => setDragOver(false)}
                 onDrop={handleFileDrop}
                 onClick={() => fileInputRef.current?.click()}
                 className={`relative border-2 border-dashed rounded-xl p-3 text-center cursor-pointer transition-all ${
-                  dragOver ? 'border-primary bg-primary/10' : 'border-border hover:border-primary/40 hover:bg-muted/30'
+                  dragOver
+                    ? 'border-primary bg-primary/10'
+                    : 'border-border hover:border-primary/40 hover:bg-muted/30'
                 }`}
               >
-                <input ref={fileInputRef} type="file" accept=".srt,.vtt" className="hidden" onChange={handleFileInput} />
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".srt,.vtt"
+                  className="hidden"
+                  onChange={handleFileInput}
+                />
+
                 {uploadStatus[uploadLang] === 'uploading' ? (
                   <div className="flex flex-col items-center gap-1">
                     <Loader2 className="w-4 h-4 text-primary animate-spin" />
@@ -260,12 +324,14 @@ export default function CaptionManager({ mediaId, title, captions, onUpdated }: 
                 )}
               </div>
 
+              {/* ── Close ── */}
               <button
                 onClick={() => setExpanded(false)}
                 className="w-full flex items-center justify-center gap-1 text-[9px] text-muted-foreground hover:text-foreground transition-colors py-0.5"
               >
                 <X className="w-2.5 h-2.5" /> Close
               </button>
+
             </div>
           </motion.div>
         )}

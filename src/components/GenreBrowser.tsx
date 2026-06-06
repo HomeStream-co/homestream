@@ -1,5 +1,16 @@
 /**
  * GenreBrowser — Genre tab for the Discover page.
+ *
+ * Layout:
+ *   • Genre pill selector at the top (Action, Comedy, Horror, …)
+ *   • Two horizontal scroll carousels per genre:
+ *       1. "Must See"      — all-time classics (high vote_average + vote_count)
+ *       2. "Top Rated Now" — currently popular titles
+ *   • Every card has Trailer, Download, and Watchlist buttons
+ *
+ * Data: fetched from GET /api/tmdb/genres?genreId=<id> on demand.
+ * Per-genre results are cached in a React ref so switching genres is instant
+ * after the first load.
  */
 
 import { useState, useRef, useCallback, useEffect } from 'react';
@@ -42,6 +53,7 @@ const MOVIE_GENRES: GenreDef[] = [
   { id: 10752, name: 'War',         emoji: '⚔️' },
 ];
 
+// TV show genres use different TMDB IDs
 const TV_GENRES: GenreDef[] = [
   { id: 10759, name: 'Action & Adventure', emoji: '💥' },
   { id: 35,    name: 'Comedy',             emoji: '😂' },
@@ -62,6 +74,8 @@ const TV_GENRES: GenreDef[] = [
 
 type MediaType = 'movie' | 'tv';
 
+// ── Types ─────────────────────────────────────────────────────────────────────
+
 interface GenreData {
   mustSee: TMDBMovie[];
   topRated: TMDBMovie[];
@@ -75,9 +89,11 @@ interface DownloadTarget {
   type: 'movie' | 'series';
 }
 
-// ── Trailer modal ─────────────────────────────────────────────────────────────
+// ── Trailer modal (inline, reused from discover page pattern) ─────────────────
 
-function TrailerModal({ movie, onClose }: { movie: TMDBMovie; onClose: () => void }) {
+function TrailerModal({
+  movie, onClose,
+}: { movie: TMDBMovie; onClose: () => void }) {
   const [trailerKey, setTrailerKey] = useState<string | null | 'loading'>('loading');
   const [muted, setMuted] = useState(false);
   const overlayRef = useRef<HTMLDivElement>(null);
@@ -174,7 +190,7 @@ function TrailerModal({ movie, onClose }: { movie: TMDBMovie; onClose: () => voi
   );
 }
 
-// ── Download modal ────────────────────────────────────────────────────────────
+// ── Download modal (same pattern as discover page) ────────────────────────────
 
 function DownloadModal({ target, onClose }: { target: DownloadTarget; onClose: () => void }) {
   const [searching, setSearching] = useState(false);
@@ -186,6 +202,8 @@ function DownloadModal({ target, onClose }: { target: DownloadTarget; onClose: (
     setSearching(true);
     setError('');
     try {
+      // Route through backend proxy — direct browser fetches to Cinemeta/Torrentio
+      // are blocked by CORS in the packaged Electron app and in cloud preview.
       const res = await fetch('/api/stremio/stream', {
         method: 'POST',
         credentials: 'include',
@@ -330,7 +348,7 @@ function GenreCard({
   return (
     <>
       <div className="flex-shrink-0 w-36 sm:w-40 group">
-        <div className="relative aspect-poster rounded-xl overflow-hidden bg-muted mb-2">
+        <div className="relative aspect-[2/3] rounded-xl overflow-hidden bg-muted mb-2">
           <ImageWithFallback
             src={movie.posterUrl}
             alt={movie.title}
@@ -339,6 +357,7 @@ function GenreCard({
             loading="lazy"
           />
 
+          {/* Hover overlay */}
           <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2 p-2">
             <button
               onClick={() => setShowTrailer(true)}
@@ -375,6 +394,7 @@ function GenreCard({
             </div>
           </div>
 
+          {/* Rating badge */}
           {movie.vote_average > 0 && (
             <div className="absolute top-1.5 left-1.5 flex items-center gap-0.5 bg-black/70 backdrop-blur-sm rounded-full px-1.5 py-0.5">
               <Star className="w-2 h-2 text-yellow-400 fill-yellow-400" />
@@ -453,6 +473,7 @@ function HorizontalCarousel({
       <div
         ref={scrollRef}
         className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide"
+        style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
       >
         {movies.map(movie => (
           <GenreCard
@@ -481,6 +502,7 @@ export default function GenreBrowser() {
   const [error, setError] = useState<string | null>(null);
   const [downloadTarget, setDownloadTarget] = useState<DownloadTarget | null>(null);
 
+  // Separate caches for movies and TV so switching back is instant
   const movieCache = useRef<Map<number, GenreData>>(new Map());
   const tvCache    = useRef<Map<number, GenreData>>(new Map());
 
@@ -512,12 +534,14 @@ export default function GenreBrowser() {
     }
   }, []);
 
+  // Switch media type — reset to first genre of the new type
   const handleMediaTypeSwitch = useCallback((type: MediaType) => {
     setMediaType(type);
     const genres = type === 'tv' ? TV_GENRES : MOVIE_GENRES;
     loadGenre(genres[0], type);
   }, [loadGenre]);
 
+  // Load first movie genre on mount
   useEffect(() => {
     loadGenre(MOVIE_GENRES[0], 'movie');
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -563,7 +587,7 @@ export default function GenreBrowser() {
       </div>
 
       {/* Genre pill selector */}
-      <div className="flex gap-2 overflow-x-auto pb-2 mb-8 scrollbar-hide">
+      <div className="flex gap-2 overflow-x-auto pb-2 mb-8" style={{ scrollbarWidth: 'none' }}>
         {genres.map(genre => (
           <button
             key={genre.id}
@@ -591,6 +615,7 @@ export default function GenreBrowser() {
         </div>
       </div>
 
+      {/* Loading state */}
       {loading && (
         <div className="flex flex-col items-center justify-center py-24 gap-3">
           <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -598,6 +623,7 @@ export default function GenreBrowser() {
         </div>
       )}
 
+      {/* Error state */}
       {error && !loading && (
         <div className="text-center py-16">
           <p className="text-sm text-red-400 mb-3">{error}</p>
@@ -610,6 +636,7 @@ export default function GenreBrowser() {
         </div>
       )}
 
+      {/* Carousels */}
       <AnimatePresence mode="wait">
         {genreData && !loading && (
           <motion.div
@@ -645,6 +672,7 @@ export default function GenreBrowser() {
         )}
       </AnimatePresence>
 
+      {/* Download modal */}
       <AnimatePresence>
         {downloadTarget && (
           <DownloadModal
@@ -656,3 +684,4 @@ export default function GenreBrowser() {
     </>
   );
 }
+

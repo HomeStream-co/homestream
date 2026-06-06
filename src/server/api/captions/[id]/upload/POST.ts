@@ -61,7 +61,7 @@ export default function handler(req: Request, res: Response) {
       return;
     }
 
-    const id = req.params.id as string;
+    const { id } = req.params;
     const lang = (req.body?.lang as string | undefined) ?? 'en';
 
     if (!['en', 'es'].includes(lang)) {

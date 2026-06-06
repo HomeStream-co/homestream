@@ -1,5 +1,10 @@
 /**
  * RouteErrorBoundary — lightweight per-route error boundary.
+ *
+ * Catches render errors in a single route so one broken page doesn't
+ * crash the entire app. Shows a minimal recovery UI with a reload button.
+ *
+ * The global AppErrorBoundary still wraps the root for catastrophic failures.
  */
 
 import React from 'react';
@@ -7,6 +12,7 @@ import { RefreshCw, AlertTriangle } from 'lucide-react';
 
 interface Props {
   children: React.ReactNode;
+  /** Optional route name for the error message */
   routeName?: string;
 }
 
@@ -26,6 +32,7 @@ export default class RouteErrorBoundary extends React.Component<Props, State> {
   }
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
+    // Report to crash log — best effort, don't throw if it fails
     fetch('/api/crash-log', {
       method: 'POST',
       credentials: 'include',
@@ -38,7 +45,7 @@ export default class RouteErrorBoundary extends React.Component<Props, State> {
         componentStack: info.componentStack,
         timestamp: new Date().toISOString(),
       }),
-    }).catch(() => {});
+    }).catch(() => {}); // non-fatal — ignore
   }
 
   render() {

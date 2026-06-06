@@ -166,6 +166,9 @@ function KeyLifespanBadge({ savedAt, lifespanDays, warnDays, renewUrl, renewLabe
 }
 
 // ── RealDebridPremiumBadge ────────────────────────────────────────────────────
+// Fetches live subscription data from /api/real-debrid/status.
+// The server caches the result and only re-fetches from RD after the expiry
+// passes — so this component never hammers the RD API.
 
 interface RDStatus {
   ok: boolean;
@@ -185,6 +188,8 @@ function RealDebridPremiumBadge({ hasSavedKey }: { hasSavedKey: boolean }) {
   useEffect(() => {
     if (!hasSavedKey) return;
     setLoading(true);
+    // 10-second abort guard — if the RD API is slow or unreachable the spinner
+    // must not run forever; fall through to the error state instead.
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 10_000);
     fetch('/api/real-debrid/status', { credentials: 'include', signal: controller.signal })
@@ -261,6 +266,7 @@ function RealDebridPremiumBadge({ hasSavedKey }: { hasSavedKey: boolean }) {
         </a>
       </div>
 
+      {/* Progress bar — fills as days run out */}
       <div className="h-1 rounded-full bg-white/8 overflow-hidden">
         <div
           className={`h-full rounded-full transition-all duration-500 ${barColor}`}
@@ -303,7 +309,10 @@ export default function SettingsApiKeys({
             onTest={onTestOmdb}
             placeholder={apiKeysSavedState.omdb ? '(key saved — enter new to replace)' : 'e.g. a1b2c3d4'}
           />
-          <KeyLifespanBadge savedAt={apiKeyTimestamps.omdb} {...KEY_META.omdb} />
+          <KeyLifespanBadge
+            savedAt={apiKeyTimestamps.omdb}
+            {...KEY_META.omdb}
+          />
         </div>
 
         {/* ── TMDB ── */}
@@ -321,7 +330,10 @@ export default function SettingsApiKeys({
             onTest={onTestTmdb}
             placeholder={apiKeysSavedState.tmdb ? '(key saved — enter new to replace)' : 'v3 API key or Bearer token'}
           />
-          <KeyLifespanBadge savedAt={apiKeyTimestamps.tmdb} {...KEY_META.tmdb} />
+          <KeyLifespanBadge
+            savedAt={apiKeyTimestamps.tmdb}
+            {...KEY_META.tmdb}
+          />
         </div>
 
         {/* ── Google Gemini ── */}
@@ -339,7 +351,10 @@ export default function SettingsApiKeys({
             onTest={onTestGemini}
             placeholder={apiKeysSavedState.googleAi ? '(key saved — enter new to replace)' : 'AIza…'}
           />
-          <KeyLifespanBadge savedAt={apiKeyTimestamps.googleAi} {...KEY_META.googleAi} />
+          <KeyLifespanBadge
+            savedAt={apiKeyTimestamps.googleAi}
+            {...KEY_META.googleAi}
+          />
         </div>
 
         {/* ── Real-Debrid ── */}

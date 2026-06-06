@@ -72,8 +72,7 @@ export default function PlayerInfoPanel({ item }: Props) {
         <p className="text-white/30 text-[10px] uppercase tracking-widest mb-2">Keyboard Shortcuts</p>
         {[
           ['Space / K', 'Play / Pause'],
-          ['← / J', 'Rewind 10s'],
-          ['→ / L', 'Forward 10s'],
+          ['← / →', 'Seek ±10s'],
           ['↑ / ↓', 'Volume'],
           ['M', 'Mute'],
           ['F', 'Fullscreen'],

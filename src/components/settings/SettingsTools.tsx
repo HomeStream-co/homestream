@@ -11,6 +11,10 @@ interface SettingsToolsProps {
   healthStatus: 'ok' | 'warn' | 'error' | null;
 }
 
+// ── Beta channel toggle ───────────────────────────────────────────────────────
+// Reads/writes via the Electron IPC bridge (window.electronAPI).
+// In the browser (non-Electron) context, the toggle is hidden.
+
 type ElectronAPI = {
   getBetaChannel?: () => Promise<boolean>;
   setBetaChannel?: (enabled: boolean) => void;
@@ -68,12 +72,15 @@ function BetaChannelToggle() {
             : 'Enable to receive beta builds before stable release'}
         </p>
       </div>
+      {/* Toggle pill */}
       <div className={`relative w-9 h-5 rounded-full transition-colors flex-shrink-0 ${betaEnabled ? 'bg-amber-500' : 'bg-muted'}`}>
         <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${betaEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
       </div>
     </button>
   );
 }
+
+// ── Main component ────────────────────────────────────────────────────────────
 
 export default function SettingsTools({
   onClose, onOpenSecurity, onOpenDebug, onClearHealth, healthStatus,
@@ -92,6 +99,7 @@ export default function SettingsTools({
         Tools
       </p>
 
+      {/* Security Center */}
       <button
         onClick={() => { onClose(); onOpenSecurity?.(); }}
         className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border border-border hover:border-primary/40 hover:bg-primary/5 transition-colors text-left group"
@@ -105,6 +113,7 @@ export default function SettingsTools({
         </div>
       </button>
 
+      {/* HTTPS Setup */}
       <button
         onClick={() => { onClose(); navigate('/https-setup'); }}
         className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border border-border hover:border-primary/40 hover:bg-primary/5 transition-colors text-left group"
@@ -118,6 +127,7 @@ export default function SettingsTools({
         </div>
       </button>
 
+      {/* Samsung TV Setup */}
       <button
         onClick={() => { onClose(); navigate('/samsung-tv'); }}
         className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border border-border hover:border-primary/40 hover:bg-primary/5 transition-colors text-left group"
@@ -131,6 +141,7 @@ export default function SettingsTools({
         </div>
       </button>
 
+      {/* Setup Wizard */}
       <button
         onClick={() => { onClose(); navigate('/setup'); }}
         className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border border-border hover:border-primary/40 hover:bg-primary/5 transition-colors text-left group"
@@ -144,6 +155,7 @@ export default function SettingsTools({
         </div>
       </button>
 
+      {/* Debug Panel */}
       {onOpenDebug && (
         <button
           onClick={() => { onClose(); onClearHealth(); onOpenDebug(); }}
@@ -180,8 +192,10 @@ export default function SettingsTools({
         </button>
       )}
 
+      {/* Beta Channel toggle (Electron only) */}
       <BetaChannelToggle />
 
+      {/* Feedback */}
       <div className="pt-1">
         <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-semibold mb-2">
           Feedback

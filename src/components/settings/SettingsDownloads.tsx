@@ -1,5 +1,8 @@
 /**
  * SettingsDownloads — Download quality preference.
+ *
+ * Lets the user change their preferred torrent quality without re-running
+ * the setup wizard.  Reads/writes `preferredQuality` via POST /api/setup.
  */
 import { useEffect, useState, useCallback } from 'react';
 import { Download, Check, Loader2 } from 'lucide-react';
@@ -15,11 +18,12 @@ const QUALITY_OPTIONS: { value: Quality; label: string; hint: string }[] = [
 ];
 
 export default function SettingsDownloads() {
-  const [quality, setQuality] = useState<Quality>('1080p');
-  const [loaded, setLoaded]   = useState(false);
-  const [saving, setSaving]   = useState(false);
-  const [saved, setSaved]     = useState(false);
+  const [quality, setQuality]   = useState<Quality>('1080p');
+  const [loaded, setLoaded]     = useState(false);
+  const [saving, setSaving]     = useState(false);
+  const [saved, setSaved]       = useState(false);
 
+  // Load current value from server
   useEffect(() => {
     fetch('/api/setup', { credentials: 'include' })
       .then(r => r.json())
@@ -45,7 +49,7 @@ export default function SettingsDownloads() {
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } catch {
-      // non-fatal
+      // non-fatal — quality is already updated in UI
     } finally {
       setSaving(false);
     }

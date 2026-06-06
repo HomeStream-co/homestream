@@ -1,5 +1,8 @@
 /**
  * NotificationBell — header bell icon with dropdown notification panel.
+ *
+ * Shows an unread badge count, opens a panel listing recent notifications,
+ * and links download-complete notifications directly to the player.
  */
 
 import { useState, useRef, useEffect } from 'react';
@@ -7,6 +10,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Bell, X, CheckCheck, Download, AlertCircle, Info, Film, Plus } from 'lucide-react';
 import { useNotifications, type AppNotification, type NotificationType } from '@/lib/notificationStore';
 import { useNavigate } from 'react-router-dom';
+
+// ── Icon map ──────────────────────────────────────────────────────────────────
 
 function NotifIcon({ type }: { type: NotificationType }) {
   const cls = 'w-4 h-4 flex-shrink-0';
@@ -35,13 +40,23 @@ function notifBg(type: NotificationType): string {
 
 function timeAgo(ts: number): string {
   const diff = Math.floor((Date.now() - ts) / 1000);
-  if (diff < 60)    return 'just now';
-  if (diff < 3600)  return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 60)   return 'just now';
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
   if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
   return `${Math.floor(diff / 86400)}d ago`;
 }
 
-function NotifRow({ n, onDismiss, onMarkRead }: { n: AppNotification; onDismiss: (id: string) => void; onMarkRead: (id: string) => void }) {
+// ── Notification row ──────────────────────────────────────────────────────────
+
+function NotifRow({
+  n,
+  onDismiss,
+  onMarkRead,
+}: {
+  n: AppNotification;
+  onDismiss: (id: string) => void;
+  onMarkRead: (id: string) => void;
+}) {
   const navigate = useNavigate();
 
   function handleClick() {
@@ -61,6 +76,7 @@ function NotifRow({ n, onDismiss, onMarkRead }: { n: AppNotification; onDismiss:
       className={`relative flex gap-3 p-3 rounded-xl border cursor-pointer transition-colors hover:brightness-110 ${notifBg(n.type)} ${!n.read ? 'ring-1 ring-primary/20' : ''}`}
       onClick={handleClick}
     >
+      {/* Poster thumbnail */}
       {n.poster ? (
         <img
           src={n.poster}
@@ -74,17 +90,23 @@ function NotifRow({ n, onDismiss, onMarkRead }: { n: AppNotification; onDismiss:
         </div>
       )}
 
+      {/* Content */}
       <div className="flex-1 min-w-0">
         <div className="flex items-start justify-between gap-2">
           <p className={`text-sm font-semibold leading-tight truncate ${n.read ? 'text-muted-foreground' : 'text-foreground'}`}>
             {n.title}
           </p>
-          {!n.read && <span className="w-2 h-2 rounded-full bg-primary flex-shrink-0 mt-1" />}
+          {!n.read && (
+            <span className="w-2 h-2 rounded-full bg-primary flex-shrink-0 mt-1" />
+          )}
         </div>
-        {n.message && <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{n.message}</p>}
+        {n.message && (
+          <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{n.message}</p>
+        )}
         <p className="text-[10px] text-muted-foreground/60 mt-1">{timeAgo(n.createdAt)}</p>
       </div>
 
+      {/* Dismiss button */}
       <button
         onClick={e => { e.stopPropagation(); onDismiss(n.id); }}
         className="absolute top-2 right-2 w-5 h-5 rounded-full bg-muted/50 flex items-center justify-center text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 transition-opacity"
@@ -96,30 +118,39 @@ function NotifRow({ n, onDismiss, onMarkRead }: { n: AppNotification; onDismiss:
   );
 }
 
+// ── Bell component ────────────────────────────────────────────────────────────
+
 export default function NotificationBell() {
   const { notifications, unreadCount, dismiss, dismissAll, markRead, markAllRead } = useNotifications();
   const [open, setOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
   const btnRef = useRef<HTMLButtonElement>(null);
 
+  // Close on outside click
   useEffect(() => {
     if (!open) return;
     function handler(e: MouseEvent) {
       if (
         panelRef.current && !panelRef.current.contains(e.target as Node) &&
         btnRef.current && !btnRef.current.contains(e.target as Node)
-      ) { setOpen(false); }
+      ) {
+        setOpen(false);
+      }
     }
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [open]);
 
+  // Mark all read when panel opens
   useEffect(() => {
-    if (open && unreadCount > 0) { setTimeout(markAllRead, 800); }
+    if (open && unreadCount > 0) {
+      setTimeout(markAllRead, 800);
+    }
   }, [open, unreadCount, markAllRead]);
 
   return (
     <div className="relative">
+      {/* Bell button */}
       <button
         ref={btnRef}
         onClick={() => setOpen(v => !v)}
@@ -142,6 +173,7 @@ export default function NotificationBell() {
         </AnimatePresence>
       </button>
 
+      {/* Dropdown panel */}
       <AnimatePresence>
         {open && (
           <motion.div
@@ -152,6 +184,7 @@ export default function NotificationBell() {
             transition={{ duration: 0.15 }}
             className="absolute right-0 top-full mt-2 w-80 bg-card border border-border rounded-2xl shadow-2xl z-50 overflow-hidden"
           >
+            {/* Header */}
             <div className="flex items-center justify-between px-4 py-3 border-b border-border">
               <div className="flex items-center gap-2">
                 <Bell className="w-4 h-4 text-primary" />
@@ -167,7 +200,8 @@ export default function NotificationBell() {
                     className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors px-2 py-1 rounded-lg hover:bg-muted/50"
                     title="Clear all"
                   >
-                    <CheckCheck className="w-3.5 h-3.5" />Clear all
+                    <CheckCheck className="w-3.5 h-3.5" />
+                    Clear all
                   </button>
                 )}
                 <button
@@ -179,10 +213,16 @@ export default function NotificationBell() {
               </div>
             </div>
 
+            {/* List */}
             <div className="max-h-[420px] overflow-y-auto p-3 flex flex-col gap-2">
               <AnimatePresence mode="popLayout">
                 {notifications.length === 0 ? (
-                  <motion.div key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="py-10 text-center">
+                  <motion.div
+                    key="empty"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="py-10 text-center"
+                  >
                     <div className="w-12 h-12 rounded-2xl bg-muted/50 flex items-center justify-center mx-auto mb-3">
                       <Film className="w-5 h-5 text-muted-foreground" />
                     </div>
@@ -193,7 +233,12 @@ export default function NotificationBell() {
                   </motion.div>
                 ) : (
                   notifications.map(n => (
-                    <NotifRow key={n.id} n={n} onDismiss={dismiss} onMarkRead={markRead} />
+                    <NotifRow
+                      key={n.id}
+                      n={n}
+                      onDismiss={dismiss}
+                      onMarkRead={markRead}
+                    />
                   ))
                 )}
               </AnimatePresence>

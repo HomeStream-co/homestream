@@ -43,7 +43,7 @@ function safeDelete(fileRef: string): void {
 export default async function handler(req: Request, res: Response) {
   try {
     if (!requireAuth(req, res)) return;
-    const id = req.params.id as string;
+    const { id } = req.params;
     const data = readLibrary<Record<string, unknown>>();
     const item = data.find((m) => m.id === id);
     if (!item) {

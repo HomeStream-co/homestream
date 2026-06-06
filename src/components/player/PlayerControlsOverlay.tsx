@@ -7,6 +7,18 @@
  *   - Bottom bar (seek bar + thumbnail, play/pause, ±10s, mute, volume,
  *     time, speed menu, audio menu, CC menu, fullscreen, PiP, shortcuts,
  *     Cast, Chromecast)
+ *
+ * PERFORMANCE
+ * -----------
+ * Wrapped in React.memo with a hand-written comparator that skips re-renders
+ * when only refs or stable callbacks change.  The comparator checks every
+ * prop that can legitimately change the rendered output; it ignores:
+ *   - All React refs (seekBarRef, bufferedBarRef, etc.) — same object always
+ *   - All stable callbacks (togglePlay, handleSeek, etc.) — from useCallback
+ *   - All React setState dispatchers — stable by contract
+ *
+ * This means the overlay only re-renders when something the user can actually
+ * SEE changes: playing state, menus, CC settings, volume, etc.
  */
 
 import { memo } from 'react';
@@ -39,11 +51,13 @@ interface MediaItem {
   filename?: string;
   poster?: string;
   watchedSeconds?: number;
+  /** Set to true when the player is using HLS (transcoded) mode */
   usingHls?: boolean;
 }
 
 interface Props {
   item: MediaItem;
+  // Playback state — only values that legitimately trigger re-renders
   playing: boolean;
   duration: number;
   volume: number;
@@ -51,6 +65,7 @@ interface Props {
   fullscreen: boolean;
   playbackRate: number;
   isPiP: boolean;
+  // UI state
   showInfo: boolean;
   showSpeedMenu: boolean;
   showCcMenu: boolean;
@@ -62,14 +77,18 @@ interface Props {
   activeAudioTrack: number;
   tvFocus: TvControl | null;
   playerAccent: string;
+  // Seek hover thumbnail
   seekHover: { x: number; time: number; dataUrl: string } | null;
   seekBarRef: React.RefObject<HTMLInputElement | null>;
   thumbCanvasRef: React.RefObject<HTMLCanvasElement | null>;
+  // Refs for direct DOM updates (no React re-renders on time tick)
   currentTimeRef: React.MutableRefObject<number>;
   bufferedRef: React.MutableRefObject<number>;
   timeDisplayRef: React.MutableRefObject<HTMLSpanElement | null>;
   bufferedBarRef: React.MutableRefObject<HTMLDivElement | null>;
+  // Refs for cast
   castButtonRef: React.MutableRefObject<(() => void) | null>;
+  /** Imperative controls for an active Chromecast session (play/pause, stop, seek, volume) */
   castControlRef: React.MutableRefObject<{
     playPause: () => void;
     stop: () => void;
@@ -77,6 +96,7 @@ interface Props {
     setVolume: (level: number) => void;
   } | null>;
   videoRef: React.RefObject<HTMLVideoElement | null>;
+  // Callbacks
   togglePlay: () => void;
   toggleMute: () => void;
   toggleFullscreen: () => void;
@@ -143,6 +163,7 @@ function PlayerControlsOverlayInner({
       <div className="bg-gradient-to-b from-black/70 to-transparent px-4 pt-4 pb-8 flex items-center gap-3">
         <button
           onClick={() => {
+            // Navigate to the detail page (movie or show), not always home
             const backTo = item.type === 'series' ? `/show/${item.id}` : `/movie/${item.id}`;
             fadeAndNavigate(backTo);
           }}
@@ -201,7 +222,8 @@ function PlayerControlsOverlayInner({
       </div>
 
       {/* ── Bottom controls ── */}
-      <div className="bg-gradient-to-t from-black/80 to-transparent px-2 sm:px-4 pb-4 pt-8">
+      <div className="bg-gradient-to-t from-black/80 to-transparent px-2 sm:px-4 pb-safe pb-4 pt-8">
+        {/* Seek bar */}
         <PlayerSeekBar
           duration={duration}
           playerAccent={playerAccent}
@@ -215,6 +237,7 @@ function PlayerControlsOverlayInner({
           setSeekHover={setSeekHover}
         />
 
+        {/* Control row */}
         <div className="flex items-center justify-between gap-1">
           {/* Left cluster */}
           <div className="flex items-center gap-1 sm:gap-2">
@@ -222,16 +245,24 @@ function PlayerControlsOverlayInner({
               {playing ? <Pause className="w-5 h-5 fill-white" /> : <Play className="w-5 h-5 fill-white ml-0.5" />}
             </button>
             <button
-              onClick={() => { if (!videoRef.current) return; videoRef.current.currentTime = Math.max(videoRef.current.currentTime - 10, 0); flashSeek('back'); }}
+              onClick={() => {
+                if (!videoRef.current) return;
+                videoRef.current.currentTime = Math.max(videoRef.current.currentTime - 10, 0);
+                flashSeek('back');
+              }}
               className={`text-white/70 hover:text-white rounded transition-all ${tvRing('rewind')}`}
-              title="Rewind 10s"
+              title="Rewind 10s (←)"
             >
               <Rewind className="w-4 h-4" />
             </button>
             <button
-              onClick={() => { if (!videoRef.current) return; videoRef.current.currentTime = Math.min(videoRef.current.currentTime + 10, videoRef.current.duration); flashSeek('forward'); }}
+              onClick={() => {
+                if (!videoRef.current) return;
+                videoRef.current.currentTime = Math.min(videoRef.current.currentTime + 10, videoRef.current.duration);
+                flashSeek('forward');
+              }}
               className={`text-white/70 hover:text-white rounded transition-all ${tvRing('forward')}`}
-              title="Forward 10s"
+              title="Forward 10s (→)"
             >
               <FastForward className="w-4 h-4" />
             </button>
@@ -244,6 +275,7 @@ function PlayerControlsOverlayInner({
               onChange={handleVolumeChange}
               className={`hidden sm:block w-20 h-1 appearance-none bg-white/30 rounded-full cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white ${tvFocus === 'volume' ? 'ring-2 ring-white/60' : ''}`}
             />
+            {/* Time display — updated via ref in onTimeUpdate, no React re-render */}
             <span ref={timeDisplayRef} className="text-white/70 text-[10px] sm:text-xs whitespace-nowrap font-mono">
               {formatTime(currentTimeRef.current)} / {formatTime(duration)}
             </span>
@@ -260,6 +292,7 @@ function PlayerControlsOverlayInner({
                     ? 'text-primary bg-primary/20 border border-primary/40'
                     : 'text-white/70 hover:text-white bg-white/10 hover:bg-white/20'
                 } ${tvRing('speed')}`}
+                title="Playback speed (S or < >)"
               >
                 {playbackRate === 1 ? '1×' : `${playbackRate}×`}
               </button>
@@ -300,6 +333,7 @@ function PlayerControlsOverlayInner({
                 <button
                   onClick={e => { e.stopPropagation(); setShowAudioMenu(prev => !prev); setShowSpeedMenu(false); setShowCcMenu(false); }}
                   className="flex items-center gap-1 text-xs font-medium px-2 py-1 rounded transition-all text-white/70 hover:text-white bg-white/10 hover:bg-white/20"
+                  title="Audio track"
                 >
                   <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <path d="M9 18V5l12-2v13" /><circle cx="6" cy="18" r="3" /><circle cx="18" cy="16" r="3" />
@@ -360,6 +394,7 @@ function PlayerControlsOverlayInner({
                     ? 'text-primary bg-primary/20 border border-primary/40'
                     : 'text-white/70 hover:text-white bg-white/10 hover:bg-white/20'
                 } ${tvRing('cc')}`}
+                title="Closed captions (C to cycle)"
               >
                 <Captions className="w-4 h-4" />
                 <span className="hidden sm:inline">{ccLang === 'off' ? 'CC' : ccLang === 'en' ? 'EN' : 'ES'}</span>
@@ -387,6 +422,7 @@ function PlayerControlsOverlayInner({
                         {ccLang === opt.value && <div className="w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0" />}
                       </button>
                     ))}
+                    {/* CC Styling */}
                     <div className="border-t border-white/10 px-3 py-2">
                       <p className="text-[10px] text-white/30 uppercase tracking-wider mb-2">Style</p>
                       <div className="flex items-center justify-between mb-1.5">
@@ -427,15 +463,17 @@ function PlayerControlsOverlayInner({
               <button
                 onClick={e => { e.stopPropagation(); togglePiP(); }}
                 className={`hidden sm:block rounded transition-all ${isPiP ? 'text-primary bg-primary/20 p-1' : 'text-white/70 hover:text-white'}`}
+                title={isPiP ? 'Exit Picture-in-Picture (P)' : 'Picture-in-Picture (P)'}
               >
                 <PictureInPicture2 className="w-4 h-4" />
               </button>
             )}
 
-            {/* Shortcuts */}
+            {/* Shortcuts help */}
             <button
               onClick={e => { e.stopPropagation(); setShowShortcuts(prev => !prev); }}
               className="hidden sm:block text-white/50 hover:text-white/80 rounded transition-all"
+              title="Keyboard shortcuts (?)"
             >
               <Keyboard className="w-4 h-4" />
             </button>
@@ -453,15 +491,17 @@ function PlayerControlsOverlayInner({
 
             {/* Chromecast */}
             {item.filename && (
-              <ChromecastButton
-                streamUrl={`/api/stream/${item.filename}`}
-                title={item.title}
-                poster={item.poster}
-                currentTime={currentTimeRef.current}
-                onTriggerRef={(fn) => { castButtonRef.current = fn; }}
-                onControlRef={(ctrl) => { castControlRef.current = ctrl; }}
-                onCastStateChange={(info) => setCastInfo(info.active ? info : null)}
-              />
+              <div className="relative">
+                <ChromecastButton
+                  streamUrl={`/api/stream/${item.filename}`}
+                  title={item.title}
+                  poster={item.poster}
+                  currentTime={currentTimeRef.current}
+                  onTriggerRef={(fn) => { castButtonRef.current = fn; }}
+                  onControlRef={(ctrl) => { castControlRef.current = ctrl; }}
+                  onCastStateChange={(info) => setCastInfo(info.active ? info : null)}
+                />
+              </div>
             )}
           </div>
         </div>
@@ -470,9 +510,33 @@ function PlayerControlsOverlayInner({
   );
 }
 
+// ── Memo comparator ───────────────────────────────────────────────────────────
+//
+// Only re-render when a prop that affects the rendered output changes.
+//
+// SKIPPED (always stable — same object reference across renders):
+//   Refs:      seekBarRef, thumbCanvasRef, currentTimeRef, bufferedRef,
+//              timeDisplayRef, bufferedBarRef, castButtonRef, castControlRef,
+//              videoRef, resumeBannerTimer
+//   Callbacks: togglePlay, toggleMute, toggleFullscreen, togglePiP,
+//              handleSeek, handleVolumeChange, handleSeekHover, changeSpeed,
+//              fadeAndNavigate, showActionToast
+//   Setters:   all set* dispatchers (stable by React contract)
+//
+// COMPARED (can change and affect visible output):
+//   item       — by id + usingHls (spread creates new object every render)
+//   playing, duration, volume, muted, fullscreen, playbackRate, isPiP
+//   showInfo, showSpeedMenu, showCcMenu, showAudioMenu
+//   ccLang, ccFontSize, ccBgOpacity
+//   audioTracks — by reference (only changes when tracks are fetched)
+//   activeAudioTrack, tvFocus, playerAccent, seekHover
+
 function arePropsEqual(prev: Props, next: Props): boolean {
+  // item — compare by identity fields only (spread creates new obj every render)
   if (prev.item.id       !== next.item.id)       return false;
   if (prev.item.usingHls !== next.item.usingHls) return false;
+
+  // Playback state
   if (prev.playing      !== next.playing)      return false;
   if (prev.duration     !== next.duration)     return false;
   if (prev.volume       !== next.volume)       return false;
@@ -480,18 +544,31 @@ function arePropsEqual(prev: Props, next: Props): boolean {
   if (prev.fullscreen   !== next.fullscreen)   return false;
   if (prev.playbackRate !== next.playbackRate) return false;
   if (prev.isPiP        !== next.isPiP)        return false;
+
+  // UI menus / panels
   if (prev.showInfo      !== next.showInfo)      return false;
   if (prev.showSpeedMenu !== next.showSpeedMenu) return false;
   if (prev.showCcMenu    !== next.showCcMenu)    return false;
   if (prev.showAudioMenu !== next.showAudioMenu) return false;
+
+  // CC settings
   if (prev.ccLang      !== next.ccLang)      return false;
   if (prev.ccFontSize  !== next.ccFontSize)  return false;
   if (prev.ccBgOpacity !== next.ccBgOpacity) return false;
+
+  // Audio tracks — reference equality (array only replaced on fetch)
   if (prev.audioTracks      !== next.audioTracks)      return false;
   if (prev.activeAudioTrack !== next.activeAudioTrack) return false;
+
+  // TV D-pad focus
   if (prev.tvFocus !== next.tvFocus) return false;
+
+  // Accent colour (changes when theme switches)
   if (prev.playerAccent !== next.playerAccent) return false;
+
+  // Seek hover thumbnail (null | object — compare by reference)
   if (prev.seekHover !== next.seekHover) return false;
+
   return true;
 }
 

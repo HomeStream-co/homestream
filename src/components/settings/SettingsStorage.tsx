@@ -36,6 +36,7 @@ export default function SettingsStorage({
       <SectionHeader icon={Database} label="Storage &amp; Library" />
       <div className="px-4 pb-4 space-y-3">
 
+        {/* Disk stats */}
         {storageLoading ? (
           <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
             <Loader2 className="w-3 h-3 animate-spin" /> Loading storage info…
@@ -87,6 +88,7 @@ export default function SettingsStorage({
           <p className="text-[11px] text-muted-foreground">Storage info unavailable</p>
         )}
 
+        {/* Scan button */}
         <div className="space-y-1.5">
           <button
             onClick={onScanLibrary}
@@ -108,6 +110,7 @@ export default function SettingsStorage({
           </p>
         </div>
 
+        {/* Storage allocation sliders */}
         <div className="border-t border-border/40 pt-3 space-y-3">
           <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-semibold">
             Storage Allocation Targets
@@ -117,6 +120,7 @@ export default function SettingsStorage({
             targets — HomeStream uses them to warn you when a category is over-allocated.
           </p>
 
+          {/* Movies slider */}
           <div className="space-y-1.5">
             <div className="flex items-center justify-between text-[11px]">
               <span className="text-foreground flex items-center gap-1.5">
@@ -136,6 +140,7 @@ export default function SettingsStorage({
             />
           </div>
 
+          {/* TV slider */}
           <div className="space-y-1.5">
             <div className="flex items-center justify-between text-[11px]">
               <span className="text-foreground flex items-center gap-1.5">
@@ -155,6 +160,7 @@ export default function SettingsStorage({
             />
           </div>
 
+          {/* Other (read-only remainder) */}
           <div className="flex items-center justify-between text-[11px]">
             <span className="text-muted-foreground flex items-center gap-1.5">
               <Layers className="w-3 h-3" /> Other (remainder)
@@ -162,6 +168,7 @@ export default function SettingsStorage({
             <span className="font-mono text-muted-foreground">{allocOther}%</span>
           </div>
 
+          {/* Visual bar */}
           <div className="h-2 rounded-full overflow-hidden flex gap-0.5">
             <div className="bg-blue-400 rounded-l-full transition-all" style={{ width: `${allocMovies}%` }} />
             <div className="bg-purple-400 transition-all" style={{ width: `${allocTv}%` }} />

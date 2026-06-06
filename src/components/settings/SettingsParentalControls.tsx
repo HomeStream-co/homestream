@@ -128,7 +128,12 @@ export default function SettingsParentalControls({
             {adultPinEnabled ? (
               <div className="flex gap-2">
                 <button
-                  onClick={() => { onSetPinMode('change'); onSetPinInput(''); onSetPinConfirm(''); onSetPinError(null); }}
+                  onClick={() => {
+                    onSetPinMode('change');
+                    onSetPinInput('');
+                    onSetPinConfirm('');
+                    onSetPinError(null);
+                  }}
                   className="text-[11px] text-primary hover:text-primary/80 transition-colors"
                 >
                   Change PIN
@@ -158,7 +163,12 @@ export default function SettingsParentalControls({
               </div>
             ) : (
               <button
-                onClick={() => { onSetPinMode('set'); onSetPinInput(''); onSetPinConfirm(''); onSetPinError(null); }}
+                onClick={() => {
+                  onSetPinMode('set');
+                  onSetPinInput('');
+                  onSetPinConfirm('');
+                  onSetPinError(null);
+                }}
                 className="text-[11px] text-primary hover:text-primary/80 transition-colors"
               >
                 Set PIN
@@ -173,7 +183,12 @@ export default function SettingsParentalControls({
                 inputMode="numeric"
                 maxLength={4}
                 value={pinInput}
-                onChange={e => { if (/^\d{0,4}$/.test(e.target.value)) { onSetPinInput(e.target.value); onSetPinError(null); } }}
+                onChange={e => {
+                  if (/^\d{0,4}$/.test(e.target.value)) {
+                    onSetPinInput(e.target.value);
+                    onSetPinError(null);
+                  }
+                }}
                 placeholder="New PIN (4 digits)"
                 className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 tracking-widest text-center"
               />
@@ -182,7 +197,12 @@ export default function SettingsParentalControls({
                 inputMode="numeric"
                 maxLength={4}
                 value={pinConfirm}
-                onChange={e => { if (/^\d{0,4}$/.test(e.target.value)) { onSetPinConfirm(e.target.value); onSetPinError(null); } }}
+                onChange={e => {
+                  if (/^\d{0,4}$/.test(e.target.value)) {
+                    onSetPinConfirm(e.target.value);
+                    onSetPinError(null);
+                  }
+                }}
                 placeholder="Confirm PIN"
                 className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 tracking-widest text-center"
               />
@@ -195,7 +215,12 @@ export default function SettingsParentalControls({
                     if (pinInput.length < 4) { onSetPinError('PIN must be 4 digits'); return; }
                     if (pinInput !== pinConfirm) { onSetPinError('PINs do not match'); return; }
                     void setPin('adult', pinInput)
-                      .then(() => { onSetPinMode('idle'); onSetPinInput(''); onSetPinConfirm(''); toast.success('Adult PIN saved'); })
+                      .then(() => {
+                        onSetPinMode('idle');
+                        onSetPinInput('');
+                        onSetPinConfirm('');
+                        toast.success('Adult PIN saved');
+                      })
                       .catch(err => onSetPinError(String(err)));
                   }}
                   className="flex-1 bg-primary/10 hover:bg-primary/20 border border-primary/20 text-primary text-xs font-semibold py-2 rounded-lg transition-colors"
@@ -203,7 +228,12 @@ export default function SettingsParentalControls({
                   Save PIN
                 </button>
                 <button
-                  onClick={() => { onSetPinMode('idle'); onSetPinInput(''); onSetPinConfirm(''); onSetPinError(null); }}
+                  onClick={() => {
+                    onSetPinMode('idle');
+                    onSetPinInput('');
+                    onSetPinConfirm('');
+                    onSetPinError(null);
+                  }}
                   className="flex-1 bg-muted hover:bg-muted/70 text-muted-foreground text-xs font-semibold py-2 rounded-lg transition-colors"
                 >
                   Cancel

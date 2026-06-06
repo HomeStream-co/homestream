@@ -58,6 +58,7 @@ export default function AIChatAssistant() {
       if (finishedItem) {
         postWatchFiredRef.current = pendingRecommendation;
         clearPendingRecommendation();
+        // Small delay so the page transition settles first
         setTimeout(() => {
           setOpen(true);
           sendMessage(`I just finished watching "${finishedItem.title}". What should I watch next from my library?`);
@@ -79,6 +80,7 @@ export default function AIChatAssistant() {
     setLoading(true);
 
     try {
+      // Build Gemini-compatible history from previous messages (exclude suggestions)
       const geminiHistory = messages
         .filter(m => m.content)
         .map(m => ({
@@ -92,7 +94,7 @@ export default function AIChatAssistant() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: text, library, history: geminiHistory }),
       });
-      const data = await res.json() as { reply: string; suggestions?: MediaItem[] };
+      const data = await res.json();
       const aiMsg: ChatMessage = {
         id: genId(),
         role: 'assistant',
@@ -113,6 +115,7 @@ export default function AIChatAssistant() {
     }
   }, [library, messages]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Listen for programmatic open+message events (e.g. from player "Ask AI" button)
   useEffect(() => {
     const handler = (e: Event) => {
       const { message } = (e as CustomEvent<{ message: string }>).detail;
@@ -130,6 +133,7 @@ export default function AIChatAssistant() {
 
   return (
     <>
+      {/* Floating Button */}
       <AnimatePresence>
         {!open && (
           <motion.button
@@ -145,6 +149,7 @@ export default function AIChatAssistant() {
         )}
       </AnimatePresence>
 
+      {/* Chat Panel */}
       <AnimatePresence>
         {open && (
           <motion.div
@@ -154,6 +159,7 @@ export default function AIChatAssistant() {
             transition={{ duration: 0.2 }}
             className="fixed bottom-6 right-6 z-50 w-[380px] max-w-[calc(100vw-2rem)] h-[560px] max-h-[calc(100vh-5rem)] bg-card border border-border rounded-2xl shadow-2xl flex flex-col overflow-hidden"
           >
+            {/* Header */}
             <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-card">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
@@ -164,11 +170,15 @@ export default function AIChatAssistant() {
                   <p className="text-[10px] text-muted-foreground">Picks from your library only</p>
                 </div>
               </div>
-              <button onClick={() => setOpen(false)} className="p-1.5 text-muted-foreground hover:text-foreground transition-colors rounded">
+              <button
+                onClick={() => setOpen(false)}
+                className="p-1.5 text-muted-foreground hover:text-foreground transition-colors rounded"
+              >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
+            {/* Messages */}
             <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-3">
               {messages.length === 0 && (
                 <div className="flex flex-col gap-3">
@@ -211,6 +221,7 @@ export default function AIChatAssistant() {
                     }`}>
                       <p className="whitespace-pre-wrap">{msg.content.replace(/\*\*(.*?)\*\*/g, '$1')}</p>
                     </div>
+                    {/* Suggestion cards */}
                     {msg.suggestions && msg.suggestions.length > 0 && (
                       <div className="flex flex-col gap-1.5 w-full">
                         {msg.suggestions.map((item: MediaItem) => (
@@ -262,6 +273,7 @@ export default function AIChatAssistant() {
               <div ref={messagesEndRef} />
             </div>
 
+            {/* Input */}
             <form onSubmit={handleSubmit} className="p-3 border-t border-border flex gap-2">
               <input
                 type="text"

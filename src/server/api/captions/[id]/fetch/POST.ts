@@ -101,7 +101,7 @@ export default async function handler(req: Request, res: Response) {
     return;
   }
 
-  const id = req.params.id as string;
+  const { id } = req.params;
 
   // Look up the media item to get its IMDB ID and title
   const library = readLibrary();

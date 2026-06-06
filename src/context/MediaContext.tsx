@@ -15,7 +15,7 @@ interface MediaContextType {
   loading: boolean;
   watchlist: string[];
   continueWatching: ContinueWatchingItem[];
-  pendingRecommendation: string | null;
+  pendingRecommendation: string | null; // id of just-finished item
   refreshLibrary: () => Promise<void>;
   addToWatchlist: (id: string) => void;
   removeFromWatchlist: (id: string) => void;
@@ -33,58 +33,81 @@ export function MediaProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [pendingRecommendation, setPendingRecommendation] = useState<string | null>(null);
 
+  // Get active profile so we can scope library fetches and progress writes
   const { activeProfile } = useProfile();
   const profileId = activeProfile?.id ?? 'adult';
 
+  // Profile-scoped localStorage keys — each profile gets its own cache bucket
   const progressKey = `homestream-progress-${profileId}`;
   const watchlistKey = `homestream-watchlist-${profileId}`;
+
+  // ETag from the last successful /api/media response — used for 304 revalidation.
+  // Stored per-profile so switching profiles always fetches fresh data.
   const etagKey = `homestream-etag-${profileId}`;
   const libraryEtagRef = useRef<string | null>(null);
 
+  // Seed ETag from localStorage on mount so the very first navigation after
+  // a page refresh can still get a 304 if nothing changed.
   useEffect(() => {
     libraryEtagRef.current = localStorage.getItem(etagKey);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profileId]);
 
+  // Watchlist — server is source of truth; localStorage is a fast initial value
+  // that gets replaced on first successful server fetch.
   const [watchlist, setWatchlist] = useState<string[]>(() => {
-    try { return JSON.parse(localStorage.getItem(`homestream-watchlist-${profileId}`) || '[]'); }
-    catch { return []; }
+    try {
+      return JSON.parse(localStorage.getItem(watchlistKey) || '[]');
+    } catch { return []; }
   });
 
   const [continueWatching, setContinueWatching] = useState<ContinueWatchingItem[]>(() => {
-    try { return JSON.parse(localStorage.getItem(`homestream-progress-${profileId}`) || '[]'); }
-    catch { return []; }
+    try {
+      return JSON.parse(localStorage.getItem(progressKey) || '[]');
+    } catch { return []; }
   });
 
+  // ── Fetch watchlist from server on mount / profile change ───────────────────
   useEffect(() => {
-    fetch(`/api/watchlist?profile=${encodeURIComponent(profileId)}`, { credentials: 'include' })
-      .then(r => r.ok ? r.json() as Promise<string[]> : Promise.reject())
+    fetch(`/api/watchlist?profile=${encodeURIComponent(profileId)}`, { credentials: 'include' })      .then(r => r.ok ? r.json() as Promise<string[]> : Promise.reject())
       .then(ids => {
         setWatchlist(ids);
         localStorage.setItem(watchlistKey, JSON.stringify(ids));
       })
-      .catch(() => { /* keep localStorage value */ });
+      .catch(() => {
+        // Server unavailable — keep localStorage value, will sync on next load
+      });
   }, [profileId, watchlistKey]);
 
   const refreshLibrary = useCallback(async () => {
     try {
       setLoading(true);
+      // Send ETag from last fetch — server returns 304 if nothing changed,
+      // saving the full JSON round-trip on every page navigation.
       const headers: HeadersInit = {};
       const cachedEtag = libraryEtagRef.current;
       if (cachedEtag) headers['If-None-Match'] = cachedEtag;
 
       const res = await fetch(`/api/media?profile=${profileId}`, { headers, credentials: 'include' });
 
-      if (res.status === 304) { setLoading(false); return; }
+      // 304 Not Modified — library hasn't changed; keep current state as-is.
+      if (res.status === 304) {
+        setLoading(false);
+        return;
+      }
 
       if (res.ok) {
+        // Store the new ETag for the next request
         const newEtag = res.headers.get('ETag');
         if (newEtag) {
           libraryEtagRef.current = newEtag;
           localStorage.setItem(etagKey, newEtag);
         }
+
         const data = await res.json() as MediaItem[];
         setLibrary(data);
+        // Reconcile continueWatching from server — server is source of truth after restart.
+        // Build a merged list: server watchProgress wins over stale localStorage values.
         const serverProgress: ContinueWatchingItem[] = data
           .filter(m => m.watchProgress && m.watchProgress > 2 && m.watchProgress < 95)
           .sort((a, b) => {
@@ -92,11 +115,17 @@ export function MediaProvider({ children }: { children: ReactNode }) {
             const tb = b.lastWatchedAt ? new Date(b.lastWatchedAt).getTime() : 0;
             return tb - ta;
           })
-          .map(m => ({ id: m.id, progress: m.watchProgress!, lastWatchedAt: m.lastWatchedAt, totalSeconds: m.totalSeconds }));
+          .map(m => ({
+            id: m.id,
+            progress: m.watchProgress!,
+            lastWatchedAt: m.lastWatchedAt,
+            totalSeconds: m.totalSeconds,
+          }));
         if (serverProgress.length > 0) {
           setContinueWatching(serverProgress);
           localStorage.setItem(progressKey, JSON.stringify(serverProgress));
         } else {
+          // Profile has no in-progress items — clear the local cache too
           setContinueWatching([]);
           localStorage.removeItem(progressKey);
         }
@@ -108,8 +137,13 @@ export function MediaProvider({ children }: { children: ReactNode }) {
     }
   }, [profileId, progressKey, etagKey]);
 
-  useEffect(() => { refreshLibrary(); }, [refreshLibrary]);
+  useEffect(() => {
+    refreshLibrary();
+  }, [refreshLibrary]);
 
+  // When the active profile changes, immediately seed continueWatching and
+  // watchlist from that profile's localStorage cache so the UI doesn't flash
+  // the old profile's data before the server fetch completes.
   useEffect(() => {
     try {
       const cached = JSON.parse(localStorage.getItem(progressKey) || '[]') as ContinueWatchingItem[];
@@ -121,13 +155,17 @@ export function MediaProvider({ children }: { children: ReactNode }) {
     } catch { /* ignore */ }
   }, [progressKey, watchlistKey]);
 
+  // ── Watchlist mutations — optimistic UI + server persist ───────────────────
+
   const addToWatchlist = useCallback((id: string) => {
+    // Optimistic update
     setWatchlist(prev => {
       if (prev.includes(id)) return prev;
       const next = [...prev, id];
       localStorage.setItem(watchlistKey, JSON.stringify(next));
       return next;
     });
+    // Persist to server
     fetch(`/api/watchlist/${id}?profile=${encodeURIComponent(profileId)}`, { method: 'PUT', credentials: 'include' })
       .then(r => r.ok ? r.json() as Promise<{ watchlist: string[] }> : Promise.reject())
       .then(({ watchlist: serverList }) => {
@@ -135,6 +173,7 @@ export function MediaProvider({ children }: { children: ReactNode }) {
         localStorage.setItem(watchlistKey, JSON.stringify(serverList));
       })
       .catch(() => {
+        // Server write failed — revert optimistic update
         setWatchlist(prev => {
           const reverted = prev.filter(w => w !== id);
           localStorage.setItem(watchlistKey, JSON.stringify(reverted));
@@ -144,11 +183,13 @@ export function MediaProvider({ children }: { children: ReactNode }) {
   }, [profileId, watchlistKey]);
 
   const removeFromWatchlist = useCallback((id: string) => {
+    // Optimistic update
     setWatchlist(prev => {
       const next = prev.filter(w => w !== id);
       localStorage.setItem(watchlistKey, JSON.stringify(next));
       return next;
     });
+    // Persist to server
     fetch(`/api/watchlist/${id}?profile=${encodeURIComponent(profileId)}`, { method: 'DELETE', credentials: 'include' })
       .then(r => r.ok ? r.json() as Promise<{ watchlist: string[] }> : Promise.reject())
       .then(({ watchlist: serverList }) => {
@@ -156,6 +197,7 @@ export function MediaProvider({ children }: { children: ReactNode }) {
         localStorage.setItem(watchlistKey, JSON.stringify(serverList));
       })
       .catch(() => {
+        // Server write failed — revert optimistic update (add back)
         setWatchlist(prev => {
           const reverted = [...prev, id];
           localStorage.setItem(watchlistKey, JSON.stringify(reverted));
@@ -165,8 +207,10 @@ export function MediaProvider({ children }: { children: ReactNode }) {
   }, [profileId, watchlistKey]);
 
   const updateProgress = useCallback((id: string, progress: number, currentTime?: number, duration?: number) => {
+    // If complete (≥95%), remove from Continue Watching
     const isComplete = progress >= 95;
     const now = new Date().toISOString();
+    const totalSeconds = duration;
     setContinueWatching(prev => {
       let next: ContinueWatchingItem[];
       if (isComplete) {
@@ -175,14 +219,15 @@ export function MediaProvider({ children }: { children: ReactNode }) {
         const existing = prev.findIndex(c => c.id === id);
         if (existing >= 0) {
           next = [...prev];
-          next[existing] = { id, progress, lastWatchedAt: now, totalSeconds: duration };
+          next[existing] = { id, progress, lastWatchedAt: now, totalSeconds };
         } else {
-          next = [...prev, { id, progress, lastWatchedAt: now, totalSeconds: duration }];
+          next = [...prev, { id, progress, lastWatchedAt: now, totalSeconds }];
         }
       }
       localStorage.setItem(progressKey, JSON.stringify(next));
       return next;
     });
+    // Persist to server — survives restarts, device switches
     fetch(`/api/media/${id}/progress`, {
       method: 'PATCH',
       credentials: 'include',
@@ -202,6 +247,7 @@ export function MediaProvider({ children }: { children: ReactNode }) {
   const deleteMedia = useCallback(async (id: string) => {
     await fetch(`/api/media/${id}`, { method: 'DELETE', credentials: 'include' });
     setLibrary(prev => prev.filter(m => m.id !== id));
+    // Also remove from watchlist if present
     removeFromWatchlist(id);
   }, [removeFromWatchlist]);
 
@@ -219,9 +265,19 @@ export function MediaProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const contextValue = useMemo(() => ({
-    library, loading, watchlist, continueWatching, pendingRecommendation,
-    refreshLibrary, addToWatchlist, removeFromWatchlist, updateProgress,
-    deleteMedia, updateMedia, triggerPostWatchRecommendation, clearPendingRecommendation,
+    library,
+    loading,
+    watchlist,
+    continueWatching,
+    pendingRecommendation,
+    refreshLibrary,
+    addToWatchlist,
+    removeFromWatchlist,
+    updateProgress,
+    deleteMedia,
+    updateMedia,
+    triggerPostWatchRecommendation,
+    clearPendingRecommendation,
   }), [
     library, loading, watchlist, continueWatching, pendingRecommendation,
     refreshLibrary, addToWatchlist, removeFromWatchlist, updateProgress,

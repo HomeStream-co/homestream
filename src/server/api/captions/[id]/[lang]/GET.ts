@@ -57,8 +57,7 @@ const VALID_LANG_CODES = new Set([
 ]);
 
 export default async function handler(req: Request, res: Response) {
-  const id = req.params.id as string;
-  const lang = req.params.lang as string;
+  const { id, lang } = req.params;
 
   // Validate lang against the full ISO 639-1 whitelist to prevent path traversal.
   // Any value not in the set (e.g. "../../../etc/passwd") is rejected here

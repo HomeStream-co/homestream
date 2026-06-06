@@ -27,15 +27,26 @@ export default function SettingsAppearance() {
               >
                 {/* Half-color / half-black circle swatch */}
                 <div className="relative w-7 h-7 rounded-full overflow-hidden flex-shrink-0 ring-1 ring-white/10">
-                  <div className="absolute inset-0 w-1/2" style={{ background: theme.swatch }} />
-                  <div className="absolute inset-0 left-1/2" style={{ background: '#0a0a0a' }} />
+                  {/* Left half — theme color */}
+                  <div
+                    className="absolute inset-0 w-1/2"
+                    style={{ background: theme.swatch }}
+                  />
+                  {/* Right half — near-black */}
+                  <div
+                    className="absolute inset-0 left-1/2"
+                    style={{ background: '#0a0a0a' }}
+                  />
+                  {/* Divider line */}
                   <div className="absolute inset-y-0 left-1/2 w-px bg-white/10" />
                 </div>
 
+                {/* Label */}
                 <span className="text-[9px] text-center leading-tight text-muted-foreground font-medium line-clamp-2 w-full">
                   {theme.name}
                 </span>
 
+                {/* Active checkmark */}
                 {active && (
                   <div className="absolute top-1 right-1 w-3 h-3 rounded-full bg-primary flex items-center justify-center">
                     <Check className="w-1.5 h-1.5 text-white" />

@@ -3,6 +3,20 @@
  *
  * Opens when the user right-clicks (desktop) or long-presses (mobile) any
  * MediaCard in the library or carousels.
+ *
+ * Menu options:
+ *   ▶  Play                — navigate to player
+ *   ℹ  More Info           — navigate to detail page (movie/show only)
+ *   ★  Add to Favorites    — toggle watchlist
+ *   ▶  Play Trailer        — fetch + open YouTube trailer (no-ad domain)
+ *
+ * The panel slides in from the right side of the screen on mobile,
+ * and appears as a floating card near the cursor on desktop.
+ *
+ * Usage:
+ *   Wrap any element with <MediaContextMenu item={item}>
+ *     <MediaCard item={item} />
+ *   </MediaContextMenu>
  */
 
 import { useState, useRef, useCallback, useEffect } from 'react';
@@ -16,11 +30,16 @@ import { useMedia } from '@/context/MediaContext';
 import TrailerButton from '@/components/TrailerButton';
 import { toast } from 'sonner';
 
+// ── Types ─────────────────────────────────────────────────────────────────────
+
 interface MediaContextMenuProps {
   item: MediaItem;
   children: React.ReactNode;
+  /** Disable the context menu (e.g. in select mode) */
   disabled?: boolean;
 }
+
+// ── Component ─────────────────────────────────────────────────────────────────
 
 export default function MediaContextMenu({ item, children, disabled = false }: MediaContextMenuProps) {
   const navigate = useNavigate();
@@ -34,6 +53,8 @@ export default function MediaContextMenu({ item, children, disabled = false }: M
   const containerRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
+  // ── Open helpers ────────────────────────────────────────────────────────────
+
   const openMenu = useCallback((x: number, y: number) => {
     if (disabled) return;
     setMenuPos({ x, y });
@@ -46,10 +67,14 @@ export default function MediaContextMenu({ item, children, disabled = false }: M
     setConfirmDelete(false);
   }, []);
 
+  // ── Right-click (desktop) ───────────────────────────────────────────────────
+
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     openMenu(e.clientX, e.clientY);
   }, [openMenu]);
+
+  // ── Long-press (mobile / touch) ─────────────────────────────────────────────
 
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
     const touch = e.touches[0];
@@ -65,12 +90,16 @@ export default function MediaContextMenu({ item, children, disabled = false }: M
     }
   }, []);
 
+  // ── Close on outside click / Escape ────────────────────────────────────────
+
   useEffect(() => {
     if (!open) return;
+
     const handleKey = (e: KeyboardEvent) => { if (e.key === 'Escape') closeMenu(); };
     const handleClick = (e: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) closeMenu();
     };
+
     window.addEventListener('keydown', handleKey);
     window.addEventListener('mousedown', handleClick);
     return () => {
@@ -78,6 +107,8 @@ export default function MediaContextMenu({ item, children, disabled = false }: M
       window.removeEventListener('mousedown', handleClick);
     };
   }, [open, closeMenu]);
+
+  // ── Routing ─────────────────────────────────────────────────────────────────
 
   const detailPath = item.type === 'movie'
     ? `/movie/${item.id}`
@@ -91,6 +122,7 @@ export default function MediaContextMenu({ item, children, disabled = false }: M
   const handleInfo = () => { closeMenu(); navigate(detailPath); };
   const handleFavorite = () => {
     if (inWatchlist) { removeFromWatchlist(item.id); } else { addToWatchlist(item.id); }
+    // Keep menu open so user can see the state change
   };
   const handleDeleteConfirmed = async () => {
     closeMenu();
@@ -98,8 +130,11 @@ export default function MediaContextMenu({ item, children, disabled = false }: M
     toast.success(`"${item.title}" removed from library`);
   };
 
+  // ── Compute menu position (keep inside viewport) ────────────────────────────
+
   const isMobile = typeof window !== 'undefined' && window.innerWidth < 640;
 
+  // On mobile: full-width bottom sheet. On desktop: floating card near cursor.
   const getMenuStyle = (): React.CSSProperties => {
     if (isMobile || !menuPos) return {};
     const menuW = 220;
@@ -129,6 +164,7 @@ export default function MediaContextMenu({ item, children, disabled = false }: M
       <AnimatePresence>
         {open && (
           <>
+            {/* Backdrop (mobile only) */}
             {isMobile && (
               <motion.div
                 initial={{ opacity: 0 }}
@@ -139,11 +175,21 @@ export default function MediaContextMenu({ item, children, disabled = false }: M
               />
             )}
 
+            {/* Menu panel */}
             <motion.div
               ref={menuRef}
-              initial={isMobile ? { y: '100%', opacity: 1 } : { opacity: 0, scale: 0.95 }}
-              animate={isMobile ? { y: 0, opacity: 1 } : { opacity: 1, scale: 1 }}
-              exit={isMobile ? { y: '100%', opacity: 1 } : { opacity: 0, scale: 0.95 }}
+              initial={isMobile
+                ? { y: '100%', opacity: 1 }
+                : { opacity: 0, scale: 0.95 }
+              }
+              animate={isMobile
+                ? { y: 0, opacity: 1 }
+                : { opacity: 1, scale: 1 }
+              }
+              exit={isMobile
+                ? { y: '100%', opacity: 1 }
+                : { opacity: 0, scale: 0.95 }
+              }
               transition={{ duration: 0.18, ease: 'easeOut' }}
               style={isMobile
                 ? { position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 300 }
@@ -153,7 +199,7 @@ export default function MediaContextMenu({ item, children, disabled = false }: M
                 isMobile ? 'rounded-t-2xl' : 'rounded-xl w-56'
               }`}
             >
-              {/* Header */}
+              {/* Header — poster + title */}
               <div className="flex items-center gap-3 px-4 py-3 border-b border-border bg-muted/20">
                 <div className="w-10 h-14 rounded-md overflow-hidden bg-muted flex-shrink-0">
                   {item.poster
@@ -177,6 +223,8 @@ export default function MediaContextMenu({ item, children, disabled = false }: M
 
               {/* Menu items */}
               <div className="py-1">
+
+                {/* Confirm-delete state */}
                 {confirmDelete ? (
                   <div className="px-4 py-3">
                     <div className="flex items-center gap-2 mb-3">
@@ -191,7 +239,8 @@ export default function MediaContextMenu({ item, children, disabled = false }: M
                         onClick={handleDeleteConfirmed}
                         className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-red-500 hover:bg-red-600 text-white text-xs font-semibold transition-colors"
                       >
-                        <Trash2 className="w-3 h-3" />Remove
+                        <Trash2 className="w-3 h-3" />
+                        Remove
                       </button>
                       <button
                         onClick={() => setConfirmDelete(false)}
@@ -203,57 +252,75 @@ export default function MediaContextMenu({ item, children, disabled = false }: M
                   </div>
                 ) : (
                   <>
-                    <button onClick={handlePlay} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/60 transition-colors text-left">
-                      <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
-                        <Play className="w-3.5 h-3.5 text-primary-foreground fill-primary-foreground ml-0.5" />
-                      </div>
-                      <span className="text-sm font-semibold text-foreground">
-                        {item.type === 'series' ? 'Watch Show' : 'Play'}
-                      </span>
-                    </button>
+                {/* Play */}
+                <button
+                  onClick={handlePlay}
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/60 transition-colors text-left"
+                >
+                  <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
+                    <Play className="w-3.5 h-3.5 text-primary-foreground fill-primary-foreground ml-0.5" />
+                  </div>
+                  <span className="text-sm font-semibold text-foreground">
+                    {item.type === 'series' ? 'Watch Show' : 'Play'}
+                  </span>
+                </button>
 
-                    {(item.type === 'movie' || item.type === 'series') && (
-                      <button onClick={handleInfo} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/60 transition-colors text-left">
-                        <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
-                          <Info className="w-3.5 h-3.5 text-muted-foreground" />
-                        </div>
-                        <span className="text-sm font-medium text-foreground">More Info</span>
-                      </button>
-                    )}
+                {/* More Info (movie/series only) */}
+                {(item.type === 'movie' || item.type === 'series') && (
+                  <button
+                    onClick={handleInfo}
+                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/60 transition-colors text-left"
+                  >
+                    <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
+                      <Info className="w-3.5 h-3.5 text-muted-foreground" />
+                    </div>
+                    <span className="text-sm font-medium text-foreground">More Info</span>
+                  </button>
+                )}
 
-                    <button onClick={handleFavorite} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/60 transition-colors text-left">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${inWatchlist ? 'bg-yellow-500/20' : 'bg-muted'}`}>
-                        {inWatchlist
-                          ? <StarOff className="w-3.5 h-3.5 text-yellow-500" />
-                          : <Star className="w-3.5 h-3.5 text-muted-foreground" />
-                        }
-                      </div>
-                      <span className="text-sm font-medium text-foreground">
-                        {inWatchlist ? 'Remove from Favorites' : 'Add to Favorites'}
-                      </span>
-                    </button>
+                {/* Add to / Remove from Favorites */}
+                <button
+                  onClick={handleFavorite}
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/60 transition-colors text-left"
+                >
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+                    inWatchlist ? 'bg-yellow-500/20' : 'bg-muted'
+                  }`}>
+                    {inWatchlist
+                      ? <StarOff className="w-3.5 h-3.5 text-yellow-500" />
+                      : <Star className="w-3.5 h-3.5 text-muted-foreground" />
+                    }
+                  </div>
+                  <span className="text-sm font-medium text-foreground">
+                    {inWatchlist ? 'Remove from Favorites' : 'Add to Favorites'}
+                  </span>
+                </button>
 
-                    <TrailerButton
-                      title={item.title}
-                      year={item.year}
-                      type={item.type === 'series' ? 'series' : 'movie'}
-                      variant="menuitem"
-                    />
+                {/* Play Trailer — uses TrailerButton in menuitem variant */}
+                <TrailerButton
+                  title={item.title}
+                  year={item.year}
+                  type={item.type === 'series' ? 'series' : 'movie'}
+                  variant="menuitem"
+                />
 
-                    <div className="border-t border-border mx-4 my-1" />
-                    <button
-                      onClick={() => setConfirmDelete(true)}
-                      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-red-500/10 transition-colors text-left group"
-                    >
-                      <div className="w-8 h-8 rounded-full bg-red-500/10 flex items-center justify-center flex-shrink-0 group-hover:bg-red-500/20 transition-colors">
-                        <Trash2 className="w-3.5 h-3.5 text-red-400" />
-                      </div>
-                      <span className="text-sm font-medium text-red-400">Remove from Library</span>
-                    </button>
+                {/* Divider + Delete */}
+                <div className="border-t border-border mx-4 my-1" />
+                <button
+                  onClick={() => setConfirmDelete(true)}
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-red-500/10 transition-colors text-left group"
+                >
+                  <div className="w-8 h-8 rounded-full bg-red-500/10 flex items-center justify-center flex-shrink-0 group-hover:bg-red-500/20 transition-colors">
+                    <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                  </div>
+                  <span className="text-sm font-medium text-red-400">Remove from Library</span>
+                </button>
                   </>
                 )}
+
               </div>
 
+              {/* Safe area padding for mobile notch */}
               {isMobile && <div className="h-safe-bottom pb-4" />}
             </motion.div>
           </>

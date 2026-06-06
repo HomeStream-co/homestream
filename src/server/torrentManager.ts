@@ -95,10 +95,10 @@ export function getAllJobs(): TorrentJob[] {
       eta: 0,
       addedAt: j.addedAt,
       completedAt: j.completedAt,
-      infoHash: j.infoHash ?? '',
-      imdbId: j.imdbId ?? '',
+      infoHash: j.infoHash,
+      imdbId: j.imdbId,
       poster: j.poster,
-    } as TorrentJob));
+    }));
 
   const inMemoryIds = new Set(jobs.keys());
   const merged = [...Array.from(jobs.values()).sort(

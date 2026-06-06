@@ -6,7 +6,7 @@ import { getActiveProfileId } from '../../../ratingGate.js';
 export default function handler(req: Request, res: Response) {
   try {
     if (!requireAuth(req, res)) return;
-    const id = req.params.id as string;
+    const { id } = req.params;
     const { name, avatar, color, restricted, maxRating, isAdmin } = req.body as {
       name?: string;
       avatar?: string;

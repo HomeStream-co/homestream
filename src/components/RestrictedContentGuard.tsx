@@ -2,9 +2,22 @@
  * RestrictedContentGuard
  *
  * Wraps any page that shows a single piece of content (movie detail, show
- * detail, player). When the active profile is restricted AND the content's
+ * detail, player).  When the active profile is restricted AND the content's
  * MPAA rating is not in the allowed list, the page is replaced with a PIN
  * challenge overlay.
+ *
+ * Once the correct PIN is entered the user gets a 30-minute session window
+ * (stored in sessionStorage so it survives in-tab navigation but not a new
+ * tab or browser restart).  The window is keyed per-profile so switching
+ * profiles resets it.
+ *
+ * Usage:
+ *   <RestrictedContentGuard rated={item?.rated}>
+ *     <MovieDetailContent />
+ *   </RestrictedContentGuard>
+ *
+ * If `rated` is undefined (item not yet loaded) the guard renders children
+ * immediately — the caller is responsible for showing its own loading state.
  */
 
 import { useState, useEffect, useCallback, type ReactNode } from 'react';
@@ -13,7 +26,9 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Lock, ArrowLeft, ShieldAlert } from 'lucide-react';
 import { useProfile, KIDS_ALLOWED_RATINGS } from '@/context/ProfileContext';
 
-const SESSION_TTL_MS = 30 * 60 * 1000;
+// ── Session storage helpers ───────────────────────────────────────────────────
+
+const SESSION_TTL_MS = 30 * 60 * 1000; // 30 minutes
 
 function sessionKey(profileId: string) {
   return `homestream-parental-unlock-${profileId}`;
@@ -24,14 +39,24 @@ function isUnlocked(profileId: string): boolean {
     const raw = sessionStorage.getItem(sessionKey(profileId));
     if (!raw) return false;
     const { expiresAt } = JSON.parse(raw) as { expiresAt: number };
-    if (Date.now() > expiresAt) { sessionStorage.removeItem(sessionKey(profileId)); return false; }
+    if (Date.now() > expiresAt) {
+      sessionStorage.removeItem(sessionKey(profileId));
+      return false;
+    }
     return true;
-  } catch { return false; }
+  } catch {
+    return false;
+  }
 }
 
 function grantUnlock(profileId: string) {
-  sessionStorage.setItem(sessionKey(profileId), JSON.stringify({ expiresAt: Date.now() + SESSION_TTL_MS }));
+  sessionStorage.setItem(
+    sessionKey(profileId),
+    JSON.stringify({ expiresAt: Date.now() + SESSION_TTL_MS }),
+  );
 }
+
+// ── PIN input component ───────────────────────────────────────────────────────
 
 interface PinInputProps {
   profileId: string;
@@ -53,8 +78,10 @@ function PinInput({ profileId, profileName, onSuccess, onBack }: PinInputProps) 
     setError('');
     try {
       const ok = await verifyPin(profileId, pin);
-      if (ok) { grantUnlock(profileId); onSuccess(); }
-      else {
+      if (ok) {
+        grantUnlock(profileId);
+        onSuccess();
+      } else {
         setShake(true);
         setError('Incorrect PIN');
         setDigits('');
@@ -63,14 +90,20 @@ function PinInput({ profileId, profileName, onSuccess, onBack }: PinInputProps) 
     } catch {
       setError('Could not verify PIN. Try again.');
       setDigits('');
-    } finally { setChecking(false); }
+    } finally {
+      setChecking(false);
+    }
   }, [checking, profileId, verifyPin, onSuccess]);
 
   const handleDigit = useCallback((d: string) => {
     const next = (digits + d).slice(0, 8);
     setDigits(next);
     setError('');
-    if (next.length >= 4) { setTimeout(() => submit(next), 80); }
+    if (next.length >= 4) {
+      // Auto-submit once we have at least 4 digits and user pressed the last one
+      // We wait briefly so the dot animation is visible
+      setTimeout(() => submit(next), 80);
+    }
   }, [digits, submit]);
 
   const handleKey = useCallback((e: React.KeyboardEvent) => {
@@ -86,14 +119,26 @@ function PinInput({ profileId, profileName, onSuccess, onBack }: PinInputProps) 
       tabIndex={-1}
       autoFocus
     >
-      <button onClick={onBack} className="absolute top-6 left-6 flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors" aria-label="Go back">
-        <ArrowLeft className="w-4 h-4" />Back
+      {/* Back button */}
+      <button
+        onClick={onBack}
+        className="absolute top-6 left-6 flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+        aria-label="Go back"
+      >
+        <ArrowLeft className="w-4 h-4" />
+        Back
       </button>
 
-      <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="w-16 h-16 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center">
+      {/* Lock icon */}
+      <motion.div
+        initial={{ scale: 0.8, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        className="w-16 h-16 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center"
+      >
         <Lock className="w-7 h-7 text-primary" />
       </motion.div>
 
+      {/* Heading */}
       <div className="text-center">
         <h2 className="text-xl font-bold text-foreground">Parental PIN Required</h2>
         <p className="text-sm text-muted-foreground mt-1">
@@ -101,6 +146,7 @@ function PinInput({ profileId, profileName, onSuccess, onBack }: PinInputProps) 
         </p>
       </div>
 
+      {/* PIN dots */}
       <motion.div
         animate={shake ? { x: [0, -8, 8, -8, 8, 0] } : {}}
         transition={{ duration: 0.4 }}
@@ -108,18 +154,33 @@ function PinInput({ profileId, profileName, onSuccess, onBack }: PinInputProps) 
         aria-label="PIN entry"
       >
         {Array.from({ length: Math.max(4, digits.length) }).map((_, i) => (
-          <div key={i} className={`w-4 h-4 rounded-full border-2 transition-all duration-150 ${i < digits.length ? 'bg-primary border-primary scale-110' : 'bg-transparent border-muted-foreground/40'}`} />
+          <div
+            key={i}
+            className={`w-4 h-4 rounded-full border-2 transition-all duration-150 ${
+              i < digits.length
+                ? 'bg-primary border-primary scale-110'
+                : 'bg-transparent border-muted-foreground/40'
+            }`}
+          />
         ))}
       </motion.div>
 
+      {/* Error */}
       <AnimatePresence>
         {error && (
-          <motion.p key="err" initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="text-sm text-destructive">
+          <motion.p
+            key="err"
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            className="text-sm text-destructive"
+          >
             {error}
           </motion.p>
         )}
       </AnimatePresence>
 
+      {/* Numpad */}
       <div className="grid grid-cols-3 gap-3 w-64">
         {['1','2','3','4','5','6','7','8','9','','0','⌫'].map((key) => (
           <button
@@ -145,11 +206,14 @@ function PinInput({ profileId, profileName, onSuccess, onBack }: PinInputProps) 
       </div>
 
       <p className="text-xs text-muted-foreground/60 text-center max-w-xs">
-        Enter the PIN for this profile to access restricted content. Access is granted for 30 minutes.
+        Enter the PIN for this profile to access restricted content.
+        Access is granted for 30 minutes.
       </p>
     </div>
   );
 }
+
+// ── Blocked screen (no PIN set — profile is restricted but no PIN configured) ─
 
 interface BlockedProps {
   profileName: string;
@@ -160,12 +224,18 @@ interface BlockedProps {
 function BlockedScreen({ profileName, contentTitle, onBack }: BlockedProps) {
   return (
     <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex flex-col items-center justify-center gap-6 p-6 text-center">
-      <button onClick={onBack} className="absolute top-6 left-6 flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
-        <ArrowLeft className="w-4 h-4" />Back
+      <button
+        onClick={onBack}
+        className="absolute top-6 left-6 flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+      >
+        <ArrowLeft className="w-4 h-4" />
+        Back
       </button>
+
       <div className="w-16 h-16 rounded-full bg-destructive/10 border border-destructive/20 flex items-center justify-center">
         <ShieldAlert className="w-7 h-7 text-destructive" />
       </div>
+
       <div>
         <h2 className="text-xl font-bold text-foreground">Content Restricted</h2>
         {contentTitle && (
@@ -174,49 +244,78 @@ function BlockedScreen({ profileName, contentTitle, onBack }: BlockedProps) {
           </p>
         )}
         <p className="text-sm text-muted-foreground mt-2">
-          <span className="text-foreground font-medium">{profileName}</span> is a restricted profile. Ask an adult to set a PIN to allow access.
+          <span className="text-foreground font-medium">{profileName}</span> is a restricted profile.
+          Ask an adult to set a PIN to allow access to this content.
         </p>
       </div>
-      <button onClick={onBack} className="px-6 py-2.5 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors">
+
+      <button
+        onClick={onBack}
+        className="px-6 py-2.5 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors"
+      >
         Go Back
       </button>
     </div>
   );
 }
 
+// ── Main guard ────────────────────────────────────────────────────────────────
+
 interface RestrictedContentGuardProps {
+  /** MPAA / TV rating string from the media item (e.g. "R", "TV-MA", "PG-13") */
   rated?: string;
+  /** Optional title for the blocked screen message */
   contentTitle?: string;
   children: ReactNode;
 }
 
-export default function RestrictedContentGuard({ rated, contentTitle, children }: RestrictedContentGuardProps) {
+export default function RestrictedContentGuard({
+  rated,
+  contentTitle,
+  children,
+}: RestrictedContentGuardProps) {
   const { activeProfile } = useProfile();
   const navigate = useNavigate();
 
+  // Track whether the user has unlocked for this session
   const [unlocked, setUnlocked] = useState(() => {
     if (!activeProfile) return false;
     return isUnlocked(activeProfile.id);
   });
 
+  // Re-check when profile changes
   useEffect(() => {
     if (!activeProfile) return;
     setUnlocked(isUnlocked(activeProfile.id));
   }, [activeProfile?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // If item not loaded yet, or profile not loaded, render children (page handles its own loading)
   if (!activeProfile || rated === undefined) return <>{children}</>;
+
+  // Profile is not restricted — always allow
   if (!activeProfile.restricted) return <>{children}</>;
 
+  // Normalise rating
   const normalised = rated.trim().toUpperCase();
   const allowed = normalised === 'N/A' || normalised === '' || KIDS_ALLOWED_RATINGS.includes(normalised);
 
+  // Content is allowed for this profile
   if (allowed) return <>{children}</>;
+
+  // Content is blocked but user already unlocked this session
   if (unlocked) return <>{children}</>;
 
+  // Blocked — show PIN gate or hard block
   const handleBack = () => navigate(-1);
 
   if (!activeProfile.hasPin) {
-    return <BlockedScreen profileName={activeProfile.name} contentTitle={contentTitle} onBack={handleBack} />;
+    return (
+      <BlockedScreen
+        profileName={activeProfile.name}
+        contentTitle={contentTitle}
+        onBack={handleBack}
+      />
+    );
   }
 
   return (

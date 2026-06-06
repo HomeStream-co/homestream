@@ -3,6 +3,12 @@
  *
  * Netflix-style 4-digit PIN entry overlay shown when the user tries to
  * select a PIN-protected profile.
+ *
+ * Props:
+ *   onVerify    — async function that returns true if the PIN is correct
+ *   onSuccess   — called after onVerify resolves true
+ *   onCancel    — called when the user dismisses without entering PIN
+ *   profileName — shown in the heading ("Enter PIN for Adult")
  */
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -12,6 +18,7 @@ interface PinLockProps {
   onSuccess: () => void;
   onCancel: () => void;
   profileName?: string;
+  /** Async verifier — returns true if PIN is correct. Defaults to always-true. */
   onVerify?: (pin: string) => Promise<boolean>;
 }
 
@@ -88,6 +95,7 @@ export default function PinLock({
         onClick={e => e.stopPropagation()}
         className={`bg-card border border-border rounded-2xl p-8 w-full max-w-xs shadow-2xl ${shake ? 'animate-shake' : ''}`}
       >
+        {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-2">
             <Lock className="w-4 h-4 text-primary" />
@@ -100,6 +108,7 @@ export default function PinLock({
           </button>
         </div>
 
+        {/* PIN inputs */}
         <div className="flex justify-center gap-3 mb-6">
           {digits.map((d, i) => (
             <input
@@ -123,10 +132,14 @@ export default function PinLock({
           ))}
         </div>
 
+        {/* Checking spinner */}
         {checking && (
-          <p className="text-xs text-muted-foreground text-center mb-4 animate-pulse">Checking…</p>
+          <p className="text-xs text-muted-foreground text-center mb-4 animate-pulse">
+            Checking…
+          </p>
         )}
 
+        {/* Error */}
         <AnimatePresence>
           {error && !checking && (
             <motion.p

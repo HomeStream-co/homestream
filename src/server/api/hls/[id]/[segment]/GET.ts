@@ -35,8 +35,7 @@ async function waitForSegment(segPath: string): Promise<boolean> {
 export default async function handler(req: Request, res: Response) {
   if (!requireAuth(req, res)) return;
 
-  const id = req.params.id as string;
-  const segment = req.params.segment as string;
+  const { id, segment } = req.params;
 
   // Validate segment name — allow 4–6 digit segment filenames (e.g. 0000.ts … 999999.ts).
   // FFmpeg uses %04d by default but overflows to 5+ digits for files longer than ~5.5 hours.

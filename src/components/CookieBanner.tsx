@@ -147,7 +147,6 @@ export default function CookieBanner() {
 
   function saveConsent(analytics: boolean) {
     localStorage.setItem(COOKIE_CONSENT_KEY, JSON.stringify({ analytics, timestamp: Date.now() }));
-    window.dispatchEvent(new CustomEvent('cookie-consent-changed', { detail: { consented: analytics } }));
     if (analytics) initC2Tracking();
     setShowBanner(false);
   }
@@ -155,7 +154,6 @@ export default function CookieBanner() {
   function revokeConsent() {
     if (typeof window === 'undefined') return;
     localStorage.removeItem(COOKIE_CONSENT_KEY);
-    window.dispatchEvent(new CustomEvent('cookie-consent-changed', { detail: { consented: false } }));
     setShowBanner(true);
   }
 
@@ -174,7 +172,6 @@ export default function CookieBanner() {
       aria-live="polite"
       aria-label="Cookie consent banner"
       aria-describedby="cookie-banner-description"
-      data-airo-non-editable
     >
       <div className="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">

@@ -21,7 +21,7 @@ import { checkRating } from '../../../../ratingGate.js';
 export default async function handler(req: Request, res: Response) {
   if (!requireAuth(req, res)) return;
 
-  const id = req.params.id as string;
+  const { id } = req.params;
 
   try {
     // Find media item

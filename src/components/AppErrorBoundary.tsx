@@ -4,6 +4,8 @@
  *  1. Sends the error to POST /api/crash-log so it appears in the Debug Panel
  *  2. Shows a friendly recovery screen with a "Copy crash report" button so
  *     the user can paste it directly into the support chat
+ *
+ * Usage: wrap the root <App /> in main.tsx with <AppErrorBoundary>
  */
 
 import React from 'react';
@@ -33,6 +35,8 @@ export default class AppErrorBoundary extends React.Component<Props, State> {
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     this.setState({ errorInfo });
 
+    // If this is a stale chunk error (Vite hash mismatch after auto-update),
+    // attempt a single auto-reload with the same loop guard used in main.tsx.
     const msg = error.message ?? '';
     const isChunkError = (
       msg.includes('Failed to fetch dynamically imported module') ||
@@ -49,11 +53,12 @@ export default class AppErrorBoundary extends React.Component<Props, State> {
         console.warn('[HomeStream] AppErrorBoundary: stale chunk — reloading…');
         sessionStorage.setItem(CHUNK_RELOAD_KEY, String(now));
         window.location.replace(window.location.href);
-        return;
+        return; // don't log crash or show error screen — we're reloading
       }
       console.error('[HomeStream] AppErrorBoundary: chunk error persists after reload — showing crash screen.');
     }
 
+    // Post to the crash log API so it persists and shows in the Debug Panel
     fetch('/api/crash-log', {
       method: 'POST',
       credentials: 'include',
@@ -101,12 +106,14 @@ export default class AppErrorBoundary extends React.Component<Props, State> {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-6">
         <div className="w-full max-w-lg">
+          {/* Icon */}
           <div className="flex justify-center mb-6">
             <div className="w-16 h-16 rounded-2xl bg-destructive/10 border border-destructive/20 flex items-center justify-center">
               <Bug className="w-8 h-8 text-destructive" />
             </div>
           </div>
 
+          {/* Heading */}
           <h1 className="text-2xl font-bold text-foreground text-center mb-2">
             HomeStream ran into a problem
           </h1>
@@ -114,18 +121,21 @@ export default class AppErrorBoundary extends React.Component<Props, State> {
             Something in the interface crashed. Your media library and settings are safe.
           </p>
 
+          {/* Error summary */}
           <div className="rounded-xl border border-destructive/20 bg-destructive/5 p-4 mb-4">
             <p className="text-xs font-semibold text-destructive mb-1 uppercase tracking-wide">Error</p>
             <p className="text-sm font-mono text-foreground break-all">{error?.message ?? 'Unknown error'}</p>
           </div>
 
+          {/* Support callout */}
           <div className="rounded-xl border border-border bg-muted/20 p-4 mb-6">
             <p className="text-xs font-semibold text-foreground mb-1">Need help?</p>
             <p className="text-xs text-muted-foreground leading-relaxed">
-              Click <strong className="text-foreground">Copy crash report</strong> below, then paste it into the support chat.
+              Click <strong className="text-foreground">Copy crash report</strong> below, then paste it into the support chat. The report includes the full stack trace and component tree so the issue can be diagnosed quickly.
             </p>
           </div>
 
+          {/* Actions */}
           <div className="flex flex-col gap-3">
             <button
               onClick={() => this.copyReport()}
@@ -156,6 +166,7 @@ export default class AppErrorBoundary extends React.Component<Props, State> {
             </button>
           </div>
 
+          {/* Stack trace (collapsed) */}
           <details className="mt-6">
             <summary className="text-[10px] text-muted-foreground cursor-pointer hover:text-foreground transition-colors select-none">
               Show full stack trace

@@ -1,9 +1,26 @@
 /**
  * SettingsTranscode — Hardware encoder status + transcode quality presets.
+ *
+ * Shows:
+ *   • Detected encoder (NVENC / VAAPI / VideoToolbox / QSV / AMF / Software)
+ *   • A "Re-detect" button (forces a fresh probe — useful after driver install)
+ *   • Quality preset picker: Fast / Balanced / Quality / Lossless
+ *
+ * Quality presets map to CRF offsets applied on top of the resolution-based
+ * defaults in transcodeWorker.ts:
+ *   Fast      → +4 CRF  (smaller files, slightly lower quality)
+ *   Balanced  → ±0 CRF  (default — matches HandBrake RF presets)
+ *   Quality   → -3 CRF  (larger files, noticeably better quality)
+ *   Lossless  → copy stream where possible, CRF 0 for re-encodes
+ *
+ * Stored in homestream-config.json as `transcodePreset`.
+ * Read/written via POST /api/setup.
  */
 import { useEffect, useState, useCallback } from 'react';
 import { Cpu, RefreshCw, Check, Loader2, Zap } from 'lucide-react';
 import { SectionHeader } from './shared';
+
+// ── Types ─────────────────────────────────────────────────────────────────────
 
 type TranscodePreset = 'fast' | 'balanced' | 'quality' | 'lossless';
 
@@ -19,30 +36,60 @@ const PRESET_OPTIONS: {
   hint: string;
   badge?: string;
 }[] = [
-  { value: 'fast',      label: 'Fast',      hint: 'Smaller files, slightly softer image',              badge: 'CRF +4'  },
-  { value: 'balanced',  label: 'Balanced',  hint: 'Default — matches HandBrake RF presets',            badge: 'Default' },
-  { value: 'quality',   label: 'Quality',   hint: 'Larger files, noticeably sharper',                  badge: 'CRF −3'  },
-  { value: 'lossless',  label: 'Lossless',  hint: 'Copy stream when possible, CRF 0 for re-encodes',   badge: 'CRF 0'   },
+  {
+    value: 'fast',
+    label: 'Fast',
+    hint: 'Smaller files, slightly softer image',
+    badge: 'CRF +4',
+  },
+  {
+    value: 'balanced',
+    label: 'Balanced',
+    hint: 'Default — matches HandBrake RF presets',
+    badge: 'Default',
+  },
+  {
+    value: 'quality',
+    label: 'Quality',
+    hint: 'Larger files, noticeably sharper',
+    badge: 'CRF −3',
+  },
+  {
+    value: 'lossless',
+    label: 'Lossless',
+    hint: 'Copy stream when possible, CRF 0 for re-encodes',
+    badge: 'CRF 0',
+  },
 ];
 
-export default function SettingsTranscode() {
-  const [encoder, setEncoder]     = useState<EncoderStatus | null>(null);
-  const [detecting, setDetecting] = useState(false);
-  const [preset, setPreset]       = useState<TranscodePreset>('balanced');
-  const [presetLoaded, setPresetLoaded] = useState(false);
-  const [saving, setSaving]       = useState(false);
-  const [saved, setSaved]         = useState(false);
+// ── Component ─────────────────────────────────────────────────────────────────
 
+export default function SettingsTranscode() {
+  const [encoder, setEncoder]   = useState<EncoderStatus | null>(null);
+  const [detecting, setDetecting] = useState(false);
+
+  const [preset, setPreset]     = useState<TranscodePreset>('balanced');
+  const [presetLoaded, setPresetLoaded] = useState(false);
+  const [saving, setSaving]     = useState(false);
+  const [saved, setSaved]       = useState(false);
+
+  // ── Load encoder status ──────────────────────────────────────────────────
   const loadEncoder = useCallback(async (force = false) => {
     setDetecting(true);
     try {
-      const url = force ? '/api/encoder/status?refresh=1' : '/api/encoder/status';
+      const url = force
+        ? '/api/encoder/status?refresh=1'
+        : '/api/encoder/status';
       const r = await fetch(url, { credentials: 'include' });
-      if (r.ok) setEncoder(await r.json() as EncoderStatus);
+      if (r.ok) {
+        const data = await r.json() as EncoderStatus;
+        setEncoder(data);
+      }
     } catch { /* non-fatal */ }
     setDetecting(false);
   }, []);
 
+  // ── Load preset from config ──────────────────────────────────────────────
   useEffect(() => {
     fetch('/api/setup', { credentials: 'include' })
       .then(r => r.json())
@@ -51,9 +98,11 @@ export default function SettingsTranscode() {
         setPresetLoaded(true);
       })
       .catch(() => setPresetLoaded(true));
+
     loadEncoder();
   }, [loadEncoder]);
 
+  // ── Save preset ──────────────────────────────────────────────────────────
   const handlePreset = useCallback(async (p: TranscodePreset) => {
     if (p === preset || saving) return;
     setPreset(p);
@@ -72,6 +121,7 @@ export default function SettingsTranscode() {
     setSaving(false);
   }, [preset, saving]);
 
+  // ── Encoder badge colour ─────────────────────────────────────────────────
   const isHw = encoder?.detected ?? false;
   const encoderColour = isHw
     ? 'text-green-400 bg-green-500/10 border-green-500/30'
@@ -99,15 +149,26 @@ export default function SettingsTranscode() {
 
           <div className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-xs font-medium ${encoderColour}`}>
             {detecting ? (
-              <><Loader2 className="w-3.5 h-3.5 animate-spin flex-shrink-0" /><span>Detecting…</span></>
+              <>
+                <Loader2 className="w-3.5 h-3.5 animate-spin flex-shrink-0" />
+                <span>Detecting…</span>
+              </>
             ) : encoder ? (
               <>
-                {isHw ? <Zap className="w-3.5 h-3.5 flex-shrink-0" /> : <Cpu className="w-3.5 h-3.5 flex-shrink-0" />}
+                {isHw
+                  ? <Zap className="w-3.5 h-3.5 flex-shrink-0" />
+                  : <Cpu className="w-3.5 h-3.5 flex-shrink-0" />
+                }
                 <span>{encoder.label}</span>
-                {isHw && <span className="ml-auto text-green-500/70 font-normal">GPU accelerated</span>}
+                {isHw && (
+                  <span className="ml-auto text-green-500/70 font-normal">GPU accelerated</span>
+                )}
               </>
             ) : (
-              <><Cpu className="w-3.5 h-3.5 flex-shrink-0" /><span>Not yet detected</span></>
+              <>
+                <Cpu className="w-3.5 h-3.5 flex-shrink-0" />
+                <span>Not yet detected</span>
+              </>
             )}
           </div>
 
@@ -148,7 +209,9 @@ export default function SettingsTranscode() {
                   <div className="flex items-center justify-between w-full">
                     <span className="text-xs font-semibold">{opt.label}</span>
                     {opt.badge && (
-                      <span className={`text-[10px] font-mono px-1 rounded ${active ? 'text-primary/70' : 'text-muted-foreground/60'}`}>
+                      <span className={`text-[10px] font-mono px-1 rounded ${
+                        active ? 'text-primary/70' : 'text-muted-foreground/60'
+                      }`}>
                         {opt.badge}
                       </span>
                     )}
@@ -164,6 +227,7 @@ export default function SettingsTranscode() {
             })}
           </div>
         </div>
+
       </div>
     </div>
   );

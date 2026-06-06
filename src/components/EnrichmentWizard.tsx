@@ -151,7 +151,7 @@ export default function EnrichmentWizard({ mediaId, title, onComplete, onError }
       {/* Steps */}
       {!allDone && !failed && (
         <div className="px-4 py-3 flex flex-col gap-2">
-          {steps.map((step) => (
+          {steps.map((step, _i) => (
             <div key={step.key} className="flex items-start gap-2.5">
               {/* Icon */}
               <div className="flex-shrink-0 mt-0.5">

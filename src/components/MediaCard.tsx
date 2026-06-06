@@ -23,7 +23,7 @@ function formatTimeLeft(watchProgress: number, totalSeconds?: number): string | 
   if (!totalSeconds || totalSeconds <= 0 || watchProgress <= 0) return null;
   const watchedSec = (watchProgress / 100) * totalSeconds;
   const leftSec = Math.max(0, totalSeconds - watchedSec);
-  if (leftSec < 60) return null;
+  if (leftSec < 60) return null; // less than a minute — not worth showing
   const h = Math.floor(leftSec / 3600);
   const m = Math.round((leftSec % 3600) / 60);
   if (h > 0) return `${h}h ${m}m left`;
@@ -79,6 +79,8 @@ function MediaCard({ item, showProgress = false, size = 'sm' }: MediaCardProps) 
   const [imgError, setImgError] = useState(false);
   const [hovered, setHovered] = useState(false);
 
+  // Derive item-specific values with useMemo so the card only re-renders when
+  // its own watchlist/progress state actually changes — not on every library update.
   const inWatchlist = useMemo(() => watchlist.includes(item.id), [watchlist, item.id]);
   const cwEntry = useMemo(
     () => continueWatching.find(c => c.id === item.id),
@@ -88,6 +90,7 @@ function MediaCard({ item, showProgress = false, size = 'sm' }: MediaCardProps) 
   const epProgress = item.type === 'series' ? getEpisodeProgress(item) : null;
   const allDone = epProgress ? epProgress.watched === epProgress.total && epProgress.total > 0 : false;
 
+  // Time-remaining label shown on hover when progress > 0
   const timeLeft = useMemo(
     () => showProgress && watchProgress > 0
       ? formatTimeLeft(watchProgress, cwEntry?.totalSeconds ?? item.totalSeconds)
@@ -95,6 +98,7 @@ function MediaCard({ item, showProgress = false, size = 'sm' }: MediaCardProps) 
     [showProgress, watchProgress, cwEntry?.totalSeconds, item.totalSeconds],
   );
 
+  // "Last watched X ago" label shown on hover
   const lastWatched = useMemo(
     () => showProgress && watchProgress > 0
       ? formatRelativeTime(cwEntry?.lastWatchedAt ?? item.lastWatchedAt)
@@ -153,7 +157,7 @@ function MediaCard({ item, showProgress = false, size = 'sm' }: MediaCardProps) 
             </div>
           )}
 
-          {/* ── Hover overlay ── */}
+          {/* ── Hover overlay — gradient reveal ── */}
           <AnimatePresence>
             {hovered && (
               <motion.div
@@ -205,7 +209,7 @@ function MediaCard({ item, showProgress = false, size = 'sm' }: MediaCardProps) 
                   )}
                 </motion.div>
 
-                {/* Time remaining + last watched */}
+                {/* ── Time remaining + last watched (shown when in Continue Watching) ── */}
                 {(timeLeft || lastWatched) && (
                   <motion.div
                     initial={{ y: 6, opacity: 0 }}
@@ -301,4 +305,7 @@ function MediaCard({ item, showProgress = false, size = 'sm' }: MediaCardProps) 
   );
 }
 
+// Wrap in memo so React can bail out of re-rendering cards whose props haven't
+// changed. This is the primary guard against carousel-wide re-renders triggered
+// by unrelated context updates (e.g. another item's progress ticking up).
 export default memo(MediaCard);

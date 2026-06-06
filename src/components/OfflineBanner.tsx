@@ -2,18 +2,23 @@
  * OfflineBanner
  *
  * Shown when TMDB/internet data is stale (server is offline or no internet).
+ * The app still works fully — library, player, history, watchlist all work
+ * without internet. Only the Discover page and TMDB metadata are affected.
  */
 import { WifiOff, X } from 'lucide-react';
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface OfflineBannerProps {
+  /** True when TMDB data is stale (no internet or TMDB unreachable) */
   stale: boolean;
+  /** Optional error message */
   error?: string | null;
 }
 
 export default function OfflineBanner({ stale, error }: OfflineBannerProps) {
   const [dismissed, setDismissed] = useState(false);
+
   const show = stale && !dismissed;
 
   return (

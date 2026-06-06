@@ -68,6 +68,8 @@ const TYPES: FeedbackTypeOption[] = [
 ];
 
 // ── Console error capture (module-level singleton) ────────────────────────────
+// Intercepts console.error calls so we can include the last N errors in the
+// diagnostic report. Installed once when the module first loads.
 
 interface CapturedError {
   ts: string;
@@ -88,6 +90,7 @@ const capturedErrors: CapturedError[] = [];
     origError(...args);
   };
 
+  // Also capture unhandled promise rejections
   window.addEventListener('unhandledrejection', (e) => {
     capturedErrors.push({
       ts: new Date().toISOString(),
@@ -99,10 +102,8 @@ const capturedErrors: CapturedError[] = [];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-declare const __APP_VERSION__: string;
-
 function getAppVersion(): string {
-  try { return __APP_VERSION__; } catch { return '0.0.0'; }
+  return __APP_VERSION__;
 }
 
 function getChannel(): 'beta' | 'stable' {
@@ -119,6 +120,7 @@ function getOsString(): string {
   return ua.slice(0, 60);
 }
 
+/** Collect a structured diagnostic snapshot for copy-paste bug reports */
 async function buildDiagnosticReport(description: string): Promise<string> {
   const version = getAppVersion();
   const os = getOsString();
@@ -126,8 +128,10 @@ async function buildDiagnosticReport(description: string): Promise<string> {
   const online = navigator.onLine;
   const ts = new Date().toISOString();
 
+  // Relevant localStorage keys (no values — just presence/absence)
   const lsKeys = Object.keys(localStorage).filter(k => k.startsWith('homestream'));
 
+  // Fetch server health
   let healthStr = 'unavailable';
   try {
     const r = await fetch('/api/health', { credentials: 'include', signal: AbortSignal.timeout(3000) });
@@ -135,6 +139,7 @@ async function buildDiagnosticReport(description: string): Promise<string> {
     healthStr = JSON.stringify(d);
   } catch { /* ignore */ }
 
+  // Fetch system info if available
   let sysInfo = '';
   try {
     const r = await fetch('/api/debug/system-info', { credentials: 'include', signal: AbortSignal.timeout(3000) });
@@ -193,7 +198,9 @@ async function buildDiagnosticReport(description: string): Promise<string> {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 interface FeedbackButtonProps {
+  /** Extra className for the trigger button */
   className?: string;
+  /** Compact mode — icon only, no label */
   compact?: boolean;
 }
 
@@ -220,6 +227,7 @@ export default function FeedbackButton({ className = '', compact = false }: Feed
   const version = getAppVersion();
   const channel = getChannel();
 
+  // Track online status
   useEffect(() => {
     const onOnline = () => setIsOnline(true);
     const onOffline = () => setIsOnline(false);
@@ -263,6 +271,7 @@ export default function FeedbackButton({ className = '', compact = false }: Feed
           channel,
           os: getOsString(),
           page: window.location.pathname,
+          // Include recent errors in the submission too
           recentErrors: capturedErrors.slice(-10).map(e => `[${e.ts}] ${e.msg}`).join('\n'),
         }),
       });
@@ -297,6 +306,7 @@ export default function FeedbackButton({ className = '', compact = false }: Feed
     }
   }, [description]);
 
+  // Auto-build report when switching to diagnostic mode
   useEffect(() => {
     if (mode === 'diagnostic' && !diagReport && !diagBuilding) {
       handleBuildDiagnostic();
@@ -310,6 +320,7 @@ export default function FeedbackButton({ className = '', compact = false }: Feed
       setDiagCopied(true);
       setTimeout(() => setDiagCopied(false), 3000);
     } catch {
+      // Fallback: select the textarea
       const el = document.getElementById('hs-diag-textarea') as HTMLTextAreaElement | null;
       el?.select();
     }
@@ -331,6 +342,7 @@ export default function FeedbackButton({ className = '', compact = false }: Feed
       <AnimatePresence>
         {open && (
           <>
+            {/* Backdrop */}
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -339,6 +351,7 @@ export default function FeedbackButton({ className = '', compact = false }: Feed
               onClick={handleClose}
             />
 
+            {/* Panel */}
             <motion.div
               ref={panelRef}
               initial={{ opacity: 0, scale: 0.95, y: 8 }}
@@ -357,6 +370,7 @@ export default function FeedbackButton({ className = '', compact = false }: Feed
                   )}
                 </div>
                 <div className="flex items-center gap-1.5">
+                  {/* Online indicator */}
                   {isOnline
                     ? <span title="Online"><Wifi className="w-3.5 h-3.5 text-green-400" /></span>
                     : <span title="Offline"><WifiOff className="w-3.5 h-3.5 text-destructive" /></span>
@@ -492,7 +506,7 @@ export default function FeedbackButton({ className = '', compact = false }: Feed
                       {!isOnline && (
                         <div className="flex items-start gap-2 text-xs text-amber-400 bg-amber-500/10 rounded-lg px-3 py-2">
                           <WifiOff className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
-                          <span>You&apos;re offline. Use the <strong>Copy Bug Report</strong> tab instead.</span>
+                          <span>You&apos;re offline. Use the <strong>Copy Bug Report</strong> tab instead — paste it to Airo when you&apos;re back online.</span>
                         </div>
                       )}
 
@@ -532,17 +546,20 @@ export default function FeedbackButton({ className = '', compact = false }: Feed
                     <div className="text-[11px] text-muted-foreground leading-relaxed">
                       <p className="font-semibold text-foreground mb-0.5">How to use this</p>
                       Copy this report and paste it into a chat with <strong className="text-primary">Airo</strong> or into a GitHub issue.
+                      It includes your version, OS, recent errors, and server health — everything needed to diagnose the bug.
                     </div>
                   </div>
 
+                  {/* Optional description */}
                   <textarea
                     value={description}
                     onChange={e => setDescription(e.target.value)}
-                    placeholder="Describe what went wrong (optional)…"
+                    placeholder="Describe what went wrong (optional — will be included in the report)…"
                     rows={2}
                     className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm text-foreground placeholder-muted-foreground resize-none focus:outline-none focus:ring-2 focus:ring-ring transition-colors"
                   />
 
+                  {/* Regenerate button */}
                   <button
                     onClick={handleBuildDiagnostic}
                     disabled={diagBuilding}
@@ -554,16 +571,20 @@ export default function FeedbackButton({ className = '', compact = false }: Feed
                     }
                   </button>
 
+                  {/* Report preview */}
                   {diagReport && (
-                    <textarea
-                      id="hs-diag-textarea"
-                      readOnly
-                      value={diagReport}
-                      rows={10}
-                      className="w-full px-3 py-2.5 rounded-lg border border-border bg-background/60 text-[10px] font-mono text-muted-foreground resize-none focus:outline-none focus:ring-2 focus:ring-ring"
-                    />
+                    <div className="relative">
+                      <textarea
+                        id="hs-diag-textarea"
+                        readOnly
+                        value={diagReport}
+                        rows={10}
+                        className="w-full px-3 py-2.5 rounded-lg border border-border bg-background/60 text-[10px] font-mono text-muted-foreground resize-none focus:outline-none focus:ring-2 focus:ring-ring"
+                      />
+                    </div>
                   )}
 
+                  {/* Copy button */}
                   <button
                     onClick={handleCopyDiag}
                     disabled={!diagReport || diagBuilding}

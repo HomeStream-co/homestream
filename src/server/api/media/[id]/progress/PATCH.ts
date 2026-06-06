@@ -151,7 +151,7 @@ export { flushAllPending as flushProgressWrites };
 export default async function handler(req: Request, res: Response) {
   if (!requireAuth(req, res)) return;
   try {
-    const id = req.params.id as string;
+    const { id } = req.params;
     const { progress, currentTime, duration, profileId = 'adult' } = req.body as {
       progress?: number;
       currentTime?: number;

@@ -24,9 +24,7 @@ import { readConfig } from './configStore.js';
 import { isValidSession } from './sessionStore.js';
 import { getAllJobs } from './torrentManager.js';
 import { getAllTorrents, getTransferInfo, isReachable } from './qbittorrentClient.js';
-// getQbitJobs — provided by the stremio download handler once that module exists.
-// Stub here so the broadcaster compiles without the full API route tree.
-function getQbitJobs(): Array<{ infoHash: string; title?: string; poster?: string }> { return []; }
+import { getQbitJobs } from './api/stremio/download/POST.js';
 import { getAllPersistedJobs } from './downloadJobStore.js';
 import type { QbitTorrent } from './qbittorrentClient.js';
 
@@ -74,7 +72,7 @@ async function fetchDownloadState(): Promise<object> {
 
     // Merge metadata (title, poster) from our job store into qBit torrent list
     const enriched = (qbitTorrents as QbitTorrent[]).map(t => {
-      const meta = qbitJobMeta.find((j: { infoHash: string; title?: string; poster?: string }) => j.infoHash === t.hash);
+      const meta = qbitJobMeta.find(j => j.infoHash === t.hash);
       return meta ? { ...t, title: meta.title, poster: meta.poster } : t;
     });
 

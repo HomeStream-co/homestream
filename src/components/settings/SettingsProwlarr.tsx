@@ -35,6 +35,7 @@ export default function SettingsProwlarr({ onSaved }: SettingsProwlarrProps) {
       .then((data: { config?: { prowlarrUrl?: string; prowlarrApiKey?: string } }) => {
         if (data.config) {
           setProwlarrUrl(data.config.prowlarrUrl ?? '');
+          // Don't pre-fill the key for security — just show placeholder if set
           setIsConfigured(!!(data.config.prowlarrUrl && data.config.prowlarrApiKey));
         }
         setLoaded(true);
@@ -123,11 +124,13 @@ export default function SettingsProwlarr({ onSaved }: SettingsProwlarrProps) {
       <SectionHeader icon={Search} label="Prowlarr Indexers" />
       <div className="px-4 pb-4 flex flex-col gap-3">
 
+        {/* Description */}
         <p className="text-[11px] text-muted-foreground leading-relaxed">
           Connect Prowlarr to search your private indexers alongside Torrentio.
           Results are merged and deduplicated automatically.
         </p>
 
+        {/* Status badge */}
         {isConfigured && testState === 'idle' && (
           <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-green-500/10 border border-green-500/20">
             <CheckCircle2 className="w-3.5 h-3.5 text-green-400 shrink-0" />
@@ -141,6 +144,7 @@ export default function SettingsProwlarr({ onSaved }: SettingsProwlarrProps) {
           </div>
         )}
 
+        {/* URL field */}
         <div className="flex flex-col gap-1.5">
           <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
             Prowlarr URL
@@ -154,6 +158,7 @@ export default function SettingsProwlarr({ onSaved }: SettingsProwlarrProps) {
           />
         </div>
 
+        {/* API Key field */}
         <div className="flex flex-col gap-1.5">
           <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
             API Key
@@ -179,6 +184,7 @@ export default function SettingsProwlarr({ onSaved }: SettingsProwlarrProps) {
           </p>
         </div>
 
+        {/* Test result */}
         {testState !== 'idle' && (
           <div className={`flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] ${
             testState === 'ok'
@@ -194,6 +200,7 @@ export default function SettingsProwlarr({ onSaved }: SettingsProwlarrProps) {
           </div>
         )}
 
+        {/* Actions */}
         <div className="flex gap-2">
           <button
             onClick={testConnection}
@@ -220,6 +227,7 @@ export default function SettingsProwlarr({ onSaved }: SettingsProwlarrProps) {
           </button>
         </div>
 
+        {/* Clear / help links */}
         <div className="flex items-center justify-between">
           {isConfigured && (
             <button

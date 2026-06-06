@@ -1,6 +1,9 @@
 /**
  * DevVersionTrigger — lightweight hold-to-unlock version badge.
- * Extracted so DebugPanel can import it statically without pulling in DevDrawer.
+ *
+ * Extracted into its own file so DebugPanel can import it statically
+ * without also pulling in the heavy DevDrawer component, which is
+ * lazy-loaded separately to keep it out of the production bundle.
  */
 
 import { useState, useRef, useCallback } from 'react';
@@ -50,6 +53,7 @@ export function DevVersionTrigger({ version, onUnlock }: VersionTriggerProps) {
       onTouchEnd={cancelHold}
       title="Shift+hold to open dev tools"
     >
+      {/* Progress ring while holding */}
       {holding && (
         <span
           className="absolute inset-0 rounded"
@@ -60,7 +64,9 @@ export function DevVersionTrigger({ version, onUnlock }: VersionTriggerProps) {
           }}
         />
       )}
-      <span className={`relative text-xs font-mono px-1 rounded transition-colors ${holding ? 'text-violet-300' : 'text-muted-foreground hover:text-foreground'}`}>
+      <span className={`relative text-xs font-mono px-1 rounded transition-colors ${
+        holding ? 'text-violet-300' : 'text-muted-foreground hover:text-foreground'
+      }`}>
         v{version}
       </span>
     </span>

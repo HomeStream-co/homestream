@@ -1,86 +1,136 @@
 /**
- * notificationStore — lightweight in-memory notification store using Zustand.
- * Persists to localStorage so notifications survive page refreshes.
+ * notificationStore — in-memory notification bus for HomeStream.
+ *
+ * Provides a lightweight pub/sub store for app-wide notifications.
+ * Notifications are ephemeral (not persisted) — they live only for the
+ * current browser session and auto-expire after `ttl` milliseconds.
+ *
+ * Usage:
+ *   import { useNotifications, notify } from '@/lib/notificationStore';
+ *
+ *   // Anywhere in the app:
+ *   notify({ type: 'download_complete', title: 'Big Buck Bunny', message: 'Download finished' });
+ *
+ *   // In a component:
+ *   const { notifications, dismiss, dismissAll } = useNotifications();
  */
 
-import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { useState, useEffect, useCallback } from 'react';
+
+// ── Types ─────────────────────────────────────────────────────────────────────
 
 export type NotificationType =
   | 'download_complete'
-  | 'download_started'
   | 'download_error'
+  | 'download_started'
   | 'library_added'
+  | 'info'
   | 'warning'
-  | 'error'
-  | 'info';
+  | 'error';
 
 export interface AppNotification {
   id: string;
   type: NotificationType;
   title: string;
   message?: string;
-  poster?: string;
+  /** Media item id — used to link to player */
   mediaId?: string;
-  read: boolean;
+  /** Poster URL for rich notifications */
+  poster?: string;
   createdAt: number;
+  /** Auto-dismiss after this many ms (default 6000) */
+  ttl?: number;
+  read: boolean;
 }
 
-interface NotificationStore {
-  notifications: AppNotification[];
-  unreadCount: number;
-  add: (n: Omit<AppNotification, 'id' | 'read' | 'createdAt'>) => void;
-  dismiss: (id: string) => void;
-  dismissAll: () => void;
-  markRead: (id: string) => void;
-  markAllRead: () => void;
+// ── Store ─────────────────────────────────────────────────────────────────────
+
+type Listener = (notifications: AppNotification[]) => void;
+
+let _notifications: AppNotification[] = [];
+const _listeners = new Set<Listener>();
+const _timers = new Map<string, ReturnType<typeof setTimeout>>();
+
+function emit() {
+  const snapshot = [..._notifications];
+  _listeners.forEach(fn => fn(snapshot));
 }
 
-export const useNotifications = create<NotificationStore>()(
-  persist(
-    (set, get) => ({
-      notifications: [],
-      unreadCount: 0,
+function scheduleExpiry(n: AppNotification) {
+  const ttl = n.ttl ?? 6000;
+  if (ttl <= 0) return; // 0 = persistent
+  const timer = setTimeout(() => {
+    _notifications = _notifications.filter(x => x.id !== n.id);
+    _timers.delete(n.id);
+    emit();
+  }, ttl);
+  _timers.set(n.id, timer);
+}
 
-      add: (n) => {
-        const notification: AppNotification = {
-          ...n,
-          id: `notif-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-          read: false,
-          createdAt: Date.now(),
-        };
-        set(state => ({
-          notifications: [notification, ...state.notifications].slice(0, 50),
-          unreadCount: state.unreadCount + 1,
-        }));
-      },
+/** Push a new notification. Returns the notification id. */
+export function notify(
+  opts: Omit<AppNotification, 'id' | 'createdAt' | 'read'>,
+): string {
+  const id = `notif-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+  const n: AppNotification = { ...opts, id, createdAt: Date.now(), read: false };
+  _notifications = [n, ..._notifications].slice(0, 50); // cap at 50
+  scheduleExpiry(n);
+  emit();
+  return id;
+}
 
-      dismiss: (id) => {
-        const n = get().notifications.find(x => x.id === id);
-        set(state => ({
-          notifications: state.notifications.filter(x => x.id !== id),
-          unreadCount: Math.max(0, state.unreadCount - (n && !n.read ? 1 : 0)),
-        }));
-      },
+/** Dismiss a single notification by id. */
+export function dismiss(id: string) {
+  const timer = _timers.get(id);
+  if (timer) { clearTimeout(timer); _timers.delete(id); }
+  _notifications = _notifications.filter(n => n.id !== id);
+  emit();
+}
 
-      dismissAll: () => set({ notifications: [], unreadCount: 0 }),
+/** Dismiss all notifications. */
+export function dismissAll() {
+  _timers.forEach(t => clearTimeout(t));
+  _timers.clear();
+  _notifications = [];
+  emit();
+}
 
-      markRead: (id) => {
-        const n = get().notifications.find(x => x.id === id);
-        if (!n || n.read) return;
-        set(state => ({
-          notifications: state.notifications.map(x => x.id === id ? { ...x, read: true } : x),
-          unreadCount: Math.max(0, state.unreadCount - 1),
-        }));
-      },
+/** Mark a notification as read. */
+export function markRead(id: string) {
+  _notifications = _notifications.map(n => n.id === id ? { ...n, read: true } : n);
+  emit();
+}
 
-      markAllRead: () => {
-        set(state => ({
-          notifications: state.notifications.map(x => ({ ...x, read: true })),
-          unreadCount: 0,
-        }));
-      },
-    }),
-    { name: 'homestream-notifications' },
-  ),
-);
+/** Mark all as read. */
+export function markAllRead() {
+  _notifications = _notifications.map(n => ({ ...n, read: true }));
+  emit();
+}
+
+// ── React hook ────────────────────────────────────────────────────────────────
+
+export function useNotifications() {
+  const [notifications, setNotifications] = useState<AppNotification[]>([..._notifications]);
+
+  useEffect(() => {
+    const listener: Listener = (ns) => setNotifications(ns);
+    _listeners.add(listener);
+    return () => { _listeners.delete(listener); };
+  }, []);
+
+  const dismissOne = useCallback((id: string) => dismiss(id), []);
+  const dismissAllFn = useCallback(() => dismissAll(), []);
+  const markReadFn = useCallback((id: string) => markRead(id), []);
+  const markAllReadFn = useCallback(() => markAllRead(), []);
+
+  const unreadCount = notifications.filter(n => !n.read).length;
+
+  return {
+    notifications,
+    unreadCount,
+    dismiss: dismissOne,
+    dismissAll: dismissAllFn,
+    markRead: markReadFn,
+    markAllRead: markAllReadFn,
+  };
+}

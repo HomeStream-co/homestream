@@ -25,7 +25,7 @@ function getClientIp(req: Request): string {
 
 export default async function handler(req: Request, res: Response) {
   try {
-    const id = req.params.id as string;
+    const { id } = req.params;
     const { action, pin } = req.body as { action?: string; pin?: string };
 
     if (!action) return res.status(400).json({ error: 'action is required' });

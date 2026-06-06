@@ -123,7 +123,7 @@ export async function getUser(apiKey: string): Promise<RDUser> {
 /** Returns true if an RD API key is configured and the account is reachable. */
 export async function isConfigured(): Promise<{ ok: boolean; error?: string; user?: RDUser }> {
   const cfg = readConfig();
-  const key = (cfg.realDebridApiKey as string | undefined)?.trim();
+  const key = cfg.realDebridApiKey?.trim();
   if (!key) return { ok: false, error: 'No API key configured' };
   try {
     const user = await getUser(key);

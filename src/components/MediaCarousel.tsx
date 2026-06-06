@@ -1,5 +1,12 @@
 /**
  * MediaCarousel — premium horizontal scroll carousel.
+ *
+ * v2 improvements:
+ *  - Section label with accent line + count badge
+ *  - Larger, more visible scroll arrows with glass morphism
+ *  - Edge fade peek effect (shows partial next card)
+ *  - Smooth momentum scrolling
+ *  - Arrow appears on hover with animation
  */
 
 import { useRef, useState } from 'react';
@@ -15,6 +22,7 @@ interface MediaCarouselProps {
   showProgress?: boolean;
   titleIcon?: React.ReactNode;
   trailerPreview?: boolean;
+  /** Optional accent color class for the section line */
   accentClass?: string;
 }
 
@@ -99,6 +107,7 @@ export default function MediaCarousel({
               <MediaCard key={item.id} item={item} showProgress={showProgress} />
             )
           ))}
+          {/* Trailing spacer so last card isn't flush against edge */}
           <div className="w-4 flex-shrink-0" />
         </div>
 

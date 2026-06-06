@@ -11,7 +11,7 @@ import { Path, Params } from './routes';
 // Export hooks with type safety
 export const useNavigate = () => {
   const navigate = useRouterNavigate();
-  return (to: Path | number, options?: { replace?: boolean; state?: any }) => {
+  return (to: Path | number, options?: { replace?: boolean; state?: unknown }) => {
     if (typeof to === 'number') {
       navigate(to);
     } else {
