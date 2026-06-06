@@ -53,7 +53,7 @@ const SORT_OPTIONS = [
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function HomePage() {
-  const { library, loading, watchlist, addToWatchlist, removeFromWatchlist, continueWatching } = useMedia();
+  const { library, loading, watchlist, addToWatchlist, removeFromWatchlist, continueWatching, isDemoMode } = useMedia();
   const { isAllowed, activeProfile } = useProfile();
   const { upcoming, loading: tmdbLoading, stale: tmdbStale, error: tmdbError } = useTMDBContext();
   const navigate = useNavigate();
@@ -576,7 +576,7 @@ export default function HomePage() {
                 <span className="text-xs text-primary font-medium group-hover:underline flex-shrink-0">Setup →</span>
               </a>
             </div>
-            {continueWatchingItems.length > 0 && (
+            {!isDemoMode && continueWatchingItems.length > 0 && (
               <MediaCarousel
                 title="Continue Watching"
                 items={continueWatchingItems.filter(m => homeTab === 'all' || m.type === homeTab || (homeTab === 'movie' && m.type !== 'series'))}
@@ -595,10 +595,10 @@ export default function HomePage() {
               />
             )}
 
-            {homeTab !== 'series' && (
+            {!isDemoMode && homeTab !== 'series' && (
               <MediaCarousel title="Recently Added" items={recentlyAdded.filter(m => homeTab === 'movie' ? m.type !== 'series' : true)} accentClass="bg-primary" />
             )}
-            {homeTab === 'series' && (
+            {!isDemoMode && homeTab === 'series' && (
               <MediaCarousel title="Recently Added" items={recentlyAdded.filter(m => m.type === 'series')} accentClass="bg-primary" />
             )}
 
