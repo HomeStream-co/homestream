@@ -277,10 +277,27 @@ function MediaCard({ item, showProgress = false, size = 'sm' }: MediaCardProps) 
           <p className={`text-xs font-semibold truncate transition-colors duration-200 ${hovered ? 'text-primary' : 'text-foreground'}`}>
             {item.title}
           </p>
-          <div className="flex items-center justify-between mt-0.5">
+          <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
             <p className="text-[10px] text-muted-foreground">{item.year}</p>
+            {/* First genre */}
+            {Array.isArray(item.genre) && item.genre[0] && item.genre[0] !== 'Unknown' && (
+              <>
+                <span className="text-[10px] text-muted-foreground/40">·</span>
+                <span className="text-[10px] text-muted-foreground truncate max-w-[72px]">{item.genre[0]}</span>
+              </>
+            )}
+            {/* Season / episode for series */}
+            {item.type === 'series' && item.season != null && item.episode != null && (
+              <>
+                <span className="text-[10px] text-muted-foreground/40">·</span>
+                <span className="text-[10px] text-primary/80 font-medium">
+                  S{String(item.season).padStart(2, '0')}E{String(item.episode).padStart(2, '0')}
+                </span>
+              </>
+            )}
+            {/* Episode progress count (right-aligned) */}
             {epProgress && (
-              <p className="text-[10px] text-muted-foreground">{epProgress.watched}/{epProgress.total} ep</p>
+              <span className="text-[10px] text-muted-foreground ml-auto">{epProgress.watched}/{epProgress.total} ep</span>
             )}
           </div>
 

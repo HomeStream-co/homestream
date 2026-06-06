@@ -71,6 +71,10 @@ export interface MediaItem {
   // TV show episode tracking
   totalSeasons?: number;
   episodes?: Episode[];
+  // For series items that represent a single episode, the season/episode number
+  // is stored directly on the item (populated by postDownloadPipeline)
+  season?: number;
+  episode?: number;
 }
 
 export interface Episode {
