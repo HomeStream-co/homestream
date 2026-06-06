@@ -1,8 +1,9 @@
-import { useState, useEffect, useRef, lazy, Suspense } from 'react';
+import { useState, useEffect, useRef, lazy, Suspense, useCallback } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import {
   Search, Menu, X, Film, Bookmark, ChevronDown, Lock,
   Home, Compass, Download, Library, History, Settings2, BarChart3, Tv2,
+  Smartphone, QrCode, Copy, Check, RefreshCw,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'sonner';
@@ -18,6 +19,148 @@ import { notify } from '@/lib/notificationStore';
 import { useDownloadSocket } from '@/hooks/useDownloadSocket';
 
 const DebugPanel = lazy(() => import('@/components/DebugPanel'));
+
+/** Compact phone-remote button that lives in the header.
+ *  Clicking it opens a small popover with the QR code + copy link. */
+function RemoteButton() {
+  const [open, setOpen] = useState(false);
+  const [data, setData] = useState<{ url: string; qr: string; lanIP?: string; port?: string } | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  const fetchQr = useCallback(() => {
+    setLoading(true);
+    fetch('/api/remote/qr?format=svg')
+      .then(r => r.ok ? r.json() : Promise.reject())
+      .then((d: { url?: string; qr?: string; lanIP?: string; port?: string }) => {
+        if (d?.url && d?.qr) setData({ url: d.url, qr: d.qr, lanIP: d.lanIP, port: d.port });
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => {
+    if (open && !data) fetchQr();
+  }, [open, data, fetchQr]);
+
+  // Close on outside click
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  const remoteUrl = data?.url ?? '';
+  const displayAddr = data?.lanIP ? `${data.lanIP}:${data.port ?? '3000'}` : '';
+  const isLocalhost = !data?.lanIP || data.lanIP === '127.0.0.1' || data.lanIP === 'localhost';
+
+  function copy() {
+    navigator.clipboard.writeText(remoteUrl).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }).catch(() => {});
+  }
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => setOpen(v => !v)}
+        title="Phone Remote"
+        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 border ${
+          open
+            ? 'bg-primary text-primary-foreground border-primary'
+            : 'bg-card border-border text-muted-foreground hover:text-foreground hover:border-primary/40 hover:bg-white/8'
+        }`}
+      >
+        <Smartphone className="w-3.5 h-3.5" />
+        <span className="hidden sm:inline">Remote</span>
+      </button>
+
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.92, y: 6 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.92, y: 6 }}
+            transition={{ duration: 0.18 }}
+            className="absolute right-0 top-full mt-2 w-64 bg-card border border-border rounded-2xl shadow-2xl p-4 z-50 flex flex-col gap-3"
+          >
+            {/* Title */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Smartphone className="w-4 h-4 text-primary" />
+                <span className="text-sm font-semibold text-foreground">Phone Remote</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <button onClick={fetchQr} disabled={loading} className="p-1 text-muted-foreground hover:text-foreground transition-colors disabled:opacity-40" title="Refresh">
+                  <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+                </button>
+                <button onClick={() => setOpen(false)} className="p-1 text-muted-foreground hover:text-foreground transition-colors">
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+
+            {/* QR or placeholder */}
+            {loading && (
+              <div className="w-full aspect-square rounded-xl bg-muted flex items-center justify-center">
+                <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+              </div>
+            )}
+            {!loading && !isLocalhost && data?.qr && (
+              <div
+                className="w-full aspect-square rounded-xl overflow-hidden bg-white p-3 [&_svg]:w-full [&_svg]:h-full"
+                dangerouslySetInnerHTML={{ __html: data.qr }}
+              />
+            )}
+            {!loading && isLocalhost && (
+              <div className="w-full aspect-square rounded-xl bg-muted flex flex-col items-center justify-center gap-2 px-4 text-center">
+                <QrCode className="w-10 h-10 text-muted-foreground/30" />
+                <p className="text-xs text-muted-foreground leading-snug">
+                  Running on localhost — connect to your LAN to get a scannable QR code
+                </p>
+              </div>
+            )}
+
+            {/* Instruction */}
+            {!loading && !isLocalhost && (
+              <p className="text-[11px] text-muted-foreground text-center -mt-1">
+                Scan with your phone camera to open the remote
+              </p>
+            )}
+
+            {/* Address + copy */}
+            {displayAddr && (
+              <div className="flex items-center gap-2 bg-muted/60 rounded-xl px-3 py-2">
+                <code className="text-xs text-foreground flex-1 truncate">{displayAddr}</code>
+                <button onClick={copy} className="text-muted-foreground hover:text-foreground transition-colors flex-shrink-0" title="Copy link">
+                  {copied ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
+                </button>
+              </div>
+            )}
+
+            {/* Open remote link */}
+            {remoteUrl && (
+              <a
+                href={remoteUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full text-center text-xs font-medium text-primary hover:underline"
+              >
+                Open remote on this device →
+              </a>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
 
 interface HeaderProps {
   onChatOpen?: () => void;
@@ -244,6 +387,9 @@ export default function Header({ onChatOpen: _onChatOpen }: HeaderProps) {
                   </motion.button>
                 )}
               </AnimatePresence>
+
+              {/* Phone Remote */}
+              <RemoteButton />
 
               {/* Watchlist */}
               <Link

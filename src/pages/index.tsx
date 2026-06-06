@@ -18,9 +18,9 @@
  * the library or watchlist actually changes.
  */
 
-import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Play, Plus, Check, Star, Upload, Clock, Search, X, SlidersHorizontal, Bookmark, Smartphone, QrCode, Copy, Tv2, RefreshCw } from 'lucide-react';
+import { Play, Plus, Check, Star, Upload, Clock, Search, X, SlidersHorizontal, Bookmark, Tv2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useMedia } from '@/context/MediaContext';
 import { useProfile } from '@/context/ProfileContext';
@@ -50,204 +50,6 @@ const SORT_OPTIONS = [
 
 // ── Phone Remote QR Widget ────────────────────────────────────────────────────
 // Shown in the bottom-right corner of the TV home screen.
-// Scan with your phone → opens the remote instantly.
-
-/** Returns true when the IP is a loopback / non-routable address that phones can't reach */
-function isLocalhostIP(ip: string): boolean {
-  return ip === 'localhost' || ip === '127.0.0.1' || ip === '::1' || ip.startsWith('127.');
-}
-
-function RemoteQRWidget() {
-  const [data, setData] = useState<{ url: string; qr: string; lanIP?: string; mdnsUrl?: string; ipUrl?: string; port?: string } | null>(null);
-  const [qrError, setQrError] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [expanded, setExpanded] = useState(false);
-  const [copied, setCopied] = useState(false);
-  const [copiedIP, setCopiedIP] = useState(false);
-
-  // QR now always encodes the raw IP — use that as the primary display address.
-  // hs.local is shown as a secondary "type it manually" hint (works on iOS/macOS).
-  const displayAddress = data?.lanIP ?? window.location.hostname;
-  const port      = data?.port  ?? '3000';
-  const remoteUrl = data?.url   ?? `http://${displayAddress}:${port}/remote`;
-
-  // True when the server returned localhost — QR would be useless on a phone
-  const isLocalhost = isLocalhostIP(data?.lanIP ?? window.location.hostname);
-
-  const fetchQr = useCallback(() => {
-    setLoading(true);
-    setQrError(false);
-    fetch('/api/remote/qr?format=svg')
-      .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
-      .then((d: { url?: string; qr?: string; lanIP?: string; mdnsUrl?: string; ipUrl?: string; port?: string }) => {
-        if (d?.url && d?.qr) {
-          setData({ url: d.url, qr: d.qr, lanIP: d.lanIP, mdnsUrl: d.mdnsUrl, ipUrl: d.ipUrl, port: d.port });
-        } else {
-          setQrError(true);
-        }
-      })
-      .catch(() => setQrError(true))
-      .finally(() => setLoading(false));
-  }, []);
-
-  function copyUrl() {
-    navigator.clipboard.writeText(remoteUrl).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }).catch(() => {}); // non-fatal — ignore
-  }
-
-  function copyIP() {
-    const toCopy = `${displayAddress}:${port}`;
-    navigator.clipboard.writeText(toCopy).then(() => {
-      setCopiedIP(true);
-      setTimeout(() => setCopiedIP(false), 2000);
-    }).catch(() => {}); // non-fatal — ignore
-  }
-
-  useEffect(() => {
-    fetchQr();
-  }, [fetchQr]);
-
-  // Determine what to show in the QR area
-  const showQR   = data && !qrError && !isLocalhost;
-  const showNoLAN = !loading && (qrError || isLocalhost);
-
-  return (
-    <div className="fixed bottom-6 right-6 z-40 flex flex-col items-end gap-2">
-      <AnimatePresence>
-        {expanded && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.85, y: 10 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.85, y: 10 }}
-            transition={{ duration: 0.2 }}
-            className="bg-card border border-border rounded-2xl p-4 shadow-2xl flex flex-col items-center gap-3 w-64"
-          >
-            {/* Header */}
-            <div className="flex items-center gap-2 w-full">
-              <Smartphone className="w-4 h-4 text-primary flex-shrink-0" />
-              <p className="text-xs font-semibold text-foreground">Phone Remote</p>
-              <button
-                onClick={fetchQr}
-                disabled={loading}
-                className="ml-auto text-muted-foreground hover:text-foreground transition-colors disabled:opacity-40"
-                title="Refresh QR code"
-              >
-                <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-              </button>
-              <button onClick={() => setExpanded(false)} className="text-muted-foreground hover:text-foreground transition-colors">
-                <X className="w-3.5 h-3.5" />
-              </button>
-            </div>
-
-            {/* QR code */}
-            {loading && (
-              <div className="w-40 h-40 rounded-xl bg-muted flex items-center justify-center">
-                <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-              </div>
-            )}
-
-            {showQR && (
-              <>
-                <div
-                  className="w-40 h-40 [&_svg]:w-full [&_svg]:h-full rounded-xl overflow-hidden bg-white p-2 flex-shrink-0"
-                  dangerouslySetInnerHTML={{ __html: data!.qr }}
-                />
-                <p className="text-[10px] text-muted-foreground text-center leading-relaxed -mt-1">
-                  Scan with your phone camera
-                </p>
-              </>
-            )}
-
-            {showNoLAN && (
-              <div className="w-40 h-40 rounded-xl bg-muted flex flex-col items-center justify-center gap-2 text-center px-3">
-                <QrCode className="w-8 h-8 text-muted-foreground/40" />
-                <p className="text-[10px] text-muted-foreground leading-tight">
-                  {isLocalhost
-                    ? 'Running on localhost — connect to your LAN to get a scannable QR code'
-                    : 'QR unavailable — type the address below on your phone'}
-                </p>
-                {isLocalhost && (
-                  <button
-                    onClick={fetchQr}
-                    className="text-[9px] text-primary hover:text-primary/80 transition-colors flex items-center gap-1"
-                  >
-                    <RefreshCw className="w-2.5 h-2.5" /> Retry
-                  </button>
-                )}
-              </div>
-            )}
-
-            {/* Address — IP is primary (what the QR encodes), hs.local as manual hint */}
-            {!loading && (
-              <div className="w-full rounded-xl border border-border bg-muted/50 px-3 py-2.5">
-                <p className="text-[10px] text-muted-foreground mb-1 uppercase tracking-wider font-medium">Server address (scan QR or type)</p>
-                <div className="flex items-center gap-2">
-                  <code className={`flex-1 text-sm font-mono font-bold tracking-wide ${isLocalhost ? 'text-muted-foreground' : 'text-foreground'}`}>
-                    {isLocalhost ? 'Not on LAN' : `${displayAddress}:${port}`}
-                  </code>
-                  {!isLocalhost && (
-                    <button onClick={copyIP} title="Copy address" className="text-muted-foreground hover:text-foreground transition-colors flex-shrink-0">
-                      {copiedIP ? <Check className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
-                    </button>
-                  )}
-                </div>
-                {/* hs.local as a secondary hint — works on iOS/macOS without typing the IP */}
-                {!isLocalhost && data?.mdnsUrl && (
-                  <p className="text-[9px] text-muted-foreground/60 mt-1 font-mono">
-                    Also try: {data.mdnsUrl.replace(/^https?:\/\//, '').replace(/\/remote$/, '')} (iOS/macOS only)
-                  </p>
-                )}
-              </div>
-            )}
-
-            {/* Full URL — copy (only when we have a real LAN address) */}
-            {!loading && !isLocalhost && (
-              <button
-                onClick={copyUrl}
-                title="Copy full URL"
-                className="w-full flex items-center gap-1.5 bg-muted hover:bg-muted/80 rounded-lg px-2.5 py-2 transition-colors group"
-              >
-                <code className="flex-1 text-[10px] text-muted-foreground truncate text-left font-mono">{remoteUrl}</code>
-                {copied
-                  ? <Check className="w-3 h-3 text-green-400 flex-shrink-0" />
-                  : <Copy className="w-3 h-3 text-muted-foreground flex-shrink-0 group-hover:text-foreground transition-colors" />}
-              </button>
-            )}
-
-            {!loading && !isLocalhost && (
-              <a
-                href={remoteUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-full text-center text-[10px] bg-primary/10 text-primary rounded-lg py-1.5 font-medium hover:bg-primary/20 transition-colors"
-              >
-                Open on this device
-              </a>
-            )}
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Toggle button — always visible */}
-      <motion.button
-        onClick={() => setExpanded(v => !v)}
-        whileTap={{ scale: 0.92 }}
-        className={`flex items-center gap-2 rounded-full px-4 py-2.5 shadow-lg border transition-all ${
-          expanded
-            ? 'bg-primary text-primary-foreground border-primary'
-            : 'bg-card text-foreground border-border hover:border-primary/50'
-        }`}
-        title="Open phone remote"
-      >
-        <QrCode className="w-4 h-4" />
-        <span className="text-xs font-semibold hidden sm:inline">Phone Remote</span>
-      </motion.button>
-    </div>
-  );
-}
-
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function HomePage() {
@@ -769,7 +571,7 @@ export default function HomePage() {
       </AnimatePresence>
 
       {/* ── Phone Remote QR ── */}
-      <RemoteQRWidget />
+      {/* Moved to header — RemoteButton is always visible in the nav */}
     </div>
   );
 }
