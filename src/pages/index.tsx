@@ -576,6 +576,27 @@ export default function HomePage() {
                 <span className="text-xs text-primary font-medium group-hover:underline flex-shrink-0">Setup →</span>
               </a>
             </div>
+            {visibleLibrary.length === 0 ? (
+              /* ── Empty library state ── */
+              <div className="flex flex-col items-center justify-center py-24 gap-5 text-center px-4">
+                <div className="w-20 h-20 rounded-2xl bg-primary/10 flex items-center justify-center">
+                  <Upload className="w-10 h-10 text-primary/60" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-semibold text-foreground">Your library is empty</h2>
+                  <p className="text-muted-foreground text-sm mt-2 max-w-sm">
+                    Head to Downloads to grab movies and TV shows. They'll appear here automatically once added.
+                  </p>
+                </div>
+                <a
+                  href="/downloads"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors"
+                >
+                  Go to Downloads
+                </a>
+              </div>
+            ) : (
+              <>
             {!isDemoMode && continueWatchingItems.length > 0 && (
               <MediaCarousel
                 title="Continue Watching"
@@ -595,10 +616,10 @@ export default function HomePage() {
               />
             )}
 
-            {!isDemoMode && homeTab !== 'series' && (
+            {homeTab !== 'series' && (
               <MediaCarousel title="Recently Added" items={recentlyAdded.filter(m => homeTab === 'movie' ? m.type !== 'series' : true)} accentClass="bg-primary" />
             )}
-            {!isDemoMode && homeTab === 'series' && (
+            {homeTab === 'series' && (
               <MediaCarousel title="Recently Added" items={recentlyAdded.filter(m => m.type === 'series')} accentClass="bg-primary" />
             )}
 
@@ -631,6 +652,8 @@ export default function HomePage() {
                   accentClass="bg-yellow-500"
                 />
               </LazySection>
+            )}
+              </>
             )}
           </motion.div>
         )}
