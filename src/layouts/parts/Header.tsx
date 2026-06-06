@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import {
-  Search, Upload, Menu, X, Film, Bookmark, ChevronDown, Lock,
-  Home, Compass, Download, Library, History, Settings2, Wifi, BarChart3, Tv2,
+  Search, Menu, X, Film, Bookmark, ChevronDown, Lock,
+  Home, Compass, Download, Library, History, Settings2, BarChart3, Tv2,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'sonner';
@@ -133,9 +133,6 @@ export default function Header({ onChatOpen: _onChatOpen }: HeaderProps) {
     { to: '/discover',  label: 'Discover' },
     { to: '/downloads', label: 'Downloads' },
     { to: '/library',   label: 'My Library' },
-    { to: '/history',   label: 'History' },
-    { to: '/stats',     label: 'Stats' },
-    { to: '/samsung-tv', label: 'Watch on TV', icon: Tv2 },
   ];
 
   const isActive = (to: string) =>
@@ -180,7 +177,7 @@ export default function Header({ onChatOpen: _onChatOpen }: HeaderProps) {
                         : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
                   }`}
                 >
-                  {link.icon && <link.icon className="w-3.5 h-3.5" />}
+                  
                   {link.label}
                   {isActive(link.to) && link.to !== '/samsung-tv' && (
                     <motion.div
@@ -247,15 +244,6 @@ export default function Header({ onChatOpen: _onChatOpen }: HeaderProps) {
                   </motion.button>
                 )}
               </AnimatePresence>
-
-              {/* Upload */}
-              <Link
-                to="/library"
-                className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-primary hover:bg-primary/80 text-primary-foreground text-sm font-semibold rounded-lg transition-all duration-200 hover:shadow-md hover:shadow-primary/25"
-              >
-                <Upload className="w-3.5 h-3.5" />
-                <span>Upload</span>
-              </Link>
 
               {/* Watchlist */}
               <Link
@@ -377,6 +365,29 @@ export default function Header({ onChatOpen: _onChatOpen }: HeaderProps) {
                         </div>
                         <div className="border-t border-border/50 py-1">
                           <button
+                            onClick={() => { setProfileMenuOpen(false); navigate('/history'); }}
+                            className="w-full px-3 py-2.5 text-xs text-muted-foreground hover:text-foreground hover:bg-white/8 transition-colors text-left flex items-center gap-2"
+                          >
+                            <History className="w-3.5 h-3.5" />
+                            Watch history
+                          </button>
+                          <button
+                            onClick={() => { setProfileMenuOpen(false); navigate('/stats'); }}
+                            className="w-full px-3 py-2.5 text-xs text-muted-foreground hover:text-foreground hover:bg-white/8 transition-colors text-left flex items-center gap-2"
+                          >
+                            <BarChart3 className="w-3.5 h-3.5" />
+                            Stats
+                          </button>
+                          <button
+                            onClick={() => { setProfileMenuOpen(false); navigate('/samsung-tv'); }}
+                            className="w-full px-3 py-2.5 text-xs text-muted-foreground hover:text-foreground hover:bg-white/8 transition-colors text-left flex items-center gap-2"
+                          >
+                            <Tv2 className="w-3.5 h-3.5" />
+                            Watch on TV
+                          </button>
+                        </div>
+                        <div className="border-t border-border/50 py-1">
+                          <button
                             onClick={() => { setProfileMenuOpen(false); navigate('/profiles'); }}
                             className="w-full px-3 py-2.5 text-xs text-muted-foreground hover:text-foreground hover:bg-white/8 transition-colors text-left flex items-center gap-2"
                           >
@@ -418,14 +429,14 @@ export default function Header({ onChatOpen: _onChatOpen }: HeaderProps) {
             >
               <div className="px-4 py-4 flex flex-col gap-1">
                 {[
-                  { to: '/',          label: 'Home',         Icon: Home },
-                  { to: '/discover',  label: 'Discover',     Icon: Compass },
-                  { to: '/downloads', label: 'Downloads',    Icon: Download, badge: activeDownloads },
-                  { to: '/library',   label: 'My Library',   Icon: Library },
-                  { to: '/history',   label: 'History',      Icon: History },
-                  { to: '/watchlist', label: 'Watchlist',    Icon: Bookmark, badge: watchlist.length },
-                  { to: '/remote',    label: 'Phone Remote', Icon: Wifi },
-                  { to: '/stats',     label: 'Stats',        Icon: BarChart3 },
+                  { to: '/',          label: 'Home',       Icon: Home },
+                  { to: '/discover',  label: 'Discover',   Icon: Compass },
+                  { to: '/downloads', label: 'Downloads',  Icon: Download, badge: activeDownloads },
+                  { to: '/library',   label: 'My Library', Icon: Library },
+                  { to: '/watchlist', label: 'Watchlist',  Icon: Bookmark, badge: watchlist.length },
+                  { to: '/history',   label: 'History',    Icon: History },
+                  { to: '/stats',     label: 'Stats',      Icon: BarChart3 },
+                  { to: '/samsung-tv',label: 'Watch on TV',Icon: Tv2 },
                 ].map(({ to, label, Icon, badge }) => (
                   <Link
                     key={to}
@@ -446,17 +457,6 @@ export default function Header({ onChatOpen: _onChatOpen }: HeaderProps) {
                     )}
                   </Link>
                 ))}
-
-                <div className="border-t border-border/50 my-2" />
-
-                <Link
-                  to="/library"
-                  onClick={() => setMobileOpen(false)}
-                  className="flex items-center gap-3 px-3 py-3 rounded-xl bg-primary/15 border border-primary/25 text-primary hover:bg-primary/25 transition-all"
-                >
-                  <Upload className="w-4 h-4 flex-shrink-0" />
-                  <span className="text-sm font-semibold">Upload Media</span>
-                </Link>
 
                 <div className="border-t border-border/50 my-2" />
 
