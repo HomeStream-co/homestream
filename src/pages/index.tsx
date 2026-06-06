@@ -111,16 +111,23 @@ export default function HomePage() {
     [visibleLibrary],
   );
 
-  const series = useMemo(
-    () => visibleLibrary.filter(m => m.type === 'series'),
-    [visibleLibrary],
-  );
+  // Deduplicated series — one card per show title (first episode found), matching Library ShowCard logic
+  const series = useMemo(() => {
+    const seen = new Set<string>();
+    const deduped: typeof visibleLibrary = [];
+    for (const m of visibleLibrary) {
+      if (m.type !== 'series') continue;
+      const key = m.title.trim().toLowerCase();
+      if (!seen.has(key)) {
+        seen.add(key);
+        deduped.push(m);
+      }
+    }
+    return deduped;
+  }, [visibleLibrary]);
 
-  // Unique show count — deduplicated by title, matching the Library page logic
-  const uniqueShowCount = useMemo(
-    () => new Set(series.map(m => m.title.trim().toLowerCase())).size,
-    [series],
-  );
+  // Count matches the carousel — both are deduped by title
+  const uniqueShowCount = series.length;
 
   const topRated = useMemo(() =>
     [...visibleLibrary]
