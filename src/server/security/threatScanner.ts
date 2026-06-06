@@ -18,3 +18,26 @@ export async function runPreDownloadScan(
 ): Promise<ScanResult> {
   return { allowed: true };
 }
+
+export interface QuarantineEntry {
+  id: string;
+  filePath: string;
+  infoHash?: string;
+  title?: string;
+  reason?: string;
+  quarantinedAt: number;
+}
+
+export async function readQuarantineLog(): Promise<QuarantineEntry[]> {
+  return [];
+}
+
+export async function deleteFromQuarantine(_id: string): Promise<void> {}
+
+export async function restoreFromQuarantine(_id: string): Promise<void> {}
+
+export async function runPostDownloadScan(
+  _opts: { filePath?: string; infoHash?: string; title?: string }
+): Promise<ScanResult> {
+  return { allowed: true };
+}

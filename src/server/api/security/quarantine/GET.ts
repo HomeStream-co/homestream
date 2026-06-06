@@ -11,6 +11,6 @@ import { requireAuth } from '../../../authMiddleware.js';
  */
 export default function handler(_req: Request, res: Response) {
   if (!requireAuth(_req, res)) return;
-  const entries = readQuarantineLog();
+  const entries = await readQuarantineLog();
   res.json({ entries, count: entries.length });
 }
