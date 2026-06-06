@@ -1,5 +1,5 @@
-import { type ReactElement } from 'react';
-import { useLocation } from 'react-router-dom';
+import { type ReactElement, useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Toaster } from 'sonner';
 
 import Footer from '@/layouts/parts/Footer';
@@ -15,15 +15,41 @@ interface RootLayoutProps {
   children: ReactElement;
 }
 
+/** On first load, if setup hasn't been completed, redirect to /setup */
+function FirstRunGuard() {
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    // Don't redirect if already on /setup or /profiles
+    if (location.pathname === '/setup' || location.pathname === '/profiles') return;
+
+    fetch('/api/setup', { credentials: 'include' })
+      .then(r => r.json())
+      .then((data: { setupComplete?: boolean }) => {
+        if (data.setupComplete === false) {
+          navigate('/setup', { replace: true });
+        }
+      })
+      .catch(() => { /* non-fatal — stay on current page */ });
+  // Only run once on mount
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return null;
+}
+
 function AppShell({ children }: { children: ReactElement }) {
   const location = useLocation();
   const isPlayer = location.pathname.startsWith('/player');
   const isProfiles = location.pathname === '/profiles';
-  const hideChrome = isPlayer || isProfiles;
+  const isSetup = location.pathname === '/setup';
+  const hideChrome = isPlayer || isProfiles || isSetup;
 
   return (
     <Website>
       <>
+        <FirstRunGuard />
         {!hideChrome && <Header />}
         {children}
         {!hideChrome && <Footer />}
