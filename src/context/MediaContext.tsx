@@ -93,18 +93,7 @@ export function MediaProvider({ children }: { children: ReactNode }) {
       const res = await fetch(`/api/media?profile=${profileId}`, { headers, credentials: 'include' });
 
       // 304 Not Modified — library hasn't changed; keep current state as-is.
-      // But if the library is currently empty we still need to load demo content.
       if (res.status === 304) {
-        if (library.length === 0) {
-          try {
-            const demoRes = await fetch('/api/demo', { credentials: 'include' });
-            if (demoRes.ok) {
-              const demoData = await demoRes.json() as MediaItem[];
-              setLibrary(demoData);
-              setIsDemoMode(true);
-            }
-          } catch { /* non-fatal */ }
-        }
         setLoading(false);
         return;
       }
@@ -119,17 +108,9 @@ export function MediaProvider({ children }: { children: ReactNode }) {
 
         let data = await res.json() as MediaItem[];
 
-        // ── Demo mode ──────────────────────────────────────────────────────
-        // When the library is empty (fresh install / builder preview), load
-        // demo items so the UI renders with realistic content.
+        // ── Empty library — just show nothing, no demo data ──────────────────
         if (data.length === 0) {
-          try {
-            const demoRes = await fetch('/api/demo', { credentials: 'include' });
-            if (demoRes.ok) {
-              data = await demoRes.json() as MediaItem[];
-              setIsDemoMode(true);
-            }
-          } catch { /* non-fatal — keep empty library */ }
+          setIsDemoMode(false);
         } else {
           setIsDemoMode(false);
         }
