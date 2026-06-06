@@ -22,6 +22,7 @@ export default defineConfig({
   plugins: [react()],
   test: {
     globals: true,
+    passWithNoTests: true,
     // Use forks pool to isolate memory per test file (prevents OOM)
     pool: 'forks',
     poolOptions: {
