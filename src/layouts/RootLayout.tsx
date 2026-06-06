@@ -1,35 +1,40 @@
-import { Helmet } from '@dr.pogodin/react-helmet';
 import { type ReactElement } from 'react';
-import { ScrollRestoration } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
+import { Toaster } from 'sonner';
 
 import Footer from '@/layouts/parts/Footer';
 import Header from '@/layouts/parts/Header';
 import Website from '@/layouts/Website';
 
-/**
- * Root layout component that wraps all pages with consistent header and footer.
- *
- * To customize the header or footer, directly edit the Header.tsx and Footer.tsx
- * files in the layouts/parts directory.
- *
- * Site-wide <title> and <meta> live in the <Helmet> below. Individual pages can
- * override them by rendering their own <Helmet> — last-mounted wins.
- */
 interface RootLayoutProps {
   children: ReactElement;
 }
 
 export default function RootLayout({ children }: RootLayoutProps) {
+  const location = useLocation();
+
+  const isPlayer = location.pathname.startsWith('/player/');
+  const isProfiles = location.pathname === '/profiles';
+  const hideChrome = isPlayer || isProfiles;
+
   return (
     <Website>
-      <Helmet>
-        <title>App Template</title>
-        <meta name="description" content="App Template" />
-      </Helmet>
-      <ScrollRestoration />
-      <Header />
-      {children}
-      <Footer />
+      <>
+        {!hideChrome && <Header />}
+        {children}
+        {!hideChrome && <Footer />}
+        <Toaster
+          theme="dark"
+          position="bottom-left"
+          toastOptions={{
+            style: {
+              background: 'hsl(var(--card))',
+              border: '1px solid hsl(var(--border))',
+              color: 'hsl(var(--foreground))',
+            },
+          }}
+        />
+      </>
     </Website>
   );
 }
