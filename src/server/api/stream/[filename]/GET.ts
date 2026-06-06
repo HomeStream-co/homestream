@@ -120,10 +120,63 @@ function isPathAllowed(resolvedPath: string): boolean {
   return allowedRoots.some(root => normalised.startsWith(root + path.sep) || normalised === root);
 }
 
+// ── Demo mode — royalty-free Blender Foundation clips ────────────────────────
+// When the library is empty the UI loads demo items whose filenames start with
+// a known prefix. Rather than 404-ing, we redirect to a real playable MP4 so
+// the player, controls, seek bar, and autoplay flow all work in the preview.
+//
+// Videos are hosted by the Blender Foundation and are CC-licensed:
+//   Big Buck Bunny  — https://peach.blender.org/
+//   Elephants Dream — https://orange.blender.org/
+//   Tears of Steel  — https://mango.blender.org/
+//   Sintel          — https://durian.blender.org/
+// All URLs verified live — test-videos.co.uk hosts royalty-free H.264 MP4 clips
+// specifically for player/streaming demos. w3schools hosts a short BBB clip too.
+// Using 4 distinct clips so different titles feel varied in the preview.
+const CLIP_A = 'https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/1080/Big_Buck_Bunny_1080_10s_5MB.mp4';
+const CLIP_B = 'https://test-videos.co.uk/vids/jellyfish/mp4/h264/1080/Jellyfish_1080_10s_1MB.mp4';
+const CLIP_C = 'https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/720/Big_Buck_Bunny_720_10s_1MB.mp4';
+const CLIP_D = 'https://test-videos.co.uk/vids/jellyfish/mp4/h264/720/Jellyfish_720_10s_1MB.mp4';
+const CLIP_W = 'https://www.w3schools.com/html/mov_bbb.mp4'; // short BBB clip, very fast
+
+const DEMO_VIDEO_MAP: Record<string, string> = {
+  // Movies
+  'Avengers.Endgame':    CLIP_A,
+  'Inception':           CLIP_B,
+  'Interstellar':        CLIP_C,
+  'The.Dark.Knight':     CLIP_D,
+  'Parasite':            CLIP_A,
+  'Pulp.Fiction':        CLIP_B,
+  'Spirited.Away':       CLIP_W,
+  'Django.Unchained':    CLIP_C,
+  'The.Conjuring':       CLIP_D,
+  'Forrest.Gump':        CLIP_B,
+  // TV shows — each show gets its own clip
+  'Breaking.Bad':        CLIP_C,
+  'Stranger.Things':     CLIP_D,
+  'Game.of.Thrones':     CLIP_B,
+  'Rick.and.Morty':      CLIP_W,
+};
+
+function getDemoVideoUrl(filename: string): string | null {
+  for (const [prefix, url] of Object.entries(DEMO_VIDEO_MAP)) {
+    if (filename.startsWith(prefix)) return url;
+  }
+  return null;
+}
+
 export default function handler(req: Request, res: Response) {
   if (!requireAuth(req, res)) return;
   try {
     const filename = req.params.filename as string;
+
+    // ── Demo mode short-circuit ───────────────────────────────────────────────
+    // If the filename matches a known demo item, redirect to the royalty-free
+    // clip so the player works end-to-end without any real media files.
+    const demoUrl = getDemoVideoUrl(filename);
+    if (demoUrl) {
+      return res.redirect(302, demoUrl);
+    }
 
     // ── Rating gate — look up the item's rating and check against active profile ──
     try {
