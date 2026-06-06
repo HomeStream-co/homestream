@@ -29,13 +29,6 @@ export default function PlayerBelowFold({
   return (
     <div className="bg-background px-4 sm:px-6 lg:px-8 py-8 max-w-screen-2xl mx-auto">
       <div className="flex flex-col sm:flex-row gap-6 mb-10">
-        {/* Poster */}
-        <div className="w-32 aspect-[2/3] rounded-lg overflow-hidden bg-card flex-shrink-0 hidden sm:block">
-          {item.poster ? (
-            <img src={item.poster} alt={item.title} className="w-full h-full object-cover" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-          ) : null}
-        </div>
-
         <div className="flex-1 min-w-0">
           <h1 className="text-3xl font-heading text-foreground mb-2">{item.title}</h1>
           <div className="flex flex-wrap items-center gap-3 mb-3 text-sm text-muted-foreground">
