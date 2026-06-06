@@ -26,6 +26,7 @@ import { useTheme } from '@/context/ThemeContext';
 import MediaCard from '@/components/MediaCard';
 import TrailerButton from '@/components/TrailerButton';
 import RestrictedContentGuard from '@/components/RestrictedContentGuard';
+import MovieCollectionDownloadDialog from '@/components/MovieCollectionDownloadDialog';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -87,6 +88,7 @@ export default function MoviePage() {
   const { isAllowed } = useProfile();
   const { settings } = useTheme();
   const [imgError, setImgError] = useState(false);
+  const [collectionDlOpen, setCollectionDlOpen] = useState(false);
 
   // ── Find the item ──
   const item = useMemo(() => library.find(m => m.id === id), [library, id]);
@@ -116,11 +118,17 @@ export default function MoviePage() {
   }, [item, library, isAllowed]);
 
   // ── AI similar titles (names only, not in library) ──
+  const libraryTitleSet = useMemo(
+    () => new Set(library.map(m => m.title.toLowerCase())),
+    [library],
+  );
   const aiSimilar = useMemo(() => {
     if (!item?.enrichment?.similarTitles) return [];
-    const inLibraryTitles = new Set(library.map(m => m.title.toLowerCase()));
-    return item.enrichment.similarTitles.filter(t => !inLibraryTitles.has(t.toLowerCase())).slice(0, 6);
-  }, [item, library]);
+    return item.enrichment.similarTitles.filter(t => !libraryTitleSet.has(t.toLowerCase())).slice(0, 6);
+  }, [item, libraryTitleSet]);
+
+  // Show "Download Collection" button when the movie has AI-suggested related titles
+  const hasCollection = (item?.enrichment?.similarTitles?.length ?? 0) > 0;
 
   // ── Not found ──
   if (!item) {
@@ -145,6 +153,7 @@ export default function MoviePage() {
     'text-red-400 border-red-400/40';
 
   return (
+    <>
     <RestrictedContentGuard rated={item.rated} contentTitle={item.title}>
     <>
       <title>{item.title} — HomeStream</title>
@@ -327,6 +336,18 @@ export default function MoviePage() {
                     Download
                   </a>
 
+                  {/* Download collection — only shown when AI enrichment has related titles */}
+                  {hasCollection && (
+                    <button
+                      onClick={() => setCollectionDlOpen(true)}
+                      className="flex items-center gap-2 px-5 py-3 rounded-xl bg-card border border-border text-foreground font-semibold text-sm hover:bg-muted transition-colors"
+                      title="Download related movies in this series/franchise"
+                    >
+                      <Layers className="w-4 h-4" />
+                      Download Series
+                    </button>
+                  )}
+
                   <button
                     onClick={handleWatchlist}
                     className={`flex items-center gap-2 px-5 py-3 rounded-xl border font-semibold text-sm transition-colors ${
@@ -496,5 +517,16 @@ export default function MoviePage() {
       </div>
     </>
     </RestrictedContentGuard>
+
+    {/* ── Collection download dialog ─────────────────────────────────────── */}
+    {item && (
+      <MovieCollectionDownloadDialog
+        open={collectionDlOpen}
+        onOpenChange={setCollectionDlOpen}
+        item={item}
+        libraryTitles={libraryTitleSet}
+      />
+    )}
+    </>
   );
 }
