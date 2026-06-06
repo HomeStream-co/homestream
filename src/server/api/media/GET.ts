@@ -23,7 +23,6 @@ import type { Request, Response } from 'express';
 import crypto from 'crypto';
 import { readLibrary } from '../../libraryStore.js';
 import { requireAuth } from '../../authMiddleware.js';
-import { filterByRating } from '../../ratingGate.js';
 
 interface ProfileProgressEntry {
   progress: number;
@@ -64,18 +63,21 @@ export default function handler(req: Request, res: Response) {
     const profileId = (req.query.profile as string | undefined)?.trim() ?? '';
 
     // ── ETag / 304 handling ───────────────────────────────────────────────────
-    const etag = buildETag(library, profileId);
-    res.setHeader('ETag', etag);
-    res.setHeader('Cache-Control', 'no-cache');
-    if (req.headers['if-none-match'] === etag) {
-      res.status(304).end();
-      return;
+    // Skip ETag caching for empty libraries so the client always gets a fresh
+    // 200 [] response and can trigger demo mode correctly.
+    if (library.length > 0) {
+      const etag = buildETag(library, profileId);
+      res.setHeader('ETag', etag);
+      res.setHeader('Cache-Control', 'no-cache');
+      if (req.headers['if-none-match'] === etag) {
+        res.status(304).end();
+        return;
+      }
     }
 
     if (!profileId) {
-      // No profile filter — apply rating gate based on active session profile, return data
-      const filtered = filterByRating(req, library as Array<{ rated?: string } & Record<string, unknown>>);
-      return res.json(filtered);
+      // No profile filter — return full library (client applies its own rating gate)
+      return res.json(library);
     }
 
     // Resolve per-profile progress fields
@@ -110,7 +112,7 @@ export default function handler(req: Request, res: Response) {
       };
     });
 
-    res.json(filterByRating(req, resolved as Array<{ rated?: string } & Record<string, unknown>>));
+    res.json(resolved);
   } catch (error) {
     res.status(500).json({ error: 'Failed to read media library', message: String(error) });
   }
