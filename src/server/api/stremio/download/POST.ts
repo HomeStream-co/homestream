@@ -1,13 +1,15 @@
 import type { Request, Response } from 'express';
 import { pickBestStream } from '../../../torrentManager.js';
 import { addMagnet, isReachable } from '../../../qbittorrentClient.js';
-import { readConfig } from '../../../configStore.js';
+import { readConfig, DEFAULT_TORRENT_SOURCES } from '../../../configStore.js';
 import { runPreDownloadScan } from '../../../security/threatScanner.js';
 import { connectForDownload, disconnectAfterDownload } from '../../../vpnService.js';
 import type { VPNConfig } from '../../../vpnService.js';
 import { upsertJob, getAllPersistedJobs, findJobByInfoHash, updateJobProgress } from '../../../downloadJobStore.js';
 import { requireAuth } from '../../../authMiddleware.js';
 import { resolvemagnet, downloadUrl } from '../../../realDebridClient.js';
+import { runPostDownloadPipeline } from '../../../postDownloadPipeline.js';
+import { fetchAllCustomSources } from '../../../customSourceFetcher.js';
 
 const CINEMETA   = 'https://v3-cinemeta.strem.io';
 const TIMEOUT_MS = 15_000;
@@ -36,15 +38,18 @@ async function resolveImdbId(title: string, type: string): Promise<string | null
  * Routes magnet links to the best available download backend:
  *   1. Real-Debrid (preferred) — premium cached downloads, no torrent client needed
  *   2. qBittorrent (fallback)  — full BitTorrent swarm, resume on restart
- *   3. WebTorrent (last resort) — built-in, works without qBittorrent
  *
- * Stream sources (queried in parallel, same as /api/stremio/stream):
- *   1. Torrentio  — always queried (public, no config needed)
- *   2. Prowlarr   — queried when prowlarrUrl + prowlarrApiKey are set in config
- *   3. Nyaa.si    — queried for anime (always, public API, no auth)
+ * Stream sources (queried in parallel, respecting torrentSources enabled flags):
+ *   1. Torrentio  — built-in, public
+ *   2. Prowlarr   — built-in, requires config
+ *   3. Nyaa.si    — built-in, public
+ *   4. Custom     — user-added Jackett / Torznab / RSS sources
  *
  * For MOVIES: picks the best single stream and queues one download.
  * For SERIES: fetches streams per episode, picks best, queues all.
+ *
+ * After download completes, both RD and qBit paths call runPostDownloadPipeline
+ * which handles: transcode → OMDB metadata → category assignment → library add.
  */
 
 interface StreamResult {
@@ -54,7 +59,7 @@ interface StreamResult {
   seeds: string;
   magnet: string;
   infoHash: string;
-  source: 'torrentio' | 'prowlarr' | 'nyaa';
+  source: 'torrentio' | 'prowlarr' | 'nyaa' | 'jackett' | 'torznab' | 'rss';
 }
 
 interface TorrentioResponse {
@@ -96,21 +101,14 @@ const streamCache = new Map<string, CacheEntry>();
 function getCached(key: string): StreamResult[] | null {
   const entry = streamCache.get(key);
   if (!entry || Date.now() > entry.expiresAt) { streamCache.delete(key); return null; }
-  // FIX (🟡): LRU touch — re-insert the entry so it moves to the end of the
-  // Map's insertion order. This makes eviction remove the least-recently-used
-  // entry instead of the oldest-inserted one (FIFO). Previously a frequently-
-  // accessed stream could be evicted just because it was inserted first, causing
-  // redundant Torrentio fetches for active downloads.
   streamCache.delete(key);
   streamCache.set(key, entry);
   return entry.streams;
 }
 function setCached(key: string, streams: StreamResult[]) {
-  // Re-insert to update LRU position if key already exists
   streamCache.delete(key);
   streamCache.set(key, { streams, expiresAt: Date.now() + 5 * 60 * 1000 });
   if (streamCache.size > 200) {
-    // Evict the least-recently-used entry (first key in Map = oldest access)
     const lru = streamCache.keys().next().value;
     if (lru) streamCache.delete(lru);
   }
@@ -164,7 +162,7 @@ async function fetchTorrentio(
   try {
     const res = await fetch(url, {
       signal: controller.signal,
-      headers: { 'User-Agent': 'HomeStream/1.5' },
+      headers: { 'User-Agent': 'HomeStream/1.6' },
     });
     clearTimeout(t);
     if (!res.ok) return [];
@@ -183,7 +181,7 @@ async function fetchTorrentio(
           source: 'torrentio' as const,
         };
       });
-  } catch { // non-fatal — Torrentio unreachable or returned bad data; caller falls back to other sources
+  } catch {
     clearTimeout(t);
     return [];
   }
@@ -201,7 +199,7 @@ async function fetchProwlarr(
   try {
     const res = await fetch(url, {
       signal: controller.signal,
-      headers: { 'X-Api-Key': prowlarrApiKey, 'User-Agent': 'HomeStream/1.5' },
+      headers: { 'X-Api-Key': prowlarrApiKey, 'User-Agent': 'HomeStream/1.6' },
     });
     clearTimeout(t);
     if (!res.ok) return [];
@@ -223,7 +221,7 @@ async function fetchProwlarr(
         } satisfies StreamResult;
       });
     return mapped.filter((r): r is StreamResult => r !== null);
-  } catch { // non-fatal — Prowlarr unreachable or returned bad data; caller falls back to other sources
+  } catch {
     clearTimeout(t);
     return [];
   }
@@ -234,7 +232,7 @@ async function fetchNyaa(query: string): Promise<StreamResult[]> {
   const controller = new AbortController();
   const t = setTimeout(() => controller.abort(), 10_000);
   try {
-    const res = await fetch(url, { signal: controller.signal, headers: { 'User-Agent': 'HomeStream/1.5' } });
+    const res = await fetch(url, { signal: controller.signal, headers: { 'User-Agent': 'HomeStream/1.6' } });
     clearTimeout(t);
     if (!res.ok) return [];
     const data = await res.json() as { results?: NyaaItem[] } | NyaaItem[];
@@ -250,13 +248,13 @@ async function fetchNyaa(query: string): Promise<StreamResult[]> {
         magnet: i.magnet,
         source: 'nyaa' as const,
       }));
-  } catch { // non-fatal — Nyaa unreachable or returned bad data; caller falls back to other sources
+  } catch {
     clearTimeout(t);
     return [];
   }
 }
 
-// ── Multi-source fetch + merge (mirrors /api/stremio/stream logic) ────────────
+// ── Multi-source fetch + merge (respects torrentSources enabled flags) ─────────
 
 async function fetchStreamsForEpisode(
   imdbId: string,
@@ -274,7 +272,7 @@ async function fetchStreamsForEpisode(
   const cached = getCached(cacheKey);
   if (cached) return cached;
 
-  // Build search query for Prowlarr + Nyaa (same format as stream/POST.ts)
+  // Build search query for Prowlarr / Nyaa / custom sources
   let searchQuery = title || imdbId;
   if (type === 'series' && season != null && episode != null) {
     const s = String(season).padStart(2, '0');
@@ -283,22 +281,26 @@ async function fetchStreamsForEpisode(
   }
 
   const config = readConfig();
+  const sources = config.torrentSources ?? DEFAULT_TORRENT_SOURCES;
+  const srcEnabled = (srcType: string) => sources.find(s => s.type === srcType)?.enabled ?? true;
 
-  // Fire all sources in parallel — failures are isolated via allSettled
-  const [torrentioRes, prowlarrRes, nyaaRes] = await Promise.allSettled([
-    fetchTorrentio(imdbId, type, season, episode),
-    fetchProwlarr(searchQuery, config.prowlarrUrl, config.prowlarrApiKey),
-    fetchNyaa(searchQuery),
+  // Fire all enabled sources in parallel
+  const [torrentioRes, prowlarrRes, nyaaRes, customRes] = await Promise.allSettled([
+    srcEnabled('torrentio') ? fetchTorrentio(imdbId, type, season, episode) : Promise.resolve([]),
+    srcEnabled('prowlarr')  ? fetchProwlarr(searchQuery, config.prowlarrUrl, config.prowlarrApiKey) : Promise.resolve([]),
+    srcEnabled('nyaa')      ? fetchNyaa(searchQuery) : Promise.resolve([]),
+    fetchAllCustomSources(sources, searchQuery),
   ]);
 
   const torrentioStreams = torrentioRes.status === 'fulfilled' ? torrentioRes.value : [];
   const prowlarrStreams  = prowlarrRes.status  === 'fulfilled' ? prowlarrRes.value  : [];
   const nyaaStreams      = nyaaRes.status      === 'fulfilled' ? nyaaRes.value      : [];
+  const customStreams    = customRes.status    === 'fulfilled' ? customRes.value    : [];
 
   // Merge + deduplicate by infoHash (case-insensitive), sort by seeds desc
   const seen = new Set<string>();
   const merged: StreamResult[] = [];
-  for (const stream of [...torrentioStreams, ...prowlarrStreams, ...nyaaStreams]) {
+  for (const stream of [...torrentioStreams, ...prowlarrStreams, ...nyaaStreams, ...customStreams]) {
     const key = stream.infoHash.toLowerCase();
     if (!seen.has(key)) {
       seen.add(key);
@@ -331,8 +333,6 @@ interface QbitJob {
 const qbitJobs = new Map<string, QbitJob>();
 
 export function getQbitJobs(): QbitJob[] {
-  // Merge in-memory jobs with persisted jobs from disk.
-  // In-memory jobs take precedence (they have live status).
   const persisted = getAllPersistedJobs()
     .filter(j => j.backend === 'qbittorrent')
     .map(j => ({
@@ -397,7 +397,6 @@ async function queueViaQbit(params: {
 
   qbitJobs.set(job.jobId, job);
 
-  // Persist to disk so job survives server restarts
   upsertJob({
     jobId: job.jobId,
     infoHash: job.infoHash,
@@ -447,54 +446,38 @@ export default async function handler(req: Request, res: Response) {
     return;
   }
 
-  // Resolve IMDB ID — either provided directly or looked up via Cinemeta.
-  // TMDB cards don't carry an imdbId, so we fall back to a title search.
+  // Resolve IMDB ID
   let resolvedImdbId = imdbId;
   if (!resolvedImdbId) {
-    console.log(`[download] No imdbId provided for "${title}" — resolving via Cinemeta…`);
+    console.log(`[download] No imdbId for "${title}" — resolving via Cinemeta…`);
     resolvedImdbId = (await resolveImdbId(title, type)) ?? undefined;
     if (!resolvedImdbId) {
       res.status(404).json({ error: `Could not find "${title}" in Cinemeta — try searching by exact title` });
       return;
     }
-    console.log(`[download] Resolved imdbId for "${title}": ${resolvedImdbId}`);
   }
   const finalImdbId = resolvedImdbId;
 
-  // ── Backend selection: RD > qBit > WebTorrent ─────────────────────────────
+  // ── Backend selection: RD > qBit ──────────────────────────────────────────
   const cfg = readConfig();
   const rdApiKey = cfg.realDebridApiKey?.trim();
   const useRD = !!rdApiKey;
   const preferredQuality = (cfg.preferredQuality as '720p' | '1080p' | '4k' | 'best') ?? '1080p';
 
-  // Only check qBit / WebTorrent if RD is not configured.
-  //
-  // FIX (🔴): Previously called testConnection() here, which goes through the
-  // shared login() path and writes to the module-level sessionCookie. If qBit
-  // is down, login() throws and sets sessionCookie = null — silently invalidating
-  // any active qBit session for concurrent downloads already in flight.
-  //
-  // isReachable() is a plain unauthenticated GET to /api/v2/app/version. It
-  // never touches sessionCookie, so a down qBit cannot corrupt live sessions.
   let useQbit = false;
-  let wtAvailable = false;
   if (!useRD) {
     useQbit = await isReachable();
     if (!useQbit) {
-      try { await import('webtorrent'); wtAvailable = true; } catch { /* not bundled */ }
-      if (!wtAvailable) {
-        res.status(503).json({
-          error: 'No download backend available',
-          message: 'qBittorrent is offline and the built-in downloader is not available. Configure Real-Debrid in Settings → Downloads for dependency-free downloads, or start qBittorrent.',
-          hint: 'real-debrid',
-        });
-        return;
-      }
-      console.warn('[download] qBittorrent unreachable — falling back to WebTorrent');
+      res.status(503).json({
+        error: 'No download backend available',
+        message: 'Configure Real-Debrid in Settings → Downloads for instant downloads, or start qBittorrent.',
+        hint: 'real-debrid',
+      });
+      return;
     }
   }
 
-  const backendLabel = useRD ? 'Real-Debrid' : useQbit ? 'qBittorrent' : 'WebTorrent (fallback)';
+  const backendLabel = useRD ? 'Real-Debrid' : 'qBittorrent';
   console.log(`[download] Backend: ${backendLabel}`);
 
   // ── VPN: connect before download (download-only, never affects streaming) ──
@@ -512,39 +495,23 @@ export default async function handler(req: Request, res: Response) {
     }
   }
 
-  // Helper to disconnect VPN after all downloads are queued
   const releaseVPN = async () => {
     if (vpnConnected && vpnCfg) {
       await disconnectAfterDownload(vpnCfg);
     }
   };
 
-  // ── Duplicate detection helper ─────────────────────────────────────────────
-  // Returns true (and sends 409) if the infoHash is already active.
-  // Errored jobs are NOT considered duplicates — allow the user to retry them.
-  //
-  // FIX (🟡): Previously only checked the persisted store (disk read). Between
-  // upsertJob() being called and the async write queue flushing to disk, a
-  // second concurrent request could slip through the duplicate check because
-  // findJobByInfoHash() reads from disk and the new job isn't there yet.
-  // Now we also maintain an in-request in-memory Set of hashes being queued
-  // in this handler invocation so back-to-back requests in the same tick are
-  // caught too.
+  // ── Duplicate detection ────────────────────────────────────────────────────
   const activeInThisRequest = new Set<string>();
   const checkDuplicate = (infoHash: string, label: string): boolean => {
     const normalized = (infoHash ?? '').toLowerCase();
-    if (!normalized) return false; // guard: no hash = can't be a duplicate
+    if (!normalized) return false;
     if (activeInThisRequest.has(normalized)) {
-      res.status(409).json({
-        error: 'duplicate',
-        message: `"${label}" is already being queued in this request`,
-        infoHash,
-      });
+      res.status(409).json({ error: 'duplicate', message: `"${label}" is already being queued`, infoHash });
       return true;
     }
     const existing = findJobByInfoHash(infoHash);
     if (existing && existing.status !== 'error') {
-      console.log(`[download] Duplicate detected for "${label}" — infoHash ${infoHash} already ${existing.status}`);
       res.status(409).json({
         error: 'duplicate',
         message: `"${label}" is already in the download queue (${existing.status})`,
@@ -556,6 +523,65 @@ export default async function handler(req: Request, res: Response) {
     activeInThisRequest.add(normalized);
     return false;
   };
+
+  // ── RD background download helper ─────────────────────────────────────────
+  // Fires RD resolve + download + pipeline in the background.
+  // Responds immediately with the job entry.
+  function fireRdDownload(params: {
+    jobEntry: {
+      jobId: string; infoHash: string; title: string; quality: string;
+      type: 'movie' | 'series'; season?: number; episode?: number;
+      status: 'downloading'; addedAt: string; poster?: string;
+      imdbId: string; backend: 'real-debrid';
+    };
+    magnet: string;
+  }) {
+    const { jobEntry, magnet } = params;
+    const { jobId, title: jobTitle, quality, type: jobType, season: jobSeason, episode: jobEpisode, imdbId: jobImdbId, poster: jobPoster } = jobEntry;
+
+    (async () => {
+      try {
+        const cfg2 = readConfig();
+        const directUrl = await resolvemagnet(magnet, rdApiKey!, (pct, status) => {
+          console.log(`[rd] ${jobTitle}: ${status} ${pct}%`);
+        });
+        const ext = directUrl.split('?')[0].split('.').pop() ?? 'mkv';
+        const safeTitle = jobTitle.replace(/[^a-zA-Z0-9 ._-]/g, '').trim();
+        const destDir = cfg2.downloadsDir || (cfg2.mediaDir ? `${cfg2.mediaDir}/downloads` : '/downloads');
+        const destPath = `${destDir}/${safeTitle} [${quality}].${ext}`;
+
+        let lastProgressWrite = 0;
+        await downloadUrl(directUrl, destPath, (dl, total) => {
+          const now = Date.now();
+          if (total > 0 && now - lastProgressWrite > 1000) {
+            lastProgressWrite = now;
+            updateJobProgress(jobId, dl, total);
+          }
+        });
+
+        console.log(`[rd] ✓ ${jobTitle} saved to ${destPath} — starting pipeline`);
+
+        // Hand off to the shared post-download pipeline
+        await runPostDownloadPipeline({
+          filePath: destPath,
+          title: jobTitle,
+          quality,
+          type: jobType,
+          season: jobSeason,
+          episode: jobEpisode,
+          imdbId: jobImdbId,
+          poster: jobPoster,
+          year,
+          jobId,
+          backend: 'real-debrid',
+        });
+
+      } catch (err) {
+        console.error(`[rd] ✗ ${jobTitle} failed:`, err);
+        upsertJob({ ...jobEntry, status: 'error' });
+      }
+    })();
+  }
 
   try {
     if (type === 'movie') {
@@ -571,7 +597,6 @@ export default async function handler(req: Request, res: Response) {
       }
 
       if (useRD) {
-        // ── Real-Debrid path ────────────────────────────────────────────────
         if (checkDuplicate(best.infoHash, title)) { await releaseVPN(); return; }
         const scan = await runPreDownloadScan({ infoHash: best.infoHash, title });
         if (!scan.allowed) {
@@ -579,8 +604,6 @@ export default async function handler(req: Request, res: Response) {
           res.status(403).json({ error: 'Download blocked by security scan', reason: scan.reason, layer: scan.layer, details: scan.details, threatLevel: scan.threatLevel });
           return;
         }
-        // Use hash + timestamp so the same torrent can be re-queued after an error
-        // without colliding with the previous job record.
         const jobId = `rd-${best.infoHash}-${Date.now()}`;
         const jobEntry = {
           jobId, infoHash: best.infoHash, title, quality: best.quality,
@@ -588,40 +611,11 @@ export default async function handler(req: Request, res: Response) {
           addedAt: new Date().toISOString(), poster, imdbId: finalImdbId, backend: 'real-debrid' as const,
         };
         upsertJob(jobEntry);
-        // Respond immediately — RD resolves in background
         res.json({ queued: 1, jobs: [jobEntry], backend: 'real-debrid', securityScan: scan, vpnUsed: vpnConnected });
         await releaseVPN();
-        // Background: resolve via RD and download to media folder
-        (async () => {
-          try {
-            const cfg2 = readConfig();
-            const directUrl = await resolvemagnet(best.magnet, rdApiKey!, (pct, status) => {
-              console.log(`[rd] ${title}: ${status} ${pct}%`);
-              upsertJob({ ...jobEntry, status: 'downloading' });
-            });
-            const ext = directUrl.split('?')[0].split('.').pop() ?? 'mkv';
-            const safeTitle = title.replace(/[^a-zA-Z0-9 ._-]/g, '').trim();
-            const destDir = cfg2.downloadsDir || (cfg2.mediaDir ? `${cfg2.mediaDir}/downloads` : '/downloads');
-            const destPath = `${destDir}/${safeTitle} [${best.quality}].${ext}`;
-            // Throttle progress writes — at most once per second
-            let lastProgressWrite = 0;
-            await downloadUrl(directUrl, destPath, (dl, total) => {
-              const now = Date.now();
-              if (total > 0 && now - lastProgressWrite > 1000) {
-                lastProgressWrite = now;
-                updateJobProgress(jobId, dl, total);
-              }
-            });
-            upsertJob({ ...jobEntry, status: 'done', progress: 100 });
-            console.log(`[rd] ✓ ${title} saved to ${destPath}`);
-          } catch (err) {
-            console.error(`[rd] ✗ ${title} failed:`, err);
-            upsertJob({ ...jobEntry, status: 'error' });
-          }
-        })();
+        fireRdDownload({ jobEntry, magnet: best.magnet });
 
-      } else if (useQbit) {
-        // ── qBittorrent path ────────────────────────────────────────────────
+      } else {
         if (checkDuplicate(best.infoHash, title)) { await releaseVPN(); return; }
         const scan = await runPreDownloadScan({ infoHash: best.infoHash, title });
         if (!scan.allowed) {
@@ -632,19 +626,6 @@ export default async function handler(req: Request, res: Response) {
         const job = await queueViaQbit({ infoHash: best.infoHash, magnet: best.magnet, quality: best.quality, type: 'movie', title, imdbId: finalImdbId, poster });
         await releaseVPN();
         res.json({ queued: 1, jobs: [job], backend: 'qbittorrent', securityScan: scan, vpnUsed: vpnConnected });
-      } else {
-        // ── WebTorrent fallback ─────────────────────────────────────────────
-        if (checkDuplicate(best.infoHash, title)) { await releaseVPN(); return; }
-        const scan = await runPreDownloadScan({ infoHash: best.infoHash, title });
-        if (!scan.allowed) {
-          await releaseVPN();
-          res.status(403).json({ error: 'Download blocked by security scan', reason: scan.reason, layer: scan.layer, details: scan.details, threatLevel: scan.threatLevel });
-          return;
-        }
-        const { queueDownload } = await import('../../../torrentManager.js');
-        const job = queueDownload({ infoHash: best.infoHash, magnet: best.magnet, quality: best.quality, type: 'movie', title, imdbId: finalImdbId, poster, year });
-        await releaseVPN();
-        res.json({ queued: 1, jobs: [job], backend: 'webtorrent', securityScan: scan, vpnUsed: vpnConnected });
       }
 
     } else {
@@ -676,39 +657,12 @@ export default async function handler(req: Request, res: Response) {
           upsertJob(jobEntry);
           res.json({ queued: 1, jobs: [jobEntry], backend: 'real-debrid', vpnUsed: vpnConnected });
           await releaseVPN();
-          (async () => {
-            try {
-              const cfg2 = readConfig();
-              const directUrl = await resolvemagnet(best.magnet, rdApiKey!);
-              const ext = directUrl.split('?')[0].split('.').pop() ?? 'mkv';
-              const safeTitle = epTitle.replace(/[^a-zA-Z0-9 ._-]/g, '').trim();
-              const destDir = cfg2.downloadsDir || (cfg2.mediaDir ? `${cfg2.mediaDir}/downloads` : '/downloads');
-              let lastProgressWrite = 0;
-              await downloadUrl(directUrl, `${destDir}/${safeTitle}.${ext}`, (dl, total) => {
-                const now = Date.now();
-                if (total > 0 && now - lastProgressWrite > 1000) {
-                  lastProgressWrite = now;
-                  updateJobProgress(jobEntry.jobId, dl, total);
-                }
-              });
-              upsertJob({ ...jobEntry, status: 'done', progress: 100 });
-            } catch (err) {
-              console.error(`[rd] ✗ ${epTitle}:`, err);
-              upsertJob({ ...jobEntry, status: 'error' });
-            }
-          })();
-        } else if (useQbit) {
+          fireRdDownload({ jobEntry, magnet: best.magnet });
+        } else {
           if (checkDuplicate(best.infoHash, epTitle)) { await releaseVPN(); return; }
           const job = await queueViaQbit({ infoHash: best.infoHash, magnet: best.magnet, quality: best.quality, title: epTitle, type: 'series', season, episode, imdbId: finalImdbId, poster });
           await releaseVPN();
           res.json({ queued: 1, jobs: [job], backend: 'qbittorrent', vpnUsed: vpnConnected });
-        } else {
-          // FIX (🟡): WebTorrent single-episode path was missing duplicate check.
-          if (checkDuplicate(best.infoHash, epTitle)) { await releaseVPN(); return; }
-          const { queueDownload } = await import('../../../torrentManager.js');
-          const job = queueDownload({ infoHash: best.infoHash, magnet: best.magnet, quality: best.quality, title: epTitle, type: 'series', season, episode, imdbId: finalImdbId, poster, year });
-          await releaseVPN();
-          res.json({ queued: 1, jobs: [job], backend: 'webtorrent', vpnUsed: vpnConnected });
         }
         return;
       }
@@ -722,20 +676,15 @@ export default async function handler(req: Request, res: Response) {
       }
 
       const MAX_EPISODES_PER_SEASON = 50;
-      // FIX (🔴): Previously the probe loop fetched streams for each episode
-      // sequentially to find where the season ends, then the batch loop fetched
-      // the same episodes *again* via Promise.all. This doubled the number of
-      // Torrentio/Prowlarr requests and was very slow for long seasons. Now we
-      // store the probe results directly and reuse them — no second fetch.
       const episodeTasks: Array<{ season: number; episode: number; streams: StreamResult[] }> = [];
       for (const s of seasonsToFetch) {
         for (let ep = 1; ep <= MAX_EPISODES_PER_SEASON; ep++) {
-          const streams = await fetchStreamsForEpisode(finalImdbId, 'series', title, s, ep);
-          if (streams.length === 0) {
+          const epStreams = await fetchStreamsForEpisode(finalImdbId, 'series', title, s, ep);
+          if (epStreams.length === 0) {
             console.log(`[download] S${s} ends at E${ep - 1} (no streams found for E${ep})`);
             break;
           }
-          episodeTasks.push({ season: s, episode: ep, streams });
+          episodeTasks.push({ season: s, episode: ep, streams: epStreams });
         }
       }
 
@@ -772,37 +721,9 @@ export default async function handler(req: Request, res: Response) {
             };
             upsertJob(jobEntry);
             queuedJobs.push(jobEntry);
-            // Fire-and-forget RD download
-            const capturedEntry = { ...jobEntry };
-            const capturedMagnet = best.magnet;
-            const capturedJobId = jobId;
-            (async () => {
-              try {
-                const cfg2 = readConfig();
-                const directUrl = await resolvemagnet(capturedMagnet, rdApiKey!);
-                const ext = directUrl.split('?')[0].split('.').pop() ?? 'mkv';
-                const safeTitle = epTitle.replace(/[^a-zA-Z0-9 ._-]/g, '').trim();
-                const destDir = cfg2.downloadsDir || (cfg2.mediaDir ? `${cfg2.mediaDir}/downloads` : '/downloads');
-                let lastProgressWrite = 0;
-                await downloadUrl(directUrl, `${destDir}/${safeTitle}.${ext}`, (dl, total) => {
-                  const now = Date.now();
-                  if (total > 0 && now - lastProgressWrite > 1000) {
-                    lastProgressWrite = now;
-                    updateJobProgress(capturedJobId, dl, total);
-                  }
-                });
-                upsertJob({ ...capturedEntry, status: 'done', progress: 100 });
-              } catch (err) {
-                console.error(`[rd] ✗ ${epTitle}:`, err);
-                upsertJob({ ...capturedEntry, status: 'error' });
-              }
-            })();
-          } else if (useQbit) {
-            const job = await queueViaQbit({ infoHash: best.infoHash, magnet: best.magnet, quality: best.quality, title: epTitle, type: 'series', season: s, episode: ep, imdbId: finalImdbId, poster });
-            queuedJobs.push(job);
+            fireRdDownload({ jobEntry, magnet: best.magnet });
           } else {
-            const { queueDownload } = await import('../../../torrentManager.js');
-            const job = queueDownload({ infoHash: best.infoHash, magnet: best.magnet, quality: best.quality, title: epTitle, type: 'series', season: s, episode: ep, imdbId: finalImdbId, poster, year });
+            const job = await queueViaQbit({ infoHash: best.infoHash, magnet: best.magnet, quality: best.quality, title: epTitle, type: 'series', season: s, episode: ep, imdbId: finalImdbId, poster });
             queuedJobs.push(job);
           }
         }
@@ -822,20 +743,13 @@ export default async function handler(req: Request, res: Response) {
       res.json({
         queued: queuedJobs.length,
         jobs: queuedJobs,
-        backend: useRD ? 'real-debrid' : useQbit ? 'qbittorrent' : 'webtorrent',
+        backend: useRD ? 'real-debrid' : 'qbittorrent',
         vpnUsed: vpnConnected,
       });
     }
   } catch (err) {
     await releaseVPN();
     const msg = err instanceof Error ? err.message : String(err);
-    if (msg.includes('WebTorrent is not available')) {
-      res.status(503).json({
-        error: 'Built-in downloader unavailable',
-        message: 'qBittorrent is not running and the built-in downloader is not available in this environment. Configure Real-Debrid in Settings → Downloads, or start qBittorrent.',
-      });
-    } else {
-      res.status(500).json({ error: 'Download queue failed', message: msg });
-    }
+    res.status(500).json({ error: 'Download queue failed', message: msg });
   }
 }
