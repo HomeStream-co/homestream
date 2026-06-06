@@ -1960,26 +1960,39 @@ export default function DownloadsPage() {
             </div>
           )}
 
-          {/* ── Filter tabs ── */}
-          <div className="flex items-center gap-1 mb-4 bg-muted/30 rounded-xl p-1 w-fit">
-            {([
-              { key: 'all',    label: `All (${totalAll})` },
-              { key: 'active', label: `Active (${totalActive})` },
-              { key: 'done',   label: `Done (${totalDone})` },
-              { key: 'error',  label: `Issues (${totalError})` },
-            ] as const).map(({ key, label }) => (
+          {/* ── Filter tabs — sticky so they stay accessible while scrolling ── */}
+          <div className="sticky top-[64px] z-30 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-2 bg-background/90 backdrop-blur-md border-b border-border/40 mb-4">
+            <div className="max-w-5xl mx-auto flex items-center gap-1">
+              <div className="flex items-center gap-1 bg-muted/40 rounded-xl p-1 w-fit">
+                {([
+                  { key: 'all',    label: `All (${totalAll})` },
+                  { key: 'active', label: `Active (${totalActive})` },
+                  { key: 'done',   label: `Done (${totalDone})` },
+                  { key: 'error',  label: `Issues (${totalError})` },
+                ] as const).map(({ key, label }) => (
+                  <button
+                    key={key}
+                    onClick={() => setFilter(key)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                      filter === key
+                        ? 'bg-primary text-primary-foreground'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              {/* Scroll-to-top shortcut */}
               <button
-                key={key}
-                onClick={() => setFilter(key)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-                  filter === key
-                    ? 'bg-primary text-primary-foreground'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
+                onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+                className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors border border-border/50"
+                title="Back to top"
               >
-                {label}
+                <ChevronUp className="w-3.5 h-3.5" />
+                Top
               </button>
-            ))}
+            </div>
           </div>
 
           {/* ── Content ── */}
