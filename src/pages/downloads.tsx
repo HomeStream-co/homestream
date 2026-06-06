@@ -15,7 +15,7 @@
  * Polls /api/stremio/downloads every 2 seconds.
  */
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Download, Trash2, Pause, Play,
@@ -1749,6 +1749,73 @@ export default function DownloadsPage() {
 
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
 
+          {/* ── Stats strip — always visible ── */}
+          <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1, duration: 0.35, ease: 'easeOut' as const }}
+            className="mb-6 grid grid-cols-2 sm:grid-cols-4 gap-3"
+          >
+            {([
+              {
+                icon: Download,
+                label: 'Active',
+                value: totalActive > 0 ? String(totalActive) : totalAll === 0 ? '—' : '0',
+                sub: totalActive > 0 ? 'downloading now' : totalAll === 0 ? 'queue empty' : 'all paused',
+                color: totalActive > 0 ? 'text-blue-400' : 'text-muted-foreground',
+                glow: totalActive > 0,
+              },
+              {
+                icon: CheckCircle2,
+                label: 'Completed',
+                value: String(totalDone),
+                sub: totalDone === 1 ? '1 item done' : `${totalDone} items done`,
+                color: totalDone > 0 ? 'text-green-400' : 'text-muted-foreground',
+                glow: false,
+              },
+              {
+                icon: tf ? ArrowDown : HardDrive,
+                label: tf ? 'DL Speed' : 'Queue',
+                value: tf ? fmtSpeed(tf.dl_info_speed) : `${totalAll}`,
+                sub: tf ? `↑ ${fmtSpeed(tf.up_info_speed)}` : totalAll === 1 ? '1 item total' : `${totalAll} items total`,
+                color: tf && tf.dl_info_speed > 0 ? 'text-blue-400' : 'text-muted-foreground',
+                glow: !!(tf && tf.dl_info_speed > 0),
+              },
+              {
+                icon: HardDrive,
+                label: 'Storage',
+                value: storage?.diskTotalBytes && storage.diskFreeBytes != null
+                  ? `${Math.round(((storage.diskTotalBytes - storage.diskFreeBytes) / storage.diskTotalBytes) * 100)}%`
+                  : '—',
+                sub: storage?.diskFreeBytes != null
+                  ? `${fmtBytes(storage.diskFreeBytes)} free`
+                  : 'loading…',
+                color: storage?.diskTotalBytes && storage.diskFreeBytes != null && ((storage.diskTotalBytes - storage.diskFreeBytes) / storage.diskTotalBytes) > 0.85
+                  ? 'text-red-400'
+                  : 'text-muted-foreground',
+                glow: false,
+              },
+            ] as Array<{ icon: React.ElementType; label: string; value: string; sub: string; color: string; glow: boolean }>).map(({ icon: Icon, label, value, sub, color, glow }) => (
+              <div key={label} className="bg-card border border-border rounded-xl px-4 py-3 flex items-center gap-3">
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${glow ? 'bg-primary/15' : 'bg-muted/60'}`}>
+                  <Icon className={`w-4 h-4 ${glow ? 'text-primary' : 'text-muted-foreground'}`} />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider">{label}</p>
+                  <p className={`text-lg font-bold leading-none mt-0.5 ${color}`}>{value}</p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5 truncate">{sub}</p>
+                </div>
+              </div>
+            ))}
+          </motion.div>
+
+          {/* ── Live speed bar — only when qBit is online and transferring ── */}
+          {tf && (tf.dl_info_speed > 0 || tf.up_info_speed > 0) && (
+            <div className="mb-6">
+              <GlobalSpeedBar tf={tf} />
+            </div>
+          )}
+
           {/* ── qBittorrent offline help — only shown when red ── */}
           <AnimatePresence>
             <QbitOfflineHelp visible={qbitDotColor === 'red'} />
@@ -1998,11 +2065,6 @@ export default function DownloadsPage() {
               </AnimatePresence>
             </motion.div>
           )}
-
-          {/* ── Steam-style Global Speed Bar ── */}
-          <AnimatePresence>
-            {tf && (data?.qbitOnline || totalActive > 0) && <GlobalSpeedBar tf={tf} />}
-          </AnimatePresence>
 
           {/* ── Download Stats Summary ── */}
           {totalAll > 0 && (
