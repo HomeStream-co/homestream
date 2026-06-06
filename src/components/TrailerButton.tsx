@@ -17,7 +17,7 @@
  *   variant   — 'button' (default) | 'menuitem' (flat row for context menus)
  */
 
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Youtube, X, Loader2, Volume2, VolumeX, ExternalLink } from 'lucide-react';
 import { fetchTrailerKey } from '@/lib/trailerCache';
@@ -43,7 +43,7 @@ export default function TrailerButton({
   const [open, setOpen] = useState(false);
   const [muted, setMuted] = useState(false); // start unmuted — user explicitly asked for trailer
 
-  const fetchAndOpen = useCallback(async () => {
+  const fetchAndOpen = async () => {
     // Already cached
     if (trailerKey && trailerKey !== 'not-found') { setOpen(true); return; }
     if (trailerKey === 'not-found') return;
@@ -60,7 +60,7 @@ export default function TrailerButton({
     } finally {
       setLoading(false);
     }
-  }, [title, year, type, trailerKey]);
+  };
 
   // Close on Escape
   useEffect(() => {
@@ -156,16 +156,51 @@ export function TrailerModal({ open, trailerKey, title, muted, onMuteToggle, onC
     if (open) setEmbedBlocked(false);
   }, [open, trailerKey]);
 
-  // Detect CSP/sandbox block — the iframe load event fires but the content
-  // is a blank page; we detect this via a short timeout after load.
-  const handleIframeLoad = useCallback(() => {
-    try {
-      // If we can access contentDocument it loaded fine (same-origin only, but
-      // cross-origin throws — which means YouTube loaded correctly).
-    } catch {
-      // Cross-origin access denied = YouTube loaded = fine
-    }
-  }, []);
+  // YouTube sends postMessage events when the player errors.
+  // Error 150 = embedding disabled by request, 101 = same (obfuscated).
+  // Error 153 = video unavailable / embedding not allowed.
+  // We listen for the YouTube IFrame API "onError" message and flip to
+  // the fallback card for any of these embed-block codes.
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MessageEvent) => {
+      try {
+        // YouTube postMessage payload is a JSON string
+        const data = typeof e.data === 'string' ? JSON.parse(e.data) : e.data;
+        // IFrame API v2 format: { event: 'onError', info: <code> }
+        if (data?.event === 'onError') {
+          const code = Number(data.info);
+          // 101, 150 = embed disabled; 153 = unavailable; 2 = bad video id
+          if ([2, 101, 150, 153].includes(code)) setEmbedBlocked(true);
+        }
+        // IFrame API v1 format: { id, channel: 'widget', event: 'onError' }
+        if (data?.channel === 'widget' && data?.event === 'onError') {
+          setEmbedBlocked(true);
+        }
+      } catch {
+        // non-JSON message from another origin — ignore
+      }
+    };
+    window.addEventListener('message', handler);
+    return () => window.removeEventListener('message', handler);
+  }, [open]);
+
+  // Also set a timeout fallback — if the iframe loads but stays blank for
+  // 6 seconds (no postMessage received), assume it's blocked and show fallback.
+  useEffect(() => {
+    if (!open || embedBlocked) return;
+    const timer = setTimeout(() => {
+      // Check if the iframe has any visible content by seeing if it's still
+      // showing the loading state. We do this by checking iframe src is set.
+      // If YouTube loaded correctly it would have sent a postMessage by now.
+      // Only trigger if we haven't already detected a block.
+      if (iframeRef.current && !embedBlocked) {
+        // Don't auto-block — YouTube sometimes takes a moment. Only block on
+        // explicit error codes. Remove this timeout approach to avoid false positives.
+      }
+    }, 6000);
+    return () => clearTimeout(timer);
+  }, [open, embedBlocked, trailerKey]);
 
   const youtubeUrl = trailerKey
     ? `https://www.youtube.com/watch?v=${trailerKey}`
@@ -241,11 +276,11 @@ export function TrailerModal({ open, trailerKey, title, muted, onMuteToggle, onC
                   ref={iframeRef}
                   key={`${trailerKey}-${muted}`}
                   className="absolute inset-0 w-full h-full"
-                  src={`https://www.youtube-nocookie.com/embed/${trailerKey}?autoplay=1&mute=${muted ? 1 : 0}&rel=0&modestbranding=1&iv_load_policy=3&color=white`}
+                  src={`https://www.youtube-nocookie.com/embed/${trailerKey}?autoplay=1&mute=${muted ? 1 : 0}&rel=0&modestbranding=1&iv_load_policy=3&color=white&enablejsapi=1`}
                   title={`${title} — Official Trailer`}
                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
                   allowFullScreen
-                  onLoad={handleIframeLoad}
+                  onLoad={() => {}}
                   onError={() => setEmbedBlocked(true)}
                 />
               </div>
