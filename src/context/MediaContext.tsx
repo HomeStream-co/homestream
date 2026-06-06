@@ -104,7 +104,20 @@ export function MediaProvider({ children }: { children: ReactNode }) {
           localStorage.setItem(etagKey, newEtag);
         }
 
-        const data = await res.json() as MediaItem[];
+        let data = await res.json() as MediaItem[];
+
+        // ── Demo mode ──────────────────────────────────────────────────────
+        // When the library is empty (fresh install / builder preview), load
+        // demo items so the UI renders with realistic content.
+        if (data.length === 0) {
+          try {
+            const demoRes = await fetch('/api/demo', { credentials: 'include' });
+            if (demoRes.ok) {
+              data = await demoRes.json() as MediaItem[];
+            }
+          } catch { /* non-fatal — keep empty library */ }
+        }
+
         setLibrary(data);
         // Reconcile continueWatching from server — server is source of truth after restart.
         // Build a merged list: server watchProgress wins over stale localStorage values.

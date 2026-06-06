@@ -80,6 +80,7 @@ import libraryStoragePatch from "./api/library/storage/PATCH";
 import libraryStorageDrivePatch from "./api/library/storage/drive/PATCH";
 // media
 import mediaGet from "./api/media/GET";
+import demoGet from "./api/demo/GET";
 import mediaDeleteById from "./api/media/[id]/DELETE";
 import mediaPutById from "./api/media/[id]/PUT";
 import mediaEpisodesGet from "./api/media/[id]/episodes/GET";
@@ -267,6 +268,7 @@ app.patch("/api/library/storage", libraryStoragePatch);
 app.patch("/api/library/storage/drive", libraryStorageDrivePatch);
 // media
 app.get("/api/media", mediaGet);
+app.get("/api/demo", demoGet);
 app.delete("/api/media/:id", mediaDeleteById);
 app.put("/api/media/:id", mediaPutById);
 app.get("/api/media/:id/episodes", mediaEpisodesGet);
