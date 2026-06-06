@@ -1,6 +1,6 @@
 import type { Request, Response } from 'express';
 import { requireAuth } from '../../../authMiddleware.js';
-import { readConfig } from '../../../configStore.js';
+import { readConfig, DEFAULT_TORRENT_SOURCES } from '../../../configStore.js';
 
 /**
  * POST /api/stremio/stream
@@ -248,6 +248,10 @@ export default async function handler(req: Request, res: Response) {
 
   const config = readConfig();
 
+  // Resolve which sources are enabled from the torrentSources registry
+  const sources = config.torrentSources ?? DEFAULT_TORRENT_SOURCES;
+  const srcEnabled = (type: string) => sources.find(s => s.type === type)?.enabled ?? true;
+
   // Build a human-readable search query for Prowlarr + Nyaa
   // e.g. "Breaking Bad S02E04" or "Spirited Away"
   let searchQuery = title ?? imdbId;
@@ -257,11 +261,11 @@ export default async function handler(req: Request, res: Response) {
     searchQuery = `${title ?? imdbId} S${s}E${e}`;
   }
 
-  // Fire all sources in parallel — failures are isolated via allSettled
+  // Fire all enabled sources in parallel — failures are isolated via allSettled
   const [torrentioRes, prowlarrRes, nyaaRes] = await Promise.allSettled([
-    fetchTorrentio(imdbId, type, season, episode),
-    fetchProwlarr(searchQuery, config.prowlarrUrl, config.prowlarrApiKey),
-    fetchNyaa(searchQuery),
+    srcEnabled('torrentio') ? fetchTorrentio(imdbId, type, season, episode) : Promise.resolve([]),
+    srcEnabled('prowlarr')  ? fetchProwlarr(searchQuery, config.prowlarrUrl, config.prowlarrApiKey) : Promise.resolve([]),
+    srcEnabled('nyaa')      ? fetchNyaa(searchQuery) : Promise.resolve([]),
   ]);
 
   const torrentioStreams = torrentioRes.status === 'fulfilled' ? torrentioRes.value : [];

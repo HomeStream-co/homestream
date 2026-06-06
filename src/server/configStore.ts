@@ -11,9 +11,32 @@
 
 import fs from 'fs';
 import path from 'path';
+import { randomUUID } from 'crypto';
 
 import { dataPath } from './dataDir.js';
 const CONFIG_PATH = dataPath('homestream-config.json');
+
+// ── Torrent source types ───────────────────────────────────────────────────────
+
+export type TorrentSourceType = 'torrentio' | 'nyaa' | 'prowlarr' | 'jackett' | 'torznab' | 'rss';
+
+export interface TorrentSource {
+  id: string;
+  name: string;
+  type: TorrentSourceType;
+  url?: string;       // required for jackett/torznab/rss
+  apiKey?: string;    // optional auth
+  enabled: boolean;
+  builtIn: boolean;   // built-in sources cannot be deleted
+}
+
+export const DEFAULT_TORRENT_SOURCES: TorrentSource[] = [
+  { id: 'builtin-torrentio', name: 'Torrentio',  type: 'torrentio', enabled: true,  builtIn: true },
+  { id: 'builtin-nyaa',      name: 'Nyaa.si',    type: 'nyaa',      enabled: true,  builtIn: true },
+  { id: 'builtin-prowlarr',  name: 'Prowlarr',   type: 'prowlarr',  enabled: false, builtIn: true },
+];
+
+export function makeTorrentSourceId(): string { return randomUUID(); }
 
 export interface AppConfig {
   setupComplete: boolean;
@@ -68,6 +91,21 @@ export interface AppConfig {
   // Real-Debrid — premium link hoster used as preferred download backend
   // When set, downloads go via RD (no qBittorrent or WebTorrent needed)
   realDebridApiKey: string;
+  /**
+   * Torrent source registry — controls which indexers are queried when
+   * searching for streams. Built-in sources (torrentio, nyaa, prowlarr) are
+   * always present; users can add custom Jackett/Torznab/RSS endpoints.
+   *
+   * Each entry:
+   *   id       — stable UUID used as React key + delete target
+   *   name     — display label shown in Settings
+   *   type     — 'torrentio' | 'nyaa' | 'prowlarr' | 'jackett' | 'torznab' | 'rss'
+   *   url      — base URL (required for jackett/torznab/rss; ignored for built-ins)
+   *   apiKey   — optional API key (Jackett global key, Torznab auth)
+   *   enabled  — whether this source is queried
+   *   builtIn  — true for the three built-in sources (cannot be deleted)
+   */
+  torrentSources: TorrentSource[];
   // Cached RD subscription data — fetched once, re-fetched only after expiry
   realDebridPremiumExpiry?: string;    // ISO — when the RD subscription actually expires
   realDebridPremiumCheckedAt?: string; // ISO — when we last fetched from RD API
@@ -117,6 +155,7 @@ const DEFAULTS: AppConfig = {
   prowlarrUrl: process.env.PROWLARR_URL || 'http://localhost:9696',
   prowlarrApiKey: process.env.PROWLARR_API_KEY || '',
   realDebridApiKey: process.env.REAL_DEBRID_API_KEY || '',
+  torrentSources: DEFAULT_TORRENT_SOURCES,
 };
 
 // ── Read (write-through in-memory cache) ──────────────────────────────────────

@@ -3,7 +3,7 @@ import { Helmet } from '@dr.pogodin/react-helmet';
 import {
   Settings2, Palette, Key, Database, Compass, Download,
   Library, Shield, Play, Wrench, HardDrive, Cpu, Wifi,
-  Activity, ChevronRight,
+  Activity, ChevronRight, Magnet,
 } from 'lucide-react';
 import SettingsAppearance from '@/components/settings/SettingsAppearance';
 import SettingsBackup from '@/components/settings/SettingsBackup';
@@ -12,6 +12,7 @@ import SettingsLibrary from '@/components/settings/SettingsLibrary';
 import SettingsPlayback from '@/components/settings/SettingsPlayback';
 import SettingsProwlarr from '@/components/settings/SettingsProwlarr';
 import SettingsTranscode from '@/components/settings/SettingsTranscode';
+import SettingsTorrentSources from '@/components/settings/SettingsTorrentSources';
 import {
   SettingsApiKeysWrapper,
   SettingsDiscoverWrapper,
@@ -26,7 +27,7 @@ import DebugPanel from '@/components/DebugPanel';
 type SettingsTab =
   | 'appearance' | 'apikeys' | 'backup' | 'discover' | 'downloads'
   | 'library' | 'parental' | 'playback' | 'prowlarr' | 'session'
-  | 'storage' | 'tools' | 'transcode' | 'vpn' | 'debug';
+  | 'storage' | 'tools' | 'transcode' | 'vpn' | 'debug' | 'torrent-sources';
 
 interface NavItem {
   id: SettingsTab;
@@ -44,6 +45,7 @@ const NAV: NavItem[] = [
   { id: 'storage',     label: 'Storage',            icon: HardDrive, group: 'Media' },
   { id: 'transcode',   label: 'Transcoding',        icon: Cpu,       group: 'Media' },
   { id: 'downloads',   label: 'Downloads',          icon: Download,  group: 'Automation' },
+  { id: 'torrent-sources', label: 'Torrent Sources', icon: Magnet,   group: 'Automation' },
   { id: 'prowlarr',    label: 'Prowlarr',           icon: Compass,   group: 'Automation' },
   { id: 'discover',    label: 'Discover Sources',   icon: Compass,   group: 'Automation' },
   { id: 'vpn',         label: 'VPN',                icon: Wifi,      group: 'Network' },
@@ -62,6 +64,7 @@ function SettingsContent({ tab, onOpenDebug }: { tab: SettingsTab; onOpenDebug: 
     case 'backup':     return <SettingsBackup />;
     case 'discover':   return <SettingsDiscoverWrapper />;
     case 'downloads':  return <SettingsDownloads />;
+    case 'torrent-sources': return <SettingsTorrentSources />;
     case 'library':    return <SettingsLibrary />;
     case 'parental':   return <SettingsParentalControlsWrapper />;
     case 'playback':   return <SettingsPlayback />;

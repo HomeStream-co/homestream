@@ -1048,27 +1048,40 @@ function GlobalSpeedBar({ tf }: { tf: TransferInfo }) {
 function MagnetInput({ onAdded }: { onAdded: () => void }) {
   const [open, setOpen] = useState(false);
   const [magnet, setMagnet] = useState('');
+  const [title, setTitle] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  const isValid = magnet.trim().startsWith('magnet:');
+  const trimmed = magnet.trim();
+  const isMagnet = trimmed.startsWith('magnet:');
+  const isTorrentUrl = trimmed.startsWith('http') && (trimmed.includes('.torrent') || trimmed.includes('torrent'));
+  const isValid = isMagnet || isTorrentUrl;
 
   const handleSubmit = async () => {
     if (!isValid || submitting) return;
     setSubmitting(true);
     try {
-      const res = await fetch('/api/stremio/magnet', {
+      const res = await fetch('/api/stremio/magnet-direct', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ magnet: magnet.trim() }),
+        body: JSON.stringify({
+          magnet: trimmed,
+          title: title.trim() || undefined,
+        }),
       });
-      const json = await res.json() as { ok: boolean; hash?: string; error?: string };
+      const json = await res.json() as { ok: boolean; backend?: string; hash?: string; jobId?: string; error?: string; message?: string };
       if (!res.ok || !json.ok) {
-        toast.error(json.error ?? 'Failed to add magnet');
+        if (res.status === 503) {
+          toast.error('No download backend — configure Real-Debrid or start qBittorrent in Settings');
+        } else {
+          toast.error(json.error ?? 'Failed to add torrent');
+        }
       } else {
-        toast.success('Magnet added to qBittorrent');
+        const via = json.backend === 'realdebrid' ? 'Real-Debrid' : 'qBittorrent';
+        toast.success(`Added to queue via ${via}`);
         setMagnet('');
+        setTitle('');
         setOpen(false);
         onAdded();
       }
@@ -1081,11 +1094,8 @@ function MagnetInput({ onAdded }: { onAdded: () => void }) {
 
   const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
     const text = e.clipboardData.getData('text');
-    if (text.trim().startsWith('magnet:')) {
-      // Auto-submit on paste of a valid magnet
-      setTimeout(() => {
-        setMagnet(text.trim());
-      }, 0);
+    if (text.trim().startsWith('magnet:') || text.trim().startsWith('http')) {
+      setTimeout(() => setMagnet(text.trim()), 0);
     }
   };
 
@@ -1104,8 +1114,8 @@ function MagnetInput({ onAdded }: { onAdded: () => void }) {
             <Link2 className="w-4 h-4 text-primary" />
           </div>
           <div className="text-left">
-            <p className="text-sm font-medium text-foreground">Paste a magnet link</p>
-            <p className="text-xs text-muted-foreground">Add any torrent directly to qBittorrent</p>
+            <p className="text-sm font-medium text-foreground">Paste a magnet link or .torrent URL</p>
+            <p className="text-xs text-muted-foreground">Add any torrent directly — routes via Real-Debrid or qBittorrent</p>
           </div>
           <Send className="w-4 h-4 ml-auto opacity-0 group-hover:opacity-100 transition-opacity" />
         </button>
@@ -1118,15 +1128,23 @@ function MagnetInput({ onAdded }: { onAdded: () => void }) {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Link2 className="w-4 h-4 text-primary" />
-              <span className="text-sm font-semibold text-foreground">Paste Magnet Link</span>
+              <span className="text-sm font-semibold text-foreground">Add Torrent Manually</span>
             </div>
             <button
-              onClick={() => { setOpen(false); setMagnet(''); }}
+              onClick={() => { setOpen(false); setMagnet(''); setTitle(''); }}
               className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
             >
               <X className="w-3.5 h-3.5" />
             </button>
           </div>
+
+          {/* Optional title */}
+          <input
+            value={title}
+            onChange={e => setTitle(e.target.value)}
+            placeholder="Title (optional — shown in queue)"
+            className="w-full bg-background border border-border rounded-xl px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/60 transition-all"
+          />
 
           <textarea
             ref={inputRef}
@@ -1134,7 +1152,7 @@ function MagnetInput({ onAdded }: { onAdded: () => void }) {
             onChange={e => setMagnet(e.target.value)}
             onPaste={handlePaste}
             onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSubmit(); } }}
-            placeholder="magnet:?xt=urn:btih:..."
+            placeholder={'magnet:?xt=urn:btih:…\nor https://example.com/file.torrent'}
             rows={3}
             className="w-full bg-background border border-border rounded-xl px-3 py-2.5 text-sm font-mono text-foreground placeholder:text-muted-foreground resize-none focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/60 transition-all"
           />
@@ -1142,10 +1160,10 @@ function MagnetInput({ onAdded }: { onAdded: () => void }) {
           <div className="flex items-center justify-between gap-3">
             <p className="text-xs text-muted-foreground">
               {isValid
-                ? <span className="text-green-400 flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> Valid magnet link</span>
+                ? <span className="text-green-400 flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> {isMagnet ? 'Valid magnet link' : 'Valid .torrent URL'}</span>
                 : magnet.length > 0
-                  ? <span className="text-yellow-400 flex items-center gap-1"><AlertCircle className="w-3 h-3" /> Must start with magnet:</span>
-                  : 'Paste a magnet link above — press Enter or click Add'}
+                  ? <span className="text-yellow-400 flex items-center gap-1"><AlertCircle className="w-3 h-3" /> Must be a magnet: link or .torrent URL</span>
+                  : 'Paste a magnet or .torrent URL — press Enter or click Add'}
             </p>
             <button
               onClick={handleSubmit}
