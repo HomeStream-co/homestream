@@ -146,6 +146,7 @@
     "cmdk": "^1.1.1",
     "react-day-picker": "^9.9.0"
   },
-  "description": "HomeStream \u2014 self-hosted media streaming app",
-  "author": "HomeStream"
+  "description": "Self-hosted Netflix-style family media streaming app",
+  "author": "HomeStream",
+  "main": "electron/main.cjs"
 }
