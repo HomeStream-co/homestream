@@ -1,0 +1,93 @@
+/* eslint-disable react-refresh/only-export-components */
+/**
+ * AuthContext
+ *
+ * Manages the admin password gate.  On mount it calls GET /api/auth/check.
+ * If the server has an adminPassword set and the session cookie is missing/
+ * expired, `authenticated` is false and the app renders the LoginGate.
+ *
+ * Once the user logs in (POST /api/auth/login) the cookie is set server-side
+ * and `authenticated` flips to true.
+ */
+import {
+  createContext, useContext, useState, useEffect, useCallback,
+  type ReactNode,
+} from 'react';
+
+interface AuthState {
+  /** null = still checking, true = logged in, false = needs login */
+  authenticated: boolean | null;
+  requiresPassword: boolean;
+  login: (password: string) => Promise<{ ok: boolean; error?: string }>;
+  logout: () => Promise<void>;
+  /** Invalidates ALL sessions on the server — security escape hatch */
+  logoutAll: () => Promise<void>;
+}
+
+const AuthContext = createContext<AuthState | null>(null);
+
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const [authenticated, setAuthenticated] = useState<boolean | null>(null);
+  const [requiresPassword, setRequiresPassword] = useState(false);
+
+  // Check session on mount
+  useEffect(() => {
+    fetch('/api/auth/check')
+      .then(r => r.json())
+      .then((data: { authenticated: boolean; requiresPassword: boolean }) => {
+        setAuthenticated(data.authenticated);
+        setRequiresPassword(data.requiresPassword);
+      })
+      .catch(() => {
+        // If check fails (no password configured / server error) allow access
+        setAuthenticated(true);
+        setRequiresPassword(false);
+      });
+  }, []);
+
+  const login = useCallback(async (password: string) => {
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password }),
+      });
+      const data = await res.json() as { ok?: boolean; error?: string; token?: string };
+      if (data.ok) {
+        // Store token in localStorage so phone/TV clients on LAN can pass it
+        // as ?token= on WebSocket upgrades (httpOnly cookie is unreadable by JS).
+        if (data.token) {
+          try { localStorage.setItem('hs_token', data.token); } catch { /* storage blocked */ }
+        }
+        setAuthenticated(true);
+        return { ok: true };
+      }
+      return { ok: false, error: data.error ?? 'Login failed' };
+    } catch {
+      return { ok: false, error: 'Network error' };
+    }
+  }, []);
+
+  const logout = useCallback(async () => {
+    await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+    setAuthenticated(false);
+  }, []);
+
+  const logoutAll = useCallback(async () => {
+    await fetch('/api/auth/logout-all', { method: 'POST', credentials: 'include' });
+    setAuthenticated(false);
+  }, []);
+
+  return (
+    <AuthContext.Provider value={{ authenticated, requiresPassword, login, logout, logoutAll }}>
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
+export function useAuth() {
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error('useAuth must be used within AuthProvider');
+  return ctx;
+}
