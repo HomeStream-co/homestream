@@ -15,6 +15,7 @@ import EnrichmentRevealModal from '@/components/EnrichmentRevealModal';
 import CaptionManager from '@/components/CaptionManager';
 import TrailerButton from '@/components/TrailerButton';
 import MediaContextMenu from '@/components/MediaContextMenu';
+import ShowCard from '@/components/ShowCard';
 import type { MediaEnrichment } from '@/types/media';
 import {
   AlertDialog,
@@ -989,7 +990,7 @@ export default function LibraryPage() {
                       : 'text-muted-foreground hover:text-foreground'
                   }`}
                 >
-                  {tab === 'all' ? `All (${library.filter(m => isAllowed(m.rated)).length})` : tab === 'movie' ? `Movies (${library.filter(m => isAllowed(m.rated) && m.type !== 'series').length})` : `Shows (${library.filter(m => isAllowed(m.rated) && m.type === 'series').length})`}
+                  {tab === 'all' ? `All (${library.filter(m => isAllowed(m.rated)).length})` : tab === 'movie' ? `Movies (${library.filter(m => isAllowed(m.rated) && m.type !== 'series').length})` : `Shows (${new Set(library.filter(m => isAllowed(m.rated) && m.type === 'series').map(m => m.title.trim().toLowerCase())).size})`}
                 </button>
               ))}
             </div>
@@ -1074,170 +1075,234 @@ export default function LibraryPage() {
             <p className="text-muted-foreground text-sm">Upload your first video file above to get started.</p>
           </motion.div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-            {library.filter(m => isAllowed(m.rated) && (activeTab === 'all' || (activeTab === 'series' ? m.type === 'series' : m.type !== 'series'))).map((item: MediaItem & { transcoding?: boolean; transcodeWarning?: string; transcodeError?: string }, idx) => (
-              <MediaContextMenu key={item.id} item={item} disabled={selectMode}>
-              <motion.div
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3, delay: Math.min(idx * 0.025, 0.4), ease: 'easeOut' as const }}
-                className={`group relative ${selectMode ? 'cursor-pointer' : ''}`}
-                onClick={selectMode ? () => toggleSelect(item.id) : undefined}
-              >
-                <div className={`aspect-[2/3] rounded-xl overflow-hidden bg-card relative transition-all duration-200 ${
-                  selectMode && selectedIds.has(item.id)
-                    ? 'ring-2 ring-primary ring-offset-2 ring-offset-background shadow-[0_0_20px_hsl(var(--primary)/0.3)]'
-                    : 'group-hover:shadow-[0_8px_30px_rgba(0,0,0,0.4)] group-hover:-translate-y-0.5'
-                }`}>
-                  {/* Poster */}
-                  {item.poster ? (
-                    <PosterImage poster={item.poster} title={item.title} />
-                  ) : (
-                    <div className="w-full h-full flex flex-col items-center justify-center gap-2 bg-card p-2">
-                      <Film className="w-8 h-8 text-muted-foreground/30" />
-                      <p className="text-[10px] text-muted-foreground text-center line-clamp-3">{item.title}</p>
-                    </div>
-                  )}
+          (() => {
+            // Filter items by profile + active tab
+            const filtered = library.filter(m =>
+              isAllowed(m.rated) &&
+              (activeTab === 'all' || (activeTab === 'series' ? m.type === 'series' : m.type !== 'series'))
+            );
 
-                  {/* Select mode checkbox */}
-                  {selectMode && (
-                    <div className={`absolute top-2 left-2 z-10 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${
-                      selectedIds.has(item.id)
-                        ? 'bg-primary border-primary shadow-[0_0_8px_hsl(var(--primary)/0.5)]'
-                        : 'bg-black/50 border-white/60'
-                    }`}>
-                      {selectedIds.has(item.id) && <Check className="w-3.5 h-3.5 text-white" />}
-                    </div>
-                  )}
+            // Group series by title — all episodes of the same show share one card
+            const showGroups = new Map<string, MediaItem[]>();
+            const movieItems: MediaItem[] = [];
 
-                  {/* Transcoding overlay */}
-                  {item.transcoding && (
-                    <div className="absolute inset-0 bg-black/75 flex flex-col items-center justify-center gap-2">
-                      <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
-                        <Cpu className="w-5 h-5 text-primary animate-pulse" />
+            for (const item of filtered) {
+              if (item.type === 'series') {
+                const key = item.title.trim().toLowerCase();
+                if (!showGroups.has(key)) showGroups.set(key, []);
+                showGroups.get(key)!.push(item);
+              } else {
+                movieItems.push(item);
+              }
+            }
+
+            // Build a flat render list: movies stay as-is, shows become one entry per group
+            type RenderEntry =
+              | { kind: 'movie'; item: MediaItem; idx: number }
+              | { kind: 'show'; items: MediaItem[]; idx: number };
+
+            const entries: RenderEntry[] = [];
+            let idx = 0;
+
+            // Shows first (or interleaved — keep original order by first occurrence)
+            const seen = new Set<string>();
+            for (const item of filtered) {
+              if (item.type === 'series') {
+                const key = item.title.trim().toLowerCase();
+                if (!seen.has(key)) {
+                  seen.add(key);
+                  entries.push({ kind: 'show', items: showGroups.get(key)!, idx: idx++ });
+                }
+              } else {
+                entries.push({ kind: 'movie', item, idx: idx++ });
+              }
+            }
+
+            return (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                {entries.map(entry => {
+                  if (entry.kind === 'show') {
+                    return (
+                      <ShowCard
+                        key={entry.items[0].id}
+                        items={entry.items}
+                        selectMode={selectMode}
+                        selectedIds={selectedIds}
+                        onToggleSelect={toggleSelect}
+                        onDelete={setDeleteId}
+                        onEdit={startEdit}
+                        animDelay={entry.idx * 0.025}
+                      />
+                    );
+                  }
+
+                  const item = entry.item as MediaItem & { transcoding?: boolean; transcodeWarning?: string; transcodeError?: string };
+                  return (
+                    <MediaContextMenu key={item.id} item={item} disabled={selectMode}>
+                    <motion.div
+                      initial={{ opacity: 0, y: 12 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.3, delay: Math.min(entry.idx * 0.025, 0.4), ease: 'easeOut' as const }}
+                      className={`group relative ${selectMode ? 'cursor-pointer' : ''}`}
+                      onClick={selectMode ? () => toggleSelect(item.id) : undefined}
+                    >
+                      <div className={`aspect-[2/3] rounded-xl overflow-hidden bg-card relative transition-all duration-200 ${
+                        selectMode && selectedIds.has(item.id)
+                          ? 'ring-2 ring-primary ring-offset-2 ring-offset-background shadow-[0_0_20px_hsl(var(--primary)/0.3)]'
+                          : 'group-hover:shadow-[0_8px_30px_rgba(0,0,0,0.4)] group-hover:-translate-y-0.5'
+                      }`}>
+                        {/* Poster */}
+                        {item.poster ? (
+                          <PosterImage poster={item.poster} title={item.title} />
+                        ) : (
+                          <div className="w-full h-full flex flex-col items-center justify-center gap-2 bg-card p-2">
+                            <Film className="w-8 h-8 text-muted-foreground/30" />
+                            <p className="text-[10px] text-muted-foreground text-center line-clamp-3">{item.title}</p>
+                          </div>
+                        )}
+
+                        {/* Select mode checkbox */}
+                        {selectMode && (
+                          <div className={`absolute top-2 left-2 z-10 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${
+                            selectedIds.has(item.id)
+                              ? 'bg-primary border-primary shadow-[0_0_8px_hsl(var(--primary)/0.5)]'
+                              : 'bg-black/50 border-white/60'
+                          }`}>
+                            {selectedIds.has(item.id) && <Check className="w-3.5 h-3.5 text-white" />}
+                          </div>
+                        )}
+
+                        {/* Transcoding overlay */}
+                        {item.transcoding && (
+                          <div className="absolute inset-0 bg-black/75 flex flex-col items-center justify-center gap-2">
+                            <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
+                              <Cpu className="w-5 h-5 text-primary animate-pulse" />
+                            </div>
+                            <span className="text-white text-[10px] font-semibold">Transcoding…</span>
+                          </div>
+                        )}
+
+                        {/* Transcode error overlay */}
+                        {item.transcodeError && !item.transcoding && (
+                          <div className="absolute inset-0 bg-black/80 flex flex-col items-center justify-center gap-2 p-3">
+                            <div className="w-9 h-9 rounded-full bg-destructive/20 border border-destructive/50 flex items-center justify-center">
+                              <AlertCircle className="w-4 h-4 text-destructive" />
+                            </div>
+                            <p className="text-white text-[10px] font-semibold text-center leading-tight">Transcode Failed</p>
+                            <p className="text-white/50 text-[9px] text-center leading-tight line-clamp-3">{item.transcodeError}</p>
+                          </div>
+                        )}
+
+                        {/* Actions overlay */}
+                        {!item.transcoding && !item.transcodeError && (
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-black/20 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col items-center justify-center gap-2 p-2">
+                            <div className="flex items-center gap-2">
+                              <motion.button
+                                whileHover={{ scale: 1.1 }}
+                                whileTap={{ scale: 0.95 }}
+                                onClick={e => { e.stopPropagation(); window.location.href = `/player/${item.id}`; }}
+                                className="w-11 h-11 rounded-full bg-primary flex items-center justify-center shadow-[0_0_20px_hsl(var(--primary)/0.5)] hover:bg-primary/90 transition-colors"
+                                title="Play"
+                              >
+                                <Play className="w-5 h-5 text-white fill-white ml-0.5" />
+                              </motion.button>
+                              <TrailerButton
+                                title={item.title}
+                                year={item.year}
+                                type={item.type === 'series' ? 'series' : 'movie'}
+                                className="w-9 h-9 rounded-full bg-red-600/80 hover:bg-red-600 flex items-center justify-center transition-colors disabled:opacity-40"
+                              />
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={e => { e.stopPropagation(); startEdit(item); }}
+                                className="p-1.5 bg-white/15 hover:bg-white/25 rounded-full transition-colors backdrop-blur-sm"
+                                title="Edit"
+                              >
+                                <Edit2 className="w-3.5 h-3.5 text-white" />
+                              </button>
+                              <button
+                                onClick={e => { e.stopPropagation(); setDeleteId(item.id); }}
+                                className="p-1.5 bg-destructive/70 hover:bg-destructive rounded-full transition-colors"
+                                title="Delete"
+                              >
+                                <Trash2 className="w-3.5 h-3.5 text-white" />
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Error delete button */}
+                        {item.transcodeError && !item.transcoding && (
+                          <div className="absolute top-1.5 right-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button
+                              onClick={() => setDeleteId(item.id)}
+                              className="p-1.5 bg-destructive/80 hover:bg-destructive rounded-full transition-colors"
+                              title="Remove and re-upload"
+                            >
+                              <Trash2 className="w-3 h-3 text-white" />
+                            </button>
+                          </div>
+                        )}
                       </div>
-                      <span className="text-white text-[10px] font-semibold">Transcoding…</span>
-                    </div>
-                  )}
 
-                  {/* Transcode error overlay */}
-                  {item.transcodeError && !item.transcoding && (
-                    <div className="absolute inset-0 bg-black/80 flex flex-col items-center justify-center gap-2 p-3">
-                      <div className="w-9 h-9 rounded-full bg-destructive/20 border border-destructive/50 flex items-center justify-center">
-                        <AlertCircle className="w-4 h-4 text-destructive" />
+                      <div className="mt-2 px-0.5">
+                        <p className="text-xs font-semibold text-foreground truncate leading-snug">{item.title}</p>
+                        <div className="flex items-center justify-between mt-0.5">
+                          <p className="text-[10px] text-muted-foreground">{item.year}</p>
+                          {item.imdbRating !== 'N/A' && !item.transcodeError && (
+                            <p className="text-[10px] text-yellow-400 flex items-center gap-0.5">
+                              <Star className="w-2.5 h-2.5 fill-yellow-400" /> {item.imdbRating}
+                            </p>
+                          )}
+                          {item.transcodeError && (
+                            <p className="text-[9px] text-destructive font-medium">Re-upload to fix</p>
+                          )}
+                        </div>
+                        {/* Storage savings badge */}
+                        {appSettings.showStorageBadges && !item.transcodeError && !item.transcoding && (item as MediaItem & { savedBytes?: number }).savedBytes != null && (item as MediaItem & { savedBytes?: number }).savedBytes! > 1_048_576 && (
+                          <StorageSavingsBadge
+                            savedBytes={(item as MediaItem & { savedBytes?: number }).savedBytes!}
+                            originalSize={(item as MediaItem & { originalSize?: number }).originalSize ?? 0}
+                          />
+                        )}
+                        {/* Enrichment tag pills */}
+                        {appSettings.showEnrichmentTags && (item.enrichment?.mood?.length || item.enrichment?.tags?.length) ? (
+                          <div className="flex flex-wrap gap-0.5 mt-1">
+                            {item.enrichment?.mood?.slice(0, 1).map((m: string) => (
+                              <span key={m} className="text-[9px] px-1 py-0.5 rounded-full bg-primary/15 text-primary font-medium leading-none truncate max-w-[64px]">
+                                {m}
+                              </span>
+                            ))}
+                            {item.enrichment?.tags?.slice(0, 2).map((t: string) => (
+                              <span key={t} className="text-[9px] px-1 py-0.5 rounded-full bg-muted text-muted-foreground font-medium leading-none truncate max-w-[64px]">
+                                {t}
+                              </span>
+                            ))}
+                          </div>
+                        ) : null}
+                        {/* CC manager */}
+                        {!item.transcoding && !item.transcodeError && (
+                          <CaptionManager
+                            mediaId={item.id}
+                            title={item.title}
+                            captions={item.captions}
+                            onUpdated={refreshLibrary}
+                          />
+                        )}
+                        {item.transcodeWarning && !item.transcodeError && (
+                          <p className="text-[9px] text-yellow-500 mt-0.5 truncate" title={item.transcodeWarning}>
+                            ⚠ {item.transcodeWarning}
+                          </p>
+                        )}
                       </div>
-                      <p className="text-white text-[10px] font-semibold text-center leading-tight">Transcode Failed</p>
-                      <p className="text-white/50 text-[9px] text-center leading-tight line-clamp-3">{item.transcodeError}</p>
-                    </div>
-                  )}
-
-                  {/* Actions overlay */}
-                  {!item.transcoding && !item.transcodeError && (
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-black/20 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col items-center justify-center gap-2 p-2">
-                      <div className="flex items-center gap-2">
-                        <motion.button
-                          whileHover={{ scale: 1.1 }}
-                          whileTap={{ scale: 0.95 }}
-                          onClick={e => { e.stopPropagation(); window.location.href = `/player/${item.id}`; }}
-                          className="w-11 h-11 rounded-full bg-primary flex items-center justify-center shadow-[0_0_20px_hsl(var(--primary)/0.5)] hover:bg-primary/90 transition-colors"
-                          title="Play"
-                        >
-                          <Play className="w-5 h-5 text-white fill-white ml-0.5" />
-                        </motion.button>
-                        <TrailerButton
-                          title={item.title}
-                          year={item.year}
-                          type={item.type === 'series' ? 'series' : 'movie'}
-                          className="w-9 h-9 rounded-full bg-red-600/80 hover:bg-red-600 flex items-center justify-center transition-colors disabled:opacity-40"
-                        />
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={e => { e.stopPropagation(); startEdit(item); }}
-                          className="p-1.5 bg-white/15 hover:bg-white/25 rounded-full transition-colors backdrop-blur-sm"
-                          title="Edit"
-                        >
-                          <Edit2 className="w-3.5 h-3.5 text-white" />
-                        </button>
-                        <button
-                          onClick={e => { e.stopPropagation(); setDeleteId(item.id); }}
-                          className="p-1.5 bg-destructive/70 hover:bg-destructive rounded-full transition-colors"
-                          title="Delete"
-                        >
-                          <Trash2 className="w-3.5 h-3.5 text-white" />
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Error delete button */}
-                  {item.transcodeError && !item.transcoding && (
-                    <div className="absolute top-1.5 right-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button
-                        onClick={() => setDeleteId(item.id)}
-                        className="p-1.5 bg-destructive/80 hover:bg-destructive rounded-full transition-colors"
-                        title="Remove and re-upload"
-                      >
-                        <Trash2 className="w-3 h-3 text-white" />
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-                <div className="mt-2 px-0.5">
-                  <p className="text-xs font-semibold text-foreground truncate leading-snug">{item.title}</p>
-                  <div className="flex items-center justify-between mt-0.5">
-                    <p className="text-[10px] text-muted-foreground">{item.year}</p>
-                    {item.imdbRating !== 'N/A' && !item.transcodeError && (
-                      <p className="text-[10px] text-yellow-400 flex items-center gap-0.5">
-                        <Star className="w-2.5 h-2.5 fill-yellow-400" /> {item.imdbRating}
-                      </p>
-                    )}
-                    {item.transcodeError && (
-                      <p className="text-[9px] text-destructive font-medium">Re-upload to fix</p>
-                    )}
-                  </div>
-                  {/* Storage savings badge */}
-                  {appSettings.showStorageBadges && !item.transcodeError && !item.transcoding && (item as MediaItem & { savedBytes?: number }).savedBytes != null && (item as MediaItem & { savedBytes?: number }).savedBytes! > 1_048_576 && (
-                    <StorageSavingsBadge
-                      savedBytes={(item as MediaItem & { savedBytes?: number }).savedBytes!}
-                      originalSize={(item as MediaItem & { originalSize?: number }).originalSize ?? 0}
-                    />
-                  )}
-                  {/* Enrichment tag pills */}
-                  {appSettings.showEnrichmentTags && (item.enrichment?.mood?.length || item.enrichment?.tags?.length) ? (
-                    <div className="flex flex-wrap gap-0.5 mt-1">
-                      {item.enrichment?.mood?.slice(0, 1).map((m: string) => (
-                        <span key={m} className="text-[9px] px-1 py-0.5 rounded-full bg-primary/15 text-primary font-medium leading-none truncate max-w-[64px]">
-                          {m}
-                        </span>
-                      ))}
-                      {item.enrichment?.tags?.slice(0, 2).map((t: string) => (
-                        <span key={t} className="text-[9px] px-1 py-0.5 rounded-full bg-muted text-muted-foreground font-medium leading-none truncate max-w-[64px]">
-                          {t}
-                        </span>
-                      ))}
-                    </div>
-                  ) : null}
-                  {/* CC manager */}
-                  {!item.transcoding && !item.transcodeError && (
-                    <CaptionManager
-                      mediaId={item.id}
-                      title={item.title}
-                      captions={item.captions}
-                      onUpdated={refreshLibrary}
-                    />
-                  )}
-                  {item.transcodeWarning && !item.transcodeError && (
-                    <p className="text-[9px] text-yellow-500 mt-0.5 truncate" title={item.transcodeWarning}>
-                      ⚠ {item.transcodeWarning}
-                    </p>
-                  )}
-                </div>
-              </motion.div>
-              </MediaContextMenu>
-            ))}
-          </div>
+                    </motion.div>
+                    </MediaContextMenu>
+                  );
+                })}
+              </div>
+            );
+          })()
         )}
       </div>
 
