@@ -158,9 +158,8 @@ async function checkSubscription(sub: ShowSubscription): Promise<void> {
 
   let vpnConnected = false;
 
-  // Lazy-import the qBit addMagnet or WebTorrent queueDownload
+  // Lazy-import the qBit addMagnet
   const { addMagnet, isReachable } = await import('./qbittorrentClient.js');
-  const { queueDownload } = await import('./torrentManager.js');
   const { upsertJob } = await import('./downloadJobStore.js');
   const qbitActuallyReachable = useQbit && await isReachable();
 
@@ -234,17 +233,9 @@ async function checkSubscription(sub: ShowSubscription): Promise<void> {
             continue;
           }
         } else {
-          queueDownload({
-            infoHash: best.infoHash,
-            magnet: best.magnet,
-            quality: best.quality,
-            title: epTitle,
-            type: 'series',
-            season: s,
-            episode: ep,
-            imdbId: sub.imdbId,
-            poster: sub.poster,
-          });
+          // No qBittorrent available — log and skip (RD path is handled by download/POST.ts)
+          console.warn(`[scheduler] qBit not reachable for ${epTitle} — skipping (configure qBit or RD)`);
+          continue;
         }
 
         lastFound = { season: s, episode: ep };

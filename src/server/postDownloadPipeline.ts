@@ -31,7 +31,7 @@ import { createJob } from './transcodeStore.js';
 import { transcodeFile } from './transcodeWorker.js';
 import { fetchOMDB } from './mediaUtils.js';
 import { runEnrichmentInBackground, runCaptionFetchInBackground } from './mediaUtils.js';
-import { upsertJob } from './downloadJobStore.js';
+import { upsertJob, getPersistedJob } from './downloadJobStore.js';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -93,7 +93,8 @@ export async function runPostDownloadPipeline(params: PostDownloadParams): Promi
 
   if (!fs.existsSync(filePath)) {
     console.error(`[pipeline] File not found: ${filePath}`);
-    upsertJob({ jobId, status: 'error' } as Parameters<typeof upsertJob>[0]);
+    const existing = getPersistedJob(jobId);
+    if (existing) upsertJob({ ...existing, status: 'error' });
     return;
   }
 
@@ -103,7 +104,8 @@ export async function runPostDownloadPipeline(params: PostDownloadParams): Promi
   const outputPath = path.join(path.dirname(filePath), outputFilename);
 
   // ── 1. Mark job as transcoding ────────────────────────────────────────────
-  upsertJob({ jobId, status: 'transcoding' } as Parameters<typeof upsertJob>[0]);
+  const existingJob = getPersistedJob(jobId);
+  if (existingJob) upsertJob({ ...existingJob, status: 'transcoding' });
 
   // ── 2. Fetch OMDB metadata ────────────────────────────────────────────────
   // Use the clean title (strip episode label for OMDB lookup)
@@ -205,7 +207,8 @@ export async function runPostDownloadPipeline(params: PostDownloadParams): Promi
   }
 
   // ── 6. Mark job done ──────────────────────────────────────────────────────
-  upsertJob({ jobId, status: 'done', progress: 100, completedAt: new Date().toISOString() } as Parameters<typeof upsertJob>[0]);
+  const doneJob = getPersistedJob(jobId);
+  if (doneJob) upsertJob({ ...doneJob, status: 'done', progress: 100, completedAt: new Date().toISOString() });
 
   // ── 7. Background enrichment + captions ──────────────────────────────────
   runEnrichmentInBackground(mediaId).catch(() => {});

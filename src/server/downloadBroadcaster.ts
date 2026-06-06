@@ -61,7 +61,7 @@ async function fetchDownloadState(): Promise<object> {
   const rdJobs = getAllPersistedJobs().filter(j => j.backend === 'real-debrid');
 
   if (!qbitOnline) {
-    return { jobs: wtJobs, qbitTorrents: [], transferInfo: null, backend: 'webtorrent', qbitOnline: false, rdJobs };
+    return { jobs: wtJobs, qbitTorrents: [], transferInfo: null, backend: 'none', qbitOnline: false, rdJobs };
   }
 
   try {
@@ -78,7 +78,7 @@ async function fetchDownloadState(): Promise<object> {
 
     return { jobs: wtJobs, qbitTorrents: enriched, transferInfo, backend: 'qbittorrent', qbitOnline: true, rdJobs };
   } catch {
-    return { jobs: wtJobs, qbitTorrents: [], transferInfo: null, backend: 'webtorrent', qbitOnline: false, rdJobs };
+    return { jobs: wtJobs, qbitTorrents: [], transferInfo: null, backend: 'none', qbitOnline: false, rdJobs };
   }
 }
 

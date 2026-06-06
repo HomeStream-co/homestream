@@ -112,8 +112,21 @@ export default async function handler(req: Request, res: Response) {
               updateJobProgress(newJobId, dl, total);
             }
           });
-          upsertJob({ ...newJobEntry, status: 'done', progress: 100 });
-          console.log(`[rd-retry] ✓ ${job.title} saved to ${destPath}`);
+          // Hand off to the shared pipeline (transcode + library add)
+          const { runPostDownloadPipeline } = await import('../../../../postDownloadPipeline.js');
+          await runPostDownloadPipeline({
+            filePath: destPath,
+            title: job.title,
+            quality: job.quality,
+            type: job.type,
+            season: job.season,
+            episode: job.episode,
+            imdbId: job.imdbId,
+            poster: job.poster,
+            jobId: newJobId,
+            backend: 'real-debrid',
+          });
+          console.log(`[rd-retry] ✓ ${job.title} pipeline complete`);
         } catch (err) {
           console.error(`[rd-retry] ✗ ${job.title} failed:`, err);
           upsertJob({ ...newJobEntry, status: 'error' });
@@ -161,27 +174,11 @@ export default async function handler(req: Request, res: Response) {
       });
     }
 
-    // ── WebTorrent fallback ────────────────────────────────────────────────────
-    const { queueDownload } = await import('../../../../torrentManager.js');
-    deleteJob(jobId);
-
-    const newJob = queueDownload({
-      infoHash: job.infoHash,
-      magnet,
-      title: job.title,
-      quality: job.quality,
-      type: job.type,
-      season: job.season,
-      episode: job.episode,
-      imdbId: job.imdbId,
-      poster: job.poster,
-    });
-
-    return res.json({
-      ok: true,
-      newJobId: newJob.jobId,
-      backend: 'webtorrent',
-      message: `"${job.title}" restarted via WebTorrent`,
+    // ── WebTorrent fallback removed — no backend available ─────────────────────
+    return res.status(503).json({
+      ok: false,
+      error: 'No download backend available',
+      message: 'Configure Real-Debrid in Settings → Downloads for instant downloads, or start qBittorrent.',
     });
   } catch (err) {
     return res.status(500).json({ error: 'Retry failed', message: String(err) });

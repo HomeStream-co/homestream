@@ -35,7 +35,7 @@ export interface PersistedJob {
   type: 'movie' | 'series';
   season?: number;
   episode?: number;
-  status: 'queued' | 'downloading' | 'done' | 'error';
+  status: 'queued' | 'downloading' | 'transcoding' | 'done' | 'error';
   addedAt: string;
   completedAt?: string;
   poster?: string;
@@ -196,7 +196,7 @@ export function deleteJob(jobId: string): void {
 export function findJobByInfoHash(infoHash: string): PersistedJob | undefined {
   return readRaw().find(j =>
     j.infoHash.toLowerCase() === infoHash.toLowerCase() &&
-    (j.status === 'queued' || j.status === 'downloading')
+    (j.status === 'queued' || j.status === 'downloading' || j.status === 'transcoding')
   );
 }
 

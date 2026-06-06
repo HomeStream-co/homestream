@@ -89,7 +89,7 @@ async function checkQbit(): Promise<SubsystemCheck> {
     const ok = await checkWithTimeout(() => qbitReachable(), 4000, false);
     if (ok) return { name: 'qBittorrent', status: 'ok', message: `Connected at ${cfg.qbitUrl}` };
     if (rdKey) return { name: 'qBittorrent', status: 'warn', message: 'Unreachable — Real-Debrid active as primary backend', detail: cfg.qbitUrl };
-    return { name: 'qBittorrent', status: 'warn', message: 'Unreachable — WebTorrent fallback active', detail: cfg.qbitUrl };
+    return { name: 'qBittorrent', status: 'warn', message: 'Unreachable — configure qBittorrent or use Real-Debrid', detail: cfg.qbitUrl };
   } catch (err) {
     return { name: 'qBittorrent', status: 'error', message: 'Check failed', detail: String(err) };
   }

@@ -27,12 +27,12 @@ export default async function handler(req: Request, res: Response) {
   const qbitReachable = await isReachable();
 
   if (!qbitReachable) {
-    // qBit offline — return WebTorrent + RD jobs
+    // qBit offline — return persisted jobs + RD jobs
     return res.json({
       jobs: wtJobs,
       qbitTorrents: [],
       transferInfo: null,
-      backend: 'webtorrent',
+      backend: 'none',
       qbitOnline: false,
       rdJobs,
     });

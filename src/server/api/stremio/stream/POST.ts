@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express';
 import { requireAuth } from '../../../authMiddleware.js';
 import { readConfig, DEFAULT_TORRENT_SOURCES } from '../../../configStore.js';
+import { fetchAllCustomSources } from '../../../customSourceFetcher.js';
 
 /**
  * POST /api/stremio/stream
@@ -54,7 +55,7 @@ export interface StreamResult {
   seeds: string;
   magnet: string;
   infoHash: string;
-  source: 'torrentio' | 'prowlarr' | 'nyaa';
+  source: 'torrentio' | 'prowlarr' | 'nyaa' | 'jackett' | 'torznab' | 'rss';
 }
 
 const TORRENTIO   = 'https://torrentio.strem.fun';
@@ -262,20 +263,22 @@ export default async function handler(req: Request, res: Response) {
   }
 
   // Fire all enabled sources in parallel — failures are isolated via allSettled
-  const [torrentioRes, prowlarrRes, nyaaRes] = await Promise.allSettled([
+  const [torrentioRes, prowlarrRes, nyaaRes, customRes] = await Promise.allSettled([
     srcEnabled('torrentio') ? fetchTorrentio(imdbId, type, season, episode) : Promise.resolve([]),
     srcEnabled('prowlarr')  ? fetchProwlarr(searchQuery, config.prowlarrUrl, config.prowlarrApiKey) : Promise.resolve([]),
     srcEnabled('nyaa')      ? fetchNyaa(searchQuery) : Promise.resolve([]),
+    fetchAllCustomSources(sources, searchQuery),
   ]);
 
   const torrentioStreams = torrentioRes.status === 'fulfilled' ? torrentioRes.value : [];
   const prowlarrStreams  = prowlarrRes.status  === 'fulfilled' ? prowlarrRes.value  : [];
   const nyaaStreams      = nyaaRes.status      === 'fulfilled' ? nyaaRes.value      : [];
+  const customStreams    = customRes.status    === 'fulfilled' ? customRes.value    : [];
 
   // Merge + deduplicate by infoHash (case-insensitive)
   const seen = new Set<string>();
   const merged: StreamResult[] = [];
-  for (const stream of [...torrentioStreams, ...prowlarrStreams, ...nyaaStreams]) {
+  for (const stream of [...torrentioStreams, ...prowlarrStreams, ...nyaaStreams, ...customStreams]) {
     const key = stream.infoHash.toLowerCase();
     if (!seen.has(key)) {
       seen.add(key);
@@ -286,13 +289,21 @@ export default async function handler(req: Request, res: Response) {
   // Sort by seed count descending
   merged.sort((a, b) => (parseInt(b.seeds) || 0) - (parseInt(a.seeds) || 0));
 
+  // Count custom source results by type
+  const customBySource: Record<string, number> = {};
+  for (const s of customStreams) {
+    customBySource[s.source] = (customBySource[s.source] ?? 0) + 1;
+  }
+
   res.json({
     imdbId,
-    streams: merged.slice(0, 40),
+    streams: merged.slice(0, 60),
     sources: {
       torrentio: torrentioStreams.length,
       prowlarr: prowlarrStreams.length,
       nyaa: nyaaStreams.length,
+      custom: customStreams.length,
+      customBySource,
       prowlarrConfigured: !!(config.prowlarrUrl && config.prowlarrApiKey),
     },
   });

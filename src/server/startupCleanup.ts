@@ -310,13 +310,13 @@ export function runStartupCleanup(): void {
       }
     }
 
-    // qBittorrent / WebTorrent — mark interrupted so the UI shows Resume
+    // qBittorrent — mark interrupted so the UI shows Resume
     const stuckLocal = allJobs.filter(
-      j => (j.backend === 'qbittorrent' || j.backend === 'webtorrent') &&
+      j => (j.backend === 'qbittorrent') &&
            (j.status === 'queued' || j.status === 'downloading'),
     );
     if (stuckLocal.length > 0) {
-      console.log(`[startup] Found ${stuckLocal.length} interrupted qBit/WT job(s) — marking as interrupted.`);
+      console.log(`[startup] Found ${stuckLocal.length} interrupted qBit job(s) — marking as interrupted.`);
       for (const job of stuckLocal) {
         markJobInterrupted(job.jobId);
         console.log(`[startup]   ✗ ${job.backend} "${job.title}" — interrupted by server restart`);

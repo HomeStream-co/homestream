@@ -15,7 +15,7 @@
  */
 
 import { getAllTorrents, isReachable } from './qbittorrentClient.js';
-import { getAllPersistedJobs, upsertJob } from './downloadJobStore.js';
+import { getAllPersistedJobs, upsertJob, updateJobStatus } from './downloadJobStore.js';
 import { runPostDownloadPipeline } from './postDownloadPipeline.js';
 
 // ── State ─────────────────────────────────────────────────────────────────────
@@ -53,7 +53,6 @@ async function poll(): Promise<void> {
       upsertJob({ ...job, status: 'downloading', progress: Math.round(torrent.progress * 100) });
       continue;
     }
-
     // Completed states: seeding, pausedUP, forcedUP, or progress === 1
     const isComplete =
       torrent.progress >= 1 ||
@@ -90,7 +89,7 @@ async function poll(): Promise<void> {
     })
       .catch(err => {
         console.error(`[qbit-watcher] Pipeline failed for "${job.title}":`, err);
-        upsertJob({ ...job, status: 'error' });
+        updateJobStatus(job.jobId, 'error');
       })
       .finally(() => {
         processing.delete(job.infoHash);

@@ -178,6 +178,7 @@ import watchlistPutById from "./api/watchlist/[id]/PUT";
 import watchlistDeleteById from "./api/watchlist/[id]/DELETE";
 // </api-imports>
 import { seoRoutes } from "../lib/seo-routes";
+import { startQbitCompletionWatcher } from "./qbitCompletionWatcher";
 
 function normalizeCommerceApiBaseUrlEnv() {
 	if (process.env.GODADDY_API_BASE_URL) return;
@@ -634,6 +635,8 @@ if (import.meta.env.PROD) {
 	const host = process.env.HOST || "0.0.0.0";
 	const server = app.listen(port, host, () => {
 		console.log(`Server listening on http://${host}:${port}`);
+		// Start background watchers after the server is ready
+		startQbitCompletionWatcher();
 	});
 	server.on("error", (err: NodeJS.ErrnoException) => {
 		console.error("ssr.server.listen-failed", {
