@@ -791,7 +791,7 @@ export default function LibraryPage() {
           </div>
         </div>
         </motion.div>
-        )} {/* end isDemoMode ? banner : upload zone */}
+        )}
 
         {/* ── Upload / Transcode Progress Cards ── */}
         <AnimatePresence>
