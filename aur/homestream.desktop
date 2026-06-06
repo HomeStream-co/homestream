@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=HomeStream
+Comment=Self-hosted Netflix-style family media streaming app
+Exec=/usr/bin/homestream %U
+Icon=homestream
+Terminal=false
+Type=Application
+Categories=AudioVideo;Video;Player;
+MimeType=x-scheme-handler/homestream;
+StartupWMClass=HomeStream
+Keywords=media;streaming;movies;tv;series;player;

@@ -2,22 +2,35 @@ import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import path from 'path';
 
+const sharedAlias = {
+  '@/': path.resolve(__dirname, './src/'),
+  '@/components': path.resolve(__dirname, './src/components'),
+  '@/context': path.resolve(__dirname, './src/context'),
+  '@/lib': path.resolve(__dirname, './src/lib'),
+  '@/api': path.resolve(__dirname, './src/server/api'),
+  '@/db': path.resolve(__dirname, './src/server/db'),
+  '@/layouts': path.resolve(__dirname, './src/layouts'),
+  '@/patterns': path.resolve(__dirname, './src/patterns'),
+  '@/pages': path.resolve(__dirname, './src/pages'),
+  '@/hooks': path.resolve(__dirname, './src/hooks'),
+  '@/styles': path.resolve(__dirname, './src/styles'),
+  // Stub the airo secrets module so server handlers can be imported in tests
+  '#airo/secrets': path.resolve(__dirname, './src/test/__mocks__/airo-secrets.ts'),
+};
+
 export default defineConfig({
   plugins: [react()],
   test: {
-    environment: 'jsdom',
     globals: true,
-    setupFiles: './src/test/setup.ts',
     // Use forks pool to isolate memory per test file (prevents OOM)
     pool: 'forks',
     poolOptions: {
       forks: {
         minForks: 1,
-        maxForks: 4, // Limit parallelism to prevent memory exhaustion
-        isolate: true, // Each test file runs in fresh process
+        maxForks: 4,
+        isolate: true,
       },
     },
-    // Limit concurrent tests within each file
     maxConcurrency: 5,
     coverage: {
       provider: 'v8',
@@ -29,19 +42,34 @@ export default defineConfig({
         '*.config.ts',
       ],
     },
+    // Split into two projects: browser (React) and node (server handlers)
+    projects: [
+      {
+        // React component tests — jsdom environment
+        plugins: [react()],
+        test: {
+          name: 'browser',
+          globals: true,
+          environment: 'jsdom',
+          setupFiles: ['./src/test/setup.ts'],
+          include: ['src/test/**/*.test.{ts,tsx}'],
+          exclude: ['src/test/jellyfin/**', 'src/test/profiles/**', 'src/test/server/**'],
+        },
+        resolve: { alias: sharedAlias },
+      },
+      {
+        // Server-side handler tests — node environment
+        test: {
+          name: 'node',
+          environment: 'node',
+          setupFiles: ['./src/test/setup-node.ts'],
+          include: ['src/test/jellyfin/**/*.test.ts', 'src/test/profiles/**/*.test.ts', 'src/test/server/**/*.test.ts'],
+        },
+        resolve: { alias: sharedAlias },
+      },
+    ],
   },
   resolve: {
-    alias: {
-      '@/': path.resolve(__dirname, './src/'),
-      '@/components': path.resolve(__dirname, './src/components'),
-      '@/lib': path.resolve(__dirname, './src/lib'),
-      '@/api': path.resolve(__dirname, './src/server/api'),
-      '@/db': path.resolve(__dirname, './src/server/db'),
-      '@/layouts': path.resolve(__dirname, './src/layouts'),
-      '@/patterns': path.resolve(__dirname, './src/patterns'),
-      '@/pages': path.resolve(__dirname, './src/pages'),
-      '@/hooks': path.resolve(__dirname, './src/hooks'),
-      '@/styles': path.resolve(__dirname, './src/styles'),
-    },
+    alias: sharedAlias,
   },
 });

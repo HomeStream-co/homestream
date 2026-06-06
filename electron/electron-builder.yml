@@ -1,0 +1,182 @@
+# electron-builder configuration for HomeStream
+#
+# Build commands (run from project root):
+#   All platforms:  npm run electron:build
+#   Windows only:   npm run electron:win
+#   macOS only:     npm run electron:mac
+#   Linux only:     npm run electron:linux
+#
+# Output: dist-electron/
+#   Windows → HomeStream-Setup-x.x.x.exe  (NSIS installer)
+#   macOS   → HomeStream-x.x.x.dmg
+#   Linux   → HomeStream-x.x.x.AppImage + .deb
+
+appId: com.homestream.app
+productName: HomeStream
+copyright: Copyright © 2026 HomeStream
+
+# The server bundle (dist/server.bundle.cjs) is fully self-contained — all
+# node_modules are inlined by esbuild. The only node_modules shipped in the
+# asar are pure-JS packages (electron-updater, builder-util-runtime, semver).
+# Disabling npmRebuild prevents @electron/rebuild from attempting to
+# cross-compile native addons (bufferutil, utf-8-validate) from source, which
+# always fails when building Windows .exe from a Linux CI host.
+npmRebuild: false
+
+# Bake the GitHub owner/repo into the packaged app so the auto-updater knows
+# where to check for new releases.
+# updater.cjs reads pkg.build.ghOwner / pkg.build.ghRepo at runtime.
+# NOTE: electron-builder only expands its own built-in macros (${version},
+# ${productName}, etc.) — it does NOT expand arbitrary env vars in yml values.
+# Hardcode the repo coordinates here; they never change.
+extraMetadata:
+  ghOwner: HomeStream-co
+  ghRepo: homestream
+  # ghToken is injected at CI build time by the "Inject build metadata" step
+  # in release.yml, which patches package.json directly via PowerShell before
+  # electron-builder runs. This is necessary because electron-builder yml does
+  # not support arbitrary ${ENV_VAR} expansion in extraMetadata values.
+
+# ── Auto-updater (electron-updater via GitHub Releases) ───────────────────────
+# GH_TOKEN must be set in repo Settings → Secrets → Actions.
+# owner/repo are hardcoded — electron-builder yml does not support ${ENV_VAR} expansion.
+publish:
+  provider: github
+  owner: HomeStream-co
+  repo: homestream
+  releaseType: release
+  # publishAutoUpdate: true is the default — electron-builder publishes latest.yml
+  # alongside the installer. electron-updater reads latest.yml to check for updates.
+  # NOTE: draft:false is NOT a valid electron-builder publish field — un-drafting
+  # is handled by the "Publish release" step in release.yml via the GitHub API.
+
+# Directories
+directories:
+  output: dist-electron
+  buildResources: electron/assets
+
+# Files to include in the asar package (the Electron app itself).
+# NOTE: Do NOT include dist/ here — the client bundle (dist/) and server bundle
+# (dist/server.bundle.mjs) are both shipped via extraResources below, which puts
+# them outside the asar at resources/client/ and resources/server/. Including
+# dist/ here would double-ship ~10MB of client assets inside the asar for no benefit.
+files:
+  - from: "."
+    to: "."
+    filter:
+      - "electron/main.cjs"
+      - "electron/updater.cjs"
+      - "electron/preload.cjs"
+      - "electron/tray-icon.png"
+      - "package.json"
+      - "node_modules/electron-updater/**/*"
+      - "node_modules/builder-util-runtime/**/*"
+      - "node_modules/semver/**/*"
+
+# Extra resources shipped alongside the app (available at process.resourcesPath at runtime)
+extraResources:
+  # Server bundle — output to dist/server/ so electron-builder copies it as a
+  # directory (single-file extraResources entries are silently skipped on Windows
+  # in electron-builder 26.x — directory entries are always reliable).
+  - from: dist/server
+    to: server
+  # Client bundle — Vite outputs to dist/client/ (index.html + assets/).
+  - from: dist/client
+    to: client
+  # FFmpeg binary
+  - from: node_modules/ffmpeg-static
+    to: ffmpeg
+    filter:
+      - "ffmpeg"
+      - "ffmpeg.exe"
+
+# ── Windows ───────────────────────────────────────────────────────────────────
+# Default target is zip — builds cleanly from Linux (no NSIS/7zip toolchain needed).
+# The GitHub Actions release workflow overrides this to nsis via:
+#   --config.win.target=nsis
+# which runs on windows-latest where NSIS is available, producing a proper
+# HomeStream-Setup-x.x.x.exe installer for end-users.
+win:
+  target:
+    - target: zip
+      arch: [x64]
+  # Disable forced code signing — no cert available.
+  forceCodeSigning: false
+  # signAndEditExecutable is intentionally NOT set here.
+  # - Local Linux builds (electron:win) pass --config.win.signAndEditExecutable=false
+  #   via the npm script to skip rcedit (7zip/winCodeSign not available on musl).
+  # - GitHub Actions release (windows-latest) lets it default to true so rcedit
+  #   runs normally and patches the HomeStream icon into the .exe.
+  icon: electron/assets/icon.png
+
+# ── NSIS installer options ────────────────────────────────────────────────────
+# oneClick: false  → shows the full NSIS wizard (Welcome → License → Directory
+#                    → Install → Finish) instead of silently installing to C:.
+# allowToChangeInstallationDirectory: true → the "Choose Install Location" page
+#   lets users pick any drive/folder (e.g. D:\HomeStream) instead of being
+#   forced to C:\Users\<user>\AppData\Local\Programs\HomeStream.
+# perMachine: false → installs per-user (no UAC elevation required).
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  perMachine: false
+  deleteAppDataOnUninstall: false
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: HomeStream
+
+# ── macOS ─────────────────────────────────────────────────────────────────────
+mac:
+  target:
+    - target: dmg
+      arch: [x64, arm64]
+  # electron-builder auto-converts icon.png → .icns on macOS
+  icon: electron/assets/icon.png
+  category: public.app-category.entertainment
+  darkModeSupport: true
+
+dmg:
+  title: HomeStream
+  window:
+    width: 540
+    height: 380
+
+# ── Linux ─────────────────────────────────────────────────────────────────────
+#
+# Three formats are produced:
+#   AppImage  — universal, runs on any x86_64 or arm64 Linux (no install needed)
+#   deb       — Debian / Ubuntu / Pop!_OS
+#   pacman    — Arch Linux / Manjaro / CachyOS (installs via `sudo pacman -U`)
+#
+# The pacman target produces a .pkg.tar.zst file that integrates with pacman's
+# dependency tracking and shows up in `pacman -Q`. CachyOS users can also
+# install the AppImage directly without any package manager.
+linux:
+  target:
+    - target: AppImage
+      arch: [x64, arm64]
+    - target: deb
+      arch: [x64]
+    - target: pacman
+      arch: [x64]
+  icon: electron/assets/icon.png
+  category: AudioVideo
+  description: Self-hosted media streaming server
+  desktop:
+    entry:
+      Name: HomeStream
+      Comment: Stream your personal media collection
+      Categories: AudioVideo;Video;Player;
+
+# ── pacman package options ─────────────────────────────────────────────────────
+# depends: minimal runtime libs that are always present on a base Arch install.
+# fpm is used under the hood — electron-builder installs it automatically.
+pacman:
+  depends:
+    - libnotify
+    - libxtst
+    - nss
+    - gtk3
+    - libxss
+    - libxrandr
+    - alsa-lib

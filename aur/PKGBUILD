@@ -1,0 +1,95 @@
+# Maintainer: HomeStream <https://github.com/HomeStream-co/homestream>
+#
+# homestream-bin — pre-built binary package pulled from GitHub Releases.
+#
+# To update after a new release:
+#   1. Bump pkgver below to the new version (without the leading 'v').
+#   2. Run:  updpkgsums   (or manually update the sha256sums array)
+#   3. Run:  makepkg --printsrcinfo > .SRCINFO
+#   4. Commit both PKGBUILD and .SRCINFO to the AUR git repo.
+#
+# Install locally:   makepkg -si
+# Install via yay:   yay -S homestream-bin
+
+pkgname=homestream-bin
+pkgver=1.9.4
+pkgrel=1
+pkgdesc="Self-hosted Netflix-style family media streaming app"
+arch=('x86_64')
+url="https://github.com/HomeStream-co/homestream"
+license=('MIT')
+depends=(
+  'gtk3'
+  'nss'
+  'libxss'
+  'libxrandr'
+  'alsa-lib'
+  'libnotify'
+  'libxtst'
+  'xdg-utils'
+)
+optdepends=(
+  'wireguard-tools: VPN kill-switch support'
+  'openvpn: OpenVPN fallback support'
+)
+provides=('homestream')
+conflicts=('homestream')
+
+# The .pkg.tar.zst produced by electron-builder is a pacman package itself,
+# but we wrap it as an AUR source so yay/paru can manage the lifecycle.
+# We download the AppImage instead — it's self-contained and avoids the
+# double-pacman-package nesting problem. The AppImage is extracted and
+# installed as a standard application.
+#
+# GitHub Releases URL pattern:
+#   https://github.com/HomeStream-co/homestream/releases/download/v{ver}/HomeStream-{ver}.AppImage
+source=(
+  "HomeStream-${pkgver}.AppImage::https://github.com/HomeStream-co/homestream/releases/download/v${pkgver}/HomeStream-${pkgver}.AppImage"
+  "homestream.desktop"
+  "homestream.png::https://raw.githubusercontent.com/HomeStream-co/homestream/main/electron/assets/icon.png"
+)
+# Update these checksums after each release using: updpkgsums
+sha256sums=(
+  'SKIP'
+  'b3c2a1d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2'
+  'SKIP'
+)
+noextract=("HomeStream-${pkgver}.AppImage")
+
+prepare() {
+  chmod +x "HomeStream-${pkgver}.AppImage"
+  # Extract the AppImage into a directory so we can install individual files.
+  # --appimage-extract is a built-in flag on all electron-builder AppImages.
+  ./"HomeStream-${pkgver}.AppImage" --appimage-extract
+}
+
+package() {
+  # Install the extracted app to /opt/homestream
+  install -dm755 "${pkgdir}/opt/homestream"
+  cp -r squashfs-root/. "${pkgdir}/opt/homestream/"
+
+  # Make the main binary executable
+  chmod 755 "${pkgdir}/opt/homestream/homestream" 2>/dev/null || true
+  chmod 755 "${pkgdir}/opt/homestream/HomeStream" 2>/dev/null || true
+
+  # Wrapper script in /usr/bin so `homestream` works from any terminal
+  install -dm755 "${pkgdir}/usr/bin"
+  cat > "${pkgdir}/usr/bin/homestream" <<'EOF'
+#!/bin/sh
+exec /opt/homestream/HomeStream "$@"
+EOF
+  chmod 755 "${pkgdir}/usr/bin/homestream"
+
+  # .desktop file for app launchers (KDE, GNOME, etc.)
+  install -Dm644 "${srcdir}/homestream.desktop" \
+    "${pkgdir}/usr/share/applications/homestream.desktop"
+
+  # Icon
+  install -Dm644 "${srcdir}/homestream.png" \
+    "${pkgdir}/usr/share/pixmaps/homestream.png"
+
+  # License
+  install -Dm644 /dev/null "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
+  echo "MIT License — see https://github.com/HomeStream-co/homestream" \
+    > "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
+}

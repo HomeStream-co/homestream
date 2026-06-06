@@ -1,6 +1,4 @@
 /** @type {import('tailwindcss').Config} */
-import tailwindcssAnimate from 'tailwindcss-animate'
-
 export default {
   content: [
     './index.html',
@@ -134,18 +132,5 @@ export default {
   		}
   	}
   },
-  plugins: [
-    tailwindcssAnimate,
-    // aspect-poster utility (2:3 poster ratio)
-    function({ addUtilities }: { addUtilities: (u: Record<string, Record<string, string>>) => void }) {
-      addUtilities({
-        '.aspect-poster': { 'aspect-ratio': '2 / 3' },
-        '.scrollbar-hide': {
-          '-ms-overflow-style': 'none',
-          'scrollbar-width': 'none',
-        },
-        '.scrollbar-hide::-webkit-scrollbar': { display: 'none' },
-      });
-    },
-  ],
+  plugins: [require("tailwindcss-animate")],
 }

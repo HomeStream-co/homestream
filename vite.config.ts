@@ -110,7 +110,10 @@ export default defineConfig(({ mode, isSsrBuild }) => ({
   },
 
   ssr: {
-    noExternal: isSsrBuild ? true : undefined
+    // Do NOT use noExternal:true — it inlines Node built-ins (e.g. 'module')
+    // which causes duplicate symbol errors when esbuild transpiles the bundle.
+    // Leave as empty array so Vite externalises Node built-ins automatically.
+    noExternal: []
   },
 
   server: {
@@ -153,10 +156,11 @@ export default defineConfig(({ mode, isSsrBuild }) => ({
     ssr: "src/server/entry.ts",
     rollupOptions: {
       output: {
-        format: "es",
-        entryFileNames: "server.bundle.mjs",
-        chunkFileNames: "bin/[name]-[hash].js",
-        banner: "import { createRequire } from 'module';\nconst require = createRequire(import.meta.url);"
+        // CJS format + .cjs extension — electron-builder and the smoke-test
+        // both expect dist/server/server.bundle.cjs.
+        format: "cjs",
+        entryFileNames: "server/server.bundle.cjs",
+        chunkFileNames: "server/bin/[name]-[hash].js"
       }
     }
   } :
