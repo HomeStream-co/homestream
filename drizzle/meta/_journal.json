@@ -1,0 +1,13 @@
+{
+  "version": "7",
+  "dialect": "mysql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "5",
+      "when": 1780768676633,
+      "tag": "0000_hard_jasper_sitwell",
+      "breakpoints": true
+    }
+  ]
+}

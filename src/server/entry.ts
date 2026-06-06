@@ -31,6 +31,11 @@ import castSendPost from "./api/cast/send/POST";
 import castStopPost from "./api/cast/stop/POST";
 // chat
 import chatPost from "./api/chat/POST";
+// taste engine
+import tasteEventsPost  from "./api/taste/events/POST";
+import tasteProfileGet  from "./api/taste/profile/GET";
+import tasteScoresPost  from "./api/taste/scores/POST";
+import tasteEnrichPost  from "./api/taste/enrich/POST";
 // crash-log
 import crashLogGet from "./api/crash-log/GET";
 import crashLogPost from "./api/crash-log/POST";
@@ -221,6 +226,11 @@ app.post("/api/cast/send", castSendPost);
 app.post("/api/cast/stop", castStopPost);
 // chat
 app.post("/api/chat", chatPost);
+// taste engine
+app.post("/api/taste/events",  tasteEventsPost);
+app.get( "/api/taste/profile", tasteProfileGet);
+app.post("/api/taste/scores",  tasteScoresPost);
+app.post("/api/taste/enrich",  tasteEnrichPost);
 // crash-log
 app.get("/api/crash-log", crashLogGet);
 app.post("/api/crash-log", crashLogPost);

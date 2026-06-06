@@ -23,6 +23,7 @@ import type { Request, Response } from 'express';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { readConfig } from '../../configStore.js';
 import { requireAuth } from '../../authMiddleware.js';
+import { buildTasteSummary } from '../../tasteEngine.js';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -115,7 +116,7 @@ function buildLibraryLine(m: MediaItem): string {
   return `• "${m.title}" (${m.year}) [${m.id}] | ${m.type === 'series' ? 'TV' : 'Movie'} | ${(m.genre ?? []).join(', ')} | ${rating}${runtime}${progress}${tagline} | Dir: ${m.director || 'unknown'} | Cast: ${m.actors || 'unknown'} | ${plot.slice(0, 200)}`;
 }
 
-function buildSystemPrompt(library: MediaItem[], recentWatches: MediaItem[]): string {
+function buildSystemPrompt(library: MediaItem[], recentWatches: MediaItem[], tasteSummary: string): string {
   const movies  = library.filter(m => m.type !== 'series');
   const shows   = library.filter(m => m.type === 'series');
 
@@ -143,9 +144,11 @@ function buildSystemPrompt(library: MediaItem[], recentWatches: MediaItem[]): st
 
   return `You are HomeStream's personal watch-recommendation assistant. Your entire purpose is to help the user decide what to watch next from their personal media library.
 
-You have access to two data sources:
+You have access to three data sources:
   1. The user's FULL LIBRARY — every title they own, with TMDB/OMDB metadata (genres, ratings, plots, cast, director)
   2. Their RECENT WATCH HISTORY — what they've actually been watching, how far through, and when
+  3. Their LEARNED TASTE PROFILE — persistent preferences built from ALL their past watching behaviour
+${tasteSummary ? '\n' + tasteSummary + '\n' : ''}
 ${watchHistoryBlock}
 ${libraryBlock}
 
@@ -401,7 +404,14 @@ export default async function handler(req: Request, res: Response) {
 
     const config       = readConfig();
     const { provider, key, ollamaUrl, model } = resolveAI(config);
-    const systemPrompt = buildSystemPrompt(lib, watched);
+
+    // Load persistent taste profile from DB (non-blocking fallback if DB unavailable)
+    let tasteSummary = '';
+    try {
+      tasteSummary = await buildTasteSummary('default');
+    } catch { /* DB not yet set up — continue without taste data */ }
+
+    const systemPrompt  = buildSystemPrompt(lib, watched, tasteSummary);
     const recentHistory = history.slice(-12);
 
     // No AI key configured — use keyword fallback
