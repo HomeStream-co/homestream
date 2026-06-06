@@ -4,7 +4,167 @@ import { dirname, extname, join } from "node:path";
 import { readFileSync } from "node:fs";
 
 // <api-imports>
+import cookieParser from "cookie-parser";
+import multer from "multer";
+
+// admin
+import adminStatusGet from "./api/admin/status/GET";
+// auth
+import authCheckGet from "./api/auth/check/GET";
+import authLoginPost from "./api/auth/login/POST";
+import authLogoutPost from "./api/auth/logout/POST";
+import authLogoutAllPost from "./api/auth/logout-all/POST";
+// backup
+import backupGet from "./api/backup/GET";
+import backupPost from "./api/backup/POST";
+import backupRestorePost from "./api/backup/restore/POST";
+// captions
+import captionsLangGet from "./api/captions/[id]/[lang]/GET";
+import captionsFetchPost from "./api/captions/[id]/fetch/POST";
+import captionsUploadPost from "./api/captions/[id]/upload/POST";
+// cast
+import castControlPost from "./api/cast/control/POST";
+import castDevicesGet from "./api/cast/devices/GET";
+import castPositionGet from "./api/cast/position/GET";
+import castPositionServerGet from "./api/cast/position/server/GET";
+import castSendPost from "./api/cast/send/POST";
+import castStopPost from "./api/cast/stop/POST";
+// chat
+import chatPost from "./api/chat/POST";
+// crash-log
+import crashLogGet from "./api/crash-log/GET";
+import crashLogPost from "./api/crash-log/POST";
+// debug
+import debugRepairPost from "./api/debug/repair/POST";
+import debugSystemInfoGet from "./api/debug/system-info/GET";
+// dev
+import devDiagnosticsGet from "./api/dev/diagnostics/GET";
+import devReleasePost from "./api/dev/release/POST";
+// electron
+import electronGet from "./api/electron/GET";
+// encoder
+import encoderStatusGet from "./api/encoder/status/GET";
+// enrich
+import enrichPost from "./api/enrich/[id]/POST";
+// feedback
+import feedbackPost from "./api/feedback/POST";
+// health
 import healthGet from "./api/health/GET";
+import healthFullGet from "./api/health/full/GET";
+// history
+import historyGet from "./api/history/GET";
+import historyDelete from "./api/history/DELETE";
+// hls
+import hlsProbeGet from "./api/hls/[id]/probe/GET";
+import hlsPlaylistGet from "./api/hls/[id]/index.m3u8/GET";
+import hlsSegmentGet from "./api/hls/[id]/[segment]/GET";
+// jellyfin
+import jellyfinItemsGet from "./api/jellyfin/Items/GET";
+import jellyfinItemByIdGet from "./api/jellyfin/Items/[id]/GET";
+import jellyfinItemImageGet from "./api/jellyfin/Items/[id]/Images/[imageType]/GET";
+import jellyfinSearchHintsGet from "./api/jellyfin/Search/Hints/GET";
+import jellyfinSessionsPlayingPost from "./api/jellyfin/Sessions/Playing/POST";
+import jellyfinSessionsPlayingProgressPost from "./api/jellyfin/Sessions/Playing/Progress/POST";
+import jellyfinSessionsPlayingStoppedPost from "./api/jellyfin/Sessions/Playing/Stopped/POST";
+import jellyfinSystemInfoPublicGet from "./api/jellyfin/System/Info/Public/GET";
+import jellyfinAuthPost from "./api/jellyfin/Users/AuthenticateByName/POST";
+import jellyfinUsersGet from "./api/jellyfin/Users/GET";
+import jellyfinUserByIdGet from "./api/jellyfin/Users/[userId]/GET";
+import jellyfinUserItemsGet from "./api/jellyfin/Users/[userId]/Items/GET";
+import jellyfinVideosGet from "./api/jellyfin/Videos/GET";
+import jellyfinVideoStreamGet from "./api/jellyfin/Videos/[id]/stream/GET";
+// library
+import libraryScanPost from "./api/library/scan/POST";
+import libraryStorageGet from "./api/library/storage/GET";
+import libraryStoragePatch from "./api/library/storage/PATCH";
+import libraryStorageDrivePatch from "./api/library/storage/drive/PATCH";
+// media
+import mediaGet from "./api/media/GET";
+import mediaDeleteById from "./api/media/[id]/DELETE";
+import mediaPutById from "./api/media/[id]/PUT";
+import mediaEpisodesGet from "./api/media/[id]/episodes/GET";
+import mediaEpisodesPost from "./api/media/[id]/episodes/POST";
+import mediaEpisodePatch from "./api/media/[id]/episodes/[episodeId]/PATCH";
+import mediaFetchMetadataPost from "./api/media/[id]/fetch-metadata/POST";
+import mediaProgressPatch from "./api/media/[id]/progress/PATCH";
+import mediaTracksGet from "./api/media/[id]/tracks/GET";
+// network
+import networkInfoGet from "./api/network/info/GET";
+// profiles
+import profilesGet from "./api/profiles/GET";
+import profilesPost from "./api/profiles/POST";
+import profileByIdGet from "./api/profiles/[id]/GET";
+import profileByIdPatch from "./api/profiles/[id]/PATCH";
+import profileByIdDelete from "./api/profiles/[id]/DELETE";
+import profilePinPost from "./api/profiles/[id]/pin/POST";
+import profileSwitchPost from "./api/profiles/switch/POST";
+// real-debrid
+import realDebridStatusGet from "./api/real-debrid/status/GET";
+// remote
+import remoteQrGet from "./api/remote/qr/GET";
+// security
+import securityQuarantineGet from "./api/security/quarantine/GET";
+import securityQuarantinePost from "./api/security/quarantine/POST";
+import securityScanPost from "./api/security/scan/POST";
+// setup
+import setupGet from "./api/setup/GET";
+import setupPost from "./api/setup/POST";
+import setupTestKeysPost from "./api/setup/test-keys/POST";
+// shutdown
+import shutdownPost from "./api/shutdown/POST";
+// stats
+import statsGet from "./api/stats/GET";
+// stream
+import streamGet from "./api/stream/[filename]/GET";
+// stremio
+import stremioDownloadPost from "./api/stremio/download/POST";
+import stremioDownloadsGet from "./api/stremio/downloads/GET";
+import stremioDownloadDeleteByHash from "./api/stremio/downloads/[hash]/DELETE";
+import stremioDownloadsPausePost from "./api/stremio/downloads/pause/POST";
+import stremioDownloadsPriorityPost from "./api/stremio/downloads/priority/POST";
+import stremioDownloadsResumePost from "./api/stremio/downloads/resume/POST";
+import stremioDownloadsRetryPost from "./api/stremio/downloads/retry/POST";
+import stremioLoginPost from "./api/stremio/login/POST";
+import stremioMagnetPost from "./api/stremio/magnet/POST";
+import stremioScheduleGet from "./api/stremio/schedule/GET";
+import stremioSchedulePost from "./api/stremio/schedule/POST";
+import stremioScheduleDeleteById from "./api/stremio/schedule/[id]/DELETE";
+import stremioSearchPost from "./api/stremio/search/POST";
+import stremioStreamPost from "./api/stremio/stream/POST";
+// subscriptions
+import subscriptionsGet from "./api/subscriptions/GET";
+import subscriptionsPost from "./api/subscriptions/POST";
+import subscriptionCheckPost from "./api/subscriptions/[id]/check/POST";
+// tmdb
+import tmdbGet from "./api/tmdb/GET";
+import tmdbCatalogGet from "./api/tmdb/catalog/GET";
+import tmdbGenresGet from "./api/tmdb/genres/GET";
+import tmdbMovieGet from "./api/tmdb/movie/[id]/GET";
+import tmdbSearchGet from "./api/tmdb/search/GET";
+import tmdbStreamingGet from "./api/tmdb/streaming/GET";
+import tmdbTrailerGet from "./api/tmdb/trailer/GET";
+import tmdbTvGet from "./api/tmdb/tv/[id]/GET";
+import tmdbProxyGet from "./api/tmdb-proxy/GET";
+// transcode
+import transcodeGet from "./api/transcode/[id]/GET";
+// updater
+import updaterActionPost from "./api/updater/action/POST";
+import updaterDrainGet from "./api/updater/drain/GET";
+import updaterPushPost from "./api/updater/push/POST";
+import updaterStatusGet from "./api/updater/status/GET";
+// upload
+import uploadPost from "./api/upload/POST";
+// vpn
+import vpnGet from "./api/vpn/GET";
+import vpnPost from "./api/vpn/POST";
+import vpnBindPost from "./api/vpn/bind/POST";
+import vpnFastestServerGet from "./api/vpn/fastest-server/GET";
+import vpnInterfacesGet from "./api/vpn/interfaces/GET";
+import vpnInterfacesStatusGet from "./api/vpn/interfaces/status/GET";
+// watchlist
+import watchlistGet from "./api/watchlist/GET";
+import watchlistPutById from "./api/watchlist/[id]/PUT";
+import watchlistDeleteById from "./api/watchlist/[id]/DELETE";
 // </api-imports>
 import { seoRoutes } from "../lib/seo-routes";
 
@@ -29,9 +189,169 @@ app.set("trust proxy", true);
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(cookieParser());
+
+const upload = multer({ dest: "/tmp/uploads" });
 
 // <api-registrations>
+// admin
+app.get("/api/admin/status", adminStatusGet);
+// auth
+app.get("/api/auth/check", authCheckGet);
+app.post("/api/auth/login", authLoginPost);
+app.post("/api/auth/logout", authLogoutPost);
+app.post("/api/auth/logout-all", authLogoutAllPost);
+// backup
+app.get("/api/backup", backupGet);
+app.post("/api/backup", backupPost);
+app.post("/api/backup/restore", backupRestorePost);
+// captions
+app.get("/api/captions/:id/:lang", captionsLangGet);
+app.post("/api/captions/:id/fetch", captionsFetchPost);
+app.post("/api/captions/:id/upload", upload.single("file"), captionsUploadPost);
+// cast
+app.post("/api/cast/control", castControlPost);
+app.get("/api/cast/devices", castDevicesGet);
+app.get("/api/cast/position", castPositionGet);
+app.get("/api/cast/position/server", castPositionServerGet);
+app.post("/api/cast/send", castSendPost);
+app.post("/api/cast/stop", castStopPost);
+// chat
+app.post("/api/chat", chatPost);
+// crash-log
+app.get("/api/crash-log", crashLogGet);
+app.post("/api/crash-log", crashLogPost);
+// debug
+app.post("/api/debug/repair", debugRepairPost);
+app.get("/api/debug/system-info", debugSystemInfoGet);
+// dev
+app.get("/api/dev/diagnostics", devDiagnosticsGet);
+app.post("/api/dev/release", devReleasePost);
+// electron
+app.get("/api/electron", electronGet);
+// encoder
+app.get("/api/encoder/status", encoderStatusGet);
+// enrich
+app.post("/api/enrich/:id", enrichPost);
+// feedback
+app.post("/api/feedback", feedbackPost);
+// health
 app.get("/api/health", healthGet);
+app.get("/api/health/full", healthFullGet);
+// history
+app.get("/api/history", historyGet);
+app.delete("/api/history", historyDelete);
+// hls
+app.get("/api/hls/:id/probe", hlsProbeGet);
+app.get("/api/hls/:id/index.m3u8", hlsPlaylistGet);
+app.get("/api/hls/:id/:segment", hlsSegmentGet);
+// jellyfin
+app.get("/api/jellyfin/Items", jellyfinItemsGet);
+app.get("/api/jellyfin/Items/:id", jellyfinItemByIdGet);
+app.get("/api/jellyfin/Items/:id/Images/:imageType", jellyfinItemImageGet);
+app.get("/api/jellyfin/Search/Hints", jellyfinSearchHintsGet);
+app.post("/api/jellyfin/Sessions/Playing", jellyfinSessionsPlayingPost);
+app.post("/api/jellyfin/Sessions/Playing/Progress", jellyfinSessionsPlayingProgressPost);
+app.post("/api/jellyfin/Sessions/Playing/Stopped", jellyfinSessionsPlayingStoppedPost);
+app.get("/api/jellyfin/System/Info/Public", jellyfinSystemInfoPublicGet);
+app.post("/api/jellyfin/Users/AuthenticateByName", jellyfinAuthPost);
+app.get("/api/jellyfin/Users", jellyfinUsersGet);
+app.get("/api/jellyfin/Users/:userId", jellyfinUserByIdGet);
+app.get("/api/jellyfin/Users/:userId/Items", jellyfinUserItemsGet);
+app.get("/api/jellyfin/Videos", jellyfinVideosGet);
+app.get("/api/jellyfin/Videos/:id/stream", jellyfinVideoStreamGet);
+// library
+app.post("/api/library/scan", libraryScanPost);
+app.get("/api/library/storage", libraryStorageGet);
+app.patch("/api/library/storage", libraryStoragePatch);
+app.patch("/api/library/storage/drive", libraryStorageDrivePatch);
+// media
+app.get("/api/media", mediaGet);
+app.delete("/api/media/:id", mediaDeleteById);
+app.put("/api/media/:id", mediaPutById);
+app.get("/api/media/:id/episodes", mediaEpisodesGet);
+app.post("/api/media/:id/episodes", mediaEpisodesPost);
+app.patch("/api/media/:id/episodes/:episodeId", mediaEpisodePatch);
+app.post("/api/media/:id/fetch-metadata", mediaFetchMetadataPost);
+app.patch("/api/media/:id/progress", mediaProgressPatch);
+app.get("/api/media/:id/tracks", mediaTracksGet);
+// network
+app.get("/api/network/info", networkInfoGet);
+// profiles
+app.get("/api/profiles", profilesGet);
+app.post("/api/profiles", profilesPost);
+app.post("/api/profiles/switch", profileSwitchPost);
+app.get("/api/profiles/:id", profileByIdGet);
+app.patch("/api/profiles/:id", profileByIdPatch);
+app.delete("/api/profiles/:id", profileByIdDelete);
+app.post("/api/profiles/:id/pin", profilePinPost);
+// real-debrid
+app.get("/api/real-debrid/status", realDebridStatusGet);
+// remote
+app.get("/api/remote/qr", remoteQrGet);
+// security
+app.get("/api/security/quarantine", securityQuarantineGet);
+app.post("/api/security/quarantine", securityQuarantinePost);
+app.post("/api/security/scan", securityScanPost);
+// setup
+app.get("/api/setup", setupGet);
+app.post("/api/setup", setupPost);
+app.post("/api/setup/test-keys", setupTestKeysPost);
+// shutdown
+app.post("/api/shutdown", shutdownPost);
+// stats
+app.get("/api/stats", statsGet);
+// stream
+app.get("/api/stream/:filename", streamGet);
+// stremio
+app.post("/api/stremio/download", stremioDownloadPost);
+app.get("/api/stremio/downloads", stremioDownloadsGet);
+app.delete("/api/stremio/downloads/:hash", stremioDownloadDeleteByHash);
+app.post("/api/stremio/downloads/pause", stremioDownloadsPausePost);
+app.post("/api/stremio/downloads/priority", stremioDownloadsPriorityPost);
+app.post("/api/stremio/downloads/resume", stremioDownloadsResumePost);
+app.post("/api/stremio/downloads/retry", stremioDownloadsRetryPost);
+app.post("/api/stremio/login", stremioLoginPost);
+app.post("/api/stremio/magnet", stremioMagnetPost);
+app.get("/api/stremio/schedule", stremioScheduleGet);
+app.post("/api/stremio/schedule", stremioSchedulePost);
+app.delete("/api/stremio/schedule/:id", stremioScheduleDeleteById);
+app.post("/api/stremio/search", stremioSearchPost);
+app.post("/api/stremio/stream", stremioStreamPost);
+// subscriptions
+app.get("/api/subscriptions", subscriptionsGet);
+app.post("/api/subscriptions", subscriptionsPost);
+app.post("/api/subscriptions/:id/check", subscriptionCheckPost);
+// tmdb
+app.get("/api/tmdb", tmdbGet);
+app.get("/api/tmdb/catalog", tmdbCatalogGet);
+app.get("/api/tmdb/genres", tmdbGenresGet);
+app.get("/api/tmdb/movie/:id", tmdbMovieGet);
+app.get("/api/tmdb/search", tmdbSearchGet);
+app.get("/api/tmdb/streaming", tmdbStreamingGet);
+app.get("/api/tmdb/trailer", tmdbTrailerGet);
+app.get("/api/tmdb/tv/:id", tmdbTvGet);
+app.get("/api/tmdb-proxy", tmdbProxyGet);
+// transcode
+app.get("/api/transcode/:id", transcodeGet);
+// updater
+app.post("/api/updater/action", updaterActionPost);
+app.get("/api/updater/drain", updaterDrainGet);
+app.post("/api/updater/push", updaterPushPost);
+app.get("/api/updater/status", updaterStatusGet);
+// upload
+app.post("/api/upload", upload.single("file"), uploadPost);
+// vpn
+app.get("/api/vpn", vpnGet);
+app.post("/api/vpn", vpnPost);
+app.post("/api/vpn/bind", vpnBindPost);
+app.get("/api/vpn/fastest-server", vpnFastestServerGet);
+app.get("/api/vpn/interfaces", vpnInterfacesGet);
+app.get("/api/vpn/interfaces/status", vpnInterfacesStatusGet);
+// watchlist
+app.get("/api/watchlist", watchlistGet);
+app.put("/api/watchlist/:id", watchlistPutById);
+app.delete("/api/watchlist/:id", watchlistDeleteById);
 // </api-registrations>
 
 // Error middleware must be registered AFTER the routes it protects; Express

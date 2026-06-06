@@ -12,7 +12,7 @@ import { requireAuth } from '../../../authMiddleware.js';
 export default async function handler(req: Request, res: Response) {
   if (!requireAuth(req, res)) return;
   try {
-    const { id } = req.params;
+    const id = req.params.id as string;
     const profileId = (req.query.profile as string | undefined)?.trim() || 'adult';
     const watchlist = await addToWatchlist(id, profileId);
     res.json({ watchlist });

@@ -5,7 +5,7 @@ import { requireAuth } from '../../../authMiddleware.js';
 export default function handler(req: Request, res: Response) {
   try {
     if (!requireAuth(req, res)) return;
-    const { id } = req.params;
+    const id = req.params.id as string;
     const profile = getProfile(id);
     if (!profile) return res.status(404).json({ error: 'Profile not found' });
     res.json({ profile: toPublic(profile) });

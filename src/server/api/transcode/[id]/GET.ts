@@ -9,7 +9,7 @@ import { requireAuth } from '../../../authMiddleware.js';
 
 export default function handler(req: Request, res: Response) {
   if (!requireAuth(req, res)) return;
-  const { id } = req.params;
+  const id = req.params.id as string;
 
   const job = getJob(id);
   if (!job) {

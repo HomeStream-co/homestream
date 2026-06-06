@@ -24,7 +24,8 @@ const TRANSPARENT_PNG = Buffer.from(
 
 export default function handler(req: Request, res: Response) {
   try {
-    const { id, imageType } = req.params;
+    const id = req.params.id as string;
+    const imageType = req.params.imageType as string;
     const library = readLibrary<LibraryItem>();
     const item = library.find(i => i.id === id);
 
