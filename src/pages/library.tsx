@@ -350,8 +350,9 @@ function totalProgress(u: UploadingFile): number {
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function LibraryPage() {
-  const { library, loading, refreshLibrary, deleteMedia, updateMedia } = useMedia();
+  const { library, loading, isDemoMode, refreshLibrary, deleteMedia, updateMedia } = useMedia();
   const { settings: appSettings } = useTheme();
+  const [activeTab, setActiveTab] = useState<'all' | 'movie' | 'series'>('all');
   const [uploading, setUploading] = useState<UploadingFile[]>([]);
   // Netflix-style reveal modal — pops up when AI enrichment finishes
   const [revealModal, setRevealModal] = useState<{
@@ -712,7 +713,31 @@ export default function LibraryPage() {
 
       <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8">
 
-        {/* ── Upload Zone ── */}
+        {/* ── Upload Zone — hidden in demo mode ── */}
+        {isDemoMode ? (
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, delay: 0.1, ease: 'easeOut' as const }}
+            className="flex items-center gap-3 bg-primary/8 border border-primary/20 rounded-2xl px-5 py-3.5 mb-8"
+          >
+            <div className="w-8 h-8 rounded-xl bg-primary/15 flex items-center justify-center flex-shrink-0">
+              <Play className="w-4 h-4 text-primary" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-foreground">Preview mode — demo library loaded</p>
+              <p className="text-xs text-muted-foreground">Click any title to open the player. Drop real video files here to replace demo content.</p>
+            </div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              accept=".mp4,.mkv,.avi,.mov,.wmv,.m4v,.ts,.webm,.flv,.3gp,.ogv"
+              className="hidden"
+              onChange={e => handleFiles(e.target.files)}
+            />
+          </motion.div>
+        ) : (
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
@@ -764,6 +789,7 @@ export default function LibraryPage() {
           </div>
         </div>
         </motion.div>
+        )} {/* end isDemoMode ? banner : upload zone */}
 
         {/* ── Upload / Transcode Progress Cards ── */}
         <AnimatePresence>
@@ -949,14 +975,22 @@ export default function LibraryPage() {
         {/* ── Library Grid header ── */}
         <div className="flex items-center justify-between mb-5 gap-3 flex-wrap">
           <div className="flex items-center gap-3">
-            <h2 className="text-xl font-heading font-semibold text-foreground">
-              {library.length} Title{library.length !== 1 ? 's' : ''}
-            </h2>
-            {library.length > 0 && (
-              <span className="text-xs text-muted-foreground bg-muted/60 px-2.5 py-1 rounded-full">
-                {library.filter(m => m.type === 'series').length} shows · {library.filter(m => m.type !== 'series').length} movies
-              </span>
-            )}
+            {/* All / Movies / Shows tabs */}
+            <div className="flex items-center gap-1 bg-muted/50 rounded-xl p-1">
+              {(['all', 'movie', 'series'] as const).map(tab => (
+                <button
+                  key={tab}
+                  onClick={() => setActiveTab(tab)}
+                  className={`px-3.5 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 ${
+                    activeTab === tab
+                      ? 'bg-background text-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  {tab === 'all' ? `All (${library.length})` : tab === 'movie' ? `Movies (${library.filter(m => m.type !== 'series').length})` : `Shows (${library.filter(m => m.type === 'series').length})`}
+                </button>
+              ))}
+            </div>
           </div>
           <div className="flex items-center gap-2">
             {selectMode ? (
@@ -1039,7 +1073,7 @@ export default function LibraryPage() {
           </motion.div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-            {library.map((item: MediaItem & { transcoding?: boolean; transcodeWarning?: string; transcodeError?: string }, idx) => (
+            {library.filter(m => activeTab === 'all' || (activeTab === 'series' ? m.type === 'series' : m.type !== 'series')).map((item: MediaItem & { transcoding?: boolean; transcodeWarning?: string; transcodeError?: string }, idx) => (
               <MediaContextMenu key={item.id} item={item} disabled={selectMode}>
               <motion.div
                 initial={{ opacity: 0, y: 12 }}

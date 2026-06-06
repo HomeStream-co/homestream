@@ -13,6 +13,7 @@ interface ContinueWatchingItem {
 interface MediaContextType {
   library: MediaItem[];
   loading: boolean;
+  isDemoMode: boolean; // true when library is populated from /api/demo (no real files)
   watchlist: string[];
   continueWatching: ContinueWatchingItem[];
   pendingRecommendation: string | null; // id of just-finished item
@@ -31,6 +32,7 @@ const MediaContext = createContext<MediaContextType | null>(null);
 export function MediaProvider({ children }: { children: ReactNode }) {
   const [library, setLibrary] = useState<MediaItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isDemoMode, setIsDemoMode] = useState(false);
   const [pendingRecommendation, setPendingRecommendation] = useState<string | null>(null);
 
   // Get active profile so we can scope library fetches and progress writes
@@ -114,8 +116,11 @@ export function MediaProvider({ children }: { children: ReactNode }) {
             const demoRes = await fetch('/api/demo', { credentials: 'include' });
             if (demoRes.ok) {
               data = await demoRes.json() as MediaItem[];
+              setIsDemoMode(true);
             }
           } catch { /* non-fatal — keep empty library */ }
+        } else {
+          setIsDemoMode(false);
         }
 
         setLibrary(data);
@@ -280,6 +285,7 @@ export function MediaProvider({ children }: { children: ReactNode }) {
   const contextValue = useMemo(() => ({
     library,
     loading,
+    isDemoMode,
     watchlist,
     continueWatching,
     pendingRecommendation,
@@ -292,7 +298,7 @@ export function MediaProvider({ children }: { children: ReactNode }) {
     triggerPostWatchRecommendation,
     clearPendingRecommendation,
   }), [
-    library, loading, watchlist, continueWatching, pendingRecommendation,
+    library, loading, isDemoMode, watchlist, continueWatching, pendingRecommendation,
     refreshLibrary, addToWatchlist, removeFromWatchlist, updateProgress,
     deleteMedia, updateMedia, triggerPostWatchRecommendation, clearPendingRecommendation,
   ]);
