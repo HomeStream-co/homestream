@@ -1050,6 +1050,15 @@ function MagnetInput({ onAdded }: { onAdded: () => void }) {
   const [magnet, setMagnet] = useState('');
   const [title, setTitle] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [scheduleMode, setScheduleMode] = useState(false);
+  // Default scheduled time = 1 hour from now, rounded to nearest 5 min
+  const defaultScheduleTime = () => {
+    const d = new Date(Date.now() + 60 * 60 * 1000);
+    d.setMinutes(Math.ceil(d.getMinutes() / 5) * 5, 0, 0);
+    // datetime-local value format: YYYY-MM-DDTHH:mm
+    return d.toISOString().slice(0, 16);
+  };
+  const [scheduleAt, setScheduleAt] = useState(defaultScheduleTime);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   const trimmed = magnet.trim();
@@ -1057,33 +1066,64 @@ function MagnetInput({ onAdded }: { onAdded: () => void }) {
   const isTorrentUrl = trimmed.startsWith('http') && (trimmed.includes('.torrent') || trimmed.includes('torrent'));
   const isValid = isMagnet || isTorrentUrl;
 
+  // Min datetime for the picker = now + 2 min
+  const minDateTime = new Date(Date.now() + 2 * 60 * 1000).toISOString().slice(0, 16);
+
   const handleSubmit = async () => {
     if (!isValid || submitting) return;
     setSubmitting(true);
     try {
-      const res = await fetch('/api/stremio/magnet-direct', {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          magnet: trimmed,
-          title: title.trim() || undefined,
-        }),
-      });
-      const json = await res.json() as { ok: boolean; backend?: string; hash?: string; jobId?: string; error?: string; message?: string };
-      if (!res.ok || !json.ok) {
-        if (res.status === 503) {
-          toast.error('No download backend — configure Real-Debrid or start qBittorrent in Settings');
+      if (scheduleMode) {
+        // Schedule for later — needs a title
+        const scheduledFor = new Date(scheduleAt).toISOString();
+        if (new Date(scheduleAt).getTime() <= Date.now()) {
+          toast.error('Scheduled time must be in the future');
+          setSubmitting(false);
+          return;
+        }
+        const res = await fetch('/api/stremio/schedule', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: title.trim() || 'Scheduled Download',
+            imdbId: 'manual',
+            scheduledFor,
+            streams: [{ url: trimmed, name: 'Manual' }],
+          }),
+        });
+        const json = await res.json() as { ok: boolean; error?: string };
+        if (!res.ok || !json.ok) {
+          toast.error(json.error ?? 'Failed to schedule download');
         } else {
-          toast.error(json.error ?? 'Failed to add torrent');
+          const fireTime = new Date(scheduleAt).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+          toast.success(`Scheduled for ${fireTime}`);
+          setMagnet(''); setTitle(''); setOpen(false); setScheduleMode(false);
+          onAdded();
         }
       } else {
-        const via = json.backend === 'realdebrid' ? 'Real-Debrid' : 'qBittorrent';
-        toast.success(`Added to queue via ${via}`);
-        setMagnet('');
-        setTitle('');
-        setOpen(false);
-        onAdded();
+        const res = await fetch('/api/stremio/magnet-direct', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            magnet: trimmed,
+            title: title.trim() || undefined,
+          }),
+        });
+        const json = await res.json() as { ok: boolean; backend?: string; hash?: string; jobId?: string; error?: string; message?: string };
+        if (!res.ok || !json.ok) {
+          if (res.status === 503) {
+            toast.error('No download backend — configure Real-Debrid or start qBittorrent in Settings');
+          } else {
+            toast.error(json.error ?? 'Failed to add torrent');
+          }
+        } else {
+          const via = json.backend === 'realdebrid' ? 'Real-Debrid' : 'qBittorrent';
+          toast.success(`Added to queue via ${via}`);
+          setMagnet(''); setTitle(''); setOpen(false);
+          onAdded();
+        }
       }
     } catch (err) {
       toast.error(`Network error: ${String(err)}`);
@@ -1131,7 +1171,7 @@ function MagnetInput({ onAdded }: { onAdded: () => void }) {
               <span className="text-sm font-semibold text-foreground">Add Torrent Manually</span>
             </div>
             <button
-              onClick={() => { setOpen(false); setMagnet(''); setTitle(''); }}
+              onClick={() => { setOpen(false); setMagnet(''); setTitle(''); setScheduleMode(false); }}
               className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
             >
               <X className="w-3.5 h-3.5" />
@@ -1157,6 +1197,33 @@ function MagnetInput({ onAdded }: { onAdded: () => void }) {
             className="w-full bg-background border border-border rounded-xl px-3 py-2.5 text-sm font-mono text-foreground placeholder:text-muted-foreground resize-none focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/60 transition-all"
           />
 
+          {/* ── Schedule for later toggle ── */}
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => { setScheduleMode(s => !s); if (!scheduleMode) setScheduleAt(defaultScheduleTime()); }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium border transition-all ${
+                scheduleMode
+                  ? 'bg-primary/15 border-primary/40 text-primary'
+                  : 'border-border text-muted-foreground hover:text-foreground hover:border-border/80'
+              }`}
+            >
+              <CalendarClock className="w-3.5 h-3.5" />
+              Schedule for later
+            </button>
+            {scheduleMode && (
+              <motion.input
+                initial={{ opacity: 0, x: -6 }}
+                animate={{ opacity: 1, x: 0 }}
+                type="datetime-local"
+                value={scheduleAt}
+                min={minDateTime}
+                onChange={e => setScheduleAt(e.target.value)}
+                className="flex-1 bg-background border border-primary/40 rounded-xl px-3 py-1.5 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 transition-all"
+              />
+            )}
+          </div>
+
           <div className="flex items-center justify-between gap-3">
             <p className="text-xs text-muted-foreground">
               {isValid
@@ -1170,8 +1237,10 @@ function MagnetInput({ onAdded }: { onAdded: () => void }) {
               disabled={!isValid || submitting}
               className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              {submitting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
-              {submitting ? 'Adding…' : 'Add to Queue'}
+              {submitting
+                ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                : scheduleMode ? <CalendarClock className="w-3.5 h-3.5" /> : <Send className="w-3.5 h-3.5" />}
+              {submitting ? (scheduleMode ? 'Scheduling…' : 'Adding…') : scheduleMode ? 'Schedule' : 'Add to Queue'}
             </button>
           </div>
         </motion.div>
@@ -2185,7 +2254,7 @@ export default function DownloadsPage() {
               </div>
 
               <p className="text-xs text-muted-foreground mt-3">
-                Schedule a download from the <strong>Stremio</strong> panel — click the <CalendarClock className="w-3 h-3 inline" /> icon next to any stream.
+                Use the <strong>Schedule for later</strong> toggle in the magnet form above to queue a download for a specific time.
               </p>
             </div>
           )}
