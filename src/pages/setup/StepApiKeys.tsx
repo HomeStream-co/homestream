@@ -166,13 +166,6 @@ export default function StepApiKeys({
     } catch { setTest('idle'); setMsg(''); }
   };
 
-  const testTmdbKey     = () => testKeyViaServer('tmdb',     form.tmdbApiKey,     setTmdbTest,     setTmdbTestMsg);
-  const testOmdbKey     = () => testKeyViaServer('omdb',     form.omdbApiKey,     setOmdbTest,     setOmdbTestMsg);
-
-  useAutoTest(form.tmdbApiKey, testTmdbKey);
-  useAutoTest(form.omdbApiKey, testOmdbKey);
-
-  // ── AI key test — routes to the right provider ──
   const testAiKey = async () => {
     const val = (form.aiApiKey ?? '').trim();
     if (!val) return;
@@ -250,8 +243,6 @@ export default function StepApiKeys({
 
       await apiPost('save', {
         adminPassword:    form.adminPassword,
-        omdbApiKey:       form.omdbApiKey,
-        tmdbApiKey:       form.tmdbApiKey,
         realDebridApiKey: form.realDebridApiKey,
         aiApiKey:         key,
         // Legacy fields — kept so existing config readers still work
@@ -288,7 +279,7 @@ export default function StepApiKeys({
           <h2 className="text-xl font-heading font-bold text-foreground">API Keys &amp; Password</h2>
         </div>
         <p className="text-sm text-muted-foreground">
-          All optional — HomeStream works without them. Keys unlock posters, ratings, and AI recommendations.
+          Movie posters and ratings are built in — no setup needed. Just add an AI key if you want personalised recommendations, then optionally connect Real-Debrid for premium downloads.
         </p>
       </div>
 
@@ -333,79 +324,26 @@ export default function StepApiKeys({
         </div>
       </div>
 
-      {/* ── TMDB ── */}
-      <div className="p-4 rounded-xl border border-border bg-muted/20">
-        <div className="flex items-center justify-between mb-1">
-          <div className="flex items-center gap-2">
-            <Film className="w-4 h-4 text-primary" />
-            <p className="text-sm font-semibold text-foreground">TMDB API Key</p>
-            <span className="text-[10px] bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded font-medium">Recommended</span>
-          </div>
-          <a href="https://www.themoviedb.org/settings/api" target="_blank" rel="noopener noreferrer" className="text-[10px] text-primary hover:underline flex items-center gap-0.5">
-            Get free key <ExternalLink className="w-2.5 h-2.5" />
-          </a>
+      {/* ── TMDB + OMDB — pre-configured ── */}
+      <div className="p-4 rounded-xl border border-green-500/25 bg-green-500/5">
+        <div className="flex items-center gap-2 mb-2">
+          <CheckCircle2 className="w-4 h-4 text-green-400 flex-shrink-0" />
+          <p className="text-sm font-semibold text-foreground">Movie &amp; TV Data — Ready</p>
+          <span className="text-[10px] bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded font-medium">Built-in</span>
         </div>
-        <p className="text-xs text-muted-foreground mb-2">
-          Powers the hero banner, Discover page, and AI recommendation context. Free TMDB account required.
+        <div className="flex flex-col gap-1.5">
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-muted-foreground flex items-center gap-1.5"><Film className="w-3.5 h-3.5" /> TMDB — posters, hero banner, Discover page</span>
+            <span className="text-green-400 font-medium">Active</span>
+          </div>
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-muted-foreground flex items-center gap-1.5"><Film className="w-3.5 h-3.5" /> OMDB — IMDb ratings, plot summaries, cast</span>
+            <span className="text-green-400 font-medium">Active</span>
+          </div>
+        </div>
+        <p className="text-[11px] text-muted-foreground mt-2.5">
+          These are bundled with HomeStream — no account or key required. You can override them in Settings later if you prefer your own keys.
         </p>
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={form.tmdbApiKey}
-            onChange={e => { set('tmdbApiKey', e.target.value); setTmdbTest('idle'); }}
-            placeholder="eyJhbGciOiJSUzI1NiJ9… (v4 read access token)"
-            className="flex-1 bg-background border border-border rounded-lg px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary font-mono min-w-0"
-          />
-          <button onClick={testTmdbKey} disabled={!form.tmdbApiKey.trim() || tmdbTest === 'testing'}
-            className="flex items-center gap-1.5 px-3 py-2.5 rounded-lg bg-muted hover:bg-muted/80 text-foreground text-xs font-medium transition-colors disabled:opacity-40 flex-shrink-0">
-            {tmdbTest === 'testing' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />} Test
-          </button>
-        </div>
-        <TestResult state={tmdbTest} msg={tmdbTestMsg} expiry="Valid ~365 days" />
-        <HowTo>
-          <ol className="list-decimal list-inside space-y-1 ml-1">
-            <li>Go to <a href="https://www.themoviedb.org/signup" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">themoviedb.org/signup</a> — free account</li>
-            <li>Visit <strong>Settings → API</strong> and click <strong>Create</strong></li>
-            <li>Choose <strong>Developer</strong>, fill in any app name/URL</li>
-            <li>Copy the <strong>API Read Access Token (v4)</strong> — starts with <code className="bg-muted px-1 rounded">eyJ…</code></li>
-          </ol>
-        </HowTo>
-      </div>
-
-      {/* ── OMDB ── */}
-      <div className="p-4 rounded-xl border border-border bg-muted/20">
-        <div className="flex items-center justify-between mb-1">
-          <div className="flex items-center gap-2">
-            <Film className="w-4 h-4 text-primary" />
-            <p className="text-sm font-semibold text-foreground">OMDB API Key</p>
-          </div>
-          <a href="https://www.omdbapi.com/apikey.aspx" target="_blank" rel="noopener noreferrer" className="text-[10px] text-primary hover:underline flex items-center gap-0.5">
-            Get free key <ExternalLink className="w-2.5 h-2.5" />
-          </a>
-        </div>
-        <p className="text-xs text-muted-foreground mb-2">IMDb ratings, plot summaries, and cast info used by the AI assistant.</p>
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={form.omdbApiKey}
-            onChange={e => { set('omdbApiKey', e.target.value); setOmdbTest('idle'); }}
-            placeholder="xxxxxxxx"
-            className="flex-1 bg-background border border-border rounded-lg px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary font-mono min-w-0"
-          />
-          <button onClick={testOmdbKey} disabled={!form.omdbApiKey.trim() || omdbTest === 'testing'}
-            className="flex items-center gap-1.5 px-3 py-2.5 rounded-lg bg-muted hover:bg-muted/80 text-foreground text-xs font-medium transition-colors disabled:opacity-40 flex-shrink-0">
-            {omdbTest === 'testing' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />} Test
-          </button>
-        </div>
-        <TestResult state={omdbTest} msg={omdbTestMsg} expiry="Valid ~365 days" />
-        <HowTo>
-          <ol className="list-decimal list-inside space-y-1 ml-1">
-            <li>Go to <a href="https://www.omdbapi.com/apikey.aspx" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">omdbapi.com/apikey.aspx</a></li>
-            <li>Select <strong>FREE! (1,000 daily limit)</strong> and enter your email</li>
-            <li>Check your email for the activation link and click it</li>
-            <li>Your 8-character key will be shown — paste it above</li>
-          </ol>
-        </HowTo>
       </div>
 
       {/* ── AI Chat Assistant ── */}

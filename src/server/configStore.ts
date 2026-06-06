@@ -134,9 +134,11 @@ const DEFAULTS: AppConfig = {
   // adminPassword is set by the setup wizard only (homestream-config.json).
   // Never read from env — that bypasses the wizard and locks users out.
   adminPassword: '',
-  omdbApiKey: process.env.OMDB_API_KEY || '',
+  // TMDB and OMDB are bundled keys — users never need to supply these.
+  // They fall back to env vars so the developer can rotate them without a code push.
+  omdbApiKey: process.env.OMDB_API_KEY || 'b46d0701',
   googleAiApiKey: process.env.GOOGLE_AI_API_KEY || '',
-  tmdbApiKey: process.env.TMDB_API_KEY || '',
+  tmdbApiKey: process.env.TMDB_API_KEY || '1fc76698ee09cbcfe927abb03da9fe5a',
   aiApiKey: process.env.AI_API_KEY || process.env.GOOGLE_AI_API_KEY || '',
   aiProvider: 'gemini',
   ollamaUrl: process.env.OLLAMA_URL || 'http://localhost:11434',

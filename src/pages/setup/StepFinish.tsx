@@ -168,9 +168,8 @@ export default function StepFinish({
           { label: 'Auto-import', value: form.watchFolderEnabled ? 'On' : 'Off', ok: form.watchFolderEnabled },
           { label: 'qBittorrent', value: status.qbit === 'ok' ? `v${qbitVersion}` : 'Not configured', ok: status.qbit === 'ok' },
           { label: 'Jellyfin', value: status.jellyfin === 'ok' ? `v${jellyfinVersion}` : 'Not configured', ok: status.jellyfin === 'ok' },
-          { label: 'TMDB', value: form.tmdbApiKey ? 'Key set' : 'Not set', ok: !!form.tmdbApiKey },
-          { label: 'OMDB', value: form.omdbApiKey ? 'Key set' : 'Not set', ok: !!form.omdbApiKey },
-          { label: 'AI', value: form.aiApiKey ? (form.aiProvider === 'ollama' ? 'Ollama' : form.aiProvider === 'anthropic' ? 'Anthropic' : form.aiProvider === 'openai' ? 'OpenAI' : 'Gemini') : 'No key', ok: !!form.aiApiKey },
+          { label: 'TMDB / OMDB', value: 'Built-in', ok: true },
+          { label: 'AI', value: form.aiApiKey ? (form.aiProvider === 'ollama' ? 'Ollama' : form.aiProvider === 'anthropic' ? 'Anthropic' : form.aiProvider === 'openai' ? 'OpenAI' : 'Gemini') : 'No key (optional)', ok: !!form.aiApiKey },
         ].map(({ label, value, ok, wide }) => (
           <div key={label} className={`flex items-center gap-2.5 p-3 rounded-xl border bg-muted/20 ${wide ? 'col-span-2' : ''} ${ok ? 'border-border' : 'border-border/50'}`}>
             {ok
