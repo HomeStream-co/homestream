@@ -2127,12 +2127,7 @@ export default function DownloadsPage() {
           </div>
 
           {/* ── Content ── */}
-          {loading && !data ? (
-            <div className="flex flex-col items-center justify-center py-24 gap-3">
-              <Loader2 className="w-8 h-8 animate-spin text-primary" />
-              <p className="text-muted-foreground text-sm">Connecting to download queue…</p>
-            </div>
-          ) : totalAll === 0 ? (
+          {(loading && !data) || totalAll === 0 ? (
             <motion.div
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
@@ -2142,7 +2137,9 @@ export default function DownloadsPage() {
               <div className="flex items-center gap-3 px-4 py-2.5 rounded-xl bg-primary/8 border border-primary/20">
                 <Zap className="w-4 h-4 text-primary flex-shrink-0" />
                 <p className="text-xs text-muted-foreground">
-                  <span className="font-semibold text-foreground">Queue is empty.</span>{' '}
+                  <span className="font-semibold text-foreground">
+                    {loading && !data ? 'Connecting to download queue…' : 'Queue is empty.'}
+                  </span>{' '}
                   Below is a preview of what your download UI looks like when active.
                 </p>
               </div>
