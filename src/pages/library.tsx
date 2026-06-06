@@ -6,6 +6,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'sonner';
 import { useMedia } from '@/context/MediaContext';
+import { useProfile } from '@/context/ProfileContext';
 import { useTheme } from '@/context/ThemeContext';
 import type { MediaItem } from '@/types/media';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -351,6 +352,7 @@ function totalProgress(u: UploadingFile): number {
 
 export default function LibraryPage() {
   const { library, loading, isDemoMode, refreshLibrary, deleteMedia, updateMedia } = useMedia();
+  const { isAllowed } = useProfile();
   const { settings: appSettings } = useTheme();
   const [activeTab, setActiveTab] = useState<'all' | 'movie' | 'series'>('all');
   const [uploading, setUploading] = useState<UploadingFile[]>([]);
@@ -987,7 +989,7 @@ export default function LibraryPage() {
                       : 'text-muted-foreground hover:text-foreground'
                   }`}
                 >
-                  {tab === 'all' ? `All (${library.length})` : tab === 'movie' ? `Movies (${library.filter(m => m.type !== 'series').length})` : `Shows (${library.filter(m => m.type === 'series').length})`}
+                  {tab === 'all' ? `All (${library.filter(m => isAllowed(m.rated)).length})` : tab === 'movie' ? `Movies (${library.filter(m => isAllowed(m.rated) && m.type !== 'series').length})` : `Shows (${library.filter(m => isAllowed(m.rated) && m.type === 'series').length})`}
                 </button>
               ))}
             </div>
@@ -1073,7 +1075,7 @@ export default function LibraryPage() {
           </motion.div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-            {library.filter(m => activeTab === 'all' || (activeTab === 'series' ? m.type === 'series' : m.type !== 'series')).map((item: MediaItem & { transcoding?: boolean; transcodeWarning?: string; transcodeError?: string }, idx) => (
+            {library.filter(m => isAllowed(m.rated) && (activeTab === 'all' || (activeTab === 'series' ? m.type === 'series' : m.type !== 'series'))).map((item: MediaItem & { transcoding?: boolean; transcodeWarning?: string; transcodeError?: string }, idx) => (
               <MediaContextMenu key={item.id} item={item} disabled={selectMode}>
               <motion.div
                 initial={{ opacity: 0, y: 12 }}

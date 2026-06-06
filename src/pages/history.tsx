@@ -30,6 +30,7 @@ interface HistoryItem {
   genre: string[];
   imdbRating?: string;
   year?: string;
+  rated?: string;
 }
 
 function formatDate(iso?: string): string {
@@ -53,7 +54,7 @@ function formatDuration(seconds: number): string {
 }
 
 export default function HistoryPage() {
-  const { activeProfile } = useProfile();
+  const { activeProfile, isAllowed } = useProfile();
   const profileId = activeProfile?.id ?? 'adult';
 
   const [items, setItems] = useState<HistoryItem[]>([]);
@@ -113,8 +114,11 @@ export default function HistoryPage() {
     }
   };
 
+  // Filter out content not allowed for this profile (e.g. adult content on Kids profile)
+  const visibleItems = items.filter(item => isAllowed(item.rated));
+
   // Group by date label
-  const grouped = items.reduce<Record<string, HistoryItem[]>>((acc, item) => {
+  const grouped = visibleItems.reduce<Record<string, HistoryItem[]>>((acc, item) => {
     const label = formatDate(item.lastWatchedAt);
     if (!acc[label]) acc[label] = [];
     acc[label].push(item);
@@ -134,7 +138,7 @@ export default function HistoryPage() {
               <h1 className="text-2xl font-heading text-foreground">Watch History</h1>
               <div className="flex items-center gap-2 mt-0.5">
                 <p className="text-sm text-muted-foreground">
-                  {loading ? 'Loading…' : `${items.length} title${items.length !== 1 ? 's' : ''} watched`}
+                  {loading ? 'Loading…' : `${visibleItems.length} title${visibleItems.length !== 1 ? 's' : ''} watched`}
                 </p>
                 {activeProfile && (
                   <span className="inline-flex items-center gap-1 text-xs text-muted-foreground/70 bg-muted px-2 py-0.5 rounded-full">
@@ -164,7 +168,7 @@ export default function HistoryPage() {
         )}
 
         {/* Empty state */}
-        {!loading && items.length === 0 && (
+        {!loading && visibleItems.length === 0 && (
           <motion.div
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
