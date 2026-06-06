@@ -72,10 +72,20 @@ export async function runOwnershipSeed(): Promise<void> {
     console.log('[ownership] TMDB API key seeded from TMDB_API_KEY secret');
   }
 
-  // ── 3. Google AI API key ───────────────────────────────────────────────────
+  // ── 3. OMDB API key ────────────────────────────────────────────────────────
+  const secretOmdb = resolveSecret('OMDB_API_KEY');
+  if (secretOmdb && !cfg.omdbApiKey) {
+    updates.omdbApiKey = secretOmdb;
+    didSeed = true;
+    console.log('[ownership] OMDB API key seeded from OMDB_API_KEY secret');
+  }
+
+  // ── 4. Google AI API key ───────────────────────────────────────────────────
   const secretGoogleAi = resolveSecret('GOOGLE_AI_API_KEY');
   if (secretGoogleAi && !cfg.googleAiApiKey) {
     updates.googleAiApiKey = secretGoogleAi;
+    // Also seed the unified aiApiKey field used by the new chat handler
+    if (!cfg.aiApiKey) updates.aiApiKey = secretGoogleAi;
     didSeed = true;
     console.log('[ownership] Google AI key seeded from GOOGLE_AI_API_KEY secret');
   }
