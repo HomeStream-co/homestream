@@ -1,0 +1,136 @@
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-linux:
+    name: Build (Linux)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Package Linux archive
+        run: |
+          mkdir -p release
+          tar -czf release/homestream-${{ github.ref_name }}-linux.tar.gz \
+            dist/ \
+            package.json \
+            package-lock.json \
+            README.md 2>/dev/null || true
+
+      - name: Upload Linux artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-build
+          path: release/homestream-${{ github.ref_name }}-linux.tar.gz
+
+  build-windows:
+    name: Build (Windows)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Package Windows archive
+        run: |
+          mkdir release
+          Compress-Archive -Path dist, package.json, package-lock.json -DestinationPath release/homestream-${{ github.ref_name }}-windows.zip
+        shell: pwsh
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-build
+          path: release/homestream-${{ github.ref_name }}-windows.zip
+
+  release:
+    name: Create GitHub Release
+    needs: [build-linux, build-windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download Linux artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: linux-build
+          path: release/
+
+      - name: Download Windows artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-build
+          path: release/
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: HomeStream ${{ github.ref_name }}
+          body: |
+            ## HomeStream ${{ github.ref_name }}
+
+            ### What's New
+            - Bundled TMDB & OMDB API keys — no setup required
+            - Simplified setup wizard (Step 4 only asks for Admin Password, AI key, Real-Debrid)
+            - Local AI Taste Engine with match % badges
+            - RD → transcode → HLS pipeline
+            - qBittorrent completion watcher
+            - Jackett, Torznab, RSS custom torrent sources
+
+            ### Installation
+
+            #### Linux
+            ```bash
+            tar -xzf homestream-${{ github.ref_name }}-linux.tar.gz
+            npm install --omit=dev
+            npm start
+            ```
+            Requires: Node.js 18+, FFmpeg, MySQL
+
+            #### Windows
+            ```powershell
+            Expand-Archive homestream-${{ github.ref_name }}-windows.zip
+            npm install --omit=dev
+            npm start
+            ```
+            Requires: Node.js 18+, FFmpeg (add to PATH), MySQL 8+
+
+            ### Upgrading
+            ```bash
+            git pull origin main && npm install && npm run build && npm start
+            ```
+          files: |
+            release/homestream-${{ github.ref_name }}-linux.tar.gz
+            release/homestream-${{ github.ref_name }}-windows.zip
+          draft: false
+          prerelease: false
