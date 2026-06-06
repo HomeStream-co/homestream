@@ -7,8 +7,8 @@
  * clearCookie writes a response header. Neither can throw.
  */
 import type { Request, Response } from 'express';
-import { clearAllSessions } from '../../../../../sessionStore.js';
-import { requireAuth } from '../../../../authMiddleware.js';
+import { clearAllSessions } from '../../../sessionStore.js';
+import { requireAuth } from '../../../authMiddleware.js';
 
 export default async function handler(req: Request, res: Response) {
   if (!requireAuth(req, res)) return;
