@@ -29,10 +29,25 @@ export interface AppConfig {
   omdbApiKey: string;
   googleAiApiKey: string;
   tmdbApiKey: string;
+  /**
+   * Unified AI key — a single field that holds whichever key the user pasted.
+   * The chat handler detects the provider from the key prefix:
+   *   AIza…      → Gemini
+   *   sk-ant-…   → Anthropic
+   *   sk-…       → OpenAI
+   *   http://…   → Ollama URL (stored here instead of ollamaUrl when entered via wizard)
+   * Legacy per-provider fields (googleAiApiKey, openaiApiKey, anthropicApiKey) are
+   * still read as fallbacks so existing configs keep working.
+   */
+  aiApiKey: string;
   // AI provider selection
-  aiProvider: 'gemini' | 'ollama';
+  aiProvider: 'gemini' | 'ollama' | 'openai' | 'anthropic';
   ollamaUrl: string;          // e.g. http://localhost:11434
   ollamaModel: string;        // e.g. llama3, mistral, phi3
+  openaiApiKey: string;       // OpenAI API key (sk-...)
+  openaiModel: string;        // e.g. gpt-4.1, gpt-5
+  anthropicApiKey: string;    // Anthropic API key (sk-ant-...)
+  anthropicModel: string;     // e.g. claude-sonnet-4-6
   watchFolderEnabled: boolean;
   autoTranscode: boolean;
   preferredQuality: '720p' | '1080p' | '4k' | 'best';
@@ -60,6 +75,8 @@ export interface AppConfig {
   omdbApiKeySavedAt?: string;
   googleAiApiKeySavedAt?: string;
   tmdbApiKeySavedAt?: string;
+  openaiApiKeySavedAt?: string;
+  anthropicApiKeySavedAt?: string;
   realDebridApiKeySavedAt?: string;
 }
 
@@ -82,9 +99,14 @@ const DEFAULTS: AppConfig = {
   omdbApiKey: process.env.OMDB_API_KEY || '',
   googleAiApiKey: process.env.GOOGLE_AI_API_KEY || '',
   tmdbApiKey: process.env.TMDB_API_KEY || '',
+  aiApiKey: process.env.AI_API_KEY || process.env.GOOGLE_AI_API_KEY || '',
   aiProvider: 'gemini',
   ollamaUrl: process.env.OLLAMA_URL || 'http://localhost:11434',
   ollamaModel: process.env.OLLAMA_MODEL || 'llama3',
+  openaiApiKey: process.env.OPENAI_API_KEY || '',
+  openaiModel: process.env.OPENAI_MODEL || 'gpt-4.1',
+  anthropicApiKey: process.env.ANTHROPIC_API_KEY || '',
+  anthropicModel: process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6',
   watchFolderEnabled: true,
   autoTranscode: true,
   preferredQuality: '1080p',

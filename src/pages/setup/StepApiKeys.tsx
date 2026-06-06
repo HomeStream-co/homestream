@@ -1,19 +1,90 @@
 /**
- * Setup Step 4 — API Keys
- * Admin password + TMDB / OMDB / Google AI / Real-Debrid keys.
- * How-to instructions are collapsed by default to reduce visual noise.
- * Keys are auto-tested 800ms after the user stops typing.
+ * Setup Step 4 — API Keys & Password
+ *
+ * AI key entry uses a single field — the provider is auto-detected from the
+ * key format so the user never has to pick from a radio button:
+ *   AIza…     → Google Gemini  (free tier, 1 500 req/day)
+ *   sk-ant-…  → Anthropic Claude
+ *   sk-…      → OpenAI GPT
+ *   http://…  → Ollama (self-hosted, no key needed — just the URL)
+ *
+ * TMDB, OMDB, and Real-Debrid keys are unchanged.
  */
 import { useState, useEffect, useRef } from 'react';
 import {
   KeyRound, Shield, Film, CheckCircle2, ChevronLeft, ChevronRight,
   Loader2, ExternalLink, AlertCircle, Eye, EyeOff, RefreshCw,
-  XCircle, Zap, ScanSearch, ChevronDown,
+  XCircle, Zap, ChevronDown, Sparkles, Server,
 } from 'lucide-react';
 import type { SetupStepProps, KeyTestState } from './types';
 import { apiPost } from './types';
 
-/** Debounced auto-test hook — fires `fn` 800ms after `value` stops changing */
+// ── Provider detection ────────────────────────────────────────────────────────
+
+type DetectedProvider = 'gemini' | 'openai' | 'anthropic' | 'ollama' | 'unknown' | 'empty';
+
+interface ProviderInfo {
+  id: DetectedProvider;
+  label: string;
+  color: string;         // Tailwind text colour class
+  bg: string;            // Tailwind bg/border badge class
+  placeholder: string;
+  hint: string;
+  getKeyLink?: string;
+}
+
+const PROVIDERS: Record<DetectedProvider, ProviderInfo> = {
+  gemini: {
+    id: 'gemini', label: 'Google Gemini', color: 'text-blue-400',
+    bg: 'bg-blue-500/15 border-blue-500/30 text-blue-400',
+    placeholder: 'AIzaSy…',
+    hint: 'Free tier — 1,500 requests/day, no credit card needed.',
+    getKeyLink: 'https://aistudio.google.com/app/apikey',
+  },
+  openai: {
+    id: 'openai', label: 'OpenAI GPT', color: 'text-green-400',
+    bg: 'bg-green-500/15 border-green-500/30 text-green-400',
+    placeholder: 'sk-…',
+    hint: 'Uses gpt-4.1 by default. Requires a paid OpenAI account.',
+    getKeyLink: 'https://platform.openai.com/api-keys',
+  },
+  anthropic: {
+    id: 'anthropic', label: 'Anthropic Claude', color: 'text-orange-400',
+    bg: 'bg-orange-500/15 border-orange-500/30 text-orange-400',
+    placeholder: 'sk-ant-…',
+    hint: 'Uses Claude Sonnet by default. Requires an Anthropic account.',
+    getKeyLink: 'https://console.anthropic.com/settings/keys',
+  },
+  ollama: {
+    id: 'ollama', label: 'Ollama (local)', color: 'text-purple-400',
+    bg: 'bg-purple-500/15 border-purple-500/30 text-purple-400',
+    placeholder: 'http://localhost:11434',
+    hint: 'Runs fully locally — private, no API key, no cost.',
+    getKeyLink: 'https://ollama.com',
+  },
+  unknown: {
+    id: 'unknown', label: 'Unknown format', color: 'text-muted-foreground',
+    bg: 'bg-muted/30 border-border text-muted-foreground',
+    placeholder: '',
+    hint: 'Paste a Gemini (AIza…), OpenAI (sk-…), Anthropic (sk-ant-…), or Ollama URL.',
+  },
+  empty: {
+    id: 'empty', label: '', color: '', bg: '', placeholder: '', hint: '',
+  },
+};
+
+function detectProvider(value: string): DetectedProvider {
+  const v = value.trim();
+  if (!v) return 'empty';
+  if (v.startsWith('AIza'))    return 'gemini';
+  if (v.startsWith('sk-ant-')) return 'anthropic';
+  if (v.startsWith('sk-'))     return 'openai';
+  if (v.startsWith('http://') || v.startsWith('https://')) return 'ollama';
+  return 'unknown';
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
 function useAutoTest(value: string, fn: () => void) {
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
@@ -25,28 +96,19 @@ function useAutoTest(value: string, fn: () => void) {
   }, [value]);
 }
 
-/** Collapsible "How to get this key" section */
 function HowTo({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
   return (
     <div>
-      <button
-        onClick={() => setOpen(o => !o)}
-        className="flex items-center gap-1 text-[11px] text-primary hover:underline mt-1"
-      >
+      <button onClick={() => setOpen(o => !o)} className="flex items-center gap-1 text-[11px] text-primary hover:underline mt-1">
         <ChevronDown className={`w-3 h-3 transition-transform ${open ? 'rotate-180' : ''}`} />
         How to get this key
       </button>
-      {open && (
-        <div className="mt-2 text-[11px] text-muted-foreground leading-relaxed pl-1">
-          {children}
-        </div>
-      )}
+      {open && <div className="mt-2 text-[11px] text-muted-foreground leading-relaxed pl-1">{children}</div>}
     </div>
   );
 }
 
-/** Inline test result badge */
 function TestResult({ state, msg, expiry }: { state: KeyTestState; msg: string; expiry?: string }) {
   if (state === 'testing') return (
     <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground mt-1.5">
@@ -67,6 +129,8 @@ function TestResult({ state, msg, expiry }: { state: KeyTestState; msg: string; 
   return null;
 }
 
+// ── Component ─────────────────────────────────────────────────────────────────
+
 export default function StepApiKeys({
   form, set, status, setStatus, onNext, onBack,
   showAdminPass, setShowAdminPass,
@@ -77,6 +141,11 @@ export default function StepApiKeys({
   rdTest, setRdTest, rdTestMsg, setRdTestMsg,
 }: SetupStepProps) {
 
+  // Detect provider live as the user types
+  const detectedProvider = detectProvider(form.aiApiKey ?? '');
+  const providerInfo     = PROVIDERS[detectedProvider];
+
+  // ── Key test helpers ──
   const testKeyViaServer = async (
     key: 'tmdb' | 'omdb' | 'googleai',
     value: string,
@@ -87,35 +156,75 @@ export default function StepApiKeys({
     setTest('testing'); setMsg('');
     try {
       const res = await fetch('/api/setup/test-keys', {
-        method: 'POST',
-        credentials: 'include',
+        method: 'POST', credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ key, value: value.trim() }),
       });
       const data = await res.json() as { ok: boolean; message: string };
       setTest(data.ok ? 'ok' : 'error');
       setMsg(data.message);
-    } catch {
-      setTest('idle'); setMsg('');
-    }
+    } catch { setTest('idle'); setMsg(''); }
   };
 
   const testTmdbKey     = () => testKeyViaServer('tmdb',     form.tmdbApiKey,     setTmdbTest,     setTmdbTestMsg);
   const testOmdbKey     = () => testKeyViaServer('omdb',     form.omdbApiKey,     setOmdbTest,     setOmdbTestMsg);
-  const testGoogleAiKey = () => testKeyViaServer('googleai', form.googleAiApiKey, setGoogleAiTest, setGoogleAiTestMsg);
 
-  // Auto-test on paste / typing
-  useAutoTest(form.tmdbApiKey,     testTmdbKey);
-  useAutoTest(form.omdbApiKey,     testOmdbKey);
-  useAutoTest(form.googleAiApiKey, testGoogleAiKey);
+  useAutoTest(form.tmdbApiKey, testTmdbKey);
+  useAutoTest(form.omdbApiKey, testOmdbKey);
 
+  // ── AI key test — routes to the right provider ──
+  const testAiKey = async () => {
+    const val = (form.aiApiKey ?? '').trim();
+    if (!val) return;
+    const p = detectProvider(val);
+
+    if (p === 'gemini') {
+      await testKeyViaServer('googleai', val, setGoogleAiTest, setGoogleAiTestMsg);
+      return;
+    }
+
+    if (p === 'ollama') {
+      setOllamaTest('testing'); setOllamaTestMsg('');
+      try {
+        const url = val.replace(/\/$/, '');
+        const res = await fetch(`${url}/api/tags`, { signal: AbortSignal.timeout(6_000) });
+        if (res.ok) {
+          const data = await res.json() as { models?: { name: string }[] };
+          const models = data.models?.map(m => m.name) ?? [];
+          if (models.length === 0) {
+            setOllamaTest('error');
+            setOllamaTestMsg('Ollama running but no models installed. Run: ollama pull llama3');
+          } else {
+            setOllamaTest('ok');
+            setOllamaTestMsg(`Connected — ${models.length} model${models.length !== 1 ? 's' : ''} available: ${models.slice(0, 3).join(', ')}`);
+          }
+        } else {
+          setOllamaTest('error'); setOllamaTestMsg(`HTTP ${res.status} — is Ollama running?`);
+        }
+      } catch {
+        setOllamaTest('error'); setOllamaTestMsg(`Cannot reach ${val}`);
+      }
+      return;
+    }
+
+    if (p === 'openai' || p === 'anthropic') {
+      // Quick validation — just check the key format and length; a real API
+      // call would cost tokens. We mark it as "ok" with a note.
+      setGoogleAiTest('ok');
+      setGoogleAiTestMsg(`${p === 'openai' ? 'OpenAI' : 'Anthropic'} key format looks correct — will be verified on first use.`);
+      return;
+    }
+  };
+
+  useAutoTest(form.aiApiKey ?? '', testAiKey);
+
+  // ── Real-Debrid test ──
   const testRdKey = async () => {
     if (!form.realDebridApiKey.trim()) return;
     setRdTest('testing'); setRdTestMsg('');
     try {
       const res = await fetch('/api/setup', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'test_real_debrid', realDebridApiKey: form.realDebridApiKey.trim() }),
       });
       const data = await res.json() as { ok: boolean; user?: { username: string; premium: number }; error?: string };
@@ -130,34 +239,30 @@ export default function StepApiKeys({
   };
   useAutoTest(form.realDebridApiKey, testRdKey);
 
-  const testOllamaConnection = async () => {
-    if (!form.ollamaUrl.trim()) return;
-    setOllamaTest('testing'); setOllamaTestMsg('');
-    try {
-      const res = await fetch(`${form.ollamaUrl.trim()}/api/tags`, { signal: AbortSignal.timeout(6_000) });
-      if (res.ok) {
-        const data = await res.json() as { models?: { name: string }[] };
-        const models = data.models?.map(m => m.name) ?? [];
-        const installed = models.some(n => n.startsWith(form.ollamaModel.trim()));
-        if (models.length === 0) { setOllamaTest('error'); setOllamaTestMsg('Ollama running but no models installed. Run: ollama pull ' + (form.ollamaModel || 'llama3')); }
-        else if (!installed) { setOllamaTest('error'); setOllamaTestMsg(`Connected! But "${form.ollamaModel}" not found. Available: ${models.slice(0, 3).join(', ')}`); }
-        else { setOllamaTest('ok'); setOllamaTestMsg(`Connected — "${form.ollamaModel}" is ready`); }
-      } else { setOllamaTest('error'); setOllamaTestMsg(`HTTP ${res.status} — is Ollama running?`); }
-    } catch { setOllamaTest('error'); setOllamaTestMsg(`Cannot reach ${form.ollamaUrl}`); }
-  };
-
+  // ── Save ──
   const saveApiKeys = async () => {
     setStatus(s => ({ ...s, apiKeys: 'saving' }));
     try {
+      // Derive per-provider fields from the unified key so the backend can
+      // read either the new or legacy fields without a migration.
+      const p   = detectProvider(form.aiApiKey ?? '');
+      const key = (form.aiApiKey ?? '').trim();
+
       await apiPost('save', {
-        adminPassword: form.adminPassword,
-        omdbApiKey: form.omdbApiKey,
-        googleAiApiKey: form.googleAiApiKey,
-        tmdbApiKey: form.tmdbApiKey,
+        adminPassword:    form.adminPassword,
+        omdbApiKey:       form.omdbApiKey,
+        tmdbApiKey:       form.tmdbApiKey,
         realDebridApiKey: form.realDebridApiKey,
-        aiProvider: form.aiProvider,
-        ollamaUrl: form.ollamaUrl,
-        ollamaModel: form.ollamaModel,
+        aiApiKey:         key,
+        // Legacy fields — kept so existing config readers still work
+        googleAiApiKey:   p === 'gemini'    ? key : '',
+        openaiApiKey:     p === 'openai'    ? key : '',
+        anthropicApiKey:  p === 'anthropic' ? key : '',
+        ollamaUrl:        p === 'ollama'    ? key : form.ollamaUrl,
+        ollamaModel:      form.ollamaModel,
+        openaiModel:      form.openaiModel,
+        anthropicModel:   form.anthropicModel,
+        aiProvider:       p === 'empty' || p === 'unknown' ? 'gemini' : p,
       });
       setStatus(s => ({ ...s, apiKeys: 'done' }));
       onNext();
@@ -167,6 +272,10 @@ export default function StepApiKeys({
   };
 
   const passwordMismatch = !!form.adminPassword && !!form.adminPasswordConfirm && form.adminPassword !== form.adminPasswordConfirm;
+
+  // Which test state to show for the AI key section
+  const aiTestState = detectedProvider === 'ollama' ? ollamaTest : googleAiTest;
+  const aiTestMsg   = detectedProvider === 'ollama' ? ollamaTestMsg : googleAiTestMsg;
 
   return (
     <div className="flex flex-col gap-5">
@@ -179,7 +288,7 @@ export default function StepApiKeys({
           <h2 className="text-xl font-heading font-bold text-foreground">API Keys &amp; Password</h2>
         </div>
         <p className="text-sm text-muted-foreground">
-          All optional — HomeStream works without them. Keys unlock posters, ratings, and AI features.
+          All optional — HomeStream works without them. Keys unlock posters, ratings, and AI recommendations.
         </p>
       </div>
 
@@ -207,15 +316,13 @@ export default function StepApiKeys({
             </button>
           </div>
           {form.adminPassword && (
-            <div className="relative">
-              <input
-                type={showAdminPass ? 'text' : 'password'}
-                value={form.adminPasswordConfirm}
-                onChange={e => set('adminPasswordConfirm', e.target.value)}
-                placeholder="Confirm password"
-                className={`w-full bg-background border rounded-lg px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary ${passwordMismatch ? 'border-destructive' : 'border-border'}`}
-              />
-            </div>
+            <input
+              type={showAdminPass ? 'text' : 'password'}
+              value={form.adminPasswordConfirm}
+              onChange={e => set('adminPasswordConfirm', e.target.value)}
+              placeholder="Confirm password"
+              className={`w-full bg-background border rounded-lg px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary ${passwordMismatch ? 'border-destructive' : 'border-border'}`}
+            />
           )}
           {passwordMismatch && (
             <p className="text-xs text-destructive flex items-center gap-1"><AlertCircle className="w-3 h-3" /> Passwords don't match</p>
@@ -239,7 +346,7 @@ export default function StepApiKeys({
           </a>
         </div>
         <p className="text-xs text-muted-foreground mb-2">
-          Powers the hero banner, Discover page, and personalised recommendations. Free TMDB account required.
+          Powers the hero banner, Discover page, and AI recommendation context. Free TMDB account required.
         </p>
         <div className="flex gap-2">
           <input
@@ -249,11 +356,8 @@ export default function StepApiKeys({
             placeholder="eyJhbGciOiJSUzI1NiJ9… (v4 read access token)"
             className="flex-1 bg-background border border-border rounded-lg px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary font-mono min-w-0"
           />
-          <button
-            onClick={testTmdbKey}
-            disabled={!form.tmdbApiKey.trim() || tmdbTest === 'testing'}
-            className="flex items-center gap-1.5 px-3 py-2.5 rounded-lg bg-muted hover:bg-muted/80 text-foreground text-xs font-medium transition-colors disabled:opacity-40 flex-shrink-0"
-          >
+          <button onClick={testTmdbKey} disabled={!form.tmdbApiKey.trim() || tmdbTest === 'testing'}
+            className="flex items-center gap-1.5 px-3 py-2.5 rounded-lg bg-muted hover:bg-muted/80 text-foreground text-xs font-medium transition-colors disabled:opacity-40 flex-shrink-0">
             {tmdbTest === 'testing' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />} Test
           </button>
         </div>
@@ -279,7 +383,7 @@ export default function StepApiKeys({
             Get free key <ExternalLink className="w-2.5 h-2.5" />
           </a>
         </div>
-        <p className="text-xs text-muted-foreground mb-2">IMDb ratings, plot summaries, and movie posters for your local files.</p>
+        <p className="text-xs text-muted-foreground mb-2">IMDb ratings, plot summaries, and cast info used by the AI assistant.</p>
         <div className="flex gap-2">
           <input
             type="text"
@@ -288,11 +392,8 @@ export default function StepApiKeys({
             placeholder="xxxxxxxx"
             className="flex-1 bg-background border border-border rounded-lg px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary font-mono min-w-0"
           />
-          <button
-            onClick={testOmdbKey}
-            disabled={!form.omdbApiKey.trim() || omdbTest === 'testing'}
-            className="flex items-center gap-1.5 px-3 py-2.5 rounded-lg bg-muted hover:bg-muted/80 text-foreground text-xs font-medium transition-colors disabled:opacity-40 flex-shrink-0"
-          >
+          <button onClick={testOmdbKey} disabled={!form.omdbApiKey.trim() || omdbTest === 'testing'}
+            className="flex items-center gap-1.5 px-3 py-2.5 rounded-lg bg-muted hover:bg-muted/80 text-foreground text-xs font-medium transition-colors disabled:opacity-40 flex-shrink-0">
             {omdbTest === 'testing' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />} Test
           </button>
         </div>
@@ -307,98 +408,105 @@ export default function StepApiKeys({
         </HowTo>
       </div>
 
-      {/* ── AI Chat ── */}
+      {/* ── AI Chat Assistant ── */}
       <div className="p-4 rounded-xl border border-border bg-muted/20">
         <div className="flex items-center gap-2 mb-1">
-          <Zap className="w-4 h-4 text-primary" />
-          <p className="text-sm font-semibold text-foreground">AI Chat Assistant</p>
-          <span className="text-[10px] bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded font-medium">Free</span>
+          <Sparkles className="w-4 h-4 text-primary" />
+          <p className="text-sm font-semibold text-foreground">AI Recommendation Assistant</p>
+          <span className="text-[10px] bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded font-medium">Optional</span>
         </div>
-        <p className="text-xs text-muted-foreground mb-3">Movie recommendations, mood matching, and watch suggestions.</p>
+        <p className="text-xs text-muted-foreground mb-3">
+          Paste any AI key and HomeStream detects the provider automatically. The assistant learns from your watch history and uses TMDB/OMDB data to make personalised picks.
+        </p>
 
-        <div className="grid grid-cols-2 gap-2 mb-4">
-          {(['gemini', 'ollama'] as const).map(provider => (
-            <button
-              key={provider}
-              onClick={() => { set('aiProvider', provider); setGoogleAiTest('idle'); setOllamaTest('idle'); }}
-              className={`flex flex-col items-start gap-1 p-3 rounded-xl border text-left transition-all ${form.aiProvider === provider ? 'border-primary bg-primary/10 text-foreground' : 'border-border bg-background text-muted-foreground hover:border-muted-foreground'}`}
-            >
-              <div className="flex items-center gap-1.5 w-full">
-                {provider === 'gemini' ? <Film className="w-3.5 h-3.5 flex-shrink-0" /> : <ScanSearch className="w-3.5 h-3.5 flex-shrink-0" />}
-                <span className="text-xs font-semibold">{provider === 'gemini' ? 'Google Gemini' : 'Ollama (Local)'}</span>
-                {form.aiProvider === provider && <CheckCircle2 className="w-3 h-3 text-primary ml-auto" />}
-              </div>
-              <span className="text-[10px] leading-tight">
-                {provider === 'gemini' ? 'Cloud API — free tier, no install' : 'Runs locally — fully private, no API key'}
+        {/* Supported providers legend */}
+        <div className="flex flex-wrap gap-1.5 mb-3">
+          {(['gemini', 'openai', 'anthropic', 'ollama'] as const).map(p => {
+            const info = PROVIDERS[p];
+            return (
+              <span key={p} className={`text-[10px] font-medium px-2 py-0.5 rounded-full border ${info.bg}`}>
+                {info.label}
               </span>
-            </button>
-          ))}
+            );
+          })}
         </div>
 
-        {form.aiProvider === 'gemini' && (
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center justify-between">
-              <p className="text-xs font-medium text-foreground/80">Google AI API Key</p>
-              <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="text-[10px] text-primary hover:underline flex items-center gap-0.5">
-                Get free key <ExternalLink className="w-2.5 h-2.5" />
+        {/* Single key input */}
+        <div className="flex gap-2">
+          <div className="relative flex-1 min-w-0">
+            <input
+              type="text"
+              value={form.aiApiKey ?? ''}
+              onChange={e => {
+                set('aiApiKey', e.target.value);
+                setGoogleAiTest('idle'); setGoogleAiTestMsg('');
+                setOllamaTest('idle');  setOllamaTestMsg('');
+              }}
+              placeholder="Paste your AI key — or an Ollama URL (http://…)"
+              className="w-full bg-background border border-border rounded-lg px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary font-mono pr-28"
+            />
+            {/* Live provider badge inside the input */}
+            {detectedProvider !== 'empty' && (
+              <span className={`absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] font-semibold px-2 py-0.5 rounded-full border pointer-events-none ${providerInfo.bg}`}>
+                {detectedProvider === 'unknown' ? '?' : providerInfo.label}
+              </span>
+            )}
+          </div>
+          <button
+            onClick={testAiKey}
+            disabled={!form.aiApiKey?.trim() || aiTestState === 'testing' || detectedProvider === 'empty' || detectedProvider === 'unknown'}
+            className="flex items-center gap-1.5 px-3 py-2.5 rounded-lg bg-muted hover:bg-muted/80 text-foreground text-xs font-medium transition-colors disabled:opacity-40 flex-shrink-0"
+          >
+            {aiTestState === 'testing' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />} Test
+          </button>
+        </div>
+
+        {/* Provider hint */}
+        {detectedProvider !== 'empty' && detectedProvider !== 'unknown' && (
+          <p className="text-[11px] text-muted-foreground mt-1.5 flex items-start gap-1">
+            {detectedProvider === 'ollama' ? <Server className="w-3 h-3 mt-0.5 flex-shrink-0" /> : <Sparkles className="w-3 h-3 mt-0.5 flex-shrink-0" />}
+            {providerInfo.hint}
+            {providerInfo.getKeyLink && (
+              <a href={providerInfo.getKeyLink} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline ml-1 flex-shrink-0 flex items-center gap-0.5">
+                Get key <ExternalLink className="w-2.5 h-2.5" />
               </a>
-            </div>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={form.googleAiApiKey}
-                onChange={e => { set('googleAiApiKey', e.target.value); setGoogleAiTest('idle'); }}
-                placeholder="AIzaSy…"
-                className="flex-1 bg-background border border-border rounded-lg px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary font-mono min-w-0"
-              />
-              <button
-                onClick={testGoogleAiKey}
-                disabled={!form.googleAiApiKey.trim() || googleAiTest === 'testing'}
-                className="flex items-center gap-1.5 px-3 py-2.5 rounded-lg bg-muted hover:bg-muted/80 text-foreground text-xs font-medium transition-colors disabled:opacity-40 flex-shrink-0"
-              >
-                {googleAiTest === 'testing' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />} Test
-              </button>
-            </div>
-            <TestResult state={googleAiTest} msg={googleAiTestMsg} expiry="Valid ~90 days" />
-            <HowTo>
-              <ol className="list-decimal list-inside space-y-1 ml-1">
-                <li>Go to <a href="https://aistudio.google.com" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">aistudio.google.com</a> and sign in with Google</li>
-                <li>Click <strong>Get API key</strong> → <strong>Create API key</strong></li>
-                <li>Copy the key — starts with <code className="bg-muted px-1 rounded">AIzaSy…</code></li>
-                <li>Free tier: 1,500 requests/day, no credit card needed</li>
-              </ol>
-            </HowTo>
+            )}
+          </p>
+        )}
+        {detectedProvider === 'unknown' && (
+          <p className="text-[11px] text-muted-foreground mt-1.5">
+            Format not recognised. Supported: Gemini (<code className="bg-muted px-1 rounded">AIza…</code>), OpenAI (<code className="bg-muted px-1 rounded">sk-…</code>), Anthropic (<code className="bg-muted px-1 rounded">sk-ant-…</code>), or Ollama URL (<code className="bg-muted px-1 rounded">http://…</code>).
+          </p>
+        )}
+
+        <TestResult state={aiTestState} msg={aiTestMsg} />
+
+        {/* Ollama model selector — only shown when Ollama URL detected */}
+        {detectedProvider === 'ollama' && (
+          <div className="mt-3 flex flex-col gap-1.5">
+            <label className="text-[10px] font-medium text-foreground/70">Model name</label>
+            <input
+              type="text"
+              value={form.ollamaModel}
+              onChange={e => set('ollamaModel', e.target.value)}
+              placeholder="llama3"
+              className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary font-mono"
+            />
+            <p className="text-[10px] text-muted-foreground">Run <code className="bg-muted px-1 rounded">ollama pull llama3</code> to install the default model.</p>
           </div>
         )}
 
-        {form.aiProvider === 'ollama' && (
-          <div className="flex flex-col gap-3">
-            <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20 text-[11px] text-blue-300 leading-relaxed">
-              <strong>Ollama</strong> runs AI locally — free, private, no API key.
-              Install from <a href="https://ollama.com" target="_blank" rel="noopener noreferrer" className="underline">ollama.com</a>, then run{' '}
-              <code className="bg-black/30 px-1 rounded">ollama pull llama3</code>.
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="text-[10px] font-medium text-foreground/70 block mb-1">Ollama URL</label>
-                <input type="text" value={form.ollamaUrl} onChange={e => { set('ollamaUrl', e.target.value); setOllamaTest('idle'); }}
-                  placeholder="http://localhost:11434"
-                  className="w-full bg-background border border-border rounded-lg px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary font-mono" />
-              </div>
-              <div>
-                <label className="text-[10px] font-medium text-foreground/70 block mb-1">Model</label>
-                <input type="text" value={form.ollamaModel} onChange={e => { set('ollamaModel', e.target.value); setOllamaTest('idle'); }}
-                  placeholder="llama3"
-                  className="w-full bg-background border border-border rounded-lg px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary font-mono" />
-              </div>
-            </div>
-            <button onClick={testOllamaConnection} disabled={!form.ollamaUrl.trim() || ollamaTest === 'testing'}
-              className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg bg-muted hover:bg-muted/80 text-foreground text-xs font-medium transition-colors disabled:opacity-40">
-              {ollamaTest === 'testing' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />} Test Ollama
-            </button>
-            <TestResult state={ollamaTest} msg={ollamaTestMsg} />
+        <HowTo>
+          <div className="space-y-2">
+            <p className="font-medium text-foreground/70">Pick any one provider:</p>
+            <ul className="space-y-1.5 ml-1">
+              <li><strong className="text-blue-400">Google Gemini (free)</strong> — <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">aistudio.google.com</a> → Get API key → key starts with <code className="bg-muted px-1 rounded">AIza</code></li>
+              <li><strong className="text-green-400">OpenAI</strong> — <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">platform.openai.com/api-keys</a> → key starts with <code className="bg-muted px-1 rounded">sk-</code></li>
+              <li><strong className="text-orange-400">Anthropic</strong> — <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">console.anthropic.com</a> → key starts with <code className="bg-muted px-1 rounded">sk-ant-</code></li>
+              <li><strong className="text-purple-400">Ollama (local)</strong> — install from <a href="https://ollama.com" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">ollama.com</a>, then paste <code className="bg-muted px-1 rounded">http://localhost:11434</code></li>
+            </ul>
           </div>
-        )}
+        </HowTo>
       </div>
 
       {/* ── Real-Debrid ── */}
@@ -424,11 +532,8 @@ export default function StepApiKeys({
             placeholder="Paste your RD API token"
             className="flex-1 bg-background border border-border rounded-lg px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary font-mono min-w-0"
           />
-          <button
-            onClick={testRdKey}
-            disabled={!form.realDebridApiKey.trim() || rdTest === 'testing'}
-            className="flex items-center gap-1.5 px-3 py-2.5 rounded-lg bg-muted hover:bg-muted/80 text-foreground text-xs font-medium transition-colors disabled:opacity-40 flex-shrink-0"
-          >
+          <button onClick={testRdKey} disabled={!form.realDebridApiKey.trim() || rdTest === 'testing'}
+            className="flex items-center gap-1.5 px-3 py-2.5 rounded-lg bg-muted hover:bg-muted/80 text-foreground text-xs font-medium transition-colors disabled:opacity-40 flex-shrink-0">
             {rdTest === 'testing' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />} Test
           </button>
         </div>

@@ -23,11 +23,20 @@ export interface FormData {
   adminPassword: string;
   adminPasswordConfirm: string;
   omdbApiKey: string;
-  googleAiApiKey: string;
+  googleAiApiKey: string;   // kept for backward-compat; wizard writes aiApiKey instead
   tmdbApiKey: string;
-  aiProvider: 'gemini' | 'ollama';
+  /** Single unified AI key — provider is auto-detected from the key format:
+   *  - AIza…         → Gemini (Google)
+   *  - sk-ant-…      → Anthropic Claude
+   *  - sk-…          → OpenAI
+   *  - http://…      → Ollama (URL, not a key)
+   */
+  aiApiKey: string;
+  aiProvider: 'gemini' | 'ollama' | 'openai' | 'anthropic';
   ollamaUrl: string;
   ollamaModel: string;
+  openaiModel: string;
+  anthropicModel: string;
   preferredQuality: '720p' | '1080p' | '4k' | 'best';
   watchFolderEnabled: boolean;
   autoTranscode: boolean;
