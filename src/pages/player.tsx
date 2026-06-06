@@ -183,14 +183,19 @@ export default function PlayerPage() {
     onSkipIntro:   () => { if (ps.videoRef.current) ps.videoRef.current.currentTime = SKIP_INTRO_END; },
     onFullscreen:  () => {
       const fsEl = document.fullscreenElement ?? (document as Document & { webkitFullscreenElement?: Element }).webkitFullscreenElement;
-      const el = ps.containerRef.current;
-      if (!fsEl && el) {
-        if (el.requestFullscreen) el.requestFullscreen();
-        else (el as HTMLElement & { webkitRequestFullscreen?: () => void }).webkitRequestFullscreen?.();
-      } else {
+      if (fsEl) {
         if (document.exitFullscreen) document.exitFullscreen();
         else (document as Document & { webkitExitFullscreen?: () => void }).webkitExitFullscreen?.();
+        return;
       }
+      const container = ps.containerRef.current as HTMLElement & { webkitRequestFullscreen?: () => void } | null;
+      const video = ps.videoRef.current as HTMLVideoElement & { webkitRequestFullscreen?: () => void } | null;
+      const target = container ?? video;
+      if (!target) return;
+      try {
+        const p = target.requestFullscreen ? target.requestFullscreen() : target.webkitRequestFullscreen?.();
+        if (p instanceof Promise) p.catch(() => { video?.requestFullscreen?.().catch(() => {}); });
+      } catch { video?.requestFullscreen?.().catch(() => {}); }
     },
     onSpeed:       (rate) => { if (ps.videoRef.current) { ps.videoRef.current.playbackRate = rate; ps.setPlaybackRate(rate); } },
     onSubtitle:    (track) => {
@@ -603,16 +608,33 @@ export default function PlayerPage() {
   const togglePlay = () => { if (!ps.videoRef.current) return; if (ps.playing) ps.videoRef.current.pause(); else ps.videoRef.current.play(); };
   const toggleMute = () => { if (!ps.videoRef.current) return; ps.videoRef.current.muted = !ps.muted; ps.setMuted(!ps.muted); };
   const toggleFullscreen = () => {
-    const el = ps.containerRef.current;
-    if (!el) return;
     const fsEl = document.fullscreenElement ?? (document as Document & { webkitFullscreenElement?: Element }).webkitFullscreenElement;
-    if (!fsEl) {
-      // Standard API first, webkit fallback for older Samsung Tizen / Safari
-      if (el.requestFullscreen) el.requestFullscreen();
-      else (el as HTMLElement & { webkitRequestFullscreen?: () => void }).webkitRequestFullscreen?.();
-    } else {
+    if (fsEl) {
+      // Exit fullscreen
       if (document.exitFullscreen) document.exitFullscreen();
       else (document as Document & { webkitExitFullscreen?: () => void }).webkitExitFullscreen?.();
+      return;
+    }
+    // Try container first, fall back to <video> element (works in more browsers/contexts)
+    const container = ps.containerRef.current as HTMLElement & { webkitRequestFullscreen?: () => void } | null;
+    const video = ps.videoRef.current as HTMLVideoElement & { webkitRequestFullscreen?: () => void } | null;
+    const target = container ?? video;
+    if (!target) return;
+    try {
+      const p = target.requestFullscreen
+        ? target.requestFullscreen()
+        : target.webkitRequestFullscreen?.();
+      // If container fullscreen fails (e.g. inside iframe), try the video element directly
+      if (p instanceof Promise) {
+        p.catch(() => {
+          if (video && target !== video) {
+            video.requestFullscreen?.().catch(() => {});
+          }
+        });
+      }
+    } catch {
+      // Last resort — try video element
+      video?.requestFullscreen?.().catch(() => {});
     }
   };
   const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => { const v = parseFloat(e.target.value); if (ps.videoRef.current) ps.videoRef.current.volume = v; ps.setVolume(v); ps.setMuted(v === 0); };
@@ -676,7 +698,7 @@ export default function PlayerPage() {
       {/* ── Video Container ── */}
       <div
         ref={ps.containerRef}
-        className="relative bg-black"
+        className="relative bg-black player-container"
         style={{ aspectRatio: '16/9', maxHeight: '100vh' }}
         onMouseMove={resetControlsTimer}
         onClick={togglePlay}

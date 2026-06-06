@@ -221,3 +221,21 @@ html, body {
   display: flex;
   flex-direction: column;
 }
+
+/* Player fullscreen — remove aspect-ratio / max-height constraints so the
+   container fills the entire screen when it is the fullscreen element.      */
+.player-container:fullscreen,
+.player-container:-webkit-full-screen {
+  aspect-ratio: unset !important;
+  max-height: unset !important;
+  width: 100vw !important;
+  height: 100vh !important;
+}
+
+/* Ensure the <video> inside also fills the fullscreen container */
+.player-container:fullscreen video,
+.player-container:-webkit-full-screen video {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: contain;
+}
