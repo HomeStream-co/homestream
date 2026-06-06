@@ -58,6 +58,9 @@ export default function PlayerPage() {
   const playerAccent = appSettings.syncPlayerColor ? 'hsl(var(--primary))' : 'rgba(255,255,255,0.9)';
   const item = library.find(m => m.id === id);
 
+  // ── Scroll to top on mount so the video is always at the top of the viewport
+  useEffect(() => { window.scrollTo({ top: 0, behavior: 'instant' }); }, []);
+
   // ── All player state + refs ───────────────────────────────────────────────
   const ps = usePlayerState();
 

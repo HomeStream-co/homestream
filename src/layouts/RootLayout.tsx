@@ -46,6 +46,11 @@ function AppShell({ children }: { children: ReactElement }) {
   const isSetup = location.pathname === '/setup';
   const hideChrome = isPlayer || isProfiles || isSetup;
 
+  // Scroll to top on every route change
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  }, [location.pathname]);
+
   return (
     <Website>
       <>
