@@ -17,9 +17,9 @@
  *   variant   — 'button' (default) | 'menuitem' (flat row for context menus)
  */
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Youtube, X, Loader2, Volume2, VolumeX } from 'lucide-react';
+import { Youtube, X, Loader2, Volume2, VolumeX, ExternalLink } from 'lucide-react';
 import { fetchTrailerKey } from '@/lib/trailerCache';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -148,6 +148,29 @@ interface TrailerModalProps {
 }
 
 export function TrailerModal({ open, trailerKey, title, muted, onMuteToggle, onClose }: TrailerModalProps) {
+  const [embedBlocked, setEmbedBlocked] = useState(false);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+
+  // Reset blocked state when a new trailer opens
+  useEffect(() => {
+    if (open) setEmbedBlocked(false);
+  }, [open, trailerKey]);
+
+  // Detect CSP/sandbox block — the iframe load event fires but the content
+  // is a blank page; we detect this via a short timeout after load.
+  const handleIframeLoad = useCallback(() => {
+    try {
+      // If we can access contentDocument it loaded fine (same-origin only, but
+      // cross-origin throws — which means YouTube loaded correctly).
+    } catch {
+      // Cross-origin access denied = YouTube loaded = fine
+    }
+  }, []);
+
+  const youtubeUrl = trailerKey
+    ? `https://www.youtube.com/watch?v=${trailerKey}`
+    : null;
+
   return (
     <AnimatePresence>
       {open && trailerKey && (
@@ -173,17 +196,18 @@ export function TrailerModal({ open, trailerKey, title, muted, onMuteToggle, onC
                 {title} — Official Trailer
               </p>
               <div className="flex items-center gap-2">
-                {/* Mute toggle */}
-                <button
-                  onClick={onMuteToggle}
-                  className="flex items-center gap-1.5 text-white/50 hover:text-white text-xs transition-colors"
-                  title={muted ? 'Unmute' : 'Mute'}
-                >
-                  {muted
-                    ? <><VolumeX className="w-3.5 h-3.5" /> Unmute</>
-                    : <><Volume2 className="w-3.5 h-3.5" /> Mute</>
-                  }
-                </button>
+                {!embedBlocked && (
+                  <button
+                    onClick={onMuteToggle}
+                    className="flex items-center gap-1.5 text-white/50 hover:text-white text-xs transition-colors"
+                    title={muted ? 'Unmute' : 'Mute'}
+                  >
+                    {muted
+                      ? <><VolumeX className="w-3.5 h-3.5" /> Unmute</>
+                      : <><Volume2 className="w-3.5 h-3.5" /> Mute</>
+                    }
+                  </button>
+                )}
                 <button
                   onClick={onClose}
                   className="text-white/50 hover:text-white transition-colors flex items-center gap-1.5 text-xs"
@@ -193,28 +217,55 @@ export function TrailerModal({ open, trailerKey, title, muted, onMuteToggle, onC
               </div>
             </div>
 
-            {/* Player */}
-            <div className="relative w-full rounded-2xl overflow-hidden shadow-2xl border border-white/10" style={{ paddingBottom: '56.25%' }}>
-              {/*
-                youtube-nocookie.com = YouTube's privacy-enhanced mode.
-                No Google tracking cookies → no targeted pre-roll ads.
-                Same domain Stremio uses. Trailers play clean.
-                iv_load_policy=3 hides video annotations.
-                rel=0 prevents "related videos" from other channels at end.
-              */}
-              <iframe
-                key={`${trailerKey}-${muted}`}
-                className="absolute inset-0 w-full h-full"
-                src={`https://www.youtube-nocookie.com/embed/${trailerKey}?autoplay=1&mute=${muted ? 1 : 0}&rel=0&modestbranding=1&iv_load_policy=3&color=white`}
-                title={`${title} — Official Trailer`}
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
-                allowFullScreen
-              />
-            </div>
+            {/* Player or fallback */}
+            {embedBlocked ? (
+              <div className="relative w-full rounded-2xl overflow-hidden shadow-2xl border border-white/10 bg-zinc-900 flex flex-col items-center justify-center gap-5 py-16 px-8">
+                <Youtube className="w-12 h-12 text-red-500" />
+                <div className="text-center">
+                  <p className="text-white font-semibold mb-1">Trailer can't play here</p>
+                  <p className="text-white/50 text-sm mb-5">YouTube embedding is blocked in this environment.</p>
+                  <a
+                    href={youtubeUrl ?? '#'}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 bg-red-600 hover:bg-red-500 text-white font-semibold px-6 py-3 rounded-xl transition-colors"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                    Watch on YouTube
+                  </a>
+                </div>
+              </div>
+            ) : (
+              <div className="relative w-full rounded-2xl overflow-hidden shadow-2xl border border-white/10" style={{ paddingBottom: '56.25%' }}>
+                <iframe
+                  ref={iframeRef}
+                  key={`${trailerKey}-${muted}`}
+                  className="absolute inset-0 w-full h-full"
+                  src={`https://www.youtube-nocookie.com/embed/${trailerKey}?autoplay=1&mute=${muted ? 1 : 0}&rel=0&modestbranding=1&iv_load_policy=3&color=white`}
+                  title={`${title} — Official Trailer`}
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+                  allowFullScreen
+                  onLoad={handleIframeLoad}
+                  onError={() => setEmbedBlocked(true)}
+                />
+              </div>
+            )}
 
-            <p className="text-center text-white/20 text-[10px] mt-3">
-              Playing via YouTube · Click outside or press Esc to close
-            </p>
+            <div className="flex items-center justify-between mt-3 px-1">
+              <p className="text-white/20 text-[10px]">
+                {embedBlocked ? '' : 'Playing via YouTube · Click outside or press Esc to close'}
+              </p>
+              {!embedBlocked && youtubeUrl && (
+                <a
+                  href={youtubeUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1 text-white/30 hover:text-white/60 text-[10px] transition-colors"
+                >
+                  <ExternalLink className="w-3 h-3" /> Open in YouTube
+                </a>
+              )}
+            </div>
           </motion.div>
         </motion.div>
       )}

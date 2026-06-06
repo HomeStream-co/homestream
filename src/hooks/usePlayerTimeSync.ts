@@ -48,6 +48,8 @@ interface UsePlayerTimeSyncOptions {
   playerAccent: string;
   /** Wall-clock ref shared with sendRemoteStateNow so both throttle together. */
   lastRemoteSendRef: React.MutableRefObject<number>;
+  /** When true, skip seek-bar DOM writes so scrubbing is lag-free. */
+  isScrubbingRef: React.MutableRefObject<boolean>;
   /**
    * Stable sendState callback from useRemoteControl.
    * Called at most once per 2 s during playback.
@@ -67,6 +69,7 @@ export function usePlayerTimeSync({
   timeDisplayRef,
   playerAccent,
   lastRemoteSendRef,
+  isScrubbingRef,
   sendState,
   getRemoteContext,
 }: UsePlayerTimeSyncOptions) {
@@ -100,12 +103,16 @@ export function usePlayerTimeSync({
     if (buf.length > 0) bufferedRef.current = buf.end(buf.length - 1);
 
     // ── 2. Seek bar: value + gradient fill ───────────────────────────────
-    const seekBar = seekBarRef.current;
-    if (seekBar && dur > 0) {
-      const pct = (video.currentTime / dur) * 100;
-      seekBar.value = String(video.currentTime);
-      seekBar.style.background =
-        `linear-gradient(to right, ${accentRef.current} ${pct}%, rgba(255,255,255,0.2) 0%)`;
+    // Skip DOM writes while the user is dragging — the input's own value
+    // is already correct and overwriting it causes the thumb to jump back.
+    if (!isScrubbingRef.current) {
+      const seekBar = seekBarRef.current;
+      if (seekBar && dur > 0) {
+        const pct = (video.currentTime / dur) * 100;
+        seekBar.value = String(video.currentTime);
+        seekBar.style.background =
+          `linear-gradient(to right, ${accentRef.current} ${pct}%, rgba(255,255,255,0.2) 0%)`;
+      }
     }
 
     // ── 3. Buffered bar: width ────────────────────────────────────────────

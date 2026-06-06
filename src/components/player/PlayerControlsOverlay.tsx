@@ -122,6 +122,7 @@ interface Props {
   showActionToast: (msg: string) => void;
   fadeAndNavigate: (to: string) => void;
   setCastInfo: (v: CastInfo | null) => void;
+  isScrubbingRef: React.MutableRefObject<boolean>;
 }
 
 function PlayerControlsOverlayInner({
@@ -137,7 +138,7 @@ function PlayerControlsOverlayInner({
   setShowInfo, setShowSpeedMenu, setShowCcMenu, setShowAudioMenu,
   setShowShortcuts, setSeekHover, setSeekFlash, setSeekFlashCount,
   setShowResumeBanner, resumeBannerTimer, showActionToast, fadeAndNavigate,
-  setCastInfo,
+  setCastInfo, isScrubbingRef,
 }: Props) {
   const tvRing = (ctrl: TvControl | null) =>
     tvFocus === ctrl
@@ -232,6 +233,7 @@ function PlayerControlsOverlayInner({
           seekBarRef={seekBarRef}
           bufferedBarRef={bufferedBarRef}
           thumbCanvasRef={thumbCanvasRef}
+          isScrubbingRef={isScrubbingRef}
           handleSeek={handleSeek}
           handleSeekHover={handleSeekHover}
           setSeekHover={setSeekHover}

@@ -30,6 +30,7 @@ interface PlayerSeekBarProps {
   seekBarRef: React.RefObject<HTMLInputElement | null>;
   bufferedBarRef: React.RefObject<HTMLDivElement | null>;
   thumbCanvasRef: React.RefObject<HTMLCanvasElement | null>;
+  isScrubbingRef: React.MutableRefObject<boolean>;
   handleSeek: (e: React.ChangeEvent<HTMLInputElement>) => void;
   handleSeekHover: (e: React.MouseEvent<HTMLInputElement>) => void;
   setSeekHover: (v: null) => void;
@@ -43,6 +44,7 @@ function PlayerSeekBarInner({
   seekBarRef,
   bufferedBarRef,
   thumbCanvasRef,
+  isScrubbingRef,
   handleSeek,
   handleSeekHover,
   setSeekHover,
@@ -98,6 +100,10 @@ function PlayerSeekBarInner({
         max={duration || 100}
         defaultValue={0}
         onChange={handleSeek}
+        onMouseDown={() => { isScrubbingRef.current = true; }}
+        onMouseUp={() => { isScrubbingRef.current = false; }}
+        onTouchStart={() => { isScrubbingRef.current = true; }}
+        onTouchEnd={() => { isScrubbingRef.current = false; }}
         onMouseMove={handleSeekHover}
         onMouseLeave={() => setSeekHover(null)}
         className={[

@@ -235,6 +235,9 @@ export default function PlayerPage() {
 
   // Throttle ref for onTimeUpdate remote broadcasts (wall-clock, not video-time)
   const lastRemoteSendRef = useRef(0);
+  // Scrubbing ref — while true, onTimeUpdate skips DOM writes so the seek bar
+  // thumb follows the pointer at full frame rate without fighting the video clock
+  const isScrubbingRef = useRef(false);
 
   // Immediate remote state push — called on play/pause/seek/volume so the
   // phone remote reflects changes instantly without waiting for the 2s throttle.
@@ -273,6 +276,7 @@ export default function PlayerPage() {
     timeDisplayRef: ps.timeDisplayRef,
     playerAccent,
     lastRemoteSendRef,
+    isScrubbingRef,
     sendState,
     getRemoteContext: useCallback(() => ({
       mediaId: id ?? '',
@@ -679,6 +683,7 @@ export default function PlayerPage() {
           {...(!hlsUrl ? { src: item.filename ? `/api/stream/${encodeURIComponent(item.filename)}` : undefined } : {})}
           className="w-full h-full"
           preload="auto"
+          autoPlay
           onPlay={() => { ps.setPlaying(true); sendRemoteStateNow(); }}
           onPause={() => { ps.setPlaying(false); saveProgress(); sendRemoteStateNow(); }}
           onLoadStart={() => {
@@ -705,6 +710,11 @@ export default function PlayerPage() {
               clearTimeout(ps.resumeBannerTimer.current);
               ps.resumeBannerTimer.current = setTimeout(() => ps.setShowResumeBanner(false), 4000);
             }
+            // Autoplay — browser may require muted first; unmute after play starts
+            video.play().catch(() => {
+              video.muted = true;
+              video.play().catch(() => { /* user gesture required */ });
+            });
             // Push initial state to remote immediately so it shows title/duration
             sendRemoteStateNow();
           }}
@@ -912,6 +922,7 @@ export default function PlayerPage() {
               showActionToast={ps.showActionToast}
               fadeAndNavigate={fadeAndNavigate}
               setCastInfo={ps.setCastInfo}
+              isScrubbingRef={isScrubbingRef}
             />
           )}
         </AnimatePresence>

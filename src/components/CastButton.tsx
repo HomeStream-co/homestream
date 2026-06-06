@@ -359,7 +359,7 @@ export default function CastButton({ streamUrl, hlsUrl, title, className = '' }:
             {/* Footer tip */}
             <div className="px-4 py-2.5 border-t border-border bg-muted/20">
               <p className="text-[10px] text-muted-foreground leading-snug">
-                Works with Samsung, LG, Sony, Vizio TVs and Kodi.{hlsUrl ? ' Sending HLS stream for maximum compatibility.' : ' TV must be on the same WiFi network.'}
+                {hlsUrl ? 'Sending HLS stream for maximum compatibility.' : 'TV must be on the same WiFi network.'}
               </p>
             </div>
           </motion.div>
