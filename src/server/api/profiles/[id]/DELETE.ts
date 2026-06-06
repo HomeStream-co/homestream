@@ -5,7 +5,7 @@ import { requireAuth } from '../../../authMiddleware.js';
 export default function handler(req: Request, res: Response) {
   try {
     if (!requireAuth(req, res)) return;
-    const { id } = req.params;
+    const id = req.params.id as string;
     deleteProfile(id);
     res.json({ ok: true });
   } catch (err) {
