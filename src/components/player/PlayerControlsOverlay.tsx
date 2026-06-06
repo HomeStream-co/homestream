@@ -25,7 +25,7 @@ import { memo } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import {
   ArrowLeft, Play, Pause, Volume2, VolumeX, Maximize, Minimize,
-  RotateCcw, Captions, PictureInPicture2, Keyboard, FastForward, Rewind,
+  RotateCcw, Captions, PictureInPicture2, Keyboard,
 } from 'lucide-react';
 import CastButton from '@/components/CastButton';
 import ChromecastButton from '@/components/ChromecastButton';
@@ -145,12 +145,6 @@ function PlayerControlsOverlayInner({
       ? 'ring-2 ring-white ring-offset-1 ring-offset-black/60 scale-110'
       : '';
 
-  const flashSeek = (dir: 'forward' | 'back') => {
-    setSeekFlash(dir);
-    setSeekFlashCount(10);
-    setTimeout(() => { setSeekFlash(null); setSeekFlashCount(0); }, 600);
-  };
-
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -245,28 +239,6 @@ function PlayerControlsOverlayInner({
           <div className="flex items-center gap-1 sm:gap-2">
             <button onClick={togglePlay} className={`text-white hover:text-white/80 rounded transition-all ${tvRing('play')}`}>
               {playing ? <Pause className="w-5 h-5 fill-white" /> : <Play className="w-5 h-5 fill-white ml-0.5" />}
-            </button>
-            <button
-              onClick={() => {
-                if (!videoRef.current) return;
-                videoRef.current.currentTime = Math.max(videoRef.current.currentTime - 10, 0);
-                flashSeek('back');
-              }}
-              className={`text-white/70 hover:text-white rounded transition-all ${tvRing('rewind')}`}
-              title="Rewind 10s (←)"
-            >
-              <Rewind className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => {
-                if (!videoRef.current) return;
-                videoRef.current.currentTime = Math.min(videoRef.current.currentTime + 10, videoRef.current.duration);
-                flashSeek('forward');
-              }}
-              className={`text-white/70 hover:text-white rounded transition-all ${tvRing('forward')}`}
-              title="Forward 10s (→)"
-            >
-              <FastForward className="w-4 h-4" />
             </button>
             <button onClick={toggleMute} className={`text-white hover:text-white/80 rounded transition-all ${tvRing('mute')}`}>
               {muted || volume === 0 ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
