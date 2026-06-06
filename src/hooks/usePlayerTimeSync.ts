@@ -105,8 +105,15 @@ export function usePlayerTimeSync({
       if (video && seekBar && !isScrubbingRef.current) {
         const dur = video.duration;
         if (dur > 0 && isFinite(dur)) {
-          const pct = (video.currentTime / dur) * 100;
-          seekBar.value = String(video.currentTime);
+          const ct = video.currentTime;
+          const pct = (ct / dur) * 100;
+
+          // Keep the input's max in sync with the actual duration so the
+          // thumb position (value/max) is always accurate — React state
+          // `duration` may lag by one render cycle after loadedmetadata.
+          if (seekBar.max !== String(dur)) seekBar.max = String(dur);
+
+          seekBar.value = String(ct);
           seekBar.style.background =
             `linear-gradient(to right, ${accentRef.current} ${pct}%, rgba(255,255,255,0.2) 0%)`;
         }

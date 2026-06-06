@@ -289,9 +289,9 @@ function PlayerControlsOverlayInner({
             <div className="relative">
               <button
                 onClick={e => { e.stopPropagation(); setShowSpeedMenu(prev => !prev); setShowCcMenu(false); }}
-                className={`text-xs font-medium px-2 py-1 rounded transition-all ${
+                className={`text-xs font-bold px-2 py-1 rounded transition-all ${
                   playbackRate !== 1
-                    ? 'text-primary bg-primary/20 border border-primary/40'
+                    ? 'text-black bg-primary border border-primary'
                     : 'text-white/70 hover:text-white bg-white/10 hover:bg-white/20'
                 } ${tvRing('speed')}`}
                 title="Playback speed (S or < >)"
@@ -316,12 +316,13 @@ function PlayerControlsOverlayInner({
                         key={rate}
                         onClick={() => changeSpeed(rate)}
                         className={`w-full text-left px-3 py-1.5 text-sm transition-colors flex items-center justify-between gap-3 ${
-                          playbackRate === rate ? 'bg-primary/20 font-semibold' : 'text-white/80 hover:text-white hover:bg-white/10'
+                          playbackRate === rate
+                            ? 'bg-primary text-black font-bold'
+                            : 'text-white/80 hover:text-white hover:bg-white/10'
                         }`}
-                        style={playbackRate === rate ? { color: 'hsl(var(--primary))' } : undefined}
                       >
                         <span>{rate === 1 ? '1×  Normal' : `${rate}×`}</span>
-                        {playbackRate === rate && <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: 'hsl(var(--primary))' }} />}
+                        {playbackRate === rate && <div className="w-1.5 h-1.5 rounded-full bg-black flex-shrink-0" />}
                       </button>
                     ))}
                   </motion.div>
@@ -371,14 +372,14 @@ function PlayerControlsOverlayInner({
                             showActionToast(`Audio: ${track.label}`);
                           }}
                           className={`w-full text-left px-3 py-2 text-sm transition-colors flex items-center justify-between gap-3 ${
-                            activeAudioTrack === i ? 'text-primary bg-primary/20' : 'text-white/80 hover:text-white hover:bg-white/10'
+                            activeAudioTrack === i ? 'bg-primary text-black font-bold' : 'text-white/80 hover:text-white hover:bg-white/10'
                           }`}
                         >
                           <div>
                             <span className="block">{track.label}</span>
                             <span className="text-[10px] text-white/40 uppercase">{track.codec} · {track.channels}ch</span>
                           </div>
-                          {activeAudioTrack === i && <div className="w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0" />}
+                          {activeAudioTrack === i && <div className="w-1.5 h-1.5 rounded-full bg-black flex-shrink-0" />}
                         </button>
                       ))}
                     </motion.div>
@@ -391,9 +392,9 @@ function PlayerControlsOverlayInner({
             <div className="relative">
               <button
                 onClick={e => { e.stopPropagation(); setShowCcMenu(prev => !prev); setShowSpeedMenu(false); }}
-                className={`flex items-center gap-1 text-xs font-medium px-2 py-1 rounded transition-all ${
+                className={`flex items-center gap-1 text-xs font-bold px-2 py-1 rounded transition-all ${
                   ccLang !== 'off'
-                    ? 'text-primary bg-primary/20 border border-primary/40'
+                    ? 'text-black bg-primary border border-primary'
                     : 'text-white/70 hover:text-white bg-white/10 hover:bg-white/20'
                 } ${tvRing('cc')}`}
                 title="Closed captions (C to cycle)"
@@ -418,10 +419,10 @@ function PlayerControlsOverlayInner({
                       <button
                         key={opt.value}
                         onClick={() => { setCcLang(opt.value); setShowCcMenu(false); showActionToast(opt.value === 'off' ? 'CC: Off' : opt.value === 'en' ? 'CC: English' : 'CC: Español'); }}
-                        className={`w-full text-left px-3 py-1.5 text-sm transition-colors flex items-center justify-between gap-3 ${ccLang === opt.value ? 'text-primary bg-primary/20' : 'text-white/80 hover:text-white hover:bg-white/10'}`}
+                        className={`w-full text-left px-3 py-1.5 text-sm transition-colors flex items-center justify-between gap-3 ${ccLang === opt.value ? 'bg-primary text-black font-bold' : 'text-white/80 hover:text-white hover:bg-white/10'}`}
                       >
                         <span>{opt.label}</span>
-                        {ccLang === opt.value && <div className="w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0" />}
+                        {ccLang === opt.value && <div className="w-1.5 h-1.5 rounded-full bg-black flex-shrink-0" />}
                       </button>
                     ))}
                     {/* CC Styling */}
@@ -432,7 +433,7 @@ function PlayerControlsOverlayInner({
                         <div className="flex gap-1">
                           {(['small', 'medium', 'large'] as const).map(s => (
                             <button key={s} onClick={() => setCcFontSize(s)}
-                              className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${ccFontSize === s ? 'bg-primary/30 text-primary' : 'text-white/40 hover:text-white/70'}`}>
+                              className={`px-2 py-0.5 rounded text-[10px] font-bold transition-colors ${ccFontSize === s ? 'bg-primary text-black' : 'text-white/40 hover:text-white/70'}`}>
                               {s === 'small' ? 'S' : s === 'medium' ? 'M' : 'L'}
                             </button>
                           ))}
@@ -443,7 +444,7 @@ function PlayerControlsOverlayInner({
                         <div className="flex gap-1">
                           {(['none', 'low', 'high'] as const).map(b => (
                             <button key={b} onClick={() => setCcBgOpacity(b)}
-                              className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${ccBgOpacity === b ? 'bg-primary/30 text-primary' : 'text-white/40 hover:text-white/70'}`}>
+                              className={`px-2 py-0.5 rounded text-[10px] font-bold transition-colors ${ccBgOpacity === b ? 'bg-primary text-black' : 'text-white/40 hover:text-white/70'}`}>
                               {b === 'none' ? 'Off' : b === 'low' ? '50%' : '85%'}
                             </button>
                           ))}

@@ -701,6 +701,8 @@ export default function PlayerPage() {
             const video = ps.videoRef.current;
             if (!video) return;
             ps.setDuration(video.duration);
+            // Re-apply playback rate — external redirects (demo clips) reset it to 1
+            if (ps.playbackRate !== 1) video.playbackRate = ps.playbackRate;
             const resumeSeconds = item.watchedSeconds && item.watchedSeconds > 0
               ? item.watchedSeconds
               : item.watchProgress && item.watchProgress > 2 && item.watchProgress < 95
