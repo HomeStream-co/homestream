@@ -105,16 +105,18 @@ export default function StepFinish({
     setStatus(s => ({ ...s, complete: 'saving' }));
     try {
       await apiPost('save', {
-        omdbApiKey:      form.omdbApiKey,
-        googleAiApiKey:  form.googleAiApiKey,
-        tmdbApiKey:      form.tmdbApiKey,
-        aiProvider:      form.aiProvider,
-        ollamaUrl:       form.ollamaUrl,
-        ollamaModel:     form.ollamaModel,
-        mediaDir:        form.mediaDir,
-        preferredQuality: form.preferredQuality,
+        omdbApiKey:         form.omdbApiKey,
+        tmdbApiKey:         form.tmdbApiKey,
+        // Use the unified aiApiKey saved by StepApiKeys — do NOT overwrite with
+        // the legacy googleAiApiKey field which may be empty at this point.
+        ...(form.aiApiKey ? { aiApiKey: form.aiApiKey } : {}),
+        aiProvider:         form.aiProvider,
+        ollamaUrl:          form.ollamaUrl,
+        ollamaModel:        form.ollamaModel,
+        mediaDir:           form.mediaDir,
+        preferredQuality:   form.preferredQuality,
         watchFolderEnabled: String(form.watchFolderEnabled),
-        autoTranscode:   String(form.autoTranscode),
+        autoTranscode:      String(form.autoTranscode),
       });
 
       if (importExisting && scanFound > 0) {
@@ -168,7 +170,7 @@ export default function StepFinish({
           { label: 'Jellyfin', value: status.jellyfin === 'ok' ? `v${jellyfinVersion}` : 'Not configured', ok: status.jellyfin === 'ok' },
           { label: 'TMDB', value: form.tmdbApiKey ? 'Key set' : 'Not set', ok: !!form.tmdbApiKey },
           { label: 'OMDB', value: form.omdbApiKey ? 'Key set' : 'Not set', ok: !!form.omdbApiKey },
-          { label: 'AI', value: form.aiProvider === 'gemini' ? (form.googleAiApiKey ? 'Gemini' : 'No key') : 'Ollama', ok: form.aiProvider === 'ollama' || !!form.googleAiApiKey },
+          { label: 'AI', value: form.aiApiKey ? (form.aiProvider === 'ollama' ? 'Ollama' : form.aiProvider === 'anthropic' ? 'Anthropic' : form.aiProvider === 'openai' ? 'OpenAI' : 'Gemini') : 'No key', ok: !!form.aiApiKey },
         ].map(({ label, value, ok, wide }) => (
           <div key={label} className={`flex items-center gap-2.5 p-3 rounded-xl border bg-muted/20 ${wide ? 'col-span-2' : ''} ${ok ? 'border-border' : 'border-border/50'}`}>
             {ok

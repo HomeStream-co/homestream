@@ -92,7 +92,8 @@ export default async function handler(req: Request, res: Response) {
           'mediaDir', 'qbitUrl', 'qbitUsername', 'qbitPassword',
           'jellyfinUrl', 'jellyfinApiKey', 'adminPassword',
           'omdbApiKey', 'googleAiApiKey', 'tmdbApiKey', 'virusTotalApiKey',
-          'aiProvider', 'ollamaUrl', 'ollamaModel',
+          'aiApiKey', 'openaiApiKey', 'anthropicApiKey',
+          'aiProvider', 'ollamaUrl', 'ollamaModel', 'openaiModel', 'anthropicModel',
           'preferredQuality', 'watchFolderEnabled', 'autoTranscode',
           'transcodePreset',
           // VPN fields
