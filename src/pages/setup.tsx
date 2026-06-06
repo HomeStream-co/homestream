@@ -270,13 +270,13 @@ export default function SetupPage() {
   const currentStep = STEPS[step];
 
   return (
-    <div className="min-h-dvh bg-background flex flex-col items-center justify-start p-4 py-8 overflow-y-auto">
+    <div className="min-h-dvh bg-background flex flex-col items-center justify-start px-4 py-10 overflow-y-auto">
       <title>Setup — HomeStream</title>
 
-      {/* HTTPS warning — TV browsers auto-upgrade http→https */}
+      {/* HTTPS warning */}
       {typeof window !== 'undefined' && window.location.protocol === 'https:' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1' && (
-        <div className="w-full max-w-lg mb-4 bg-yellow-500/10 border border-yellow-500/40 rounded-xl px-4 py-3 text-center">
-          <p className="text-sm font-semibold text-yellow-400">⚠️ Wrong protocol detected</p>
+        <div className="w-full max-w-2xl mb-4 bg-yellow-500/10 border border-yellow-500/40 rounded-xl px-4 py-3 text-center">
+          <p className="text-sm font-semibold text-yellow-400">Wrong protocol detected</p>
           <p className="text-xs text-muted-foreground mt-0.5">
             Use <strong className="text-foreground font-mono">http://</strong>{window.location.hostname}:3000 — not https
           </p>
@@ -284,15 +284,15 @@ export default function SetupPage() {
       )}
 
       {/* Logo */}
-      <div className="flex items-center gap-2.5 mb-8">
-        <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center">
+      <div className="flex items-center gap-3 mb-6">
+        <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center shadow-lg shadow-primary/30">
           <span className="text-primary-foreground font-bold text-lg">▶</span>
         </div>
-        <span className="text-2xl font-heading font-bold text-foreground">HomeStream</span>
+        <span className="text-2xl font-heading font-bold text-foreground tracking-wide">HOME<span className="text-primary">STREAM</span></span>
       </div>
 
-      {/* TV shortcut banner — shown when accessed from a TV/non-setup device */}
-      <div className="w-full max-w-lg mb-4">
+      {/* TV shortcut */}
+      <div className="w-full max-w-2xl mb-5">
         <button
           onClick={() => navigate('/tv')}
           className="w-full flex items-center gap-3 bg-primary/10 hover:bg-primary/20 border border-primary/30 rounded-xl px-4 py-3 transition-colors group"
@@ -306,37 +306,41 @@ export default function SetupPage() {
         </button>
       </div>
 
-      {/* Step indicator */}
-      <div className="flex items-center gap-1 mb-8 flex-wrap justify-center">
-        {STEPS.map((s, i) => (
-          <div key={s.id} className="flex items-center gap-1">
-            <div
-              title={s.label}
-              className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all cursor-default ${
-                i < step ? 'bg-green-500 text-white' :
-                i === step ? 'bg-primary text-primary-foreground ring-2 ring-primary/30' :
-                'bg-muted text-muted-foreground'
-              }`}
-            >
-              {i < step ? <CheckCircle2 className="w-4 h-4" /> : i + 1}
+      {/* Step indicator — horizontal pill bar */}
+      <div className="w-full max-w-2xl mb-6">
+        <div className="flex items-center gap-0">
+          {STEPS.map((s, i) => (
+            <div key={s.id} className="flex items-center flex-1 min-w-0">
+              <div className="flex flex-col items-center flex-1 min-w-0">
+                <div className={`flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold transition-all mb-1 ${
+                  i < step ? 'bg-green-500 text-white' :
+                  i === step ? 'bg-primary text-primary-foreground ring-2 ring-primary/30 ring-offset-2 ring-offset-background' :
+                  'bg-muted text-muted-foreground'
+                }`}>
+                  {i < step ? <CheckCircle2 className="w-3.5 h-3.5" /> : i + 1}
+                </div>
+                <span className={`text-[10px] font-medium truncate max-w-full px-1 text-center ${
+                  i === step ? 'text-primary' : i < step ? 'text-green-400' : 'text-muted-foreground'
+                }`}>{s.label}</span>
+              </div>
+              {i < STEPS.length - 1 && (
+                <div className={`h-0.5 flex-1 mx-1 mb-4 transition-all ${i < step ? 'bg-green-500' : 'bg-border'}`} />
+              )}
             </div>
-            {i < STEPS.length - 1 && (
-              <div className={`w-4 h-0.5 transition-all ${i < step ? 'bg-green-500' : 'bg-muted'}`} />
-            )}
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
 
-      {/* Card */}
-      <div className="w-full max-w-lg">
+      {/* Card — wider on larger screens */}
+      <div className="w-full max-w-2xl">
         <AnimatePresence mode="wait">
           <motion.div
             key={step}
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20 }}
-            transition={{ duration: 0.2 }}
-            className="bg-card border border-border rounded-2xl p-8 shadow-2xl"
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -12 }}
+            transition={{ duration: 0.18, ease: 'easeOut' as const }}
+            className="bg-card border border-border rounded-2xl p-8 shadow-2xl shadow-black/30"
           >
             {step === 0 && <StepSysReqs     {...stepProps} />}
             {step === 1 && <StepMediaFolder {...stepProps} />}
@@ -347,8 +351,7 @@ export default function SetupPage() {
         </AnimatePresence>
       </div>
 
-      {/* Step label */}
-      <p className="text-xs text-muted-foreground mt-4">
+      <p className="text-xs text-muted-foreground mt-5">
         Step {step + 1} of {STEPS.length} — {currentStep.label}
       </p>
     </div>

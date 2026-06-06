@@ -29,11 +29,9 @@ export default function StepFinish({
   const [copied, setCopied] = useState(false);
 
   // ── Live qBit health check ─────────────────────────────────────────────────
-  // Ping qBit right before launch so the user knows if it's closed.
   const [qbitLive, setQbitLive] = useState<'checking' | 'ok' | 'down' | 'unconfigured'>('checking');
 
   useEffect(() => {
-    // If qBit was never configured in the wizard, skip the check
     if (!form.qbitUrl) { setQbitLive('unconfigured'); return; }
 
     let cancelled = false;
@@ -49,7 +47,7 @@ export default function StepFinish({
     })
       .then(r => r.json())
       .then((d: { ok: boolean }) => { if (!cancelled) setQbitLive(d.ok ? 'ok' : 'down'); })
-      .catch(() => { if (!cancelled) setQbitLive('unconfigured'); }); // no backend = treat as unconfigured
+      .catch(() => { if (!cancelled) setQbitLive('unconfigured'); });
 
     return () => { cancelled = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -64,7 +62,6 @@ export default function StepFinish({
     function tryFetch() {
       fetch('/api/remote/qr', { credentials: 'include' })
         .then(r => {
-          // 401 = setup just completed, auth cookie not yet set — treat as no-QR gracefully
           if (r.status === 401) { if (!cancelled) setQrError(true); return null; }
           if (!r.ok) throw new Error(`HTTP ${r.status}`);
           return r.json();
@@ -89,35 +86,24 @@ export default function StepFinish({
     return () => { cancelled = true; };
   }, []);
 
-  // QR always encodes the raw LAN IP (never hs.local).
-  // Check lanIP to decide if we're on a real LAN — if the server only found
-  // 127.0.0.1 it means there's no real network interface and the QR is useless.
   const lanIP = qrData?.lanIP ?? window.location.hostname;
   const qrPointsToLocalhost =
     !qrData ||
     lanIP === 'localhost' ||
     lanIP === '127.0.0.1' ||
     lanIP === '::1';
-  // url is always the raw IP URL; fall back to window.location if qrData not yet loaded
   const remoteUrl = qrData?.url ?? `http://${window.location.hostname}:${qrData?.port ?? '3000'}/remote`;
 
   function copyUrl() {
     navigator.clipboard.writeText(remoteUrl).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    }).catch(() => {}); // non-fatal — ignore
+    }).catch(() => {});
   }
 
   const completeSetup = async () => {
     setStatus(s => ({ ...s, complete: 'saving' }));
     try {
-      // Re-save the full form state before completing — the user may have gone
-      // Back and changed API keys or other settings without clicking "Save & Continue"
-      // again. This ensures the final config always reflects what's shown on screen.
-      // NOTE: adminPassword is intentionally excluded here — it was already bcrypt-hashed
-      // by the server when the user clicked "Save & Continue" on the API Keys step.
-      // Re-sending it here would cause the server to hash the already-hashed value again,
-      // producing an invalid password that can never match.
       await apiPost('save', {
         omdbApiKey:      form.omdbApiKey,
         googleAiApiKey:  form.googleAiApiKey,
@@ -139,7 +125,7 @@ export default function StepFinish({
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ action: 'import_existing' }),
           });
-        } catch { /* network failure in preview — non-fatal */ }
+        } catch { /* non-fatal */ }
         setScanState('imported');
       }
       const result = await apiPost('complete') as { ok: boolean; error?: string };
@@ -161,43 +147,42 @@ export default function StepFinish({
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="text-center">
-        <div className="w-16 h-16 rounded-2xl bg-green-500/10 flex items-center justify-center mx-auto mb-4">
-          <CheckCircle2 className="w-8 h-8 text-green-400" />
+      {/* Header */}
+      <div className="text-center pb-1">
+        <div className="w-14 h-14 rounded-2xl bg-green-500/10 border border-green-500/20 flex items-center justify-center mx-auto mb-3">
+          <CheckCircle2 className="w-7 h-7 text-green-400" />
         </div>
-        <h2 className="text-2xl font-heading font-bold text-foreground">You&apos;re all set!</h2>
-        <p className="text-muted-foreground mt-2 text-sm">Here&apos;s your HomeStream configuration summary.</p>
+        <h2 className="text-2xl font-heading font-bold text-foreground">You're all set!</h2>
+        <p className="text-muted-foreground mt-1.5 text-sm">Review your configuration and launch HomeStream.</p>
       </div>
 
-      {/* Update banner — only visible in Electron when an update is available */}
       <UpdateBanner />
 
-      {/* Config summary */}
-      <div className="flex flex-col gap-1.5 text-sm">
+      {/* Config summary — card grid */}
+      <div className="grid grid-cols-2 gap-2">
         {[
-          { label: 'Media folder', value: form.mediaDir, ok: !!form.mediaDir },
-          { label: 'qBittorrent', value: status.qbit === 'ok' ? `Connected (${qbitVersion})` : 'Not configured', ok: status.qbit === 'ok' },
-          { label: 'Jellyfin', value: status.jellyfin === 'ok' ? `Connected (${jellyfinVersion})` : 'Not configured', ok: status.jellyfin === 'ok' },
-          { label: 'TMDB (hero/discover)', value: form.tmdbApiKey ? 'API key set ✓' : 'Not configured — Discover page disabled', ok: !!form.tmdbApiKey },
-          { label: 'OMDB metadata', value: form.omdbApiKey ? 'API key set' : 'Not configured', ok: !!form.omdbApiKey },
-          { label: 'AI assistant', value: form.aiProvider === 'gemini'
-              ? (form.googleAiApiKey ? 'Google Gemini — API key set ✓' : 'Google Gemini — API key missing')
-              : `Ollama (${form.ollamaModel || 'llama3'}) @ ${form.ollamaUrl}`,
-            ok: form.aiProvider === 'ollama' || !!form.googleAiApiKey },
-          { label: 'Auto-import', value: form.watchFolderEnabled ? 'Enabled' : 'Disabled', ok: form.watchFolderEnabled },
-          { label: 'Preferred quality', value: form.preferredQuality, ok: true },
-        ].map(({ label, value, ok }) => (
-          <div key={label} className="flex items-center justify-between py-1.5 border-b border-border/40 last:border-0">
-            <span className="text-muted-foreground text-xs">{label}</span>
-            <span className={`flex items-center gap-1.5 font-medium text-xs ${ok ? 'text-foreground' : 'text-muted-foreground'}`}>
-              {ok ? <CheckCircle2 className="w-3 h-3 text-green-400" /> : <AlertCircle className="w-3 h-3 text-muted-foreground" />}
-              {value}
-            </span>
+          { label: 'Media folder', value: form.mediaDir || 'Not set', ok: !!form.mediaDir, wide: true },
+          { label: 'Quality', value: form.preferredQuality, ok: true },
+          { label: 'Auto-import', value: form.watchFolderEnabled ? 'On' : 'Off', ok: form.watchFolderEnabled },
+          { label: 'qBittorrent', value: status.qbit === 'ok' ? `v${qbitVersion}` : 'Not configured', ok: status.qbit === 'ok' },
+          { label: 'Jellyfin', value: status.jellyfin === 'ok' ? `v${jellyfinVersion}` : 'Not configured', ok: status.jellyfin === 'ok' },
+          { label: 'TMDB', value: form.tmdbApiKey ? 'Key set' : 'Not set', ok: !!form.tmdbApiKey },
+          { label: 'OMDB', value: form.omdbApiKey ? 'Key set' : 'Not set', ok: !!form.omdbApiKey },
+          { label: 'AI', value: form.aiProvider === 'gemini' ? (form.googleAiApiKey ? 'Gemini' : 'No key') : 'Ollama', ok: form.aiProvider === 'ollama' || !!form.googleAiApiKey },
+        ].map(({ label, value, ok, wide }) => (
+          <div key={label} className={`flex items-center gap-2.5 p-3 rounded-xl border bg-muted/20 ${wide ? 'col-span-2' : ''} ${ok ? 'border-border' : 'border-border/50'}`}>
+            {ok
+              ? <CheckCircle2 className="w-3.5 h-3.5 text-green-400 flex-shrink-0" />
+              : <AlertCircle className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />}
+            <div className="flex-1 min-w-0">
+              <p className="text-[10px] text-muted-foreground">{label}</p>
+              <p className={`text-xs font-medium truncate ${ok ? 'text-foreground' : 'text-muted-foreground'}`}>{value}</p>
+            </div>
           </div>
         ))}
       </div>
 
-      {/* ── Phone Remote QR ── */}
+      {/* Phone Remote QR */}
       <div className="rounded-xl border border-border bg-muted/20 p-4">
         <div className="flex items-center gap-2 mb-3">
           <Smartphone className="w-4 h-4 text-primary flex-shrink-0" />
@@ -205,7 +190,6 @@ export default function StepFinish({
           <span className="ml-auto text-[10px] text-muted-foreground bg-muted px-2 py-0.5 rounded-full">Optional</span>
         </div>
         <div className="flex items-center gap-4">
-          {/* QR code */}
           <div className="flex-shrink-0">
             {!qrData && !qrError && (
               <div className="w-24 h-24 rounded-lg bg-muted flex items-center justify-center">
@@ -225,12 +209,11 @@ export default function StepFinish({
               </div>
             )}
           </div>
-          {/* Instructions */}
           <div className="flex-1 min-w-0 flex flex-col gap-2">
             <p className="text-xs text-muted-foreground leading-relaxed">
               {qrPointsToLocalhost
                 ? 'Run HomeStream on your home server to get a scannable QR code for your phone.'
-                : 'Scan with your phone camera to open the remote control — no app needed.'}
+                : 'Scan with your phone camera to open the remote — no app needed.'}
             </p>
             {!qrPointsToLocalhost && qrData && (
               <button
@@ -243,36 +226,33 @@ export default function StepFinish({
                   : <Copy className="w-3 h-3 text-muted-foreground flex-shrink-0 group-hover:text-foreground transition-colors" />}
               </button>
             )}
-            <p className="text-[10px] text-muted-foreground">
-              You can also find this QR code on the home screen after setup.
-            </p>
           </div>
         </div>
       </div>
 
-      {/* Existing media scan panel */}
+      {/* Existing media scan */}
       <div className={`rounded-xl border p-4 transition-colors ${scanState === 'done' && scanFound > 0 ? 'border-primary/30 bg-primary/5' : 'border-border bg-muted/20'}`}>
         <div className="flex items-center gap-2 mb-2">
           <ScanSearch className="w-4 h-4 text-primary flex-shrink-0" />
-          <p className="text-sm font-semibold text-foreground">Existing Media on RAID</p>
+          <p className="text-sm font-semibold text-foreground">Existing Media</p>
           {scanState === 'scanning' && <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground ml-auto" />}
         </div>
 
         {scanState === 'scanning' && (
-          <p className="text-xs text-muted-foreground">Scanning <code className="bg-muted px-1 rounded">{form.mediaDir}</code> for existing video files…</p>
+          <p className="text-xs text-muted-foreground">Scanning <code className="bg-muted px-1 rounded">{form.mediaDir}</code>…</p>
         )}
         {scanState === 'done' && scanFound === 0 && scanSkipped === 0 && (
-          <p className="text-xs text-muted-foreground">No existing video files found in <code className="bg-muted px-1 rounded">{form.mediaDir}</code>. Files will appear here as you download content.</p>
+          <p className="text-xs text-muted-foreground">No video files found. Files will appear as you download content.</p>
         )}
         {scanState === 'done' && scanSkipped > 0 && scanFound === 0 && (
-          <p className="text-xs text-green-400"><CheckCircle2 className="w-3 h-3 inline mr-1" />All {scanSkipped} existing files are already in your library.</p>
+          <p className="text-xs text-green-400 flex items-center gap-1.5"><CheckCircle2 className="w-3 h-3" />All {scanSkipped} existing files are already in your library.</p>
         )}
         {scanState === 'done' && scanFound > 0 && (
           <div className="flex flex-col gap-3">
             <div className="flex items-center gap-3">
               <div className="flex-1">
                 <p className="text-sm font-semibold text-primary">{scanFound} file{scanFound !== 1 ? 's' : ''} found</p>
-                <p className="text-xs text-muted-foreground">{scanSkipped > 0 ? `${scanSkipped} already in library · ` : ''}Ready to import into HomeStream</p>
+                <p className="text-xs text-muted-foreground">{scanSkipped > 0 ? `${scanSkipped} already in library · ` : ''}Ready to import</p>
               </div>
               <PackageOpen className="w-8 h-8 text-primary/40" />
             </div>
@@ -289,7 +269,7 @@ export default function StepFinish({
             )}
             <label className="flex items-center justify-between cursor-pointer bg-background/60 rounded-lg px-3 py-2.5">
               <div>
-                <p className="text-xs font-semibold text-foreground">Import all into HomeStream library</p>
+                <p className="text-xs font-semibold text-foreground">Import all into HomeStream</p>
                 <p className="text-[10px] text-muted-foreground mt-0.5">Files stay in place — nothing is moved or deleted</p>
               </div>
               <button onClick={() => setImportExisting(!importExisting)}
@@ -302,54 +282,49 @@ export default function StepFinish({
         {(scanState === 'importing' || scanState === 'imported') && (
           <div className="flex items-center gap-2 text-xs text-green-400">
             {scanState === 'importing'
-              ? <><Loader2 className="w-3.5 h-3.5 animate-spin" />Importing {scanFound} files in background…</>
-              : <><CheckCircle2 className="w-3.5 h-3.5" />Import started — files will appear in your library shortly</>}
+              ? <><Loader2 className="w-3.5 h-3.5 animate-spin" />Importing {scanFound} files…</>
+              : <><CheckCircle2 className="w-3.5 h-3.5" />Import started — files will appear shortly</>}
           </div>
         )}
       </div>
 
-      {/* Jellyfin tip — only shown when Jellyfin was successfully connected */}
+      {/* Jellyfin tip */}
       {status.jellyfin === 'ok' && (
         <div className="bg-primary/10 border border-primary/20 rounded-xl p-3 text-xs text-muted-foreground leading-relaxed">
-          <strong className="text-foreground">Jellyfin tip:</strong> Open Jellyfin at{' '}
-          <a href={form.jellyfinUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">{form.jellyfinUrl}</a>{' '}
-          and add <code className="bg-muted px-1 rounded">{form.mediaDir}/library</code> as a media library.
+          <strong className="text-foreground">Jellyfin tip:</strong> Add{' '}
+          <code className="bg-muted px-1 rounded">{form.mediaDir}/library</code> as a media library in Jellyfin.
         </div>
       )}
 
-      <div className="flex gap-3">
+      {/* Actions */}
+      <div className="flex gap-3 pt-1">
         <button onClick={onBack} className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-border text-muted-foreground hover:text-foreground text-sm transition-colors">
-          <ChevronLeft className="w-4 h-4" />Back
+          <ChevronLeft className="w-4 h-4" /> Back
         </button>
-        <div className="flex-1 flex flex-col gap-1.5">
-
-          {/* Live qBit status — warn if it's not reachable right now */}
+        <div className="flex-1 flex flex-col gap-2">
           {qbitLive === 'checking' && (
             <div className="flex items-center gap-2 text-[11px] text-muted-foreground px-1">
-              <Loader2 className="w-3 h-3 animate-spin flex-shrink-0" />
-              Checking qBittorrent is running…
+              <Loader2 className="w-3 h-3 animate-spin flex-shrink-0" /> Checking qBittorrent…
             </div>
           )}
           {qbitLive === 'ok' && (
             <div className="flex items-center gap-2 text-[11px] text-green-400 px-1">
-              <CheckCircle2 className="w-3 h-3 flex-shrink-0" />
-              qBittorrent is running — downloads are ready
+              <CheckCircle2 className="w-3 h-3 flex-shrink-0" /> qBittorrent is running — downloads ready
             </div>
           )}
           {qbitLive === 'down' && (
             <div className="flex items-start gap-2 p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/30">
               <AlertTriangle className="w-3.5 h-3.5 text-amber-400 mt-0.5 flex-shrink-0" />
-              <div className="text-[11px] text-amber-300 leading-snug">
-                <p className="font-semibold mb-0.5">qBittorrent is not reachable right now</p>
-                <p>You can still launch HomeStream, but the Download button won't work until qBittorrent is open. Open it and keep it running in the background whenever you want to download.</p>
-              </div>
+              <p className="text-[11px] text-amber-300 leading-snug">
+                qBittorrent isn't running — you can still launch, but downloads won't work until you open it.
+              </p>
             </div>
           )}
           {qbitLive === 'unconfigured' && (
             <div className="flex items-start gap-2 p-2.5 rounded-lg bg-muted/40 border border-border">
               <Download className="w-3.5 h-3.5 text-muted-foreground mt-0.5 flex-shrink-0" />
               <p className="text-[11px] text-muted-foreground leading-snug">
-                qBittorrent not configured — you can add it later in Settings. Without it, downloading movies and TV shows won't work.
+                qBittorrent not configured — add it later in Settings.
               </p>
             </div>
           )}
@@ -357,15 +332,19 @@ export default function StepFinish({
           {status.complete === 'error' && (
             <p className="text-[11px] text-destructive text-center">Setup failed — check your settings and try again.</p>
           )}
-          <button onClick={completeSetup} disabled={status.complete === 'saving' || status.complete === 'done' || scanState === 'scanning'}
-            className="w-full flex items-center justify-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground py-3 rounded-xl font-bold text-sm transition-colors disabled:opacity-60">
+
+          <button
+            onClick={completeSetup}
+            disabled={status.complete === 'saving' || status.complete === 'done' || scanState === 'scanning'}
+            className="w-full flex items-center justify-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground py-3.5 rounded-xl font-bold text-base transition-all disabled:opacity-60 shadow-lg shadow-primary/30 hover:shadow-primary/50 hover:scale-[1.01] active:scale-[0.99]"
+          >
             {status.complete === 'saving' || scanState === 'importing'
-              ? <><Loader2 className="w-4 h-4 animate-spin" />Starting HomeStream…</>
+              ? <><Loader2 className="w-5 h-5 animate-spin" /> Starting HomeStream…</>
               : status.complete === 'done'
-              ? <><CheckCircle2 className="w-4 h-4" />Done! Redirecting…</>
+              ? <><CheckCircle2 className="w-5 h-5" /> Done! Redirecting…</>
               : scanState === 'scanning'
-              ? <><Loader2 className="w-4 h-4 animate-spin" />Scanning media…</>
-              : <>Launch HomeStream <Zap className="w-4 h-4" /></>}
+              ? <><Loader2 className="w-5 h-5 animate-spin" /> Scanning media…</>
+              : <><Zap className="w-5 h-5" /> Launch HomeStream</>}
           </button>
         </div>
       </div>
