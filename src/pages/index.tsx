@@ -67,6 +67,8 @@ export default function HomePage() {
   const [showFilters, setShowFilters] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
 
+  const [homeTab, setHomeTab] = useState<'all' | 'movie' | 'series'>('all');
+
   const isSearching = query.trim().length > 0 || genre !== 'All' || typeFilter !== 'all';
 
   // Sync ?q= param → local state (for links from other pages like genre pills)
@@ -371,6 +373,38 @@ export default function HomePage() {
             )}
           </div>
 
+          {/* ── Movies / TV Shows tab strip — always visible ── */}
+          {!isSearching && (
+            <div className="flex items-center gap-1 mt-3 border-t border-border/20 pt-3">
+              {([
+                { id: 'all',    label: 'All',      count: visibleLibrary.length },
+                { id: 'movie',  label: 'Movies',   count: movies.length },
+                { id: 'series', label: 'TV Shows', count: series.length },
+              ] as const).map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setHomeTab(tab.id)}
+                  className={`relative flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-semibold transition-all duration-200 ${
+                    homeTab === tab.id
+                      ? 'bg-primary text-primary-foreground shadow-sm shadow-primary/30'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-muted/60'
+                  }`}
+                >
+                  {tab.label}
+                  {tab.count > 0 && (
+                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none ${
+                      homeTab === tab.id
+                        ? 'bg-white/20 text-white'
+                        : 'bg-muted text-muted-foreground'
+                    }`}>
+                      {tab.count}
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+
           {/* Expanded filters */}
           <AnimatePresence>
             {showFilters && (
@@ -532,7 +566,7 @@ export default function HomePage() {
             {continueWatchingItems.length > 0 && (
               <MediaCarousel
                 title="Continue Watching"
-                items={continueWatchingItems}
+                items={continueWatchingItems.filter(m => homeTab === 'all' || m.type === homeTab || (homeTab === 'movie' && m.type !== 'series'))}
                 showProgress
                 titleIcon={<Clock className="w-3.5 h-3.5" />}
                 accentClass="bg-blue-500"
@@ -542,25 +576,44 @@ export default function HomePage() {
             {myList.length > 0 && (
               <MediaCarousel
                 title="My List"
-                items={myList}
+                items={myList.filter(m => homeTab === 'all' || m.type === homeTab || (homeTab === 'movie' && m.type !== 'series'))}
                 titleIcon={<Bookmark className="w-3.5 h-3.5" />}
                 accentClass="bg-yellow-500"
               />
             )}
 
-            <MediaCarousel title="Recently Added" items={recentlyAdded} accentClass="bg-primary" />
+            {homeTab !== 'series' && (
+              <MediaCarousel title="Recently Added" items={recentlyAdded.filter(m => homeTab === 'movie' ? m.type !== 'series' : true)} accentClass="bg-primary" />
+            )}
+            {homeTab === 'series' && (
+              <MediaCarousel title="Recently Added" items={recentlyAdded.filter(m => m.type === 'series')} accentClass="bg-primary" />
+            )}
 
-            <LazySection skeletonHeight={240}>
-              <MediaCarousel title="Movies" items={movies} accentClass="bg-primary" />
-            </LazySection>
-            <LazySection skeletonHeight={240}>
-              <MediaCarousel title="TV Shows & Series" items={series} accentClass="bg-purple-500" />
-            </LazySection>
-            {topRated.length > 0 && (
+            {homeTab !== 'series' && (
+              <LazySection skeletonHeight={240}>
+                <MediaCarousel title="Movies" items={movies} accentClass="bg-primary" />
+              </LazySection>
+            )}
+            {homeTab !== 'movie' && (
+              <LazySection skeletonHeight={240}>
+                <MediaCarousel title="TV Shows & Series" items={series} accentClass="bg-purple-500" />
+              </LazySection>
+            )}
+            {topRated.length > 0 && homeTab === 'all' && (
               <LazySection skeletonHeight={240}>
                 <MediaCarousel
                   title="Top Rated"
                   items={topRated}
+                  titleIcon={<Star className="w-3.5 h-3.5" />}
+                  accentClass="bg-yellow-500"
+                />
+              </LazySection>
+            )}
+            {topRated.length > 0 && homeTab !== 'all' && (
+              <LazySection skeletonHeight={240}>
+                <MediaCarousel
+                  title="Top Rated"
+                  items={topRated.filter(m => homeTab === 'series' ? m.type === 'series' : m.type !== 'series')}
                   titleIcon={<Star className="w-3.5 h-3.5" />}
                   accentClass="bg-yellow-500"
                 />

@@ -979,18 +979,22 @@ export default function LibraryPage() {
         <div className="flex items-center justify-between mb-5 gap-3 flex-wrap">
           <div className="flex items-center gap-3">
             {/* All / Movies / Shows tabs */}
-            <div className="flex items-center gap-1 bg-muted/50 rounded-xl p-1">
+            <div className="flex items-center gap-1 bg-muted/60 rounded-2xl p-1.5 border border-border/40">
               {(['all', 'movie', 'series'] as const).map(tab => (
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
-                  className={`px-3.5 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 ${
+                  className={`px-5 py-2 rounded-xl text-sm font-semibold transition-all duration-200 ${
                     activeTab === tab
-                      ? 'bg-background text-foreground shadow-sm'
-                      : 'text-muted-foreground hover:text-foreground'
+                      ? 'bg-primary text-primary-foreground shadow-sm shadow-primary/30'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-muted'
                   }`}
                 >
-                  {tab === 'all' ? `All (${library.filter(m => isAllowed(m.rated)).length})` : tab === 'movie' ? `Movies (${library.filter(m => isAllowed(m.rated) && m.type !== 'series').length})` : `Shows (${new Set(library.filter(m => isAllowed(m.rated) && m.type === 'series').map(m => m.title.trim().toLowerCase())).size})`}
+                  {tab === 'all'
+                    ? `All (${library.filter(m => isAllowed(m.rated)).length})`
+                    : tab === 'movie'
+                    ? `Movies (${library.filter(m => isAllowed(m.rated) && m.type !== 'series').length})`
+                    : `Shows (${new Set(library.filter(m => isAllowed(m.rated) && m.type === 'series').map(m => m.title.trim().toLowerCase())).size})`}
                 </button>
               ))}
             </div>
