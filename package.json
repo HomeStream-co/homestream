@@ -61,6 +61,7 @@
     "@types/cookie-parser": "^1.4.10",
     "@types/multer": "^2.1.0",
     "@types/qrcode": "^1.5.6",
+    "@types/ws": "^8.18.1",
     "bcryptjs": "^3.0.3",
     "bonjour-service": "^1.4.0",
     "class-variance-authority": "^0.7.1",
@@ -91,6 +92,7 @@
     "sonner": "^2.0.7",
     "tailwind-merge": "^2.6.1",
     "vaul": "^1.1.2",
+    "ws": "^8.21.0",
     "zod": "^3.25.76",
     "zustand": "^5.0.2"
   },
