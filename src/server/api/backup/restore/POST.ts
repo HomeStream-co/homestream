@@ -15,9 +15,9 @@
  */
 import type { Request, Response } from 'express';
 import fs from 'fs';
-import { writeLibraryDirect } from '../../libraryStore.js';
-import { requireAuth } from '../../authMiddleware.js';
-import { dataPath } from '../../dataDir.js';
+import { writeLibraryDirect } from '../../../libraryStore.js';
+import { requireAuth } from '../../../authMiddleware.js';
+import { dataPath } from '../../../dataDir.js';
 
 // Use dataPath() so paths are correct in all environments:
 //   Cloud/Linux: /private/homestream-*.json
