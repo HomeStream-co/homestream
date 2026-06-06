@@ -65,6 +65,8 @@ export interface MediaItem {
     es?: 'downloaded' | 'stub' | 'exists';
   };
   // Per-profile watch progress — keyed by profileId ("adult" | "kids")
+  // Top-level watchProgress / watchedSeconds / lastWatchedAt mirror the adult profile
+  // for backwards compatibility with Jellyfin API and legacy code.
   profileProgress?: Record<string, ProfileProgressEntry>;
   // TV show episode tracking
   totalSeasons?: number;
