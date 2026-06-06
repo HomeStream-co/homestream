@@ -179,6 +179,7 @@ import watchlistDeleteById from "./api/watchlist/[id]/DELETE";
 // </api-imports>
 import { seoRoutes } from "../lib/seo-routes";
 import { startQbitCompletionWatcher } from "./qbitCompletionWatcher";
+import { runStartupMediaSync } from "./startupMediaSync";
 
 function normalizeCommerceApiBaseUrlEnv() {
 	if (process.env.GODADDY_API_BASE_URL) return;
@@ -637,6 +638,8 @@ if (import.meta.env.PROD) {
 		console.log(`Server listening on http://${host}:${port}`);
 		// Start background watchers after the server is ready
 		startQbitCompletionWatcher();
+		// Scan for pre-downloaded media and backfill missing captions
+		runStartupMediaSync();
 	});
 	server.on("error", (err: NodeJS.ErrnoException) => {
 		console.error("ssr.server.listen-failed", {
