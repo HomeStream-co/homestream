@@ -2127,222 +2127,24 @@ export default function DownloadsPage() {
           </div>
 
           {/* ── Content ── */}
-          {(loading && !data) || totalAll === 0 ? (
+          {(loading && !data) ? (
+            <div className="flex flex-col items-center justify-center py-24 gap-3">
+              <Loader2 className="w-8 h-8 animate-spin text-primary" />
+              <p className="text-muted-foreground text-sm">Connecting to download queue…</p>
+            </div>
+          ) : totalAll === 0 ? (
             <motion.div
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
-              className="flex flex-col gap-6"
+              className="flex flex-col items-center justify-center py-24 gap-4 text-center"
             >
-              {/* ── Preview banner ── */}
-              <div className="flex items-center gap-3 px-4 py-2.5 rounded-xl bg-primary/8 border border-primary/20">
-                <Zap className="w-4 h-4 text-primary flex-shrink-0" />
-                <p className="text-xs text-muted-foreground">
-                  <span className="font-semibold text-foreground">
-                    {loading && !data ? 'Connecting to download queue…' : 'Queue is empty.'}
-                  </span>{' '}
-                  Below is a preview of what your download UI looks like when active.
-                </p>
+              <div className="w-20 h-20 rounded-2xl bg-primary/10 flex items-center justify-center">
+                <Download className="w-10 h-10 text-primary/60" />
               </div>
-
-              {/* ── Mock GlobalSpeedBar ── */}
-              <div className="bg-card border border-border rounded-2xl overflow-hidden opacity-60 pointer-events-none select-none">
-                <div className="px-4 py-2 flex items-center justify-between" style={{ background: 'linear-gradient(180deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.01) 100%)' }}>
-                  <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-2">
-                      <ArrowDown className="w-3.5 h-3.5 text-blue-400" />
-                      <div>
-                        <p className="text-[9px] text-muted-foreground uppercase tracking-widest">Download</p>
-                        <p className="text-sm font-bold text-blue-400 leading-none">12.4 MB/s</p>
-                      </div>
-                    </div>
-                    <div className="w-px h-8 bg-border" />
-                    <div className="flex items-center gap-2">
-                      <ArrowUp className="w-3.5 h-3.5 text-green-400" />
-                      <div>
-                        <p className="text-[9px] text-muted-foreground uppercase tracking-widest">Upload</p>
-                        <p className="text-sm font-bold text-green-400 leading-none">1.2 MB/s</p>
-                      </div>
-                    </div>
-                    <div className="w-px h-8 bg-border" />
-                    <div className="hidden sm:flex items-center gap-4">
-                      <div>
-                        <p className="text-[9px] text-muted-foreground uppercase tracking-widest">Downloaded</p>
-                        <p className="text-xs font-semibold text-foreground">4.7 GB</p>
-                      </div>
-                      <div>
-                        <p className="text-[9px] text-muted-foreground uppercase tracking-widest">Uploaded</p>
-                        <p className="text-xs font-semibold text-foreground">892 MB</p>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-1.5 text-[10px] font-semibold px-2 py-1 rounded-full bg-green-500/10 text-green-400">
-                    <div className="w-1.5 h-1.5 rounded-full bg-green-400" />
-                    Connected
-                  </div>
-                </div>
-                <div className="px-4 pb-3 pt-1 flex flex-col gap-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-[9px] text-blue-400 w-4 text-right font-mono">DL</span>
-                    <div className="flex-1 h-2 rounded-sm overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
-                      <div className="h-full rounded-sm w-[62%]" style={{ background: 'linear-gradient(90deg, #1d4ed8, #3b82f6)' }} />
-                    </div>
-                    <span className="text-[9px] text-muted-foreground w-16 text-right font-mono">4.7 GB</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-[9px] text-green-400 w-4 text-right font-mono">UL</span>
-                    <div className="flex-1 h-2 rounded-sm overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
-                      <div className="h-full rounded-sm w-[12%]" style={{ background: 'linear-gradient(90deg, #15803d, #22c55e)' }} />
-                    </div>
-                    <span className="text-[9px] text-muted-foreground w-16 text-right font-mono">892 MB</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* ── Mock torrent rows ── */}
-              {([
-                {
-                  title: 'Oppenheimer (2023)',
-                  type: 'movie',
-                  status: 'downloading',
-                  progress: 62,
-                  size: 14_800_000_000,
-                  dlspeed: 13_000_000,
-                  upspeed: 1_200_000,
-                  eta: 680,
-                  seeds: 142,
-                  peers: 18,
-                  quality: '2160p',
-                },
-                {
-                  title: 'Breaking Bad — S01E04',
-                  type: 'series',
-                  status: 'queued',
-                  progress: 0,
-                  size: 1_400_000_000,
-                  dlspeed: 0,
-                  upspeed: 0,
-                  eta: 0,
-                  seeds: 0,
-                  peers: 0,
-                  quality: '1080p',
-                },
-                {
-                  title: 'Dune: Part Two (2024)',
-                  type: 'movie',
-                  status: 'done',
-                  progress: 100,
-                  size: 12_200_000_000,
-                  dlspeed: 0,
-                  upspeed: 0,
-                  eta: 0,
-                  seeds: 0,
-                  peers: 0,
-                  quality: '2160p',
-                },
-              ] as Array<{
-                title: string; type: string; status: string; progress: number;
-                size: number; dlspeed: number; upspeed: number; eta: number;
-                seeds: number; peers: number; quality: string;
-              }>).map((mock, idx) => {
-                const isActive = mock.status === 'downloading';
-                const isDone = mock.status === 'done';
-                const isQueued = mock.status === 'queued';
-                const pct = mock.progress;
-                const barColor = isDone ? '#22c55e' : isQueued ? '#6b7280' : '#3b82f6';
-                const downloaded = mock.size * pct / 100;
-                const statusCfg = isDone
-                  ? { label: 'Complete', color: 'text-green-400', bg: 'bg-green-500/10' }
-                  : isQueued
-                    ? { label: 'Queued', color: 'text-muted-foreground', bg: 'bg-muted/50' }
-                    : { label: 'Downloading', color: 'text-blue-400', bg: 'bg-blue-500/10' };
-
-                return (
-                  <div key={idx} className="bg-card border border-border rounded-xl overflow-hidden opacity-60 pointer-events-none select-none">
-                    <div className="flex items-start gap-3 p-3">
-                      {/* Poster placeholder */}
-                      <div className="w-10 h-14 rounded-md bg-muted flex items-center justify-center flex-shrink-0 mt-0.5">
-                        {mock.type === 'series'
-                          ? <Tv2 className="w-4 h-4 text-muted-foreground" />
-                          : <Film className="w-4 h-4 text-muted-foreground" />}
-                      </div>
-
-                      <div className="flex-1 min-w-0">
-                        {/* Title + badges */}
-                        <div className="flex items-center gap-2 flex-wrap mb-2">
-                          <p className="text-sm font-semibold text-foreground">{mock.title}</p>
-                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ${statusCfg.color} ${statusCfg.bg}`}>
-                            {statusCfg.label}
-                          </span>
-                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-mono">{mock.quality}</span>
-                        </div>
-
-                        {/* Progress bar */}
-                        <div className="w-full">
-                          <div className="relative w-full rounded-sm overflow-hidden" style={{ height: 14, background: 'rgba(255,255,255,0.06)', boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.5)' }}>
-                            <div className="absolute top-0 left-0 h-full rounded-sm" style={{ background: barColor, width: `${pct}%` }} />
-                            {[25, 50, 75].map(tick => (
-                              <div key={tick} className="absolute top-0 h-full w-px" style={{ left: `${tick}%`, background: 'rgba(0,0,0,0.25)' }} />
-                            ))}
-                            <div className="absolute inset-0 flex items-center justify-center">
-                              <span className="text-[9px] font-bold tracking-wider select-none" style={{ color: pct > 45 ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.5)', textShadow: '0 1px 2px rgba(0,0,0,0.8)' }}>
-                                {pct.toFixed(1)}%
-                              </span>
-                            </div>
-                          </div>
-                          {/* Stats row */}
-                          <div className="flex items-center justify-between mt-1 text-[10px] text-muted-foreground">
-                            <div className="flex items-center gap-2">
-                              {pct > 0 && <span>{fmtBytes(downloaded)} / {fmtBytes(mock.size)}</span>}
-                              {isActive && mock.dlspeed > 0 && (
-                                <span className="flex items-center gap-0.5 text-blue-400 font-semibold">
-                                  <ArrowDown className="w-2.5 h-2.5" />{fmtSpeed(mock.dlspeed)}
-                                </span>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-2">
-                              {isActive && mock.eta > 0 && <span>{fmtEta(mock.eta)} remaining</span>}
-                              {isDone && <span className="text-green-400 font-semibold">Complete</span>}
-                              {isQueued && <span className="text-muted-foreground">Waiting in queue</span>}
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Extra stats */}
-                        {isActive && (
-                          <div className="flex items-center gap-3 mt-1.5 text-[10px] text-muted-foreground">
-                            <span className="flex items-center gap-0.5 text-green-400">
-                              <ArrowUp className="w-2.5 h-2.5" />{fmtSpeed(mock.upspeed)}
-                            </span>
-                            <span className="flex items-center gap-0.5">
-                              <TrendingUp className="w-2.5 h-2.5" />
-                              {mock.seeds} seeds · {mock.peers} peers
-                            </span>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Action buttons (non-functional in preview) */}
-                      <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                        <div className="flex items-center gap-1">
-                          {isActive && (
-                            <div className="p-1.5 rounded-lg text-muted-foreground opacity-50">
-                              <Pause className="w-3.5 h-3.5" />
-                            </div>
-                          )}
-                          <div className="p-1.5 rounded-lg text-muted-foreground opacity-50">
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-
-              {/* ── CTA ── */}
-              <div className="flex flex-col items-center gap-3 py-8 text-center">
-                <p className="text-sm text-muted-foreground">
-                  Head to <a href="/discover" className="text-primary hover:underline font-semibold">Discover</a> to search for movies and TV shows, then hit Download to start.
+              <div>
+                <h2 className="text-lg font-semibold text-foreground">No downloads yet</h2>
+                <p className="text-muted-foreground text-sm mt-1 max-w-sm">
+                  Head to Discover to search for movies and TV shows, then hit Download to start.
                 </p>
               </div>
             </motion.div>
