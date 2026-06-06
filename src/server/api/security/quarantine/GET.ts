@@ -9,7 +9,7 @@ import { requireAuth } from '../../../authMiddleware.js';
  * no-try/catch: intentional — readQuarantineLog() is internally guarded and
  * returns [] on any read error. Nothing here can throw at request time.
  */
-export default function handler(_req: Request, res: Response) {
+export default async function handler(_req: Request, res: Response) {
   if (!requireAuth(_req, res)) return;
   const entries = await readQuarantineLog();
   res.json({ entries, count: entries.length });
