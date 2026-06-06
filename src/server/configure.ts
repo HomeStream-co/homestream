@@ -31,9 +31,6 @@ function resolveClientDir() {
 }
 const CLIENT_DIR = resolveClientDir();
 
-/**
- * Lightweight gzip middleware for JSON API responses.
- */
 function gzipMiddleware(req: express.Request, res: express.Response, next: express.NextFunction) {
   const acceptEncoding = req.headers["accept-encoding"] ?? "";
   if (!acceptEncoding.includes("gzip")) return next();
@@ -45,9 +42,7 @@ function gzipMiddleware(req: express.Request, res: express.Response, next: expre
   res.json = function (body: unknown) {
     const json = JSON.stringify(body);
     const buf = Buffer.from(json, 'utf-8');
-
     if (buf.length < 1024) return originalJson(body);
-
     zlib.gzip(buf, (err, compressed) => {
       if (err) return originalJson(body);
       if (res.headersSent) return;
@@ -61,7 +56,6 @@ function gzipMiddleware(req: express.Request, res: express.Response, next: expre
     });
     return res;
   };
-
   next();
 }
 
@@ -69,13 +63,11 @@ function gzipMiddleware(req: express.Request, res: express.Response, next: expre
 
 export const viteServerBefore = (server: express.Express, _viteServer: ViteDevServer) => {
   console.log('[HomeStream] Dev server starting...');
-
   import('./ownershipSeed.js').then(({ runOwnershipSeed }) => {
     runOwnershipSeed().catch((err: Error) => {
       console.warn('[ownership] Dev seed failed (non-fatal):', err.message);
     });
   }).catch(() => {});
-
   server.use(cookieParser());
   server.use(express.json({ limit: '50mb' }));
   server.use(express.urlencoded({ extended: true, limit: '50mb' }));
@@ -217,11 +209,7 @@ export const serverBefore = (server: express.Express) => {
 
 export const serverAfter = (server: express.Express) => {
   server.use('/api', (req: express.Request, res: express.Response) => {
-    res.status(404).json({
-      error: 'API endpoint not found',
-      method: req.method,
-      path: req.path,
-    });
+    res.status(404).json({ error: 'API endpoint not found', method: req.method, path: req.path });
   });
 
   server.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
@@ -239,7 +227,6 @@ export const serverAfter = (server: express.Express) => {
       (err as NodeJS.ErrnoException).code === 'ENOENT' &&
       err.message?.includes('index.html') &&
       process.env.NODE_ENV !== 'production';
-
     if (!isDevIndexMissing) {
       import('./crashLogger.js').then(({ logCrash }) => {
         logCrash('expressError', err, `${req.method} ${req.path}`);
