@@ -146,9 +146,11 @@ export function injectPreviewHeader() {
     })
   }
 
-  document.readyState === 'loading'
-    ? document.addEventListener('DOMContentLoaded', inject)
-    : inject()
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', inject);
+  } else {
+    inject();
+  }
 }
 
 // Auto-inject on import in development

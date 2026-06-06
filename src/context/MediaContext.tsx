@@ -106,7 +106,7 @@ export function MediaProvider({ children }: { children: ReactNode }) {
           localStorage.setItem(etagKey, newEtag);
         }
 
-        let data = await res.json() as MediaItem[];
+        const data = await res.json() as MediaItem[];
 
         // ── Empty library — just show nothing, no demo data ──────────────────
         if (data.length === 0) {

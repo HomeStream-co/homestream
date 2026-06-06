@@ -43,6 +43,7 @@ export function injectFullStory() {
       return
     }
     g = m[e] = function(a: any, b: any, s: any) {
+      // eslint-disable-next-line @typescript-eslint/no-unused-expressions
       g.q ? g.q.push([a, b, s]) : g._api(a, b, s)
     }
     g.q = []

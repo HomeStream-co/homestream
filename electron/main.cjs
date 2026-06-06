@@ -85,7 +85,7 @@ function getFfmpegPath() {
   }
   // Dev mode: use ffmpeg-static from node_modules
   try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    // eslint-disable-next-line no-undef
     const p = require('ffmpeg-static');
     if (p && fs.existsSync(p)) return p;
   } catch { /* not installed */ }
