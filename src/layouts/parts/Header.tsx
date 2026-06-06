@@ -55,8 +55,9 @@ function RemoteButton() {
   }, [open]);
 
   const remoteUrl = data?.url ?? '';
-  const displayAddr = data?.lanIP ? `${data.lanIP}:${data.port ?? '3000'}` : '';
-  const isLocalhost = !data?.lanIP || data.lanIP === '127.0.0.1' || data.lanIP === 'localhost';
+  const parsedHost = remoteUrl ? (() => { try { return new URL(remoteUrl).hostname; } catch { return ''; } })() : '';
+  const displayAddr = remoteUrl ? (() => { try { const u = new URL(remoteUrl); return `${u.hostname}:${u.port || '80'}`; } catch { return ''; } })() : '';
+  const isLocalhost = !remoteUrl || parsedHost === '127.0.0.1' || parsedHost === 'localhost' || parsedHost === '';
 
   function copy() {
     navigator.clipboard.writeText(remoteUrl).then(() => {
