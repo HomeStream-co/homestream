@@ -68,6 +68,7 @@ files:
       - "electron/main.cjs"
       - "electron/updater.cjs"
       - "electron/preload.cjs"
+      - "electron/crashReporter.cjs"
       - "electron/tray-icon.png"
       - "package.json"
       - "node_modules/electron-updater/**/*"
@@ -168,6 +169,10 @@ linux:
       Name: HomeStream
       Comment: Stream your personal media collection
       Categories: AudioVideo;Video;Player;
+      Terminal: false
+      Type: Application
+      StartupNotify: true
+      StartupWMClass: HomeStream
 
 # ── pacman package options ─────────────────────────────────────────────────────
 # depends: minimal runtime libs that are always present on a base Arch install.
