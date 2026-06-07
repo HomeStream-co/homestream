@@ -108,7 +108,6 @@ import profileSwitchPost from "./api/profiles/switch/POST";
 import realDebridStatusGet from "./api/real-debrid/status/GET";
 // remote
 import remoteQrGet from "./api/remote/qr/GET";
-import { attachRemoteControl } from "./remoteControl.js";
 // security
 import securityQuarantineGet from "./api/security/quarantine/GET";
 import securityQuarantinePost from "./api/security/quarantine/POST";
@@ -643,8 +642,12 @@ if (import.meta.env.PROD) {
 	const host = process.env.HOST || "0.0.0.0";
 	const server = app.listen(port, host, () => {
 		console.log(`Ready at http://${host}:${port}`);
-		// Attach WebSocket remote control (/ws/remote)
-		attachRemoteControl(server);
+		// Attach WebSocket remote control (/ws/remote).
+		// Dynamic import keeps 'ws' (a CJS package) out of the top-level module
+		// graph so Vite's ESM runner doesn't choke on `module is not defined`.
+		import('./remoteControl.js').then(({ attachRemoteControl }) => {
+			attachRemoteControl(server);
+		}).catch(err => console.error('[remote] Failed to attach remote control:', err));
 		// Start background watchers after the server is ready
 		startQbitCompletionWatcher();
 		// Scan for pre-downloaded media and backfill missing captions
