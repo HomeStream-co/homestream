@@ -56,7 +56,8 @@ function normalizeUrl(url: string): string {
   return `http://${trimmed}`.replace(/\/$/, '');
 }
 
-
+/**
+ * POST /api/setup
  *
  * Handles all setup wizard steps:
  *   action: 'save'         — save config fields
