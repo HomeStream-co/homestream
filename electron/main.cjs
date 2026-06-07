@@ -19,8 +19,8 @@ const path = require('path');
 const http = require('http');
 const os = require('os');
 const fs = require('fs');
-const { setupAutoUpdater, teardown: teardownUpdater, checkForUpdateNow, downloadAndInstall } = require('./updater.cjs');
-const { submitCrashReport } = require('./crashReporter.cjs');
+const { setupAutoUpdater, teardown: teardownUpdater, checkForUpdateNow, downloadAndInstall } = require(path.join(__dirname, 'updater.cjs'));
+const { submitCrashReport } = require(path.join(__dirname, 'crashReporter.cjs'));
 
 // ── Electron-side crash logger ────────────────────────────────────────────────
 // Captures crashes in the Electron main process itself (not the server child).
