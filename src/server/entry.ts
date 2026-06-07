@@ -434,7 +434,8 @@ app.get("/sitemap.xml", (req, res) => {
 
 if (import.meta.env.PROD) {
 	const __dirname = dirname(fileURLToPath(import.meta.url));
-	const clientDir = join(__dirname, "client");
+	// Bundle lives at dist/server/server.bundle.cjs → client files are one level up at dist/client/
+	const clientDir = join(__dirname, "..", "client");
 
 	app.use(
 		express.static(clientDir, {
