@@ -245,12 +245,14 @@ jobs:
         run: npx electron-builder --linux AppImage --config electron/electron-builder.yml --publish always
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          APPIMAGE_EXTRACT_AND_RUN: 1
 
       - name: Package & publish AppImage (arm64)
         run: npx electron-builder --linux AppImage --arm64 --config electron/electron-builder.yml --publish always
         continue-on-error: true
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          APPIMAGE_EXTRACT_AND_RUN: 1
 
       - name: Package & publish .deb (x64)
         run: npx electron-builder --linux deb --config electron/electron-builder.yml --publish always

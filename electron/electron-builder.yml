@@ -146,12 +146,10 @@ dmg:
 #
 # Three formats are produced:
 #   AppImage  — universal, runs on any x86_64 or arm64 Linux (no install needed)
+#               Built with --appimage-extract-and-run so FUSE is NOT required.
 #   deb       — Debian / Ubuntu / Pop!_OS
 #   pacman    — Arch Linux / Manjaro / CachyOS (installs via `sudo pacman -U`)
 #
-# The pacman target produces a .pkg.tar.zst file that integrates with pacman's
-# dependency tracking and shows up in `pacman -Q`. CachyOS users can also
-# install the AppImage directly without any package manager.
 linux:
   target:
     - target: AppImage
@@ -163,6 +161,8 @@ linux:
   icon: electron/assets/icon.png
   category: AudioVideo
   description: Self-hosted media streaming server
+  executableArgs:
+    - --no-sandbox
   desktop:
     entry:
       Name: HomeStream
