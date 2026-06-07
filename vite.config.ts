@@ -110,23 +110,16 @@ export default defineConfig(({ mode, isSsrBuild }) => ({
   },
 
   ssr: {
-    // Bundle npm packages into server.bundle.cjs so the Electron packager
-    // doesn't need to ship node_modules alongside the app. Node built-ins
-    // (node:*, fs, path, crypto, etc.) are always kept external automatically.
-    // Do NOT use noExternal:true — it inlines Node built-ins (e.g. 'module')
-    // which causes duplicate symbol errors when esbuild transpiles the bundle.
-    noExternal: [
-      "express",
-      "cookie-parser",
-      "multer",
-      "ws",
-      "qrcode",
-      "bcryptjs",
-      "bonjour-service",
-      "drizzle-orm",
-      "mysql2",
-      "@google/generative-ai",
-    ],
+    // Bundle ALL npm packages (including transitive deps) into server.bundle.cjs
+    // so the Electron packager doesn't need to ship node_modules alongside the app.
+    // A regex matching every non-Node-builtin package name is the only reliable way
+    // to catch transitive deps (e.g. express → body-parser → bytes) that Rollup
+    // would otherwise leave as external require() calls.
+    // Node built-ins (node:*, fs, path, crypto, etc.) are always kept external
+    // automatically by Vite regardless of this setting.
+    // noExternal: true is intentionally NOT used — it inlines the 'module' built-in
+    // which causes duplicate symbol errors during esbuild transpilation.
+    noExternal: /^(?!node:).+/,
   },
 
   server: {
