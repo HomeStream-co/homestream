@@ -245,8 +245,13 @@ function setupAutoUpdater({ controlWindowGetter, pushLog, port = 3000 }) {
   let pkg = {};
   try { pkg = require('../package.json'); } catch { /* ignore */ }
 
-  const owner = process.env.HOMESTREAM_GH_OWNER || pkg?.build?.ghOwner || '';
-  const repo  = process.env.HOMESTREAM_GH_REPO  || pkg?.build?.ghRepo  || '';
+  // Hardcoded fallbacks — these never change and ensure the updater works
+  // even if package.json can't be read from the asar (e.g. path resolution edge case).
+  const HARDCODED_OWNER = 'HomeStream-co';
+  const HARDCODED_REPO  = 'homestream';
+
+  const owner = process.env.HOMESTREAM_GH_OWNER || pkg?.build?.ghOwner || HARDCODED_OWNER;
+  const repo  = process.env.HOMESTREAM_GH_REPO  || pkg?.build?.ghRepo  || HARDCODED_REPO;
 
   if (!owner || !repo) {
     log('Auto-updater not configured — set GH_OWNER + GH_REPO as GitHub Actions secrets to enable.', 'info');

@@ -14,7 +14,7 @@
  * Supported platforms: Windows (.exe), macOS (.dmg), Linux (.AppImage)
  */
 
-const { app, BrowserWindow, Tray, Menu, shell, nativeImage, ipcMain, globalShortcut, dialog, utilityProcess } = require('electron');
+const { app, BrowserWindow, Tray, Menu, shell, nativeImage, ipcMain, globalShortcut, dialog, clipboard, utilityProcess } = require('electron');
 const path = require('path');
 const http = require('http');
 const os = require('os');
@@ -358,14 +358,26 @@ async function startServer() {
             ? `~/.config/HomeStream/homestream-debug.txt`
             : `homestream-debug.txt on your Desktop`;
 
-          dialog.showErrorBox(
-            'HomeStream — Crash loop stopped',
+          const fullErrorText =
             `The server crashed ${MAX_FAST_CRASHES} times instantly.\n\n` +
             `HomeStream has stopped to protect your PC.\n\n` +
-            `Open this file for the full error:\n` +
-            `  ${debugLogLocation}` +
-            crashDetail
-          );
+            `Full error log:\n  ${debugLogLocation}` +
+            crashDetail;
+
+          const choice = dialog.showMessageBoxSync({
+            type: 'error',
+            title: 'HomeStream — Crash loop stopped',
+            message: 'HomeStream stopped after 3 instant crashes.',
+            detail:
+              `Full error log saved to:\n  ${debugLogLocation}\n\n` +
+              (crashDetail ? `Last lines:\n${crashDetail.slice(0, 800)}` : ''),
+            buttons: ['Copy Error & Close', 'Close'],
+            defaultId: 0,
+            cancelId: 1,
+          });
+          if (choice === 0) {
+            clipboard.writeText(fullErrorText);
+          }
           app.quit();
           return;
         }
@@ -380,12 +392,37 @@ async function startServer() {
         const debugLocation2 = process.platform === 'linux'
           ? '~/.config/HomeStream/homestream-debug.txt'
           : 'homestream-debug.txt on your Desktop';
-        dialog.showErrorBox(
-          'HomeStream — Too many restarts',
+
+        let recentLines = '';
+        try {
+          const logPath2 = path.join(
+            process.platform === 'linux' ? app.getPath('userData') : app.getPath('desktop'),
+            'homestream-debug.txt'
+          );
+          if (fs.existsSync(logPath2)) {
+            recentLines = fs.readFileSync(logPath2, 'utf-8').split('\n').slice(-20).join('\n');
+          }
+        } catch { /* ignore */ }
+
+        const fullErrorText2 =
           `The HomeStream server crashed ${MAX_WATCHDOG_RESTARTS} times.\n\n` +
-          `Open this file for the full error:\n` +
-          `  ${debugLocation2}`
-        );
+          `Full error log:\n  ${debugLocation2}` +
+          (recentLines ? `\n\nLast lines:\n${recentLines}` : '');
+
+        const choice2 = dialog.showMessageBoxSync({
+          type: 'error',
+          title: 'HomeStream — Too many restarts',
+          message: `Server crashed ${MAX_WATCHDOG_RESTARTS} times — giving up.`,
+          detail:
+            `Full error log saved to:\n  ${debugLocation2}` +
+            (recentLines ? `\n\nLast lines:\n${recentLines.slice(0, 800)}` : ''),
+          buttons: ['Copy Error & Close', 'Close'],
+          defaultId: 0,
+          cancelId: 1,
+        });
+        if (choice2 === 0) {
+          clipboard.writeText(fullErrorText2);
+        }
         app.quit();
         return;
       }
