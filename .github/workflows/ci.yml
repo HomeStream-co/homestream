@@ -157,11 +157,18 @@ jobs:
 
       - name: Start server in background
         run: |
+          # Create a mock DB config so the server doesn't crash on startup.
+          # The smoke test doesn't exercise DB-backed routes, so fake creds are fine.
+          mkdir -p /tmp/homestream-nomad
+          cat > /tmp/homestream-nomad/config.json <<'EOF'
+          {"DATABASE":{"VALUE":{"HOST":"127.0.0.1","PORT":3306,"USERNAME":"smoke","PASSWORD":"smoke","NAME":"smoke"}}}
+          EOF
           node dist/server/server.bundle.cjs &
           echo "SERVER_PID=$!" >> $GITHUB_ENV
         env:
           NODE_ENV: production
           PORT: 3000
+          NOMAD_TASK_DIR: /tmp/homestream-nomad
           # Smoke test runs against a fresh install — setup is not complete,
           # which is fine: /api/health and auth endpoints work regardless.
           HOMESTREAM_DATA: /tmp/homestream-smoke
@@ -249,11 +256,16 @@ jobs:
 
       - name: Start server in background
         run: |
+          mkdir -p /tmp/homestream-nomad
+          cat > /tmp/homestream-nomad/config.json <<'EOF'
+          {"DATABASE":{"VALUE":{"HOST":"127.0.0.1","PORT":3306,"USERNAME":"smoke","PASSWORD":"smoke","NAME":"smoke"}}}
+          EOF
           node dist/server/server.bundle.cjs &
           echo "SERVER_PID=$!" >> $GITHUB_ENV
         env:
           NODE_ENV: production
           PORT: 3000
+          NOMAD_TASK_DIR: /tmp/homestream-nomad
           HOMESTREAM_DATA: /tmp/homestream-smoke-${{ matrix.distro }}
 
       - name: Run smoke tests
@@ -430,6 +442,12 @@ jobs:
           $dataDir = "$env:APPDATA\HomeStream-SmokeTest"
           New-Item -ItemType Directory -Force -Path $dataDir | Out-Null
 
+          # Create mock DB config so server doesn't crash on startup (no Nomad in CI)
+          $nomadDir = "$env:TEMP\homestream-nomad"
+          New-Item -ItemType Directory -Force -Path $nomadDir | Out-Null
+          Set-Content -Path "$nomadDir\config.json" -Value '{"DATABASE":{"VALUE":{"HOST":"127.0.0.1","PORT":3306,"USERNAME":"smoke","PASSWORD":"smoke","NAME":"smoke"}}}'
+          $env:NOMAD_TASK_DIR = $nomadDir
+
           # ── Windows Defender pre-warm ──────────────────────────────────────
           # Defender scans new .cjs files on first execution, blocking Node for
           # up to 5 minutes on GitHub-hosted runners. Running `node --check`
@@ -449,6 +467,7 @@ jobs:
             HOST            = "127.0.0.1"
             SERVER_HOST     = "127.0.0.1"
             HOMESTREAM_DATA = $dataDir
+            NOMAD_TASK_DIR  = $nomadDir
             ELECTRON_RESOURCES_PATH = "$env:INSTALL_DIR\resources"
             PATH            = $env:PATH
             TEMP            = $env:TEMP
@@ -498,6 +517,7 @@ jobs:
               HOST            = "127.0.0.1"
               SERVER_HOST     = "127.0.0.1"
               HOMESTREAM_DATA = $dataDir
+              NOMAD_TASK_DIR  = $nomadDir
               ELECTRON_RESOURCES_PATH = "$env:INSTALL_DIR\resources"
               PATH            = $env:PATH
               TEMP            = $env:TEMP
