@@ -20,8 +20,43 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
+  # ── Pre-flight: delete any stale release for this tag ─────────────────────────
+  # Runs once before both platform builds so neither job races to delete/create
+  # the same release simultaneously.  Both build jobs declare `needs: preflight`
+  # so they only start after this step completes.
+  preflight:
+    name: Delete stale release (if any)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Delete existing GitHub Release for this tag
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: |
+          TAG="${{ github.ref_name }}"
+          HEADERS=(-H "Authorization: token $GH_TOKEN" -H "Accept: application/vnd.github+json")
+          # Search all releases (including drafts) for this tag
+          RELEASES=$(curl -sf "${HEADERS[@]}" \
+            "https://api.github.com/repos/${{ github.repository }}/releases?per_page=20" || echo "[]")
+          ID=$(echo "$RELEASES" | python3 -c "
+          import sys, json
+          releases = json.load(sys.stdin)
+          tag = '$TAG'
+          match = next((r for r in releases if r['tag_name'] == tag), None)
+          print(match['id'] if match else '')
+          ")
+          if [[ -n "$ID" ]]; then
+            echo "Deleting existing release id=$ID for tag $TAG"
+            curl -sf -X DELETE "${HEADERS[@]}" \
+              "https://api.github.com/repos/${{ github.repository }}/releases/$ID"
+            echo "Deleted."
+          else
+            echo "No existing release for $TAG — proceeding."
+          fi
+
   release-windows:
     name: Build & Publish Windows Installer
+    needs: preflight
     # Pin to windows-2022 (Server 2022). windows-latest now maps to Server 2025
     # where NSIS installers built by electron-builder 26.x crash with exit code
     # 0xC0000005 (Access Violation) during silent install. Server 2022 is stable.
@@ -54,28 +89,6 @@ jobs:
         run: npm ci
         env:
           npm_config_optional: true
-
-      # Delete any existing GitHub Release for this tag so electron-builder
-      # can create it fresh. Uses PowerShell - native on windows-latest.
-      - name: Delete existing GitHub Release (if any)
-        shell: pwsh
-        env:
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
-        run: |
-          $tag = "${{ github.ref_name }}"
-          $headers = @{ Authorization = "token $env:GH_TOKEN"; Accept = "application/vnd.github+json" }
-          $uri = "https://api.github.com/repos/${{ github.repository }}/releases/tags/$tag"
-          try {
-            $release = Invoke-RestMethod -Uri $uri -Headers $headers -ErrorAction Stop
-            $id = $release.id
-            if ($id) {
-              Write-Host "Deleting existing release id=$id for tag $tag"
-              Invoke-RestMethod -Method Delete -Uri "https://api.github.com/repos/${{ github.repository }}/releases/$id" -Headers $headers
-              Write-Host "Deleted."
-            }
-          } catch {
-            Write-Host "No existing release found for $tag - proceeding"
-          }
 
       - name: Build app (Vite + server bundle)
         run: npm run build
@@ -140,31 +153,6 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
 
-      # electron-builder sometimes leaves the release as a draft even with
-      # releaseType: release. Explicitly un-draft and mark as latest so
-      # electron-updater's latest.yml points at the correct release.
-      - name: Publish release (un-draft + mark latest)
-        if: success()
-        shell: pwsh
-        env:
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
-        run: |
-          $tag = "${{ github.ref_name }}"
-          $headers = @{ Authorization = "token $env:GH_TOKEN"; Accept = "application/vnd.github+json"; "Content-Type" = "application/json" }
-          # /releases/tags/:tag only returns published releases - drafts are invisible there.
-          # Use the list endpoint instead and filter by tag_name so we find drafts too.
-          $releases = Invoke-RestMethod -Uri "https://api.github.com/repos/${{ github.repository }}/releases?per_page=20" -Headers $headers
-          $release = $releases | Where-Object { $_.tag_name -eq $tag } | Select-Object -First 1
-          if (-not $release) {
-            Write-Error "Could not find any release (draft or published) for tag $tag"
-            exit 1
-          }
-          $id = $release.id
-          Write-Host "Un-drafting release id=$id tag=$tag (was draft=$($release.draft))"
-          $body = '{"draft":false,"prerelease":false,"make_latest":"true"}'
-          Invoke-RestMethod -Method Patch -Uri "https://api.github.com/repos/${{ github.repository }}/releases/$id" -Headers $headers -Body $body
-          Write-Host "Release $tag is now published and marked as latest."
-
   # -- Linux build --------------------------------------------------------------
   # Produces:
   #   AppImage (x64 + arm64) - universal, no install needed
@@ -176,9 +164,10 @@ jobs:
   # current), which is fine for CachyOS.
   release-linux:
     name: Build & Publish Linux Packages
+    needs: preflight
     runs-on: ubuntu-latest
     timeout-minutes: 60
-    # Runs in parallel with release-windows - no dependency between them.
+    # Runs in parallel with release-windows after preflight completes.
     # Both jobs upload to the same GitHub Release; electron-builder handles
     # concurrent uploads safely via the GitHub Releases API.
 
@@ -273,6 +262,48 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
 
+  # -- Publish release (un-draft + mark latest) ---------------------------------
+  # Runs after BOTH platform builds complete so the release is fully populated
+  # before it becomes visible to electron-updater.  This prevents the updater
+  # from seeing a partial release (e.g. only latest.yml uploaded, no .exe yet)
+  # which would cause a failed download and leave the user stuck on the old version.
+  publish-release:
+    name: Publish release (un-draft + mark latest)
+    runs-on: ubuntu-latest
+    needs: [release-windows, release-linux]
+    # Always run even if one platform build failed — partial releases are still
+    # useful. Only skip if both builds failed.
+    if: always() && (needs.release-windows.result == 'success' || needs.release-linux.result == 'success')
+    timeout-minutes: 5
+    steps:
+      - name: Un-draft and mark as latest
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: |
+          TAG="${{ github.ref_name }}"
+          HEADERS=(-H "Authorization: token $GH_TOKEN" \
+                   -H "Accept: application/vnd.github+json" \
+                   -H "Content-Type: application/json")
+          # Use list endpoint — /releases/tags/:tag skips drafts
+          RELEASES=$(curl -sf "${HEADERS[@]}" \
+            "https://api.github.com/repos/${{ github.repository }}/releases?per_page=20" || echo "[]")
+          ID=$(echo "$RELEASES" | python3 -c "
+          import sys, json
+          releases = json.load(sys.stdin)
+          tag = '$TAG'
+          match = next((r for r in releases if r['tag_name'] == tag), None)
+          print(match['id'] if match else '')
+          ")
+          if [[ -z "$ID" ]]; then
+            echo "ERROR: Could not find any release (draft or published) for tag $TAG"
+            exit 1
+          fi
+          echo "Un-drafting release id=$ID tag=$TAG"
+          curl -sf -X PATCH "${HEADERS[@]}" \
+            -d '{"draft":false,"prerelease":false,"make_latest":"true"}' \
+            "https://api.github.com/repos/${{ github.repository }}/releases/$ID"
+          echo "Release $TAG is now published and marked as latest."
+
   # -- AUR publish --------------------------------------------------------------
   # Bumps homestream-bin on the AUR so `yay -Syu` picks up the new version.
   #
@@ -287,7 +318,7 @@ jobs:
   publish-aur:
     name: Publish to AUR
     runs-on: ubuntu-latest
-    needs: [release-windows, release-linux]
+    needs: [publish-release, release-linux]
     # Run whenever linux build succeeded (windows failure is non-blocking).
     # The steps below check for AUR_SSH_PRIVATE_KEY and exit 0 if not set.
     if: always() && needs.release-linux.result == 'success'
