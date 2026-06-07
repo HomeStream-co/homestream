@@ -160,7 +160,7 @@ export default defineConfig(({ mode, isSsrBuild }) => ({
         // both expect dist/server/server.bundle.cjs.
         format: "cjs",
         entryFileNames: "server/server.bundle.cjs",
-        chunkFileNames: "server/bin/[name]-[hash].js"
+        chunkFileNames: "server/bin/[name]-[hash].cjs"
       }
     }
   } :
