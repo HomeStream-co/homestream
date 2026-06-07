@@ -110,10 +110,23 @@ export default defineConfig(({ mode, isSsrBuild }) => ({
   },
 
   ssr: {
+    // Bundle npm packages into server.bundle.cjs so the Electron packager
+    // doesn't need to ship node_modules alongside the app. Node built-ins
+    // (node:*, fs, path, crypto, etc.) are always kept external automatically.
     // Do NOT use noExternal:true — it inlines Node built-ins (e.g. 'module')
     // which causes duplicate symbol errors when esbuild transpiles the bundle.
-    // Leave as empty array so Vite externalises Node built-ins automatically.
-    noExternal: []
+    noExternal: [
+      "express",
+      "cookie-parser",
+      "multer",
+      "ws",
+      "qrcode",
+      "bcryptjs",
+      "bonjour-service",
+      "drizzle-orm",
+      "mysql2",
+      "@google/generative-ai",
+    ],
   },
 
   server: {
