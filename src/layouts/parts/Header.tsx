@@ -3,7 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import {
   Search, Menu, X, Film, Bookmark, ChevronDown, Lock,
   Home, Compass, Download, Library, History, Settings2, BarChart3, Tv2,
-  Smartphone, QrCode, Copy, Check, RefreshCw, Bell,
+  Smartphone, QrCode, Copy, Check, RefreshCw, Bell, MonitorDown,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'sonner';
@@ -391,6 +391,18 @@ export default function Header({ onChatOpen: _onChatOpen }: HeaderProps) {
 
               {/* Phone Remote */}
               <RemoteButton />
+
+              {/* Download App */}
+              <a
+                href="https://github.com/HomeStream-co/homestream/releases/latest"
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Download HomeStream"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border border-border/60 bg-card text-muted-foreground hover:text-foreground hover:border-primary/40 hover:bg-white/8 transition-all duration-200"
+              >
+                <MonitorDown className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Download</span>
+              </a>
 
               {/* Watchlist */}
               <Link
