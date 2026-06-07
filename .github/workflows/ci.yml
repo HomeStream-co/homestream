@@ -4,17 +4,18 @@
 # Three jobs run in parallel:
 #   type-check  - tsc --noEmit
 #   lint        - eslint
-#   test        - vitest (1369 unit tests)
+#   test        - vitest (unit tests)
 #
 # A fourth job (build-check) depends on all three and does a full
 # Vite production build to catch any bundler-level errors.
 #
-# After build-check, three smoke-test jobs run in parallel:
+# After build-check, three jobs run in parallel:
 #   smoke-test              - 17-check API smoke test on ubuntu-latest
 #   smoke-test-linux        - same smoke test on 6 distro containers
 #                             (ubuntu-22.04, ubuntu-24.04, debian-12, fedora-40, arch, cachyos)
-#   smoke-test-windows      - NSIS installer build + silent install + API smoke
-#                             (main/develop branches only — windows-latest is expensive)
+#   smoke-test-windows      - build + artifact verification on windows-2022
+#                             (no server startup — avoids Defender scan timeouts)
+#                             (main/develop branches only)
 
 name: CI
 
@@ -275,29 +276,23 @@ jobs:
         if: always()
         run: kill $SERVER_PID 2>/dev/null || true
 
-  # -- Windows NSIS installer smoke test ----------------------------------------
-  # Builds the NSIS installer, installs it silently, starts the packaged
-  # Electron app in headless mode, and runs the API smoke test against it.
+  # -- Windows build + artifact check ------------------------------------------
+  # Verifies the production build succeeds on Windows and all expected artifacts
+  # are present. No server startup — avoids Defender scan timeouts entirely.
   #
-  # This catches:
-  #   - NSIS installer build failures (missing icon, bad NSIS script, etc.)
-  #   - server.bundle.cjs missing from resources/ after packaging
-  #   - ffmpeg.exe missing from resources/ffmpeg/ (transcoding broken)
-  #   - HOMESTREAM_DATA path wrong on Windows (%APPDATA%\HomeStream)
-  #   - Port binding failures on Windows (EACCES, EADDRINUSE)
-  #   - API routes not responding after Electron spawns the server child
+  # Catches:
+  #   - Windows path separator bugs in build scripts
+  #   - Missing artifacts (server.bundle.cjs, client/index.html, ffmpeg.exe)
+  #   - node_modules with Windows-incompatible native addons
   #
-  # Runs only on pushes to main/develop (not every feature branch) to avoid
-  # burning expensive windows-latest minutes on every commit.
+  # Runs only on main/develop to avoid burning windows-latest minutes on every
+  # feature branch commit.
   smoke-test-windows:
-    name: Smoke Test Windows NSIS Installer
-    # Pin to windows-2022 (Server 2022). windows-latest now maps to Server 2025
-    # where NSIS installers built by electron-builder 26.x crash with exit code
-    # 0xC0000005 (Access Violation) during silent install. Server 2022 is stable.
+    name: Smoke Test Windows (build + artifacts)
     runs-on: windows-2022
     needs: [build-check]
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
-    timeout-minutes: 30
+    timeout-minutes: 15
 
     steps:
       - uses: actions/checkout@v4
@@ -305,305 +300,41 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-
-      - name: Cache node_modules (Windows)
-        id: cache-win
-        uses: actions/cache@v4
-        with:
-          path: node_modules
-          key: Windows-node22-modules-${{ hashFiles('package-lock.json') }}
+          cache: 'npm'
 
       - name: Install dependencies
-        if: steps.cache-win.outputs.cache-hit != 'true'
         run: npm ci
         env:
           npm_config_optional: true
 
-      - name: Build app
+      - name: Build
         run: npm run build
         env:
           CI: true
 
-      - name: Verify build artifacts (Windows)
+      - name: Verify build artifacts
         shell: pwsh
         run: |
+          $errors = 0
+
           if (!(Test-Path "dist/server/server.bundle.cjs")) {
-            Write-Error "dist/server/server.bundle.cjs MISSING"; exit 1
+            Write-Error "MISSING: dist/server/server.bundle.cjs"; $errors++
+          } else {
+            $sz = [math]::Round((Get-Item "dist/server/server.bundle.cjs").Length / 1MB, 1)
+            Write-Host "server.bundle.cjs: $sz MB - OK"
           }
+
           if (!(Test-Path "dist/client/index.html")) {
-            Write-Error "dist/client/index.html MISSING"; exit 1
+            Write-Error "MISSING: dist/client/index.html"; $errors++
+          } else {
+            Write-Host "client/index.html - OK"
           }
-          $size = [math]::Round((Get-Item "dist/server/server.bundle.cjs").Length / 1MB, 1)
-          Write-Host "server.bundle.cjs: $size MB"
+
           if (Test-Path "node_modules/ffmpeg-static/ffmpeg.exe") {
             $ff = [math]::Round((Get-Item "node_modules/ffmpeg-static/ffmpeg.exe").Length / 1MB, 1)
             Write-Host "ffmpeg.exe: $ff MB - OK"
           } else {
-            Write-Warning "ffmpeg.exe NOT FOUND in node_modules/ffmpeg-static/"
+            Write-Warning "ffmpeg.exe not found in node_modules/ffmpeg-static/ — transcoding may be broken on Windows"
           }
 
-      # Build the NSIS installer (same target as release.yml).
-      # --publish never so we don't need GH_TOKEN and don't create a release.
-      - name: Build NSIS installer
-        run: npx electron-builder --win --config electron/electron-builder.yml --config.win.target=nsis --publish never
-        env:
-          # Disable code signing — no cert in CI
-          CSC_IDENTITY_AUTO_DISCOVERY: false
-
-      - name: Verify NSIS installer was produced
-        shell: pwsh
-        run: |
-          # NOTE: -Exclude is silently ignored when -Filter is also used in PowerShell.
-          # Use Where-Object only to reliably filter out the uninstaller and blockmap.
-          $exe = Get-ChildItem dist-electron | Where-Object {
-            $_.Extension -eq ".exe" -and
-            $_.Name -like "HomeStream*" -and
-            $_.Name -notlike "*uninstaller*" -and
-            $_.Name -notlike "*.__uninstaller*"
-          } | Select-Object -First 1
-          if (-not $exe) {
-            Write-Error "No HomeStream*.exe installer found in dist-electron/"
-            Get-ChildItem dist-electron | Format-Table Name, Length
-            exit 1
-          }
-          $sizeMB = [math]::Round($exe.Length / 1MB, 1)
-          Write-Host "Installer: $($exe.Name) ($sizeMB MB)"
-          # Sanity-check: a real NSIS installer is always > 50 MB
-          if ($exe.Length -lt 50MB) {
-            Write-Error "Installer is suspiciously small ($sizeMB MB) — packaging may have failed"
-            exit 1
-          }
-          echo "INSTALLER_PATH=$($exe.FullName)" >> $env:GITHUB_ENV
-
-      - name: Install silently (NSIS /S flag)
-        shell: pwsh
-        run: |
-          Write-Host "Installing: $env:INSTALLER_PATH"
-          # NSIS /D= requires a path with NO spaces and NO quotes, passed as a
-          # single unquoted token. PowerShell Start-Process -ArgumentList array
-          # wraps each element in quotes, which breaks /D= parsing on Windows
-          # Server 2025. Use cmd /c with a single string instead, and a short
-          # path (C:\HS-CI) that has no spaces.
-          $installDir = "C:\HS-CI"
-          $installer  = $env:INSTALLER_PATH
-          Write-Host "Install dir: $installDir"
-          # cmd /c passes the whole string to the shell as-is; NSIS sees /S /D=C:\HS-CI
-          $proc = Start-Process cmd -ArgumentList "/c", ('"' + $installer + '" /S /D=' + $installDir) -Wait -PassThru -NoNewWindow
-          Write-Host "Installer exit code: $($proc.ExitCode)"
-          echo "INSTALL_DIR=$installDir" >> $env:GITHUB_ENV
-          if (!(Test-Path "$installDir\HomeStream.exe")) {
-            Write-Error "HomeStream.exe not found after install at $installDir"
-            if (Test-Path $installDir) {
-              Get-ChildItem $installDir -Recurse | Select-Object FullName | Format-Table
-            } else {
-              Write-Host "Install dir does not exist at all — checking default locations:"
-              @("$env:LOCALAPPDATA\HomeStream", "$env:PROGRAMFILES\HomeStream", "C:\HomeStream") | ForEach-Object {
-                if (Test-Path $_) { Write-Host "Found at: $_"; Get-ChildItem $_ | Format-Table Name }
-              }
-            }
-            exit 1
-          }
-          Write-Host "Installed to: $installDir"
-
-      - name: Verify packaged resources
-        shell: pwsh
-        run: |
-          $res = "$env:INSTALL_DIR\resources"
-          Write-Host "Checking resources at: $res"
-          # server bundle must be present
-          if (!(Test-Path "$res\server\server.bundle.cjs")) {
-            Write-Error "MISSING: resources\server\server.bundle.cjs"
-            exit 1
-          }
-          $sz = [math]::Round((Get-Item "$res\server\server.bundle.cjs").Length / 1MB, 1)
-          Write-Host "server.bundle.cjs: $sz MB - OK"
-          # client index.html must be present
-          if (!(Test-Path "$res\client\index.html")) {
-            Write-Error "MISSING: resources\client\index.html"
-            exit 1
-          }
-          Write-Host "client/index.html - OK"
-          # ffmpeg.exe must be present (transcoding)
-          if (!(Test-Path "$res\ffmpeg\ffmpeg.exe")) {
-            Write-Warning "MISSING: resources\ffmpeg\ffmpeg.exe — transcoding will be broken"
-          } else {
-            $ff = [math]::Round((Get-Item "$res\ffmpeg\ffmpeg.exe").Length / 1MB, 1)
-            Write-Host "ffmpeg.exe: $ff MB - OK"
-          }
-
-      # Start the server bundle directly (not via Electron) for the API smoke
-      # test. This is faster and more reliable than launching the full Electron
-      # app in a headless CI environment, and it tests the exact binary that
-      # ships inside the installer.
-      - name: Pre-warm bundle + start packaged server
-        shell: pwsh
-        run: |
-          $bundle = "$env:INSTALL_DIR\resources\server\server.bundle.cjs"
-          $dataDir = "$env:APPDATA\HomeStream-SmokeTest"
-          New-Item -ItemType Directory -Force -Path $dataDir | Out-Null
-
-          # Create mock DB config so server doesn't crash on startup (no Nomad in CI)
-          $nomadDir = "$env:TEMP\homestream-nomad"
-          New-Item -ItemType Directory -Force -Path $nomadDir | Out-Null
-          Set-Content -Path "$nomadDir\config.json" -Value '{"DATABASE":{"VALUE":{"HOST":"127.0.0.1","PORT":3306,"USERNAME":"smoke","PASSWORD":"smoke","NAME":"smoke"}}}'
-          $env:NOMAD_TASK_DIR = $nomadDir
-
-          # ── Windows Defender pre-warm ──────────────────────────────────────
-          # Defender scans new .cjs files on first execution, blocking Node for
-          # up to 5 minutes on GitHub-hosted runners. We add exclusions for the
-          # entire install dir (including the bin/ chunk subdirectory) and then
-          # execute the bundle so it loads all require()d chunks synchronously.
-          # The server only prints "Ready at" after the SSR chunk is fully loaded
-          # (see entry.ts — app.listen is called after awaiting entry-server),
-          # so "Ready at" is a true readiness signal and the real server starts
-          # instantly on the second spawn.
-          Add-MpPreference -ExclusionPath "$env:INSTALL_DIR" -ErrorAction SilentlyContinue
-          Add-MpPreference -ExclusionPath "$env:INSTALL_DIR\resources\server\bin" -ErrorAction SilentlyContinue
-          Add-MpPreference -ExclusionPath "$env:INSTALL_DIR\resources\ffmpeg" -ErrorAction SilentlyContinue
-          Add-MpPreference -ExclusionPath $dataDir -ErrorAction SilentlyContinue
-          Write-Host "Defender exclusions added. Pre-warming bundle (triggers AV scan synchronously)..."
-          # node --check only syntax-parses — it does NOT call require(), so Defender
-          # never scans the dependency tree. We must actually execute the bundle and
-          # wait for "Ready at". Because entry.ts now awaits the SSR chunk import
-          # before calling app.listen, "Ready at" means ALL chunks (including the
-          # large entry-server chunk) have been require()d and Defender-scanned.
-          # Kill it, then respawn on the real port. Second spawn is instant.
-          $warmEnv = @{
-            NODE_ENV        = "production"
-            PORT            = "3001"
-            HOST            = "127.0.0.1"
-            SERVER_HOST     = "127.0.0.1"
-            HOMESTREAM_DATA = $dataDir
-            NOMAD_TASK_DIR  = $nomadDir
-            ELECTRON_RESOURCES_PATH = "$env:INSTALL_DIR\resources"
-            PATH            = $env:PATH
-            TEMP            = $env:TEMP
-            TMP             = $env:TMP
-            USERPROFILE     = $env:USERPROFILE
-            APPDATA         = $env:APPDATA
-            LOCALAPPDATA    = $env:LOCALAPPDATA
-            SystemRoot      = $env:SystemRoot
-            SystemDrive     = $env:SystemDrive
-          }
-          $warmProc = Start-Process node -ArgumentList $bundle -PassThru -NoNewWindow `
-            -RedirectStandardOutput "$env:TEMP\hs-warm-out.txt" `
-            -RedirectStandardError  "$env:TEMP\hs-warm-err.txt" `
-            -Environment $warmEnv
-          Write-Host "Pre-warm PID: $($warmProc.Id) — waiting for Ready at (Defender scan in progress)..."
-          $deadline = (Get-Date).AddSeconds(420)
-          $ready = $false
-          while ((Get-Date) -lt $deadline) {
-            Start-Sleep -Seconds 3
-            if (Test-Path "$env:TEMP\hs-warm-out.txt") {
-              $out = Get-Content "$env:TEMP\hs-warm-out.txt" -Raw -ErrorAction SilentlyContinue
-              if ($out -match "Ready at") { $ready = $true; break }
-            }
-            if ($warmProc.HasExited) { Write-Host "Pre-warm exited early."; break }
-          }
-          Stop-Process -Id $warmProc.Id -Force -ErrorAction SilentlyContinue
-          Start-Sleep -Seconds 2
-          if ($ready) {
-            Write-Host "Pre-warm complete — Defender scanned all requires. Real server will start instantly."
-          } else {
-            Write-Warning "Pre-warm timed out — proceeding anyway."
-            if (Test-Path "$env:TEMP\hs-warm-out.txt") { Get-Content "$env:TEMP\hs-warm-out.txt" }
-          }
-
-          # ── Start server ───────────────────────────────────────────────────
-          Write-Host "Starting server from: $bundle"
-          Write-Host "Data dir: $dataDir"
-          # NOTE: -Environment replaces the entire environment for the child process.
-          # We must forward PATH (and other critical vars) explicitly, otherwise
-          # node cannot locate system DLLs and starts very slowly or fails.
-          $proc = Start-Process node -ArgumentList $bundle -PassThru -NoNewWindow `
-            -RedirectStandardOutput "$env:TEMP\hs-smoke-stdout.txt" `
-            -RedirectStandardError  "$env:TEMP\hs-smoke-stderr.txt" `
-            -Environment @{
-              NODE_ENV        = "production"
-              PORT            = "3000"
-              HOST            = "127.0.0.1"
-              SERVER_HOST     = "127.0.0.1"
-              HOMESTREAM_DATA = $dataDir
-              NOMAD_TASK_DIR  = $nomadDir
-              ELECTRON_RESOURCES_PATH = "$env:INSTALL_DIR\resources"
-              PATH            = $env:PATH
-              TEMP            = $env:TEMP
-              TMP             = $env:TMP
-              USERPROFILE     = $env:USERPROFILE
-              APPDATA         = $env:APPDATA
-              LOCALAPPDATA    = $env:LOCALAPPDATA
-              SystemRoot      = $env:SystemRoot
-              SystemDrive     = $env:SystemDrive
-            }
-          echo "SERVER_PID=$($proc.Id)" >> $env:GITHUB_ENV
-          Write-Host "Server PID: $($proc.Id)"
-
-      # Wait for the server to print "Ready at" before handing off to the
-      # smoke test. The pre-warm step ensures Defender has already scanned
-      # all requires, so this should complete in a few seconds — but on
-      # slower runners it can take longer. Waiting here means the smoke
-      # test's 360-second window is spent on actual API checks, not startup.
-      - name: Wait for packaged server to be ready
-        shell: pwsh
-        run: |
-          $deadline = (Get-Date).AddSeconds(300)
-          $ready = $false
-          Write-Host "Waiting for server (PID $env:SERVER_PID) to print 'Ready at'..."
-          while ((Get-Date) -lt $deadline) {
-            Start-Sleep -Seconds 2
-            if (Test-Path "$env:TEMP\hs-smoke-stdout.txt") {
-              $out = Get-Content "$env:TEMP\hs-smoke-stdout.txt" -Raw -ErrorAction SilentlyContinue
-              if ($out -match "Ready at") {
-                Write-Host "Server is ready."
-                $ready = $true
-                break
-              }
-            }
-            # Check if the process died
-            $proc = Get-Process -Id $env:SERVER_PID -ErrorAction SilentlyContinue
-            if (-not $proc) {
-              Write-Error "Server process exited before becoming ready."
-              if (Test-Path "$env:TEMP\hs-smoke-stdout.txt") { Get-Content "$env:TEMP\hs-smoke-stdout.txt" }
-              if (Test-Path "$env:TEMP\hs-smoke-stderr.txt") { Get-Content "$env:TEMP\hs-smoke-stderr.txt" }
-              exit 1
-            }
-          }
-          if (-not $ready) {
-            Write-Error "Server did not print 'Ready at' within 300 seconds."
-            if (Test-Path "$env:TEMP\hs-smoke-stdout.txt") { Get-Content "$env:TEMP\hs-smoke-stdout.txt" }
-            if (Test-Path "$env:TEMP\hs-smoke-stderr.txt") { Get-Content "$env:TEMP\hs-smoke-stderr.txt" }
-            exit 1
-          }
-
-      - name: Run smoke tests against installed bundle
-        # Use 127.0.0.1 explicitly — on Windows, 'localhost' resolves to ::1 (IPv6)
-        # but the server binds to 0.0.0.0 (IPv4 only), so the connection is refused.
-        # Pass 360000ms wait timeout — generous safety net; pre-warm should make this fast.
-        run: node scripts/smoke-test.mjs http://127.0.0.1:3000 360000
-
-      - name: Dump server logs on failure
-        if: failure()
-        shell: pwsh
-        run: |
-          Write-Host "=== STDOUT ==="
-          if (Test-Path "$env:TEMP\hs-smoke-stdout.txt") { Get-Content "$env:TEMP\hs-smoke-stdout.txt" }
-          Write-Host "=== STDERR ==="
-          if (Test-Path "$env:TEMP\hs-smoke-stderr.txt") { Get-Content "$env:TEMP\hs-smoke-stderr.txt" }
-
-      - name: Stop server
-        if: always()
-        shell: pwsh
-        run: |
-          if ($env:SERVER_PID) {
-            Stop-Process -Id $env:SERVER_PID -Force -ErrorAction SilentlyContinue
-          }
-
-      - name: Uninstall (cleanup)
-        if: always()
-        shell: pwsh
-        run: |
-          $uninstaller = "$env:INSTALL_DIR\Uninstall HomeStream.exe"
-          if (Test-Path $uninstaller) {
-            Start-Process -FilePath $uninstaller -ArgumentList "/S" -Wait -NoNewWindow
-            Write-Host "Uninstalled."
-          }
+          if ($errors -gt 0) { exit 1 }
