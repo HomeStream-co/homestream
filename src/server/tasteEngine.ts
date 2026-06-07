@@ -17,8 +17,38 @@
  *
  * Dimensions tracked: genre, director, actor, decade
  */
-import { db } from './db/client.js';
-import { watchEvents, tasteProfile, tasteScores } from './db/schema.js';
+// Lazy DB access — db/client throws at import time when the cloud DB config
+// file (/local/config.json) is absent (e.g. on a user's Windows/Linux desktop).
+// We defer the import to first use so the server starts cleanly without a DB.
+import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
+type AnyDB = ReturnType<typeof import('drizzle-orm/mysql2').drizzle>;
+let _db: AnyDB | null = null;
+let _dbLoadAttempted = false;
+async function getDb(): Promise<AnyDB | null> {
+  if (_dbLoadAttempted) return _db;
+  _dbLoadAttempted = true;
+  try {
+    const mod = await import('./db/client.js' as string);
+    _db = mod.db as AnyDB;
+  } catch {
+    // No DB config available (desktop install) — taste features disabled.
+    _db = null;
+  }
+  return _db;
+}
+
+import type * as schema from './db/schema.js';
+let _schema: typeof schema | null = null;
+async function getSchema(): Promise<typeof schema | null> {
+  if (_schema) return _schema;
+  try {
+    _schema = await import('./db/schema.js' as string) as typeof schema;
+  } catch {
+    _schema = null;
+  }
+  return _schema;
+}
+
 import { eq, and, desc } from 'drizzle-orm';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -91,11 +121,14 @@ function eventScore(event: WatchEventInput): number {
 // ── Record a watch event ──────────────────────────────────────────────────────
 
 export async function recordWatchEvent(input: WatchEventInput): Promise<void> {
+  const db = await getDb();
+  const s  = await getSchema();
+  if (!db || !s) return; // no DB — silently skip
+
   const profileId = input.profileId ?? 'default';
   const score     = eventScore(input);
 
-  // 1. Persist the raw event
-  await db.insert(watchEvents).values({
+  await db.insert(s.watchEvents).values({
     profileId,
     mediaId:      input.mediaId,
     mediaTitle:   input.mediaTitle,
@@ -112,9 +145,8 @@ export async function recordWatchEvent(input: WatchEventInput): Promise<void> {
     userRating:   input.userRating,
   });
 
-  if (score === 0) return; // neutral events don't update the profile
+  if (score === 0) return;
 
-  // 2. Update taste profile dimensions
   const dimensions: { dim: string; val: string }[] = [
     ...input.genres.map(g => ({ dim: 'genre', val: g })),
     ...(input.director ? [{ dim: 'director', val: input.director }] : []),
@@ -127,24 +159,23 @@ export async function recordWatchEvent(input: WatchEventInput): Promise<void> {
 
     const existing = await db
       .select()
-      .from(tasteProfile)
+      .from(s.tasteProfile)
       .where(and(
-        eq(tasteProfile.profileId, profileId),
-        eq(tasteProfile.dimension, dim),
-        eq(tasteProfile.value, val),
+        eq(s.tasteProfile.profileId, profileId),
+        eq(s.tasteProfile.dimension, dim),
+        eq(s.tasteProfile.value, val),
       ))
       .limit(1);
 
     if (existing.length > 0) {
-      // Exponential moving average — recent events count more
       const prev       = existing[0];
       const newScore   = prev.score * 0.85 + score * 0.15;
       const newCount   = prev.eventCount + 1;
-      await db.update(tasteProfile)
+      await db.update(s.tasteProfile)
         .set({ score: newScore, eventCount: newCount })
-        .where(eq(tasteProfile.id, prev.id));
+        .where(eq(s.tasteProfile.id, prev.id));
     } else {
-      await db.insert(tasteProfile).values({
+      await db.insert(s.tasteProfile).values({
         profileId,
         dimension:  dim,
         value:      val,
@@ -158,11 +189,14 @@ export async function recordWatchEvent(input: WatchEventInput): Promise<void> {
 // ── Get taste profile ─────────────────────────────────────────────────────────
 
 export async function getTasteProfile(profileId = 'default'): Promise<TasteProfileEntry[]> {
+  const db = await getDb();
+  const s  = await getSchema();
+  if (!db || !s) return [];
   return db
     .select()
-    .from(tasteProfile)
-    .where(eq(tasteProfile.profileId, profileId))
-    .orderBy(desc(tasteProfile.score));
+    .from(s.tasteProfile)
+    .where(eq(s.tasteProfile.profileId, profileId))
+    .orderBy(desc(s.tasteProfile.score));
 }
 
 // ── Score a single library item ───────────────────────────────────────────────
@@ -224,6 +258,10 @@ export async function recomputeTasteScores(
   library: LibraryItem[],
   profileId = 'default',
 ): Promise<void> {
+  const db = await getDb();
+  const s  = await getSchema();
+  if (!db || !s) return;
+
   const profile = await getTasteProfile(profileId);
 
   for (const item of library) {
@@ -232,19 +270,19 @@ export async function recomputeTasteScores(
 
     const existing = await db
       .select()
-      .from(tasteScores)
+      .from(s.tasteScores)
       .where(and(
-        eq(tasteScores.profileId, profileId),
-        eq(tasteScores.mediaId, item.id),
+        eq(s.tasteScores.profileId, profileId),
+        eq(s.tasteScores.mediaId, item.id),
       ))
       .limit(1);
 
     if (existing.length > 0) {
-      await db.update(tasteScores)
+      await db.update(s.tasteScores)
         .set({ score, watched, mediaTitle: item.title })
-        .where(eq(tasteScores.id, existing[0].id));
+        .where(eq(s.tasteScores.id, existing[0].id));
     } else {
-      await db.insert(tasteScores).values({
+      await db.insert(s.tasteScores).values({
         profileId,
         mediaId:    item.id,
         mediaTitle: item.title,
@@ -261,14 +299,18 @@ export async function getTopRecommendations(
   profileId = 'default',
   limit = 10,
 ): Promise<{ mediaId: string; mediaTitle: string; score: number }[]> {
+  const db = await getDb();
+  const s  = await getSchema();
+  if (!db || !s) return [];
+
   const rows = await db
     .select()
-    .from(tasteScores)
+    .from(s.tasteScores)
     .where(and(
-      eq(tasteScores.profileId, profileId),
-      eq(tasteScores.watched, false),
+      eq(s.tasteScores.profileId, profileId),
+      eq(s.tasteScores.watched, false),
     ))
-    .orderBy(desc(tasteScores.score))
+    .orderBy(desc(s.tasteScores.score))
     .limit(limit);
 
   return rows.map(r => ({ mediaId: r.mediaId, mediaTitle: r.mediaTitle, score: r.score }));
@@ -317,11 +359,15 @@ export async function getRecentWatchHistory(
   profileId = 'default',
   limit = 20,
 ): Promise<{ mediaId: string; mediaTitle: string; eventType: string; progressPct: number; genres: string[]; createdAt: Date }[]> {
+  const db = await getDb();
+  const s  = await getSchema();
+  if (!db || !s) return [];
+
   const rows = await db
     .select()
-    .from(watchEvents)
-    .where(eq(watchEvents.profileId, profileId))
-    .orderBy(desc(watchEvents.createdAt))
+    .from(s.watchEvents)
+    .where(eq(s.watchEvents.profileId, profileId))
+    .orderBy(desc(s.watchEvents.createdAt))
     .limit(limit);
 
   return rows.map(r => ({
