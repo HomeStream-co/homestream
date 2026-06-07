@@ -110,16 +110,48 @@ export default defineConfig(({ mode, isSsrBuild }) => ({
   },
 
   ssr: {
-    // Bundle ALL npm packages (including transitive deps) into server.bundle.cjs
-    // so the Electron packager doesn't need to ship node_modules alongside the app.
-    // A regex matching every non-Node-builtin package name is the only reliable way
-    // to catch transitive deps (e.g. express → body-parser → bytes) that Rollup
-    // would otherwise leave as external require() calls.
-    // Node built-ins (node:*, fs, path, crypto, etc.) are always kept external
-    // automatically by Vite regardless of this setting.
-    // noExternal: true is intentionally NOT used — it inlines the 'module' built-in
-    // which causes duplicate symbol errors during esbuild transpilation.
-    noExternal: /^(?!node:).+/,
+    // ── Production build (Rollup) ─────────────────────────────────────────────
+    // Bundle ALL npm packages into server.bundle.cjs so Electron doesn't need
+    // to ship node_modules. noExternal regex covers every non-Node-builtin.
+    // Node built-ins (node:*, fs, path, …) are always kept external by Vite.
+    // noExternal: true is NOT used — it inlines the 'module' built-in which
+    // causes duplicate symbol errors during esbuild transpilation.
+    //
+    // ── Dev mode (ssrLoadModule / Vite ESM runner) ────────────────────────────
+    // noExternal tells Vite to inline packages as ESM. CJS packages that use
+    // `module.exports = …` (express, ws, multer, cookie-parser, …) crash with
+    // "module is not defined" when inlined. In dev we keep them external so
+    // Node's native require() handles them — Vite's CJS interop wraps them
+    // correctly. noExternal still applies for the prod Rollup build.
+    ...(process.env.NODE_ENV === 'production'
+      ? { noExternal: /^(?!node:).+/ }
+      : {
+          // Keep CJS-only packages external in dev so Vite doesn't try to
+          // inline them through its ESM runner.
+          external: [
+            'express',
+            'ws',
+            'multer',
+            'cookie-parser',
+            'cors',
+            'compression',
+            'morgan',
+            'helmet',
+            'qrcode',
+            'fluent-ffmpeg',
+            'ffmpeg-static',
+            'ffprobe-static',
+            'node-cron',
+            'chokidar',
+            'archiver',
+            'form-data',
+            'node-fetch',
+            'better-sqlite3',
+            'drizzle-orm',
+            'mysql2',
+          ],
+        }
+    ),
   },
 
   server: {
