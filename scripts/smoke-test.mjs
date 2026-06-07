@@ -139,7 +139,7 @@ async function runChecks() {
     const ct = res.headers.get('content-type') ?? '';
     if (!ct.includes('text/html')) return { ok: false, detail: `content-type: ${ct}` };
     const html = await res.text();
-    if (!html.includes('<div id="root">') && !html.includes('<div id="app">') && !html.includes('id="root"'))
+    if (!html.includes('<div id="root">') && !html.includes('<div id="app">') && !html.includes('id="root"') && !html.includes('id="app"'))
       return { ok: false, detail: 'no #root or #app element in HTML' };
     return { ok: true };
   });
