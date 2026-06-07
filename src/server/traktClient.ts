@@ -12,9 +12,27 @@
  * Trakt API docs: https://trakt.docs.apiary.io/
  * Rate limit: 1,000 requests/5 minutes (very generous for a home server)
  */
-import { db } from './db/client.js';
-import { mediaEnrichment } from './db/schema.js';
 import { eq } from 'drizzle-orm';
+
+// Lazy DB — same pattern as tasteEngine: defer import so the server starts
+// cleanly on desktop installs that have no /local/config.json.
+type AnyDB = ReturnType<typeof import('drizzle-orm/mysql2').drizzle>;
+let _db: AnyDB | null = null;
+let _dbAttempted = false;
+async function getDb(): Promise<AnyDB | null> {
+  if (_dbAttempted) return _db;
+  _dbAttempted = true;
+  try { _db = ((await import('./db/client.js' as string)) as { db: AnyDB }).db; } catch { _db = null; }
+  return _db;
+}
+
+import type * as schema from './db/schema.js';
+let _schema: typeof schema | null = null;
+async function getSchema(): Promise<typeof schema | null> {
+  if (_schema) return _schema;
+  try { _schema = await import('./db/schema.js' as string) as typeof schema; } catch { _schema = null; }
+  return _schema;
+}
 
 const TRAKT_BASE    = 'https://api.trakt.tv';
 const TRAKT_API_KEY = '781b7c3d7d1c2e4f5a6b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f'; // public client_id for read-only
@@ -80,22 +98,31 @@ export async function fetchTraktEnrichment(
   year:      string,
   mediaType: 'movie' | 'series',
 ): Promise<TraktEnrichment> {
-  // 1. Check cache
-  const cached = await db
-    .select()
-    .from(mediaEnrichment)
-    .where(eq(mediaEnrichment.mediaId, mediaId))
-    .limit(1);
+  const db = await getDb();
+  const s  = await getSchema();
 
-  if (cached.length > 0 && new Date(cached[0].expiresAt) > new Date()) {
-    return {
-      traktRating:   cached[0].traktRating,
-      traktVotes:    cached[0].traktVotes,
-      audienceScore: cached[0].audienceScore,
-      criticScore:   cached[0].criticScore,
-      similarIds:    (cached[0].similarIds as string[]) ?? [],
-      traktSlug:     cached[0].traktSlug,
-    };
+  const empty: TraktEnrichment = { traktRating: null, traktVotes: null, audienceScore: null, criticScore: null, similarIds: [], traktSlug: '' };
+  void empty; // available for early-return if needed
+
+  // 1. Check cache (skip if no DB)
+  let cached: { traktRating: number | null; traktVotes: number | null; audienceScore: number | null; criticScore: number | null; similarIds: unknown; traktSlug: string; expiresAt: Date }[] = [];
+  if (db && s) {
+    cached = await db
+      .select()
+      .from(s.mediaEnrichment)
+      .where(eq(s.mediaEnrichment.mediaId, mediaId))
+      .limit(1);
+
+    if (cached.length > 0 && new Date(cached[0].expiresAt) > new Date()) {
+      return {
+        traktRating:   cached[0].traktRating,
+        traktVotes:    cached[0].traktVotes,
+        audienceScore: cached[0].audienceScore,
+        criticScore:   cached[0].criticScore,
+        similarIds:    (cached[0].similarIds as string[]) ?? [],
+        traktSlug:     cached[0].traktSlug,
+      };
+    }
   }
 
   // 2. Fetch from Trakt
@@ -121,32 +148,33 @@ export async function fetchTraktEnrichment(
     traktRating,
     traktVotes,
     audienceScore,
-    criticScore: null, // Trakt doesn't expose critic scores; could add OMDB tomatoMeter later
+    criticScore: null,
     similarIds,
     traktSlug: slug,
   };
 
-  // 3. Upsert cache
-  const expiresAt = new Date(Date.now() + CACHE_TTL_MS);
-
-  if (cached.length > 0) {
-    await db.update(mediaEnrichment)
-      .set({ ...result, fetchedAt: new Date(), expiresAt })
-      .where(eq(mediaEnrichment.mediaId, mediaId));
-  } else {
-    await db.insert(mediaEnrichment).values({
-      mediaId,
-      imdbId:       imdbId || '',
-      traktSlug:    slug,
-      traktRating,
-      traktVotes,
-      audienceScore,
-      criticScore:  null,
-      similarIds,
-      traktMeta:    null,
-      fetchedAt:    new Date(),
-      expiresAt,
-    });
+  // 3. Upsert cache (skip if no DB)
+  if (db && s) {
+    const expiresAt = new Date(Date.now() + CACHE_TTL_MS);
+    if (cached.length > 0) {
+      await db.update(s.mediaEnrichment)
+        .set({ ...result, fetchedAt: new Date(), expiresAt })
+        .where(eq(s.mediaEnrichment.mediaId, mediaId));
+    } else {
+      await db.insert(s.mediaEnrichment).values({
+        mediaId,
+        imdbId:       imdbId || '',
+        traktSlug:    slug,
+        traktRating,
+        traktVotes,
+        audienceScore,
+        criticScore:  null,
+        similarIds,
+        traktMeta:    null,
+        fetchedAt:    new Date(),
+        expiresAt,
+      });
+    }
   }
 
   return result;
