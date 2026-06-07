@@ -190,5 +190,12 @@ export function getCachedHwEncoder(): HwEncoderResult | null {
 
 let _resolvedCache: HwEncoderResult | null = null;
 
-// Warm the cache on module load (non-blocking — result stored when ready)
-detectHwEncoder().then(result => { _resolvedCache = result; }).catch(() => {});
+// Warm the cache shortly after module load so the result is ready by the
+// time the first HLS job starts. Deferred by 10 s so the server finishes
+// startup and begins accepting requests before FFmpeg probes run.
+// On Windows, child_process.spawn() can block the event loop briefly while
+// Defender scans the executable — running probes at module-load time would
+// stall request handling during the critical startup window.
+setTimeout(() => {
+  detectHwEncoder().then(result => { _resolvedCache = result; }).catch(() => {});
+}, 10_000);

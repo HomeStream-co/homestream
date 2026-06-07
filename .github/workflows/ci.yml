@@ -459,6 +459,7 @@ jobs:
           # instantly on the second spawn.
           Add-MpPreference -ExclusionPath "$env:INSTALL_DIR" -ErrorAction SilentlyContinue
           Add-MpPreference -ExclusionPath "$env:INSTALL_DIR\resources\server\bin" -ErrorAction SilentlyContinue
+          Add-MpPreference -ExclusionPath "$env:INSTALL_DIR\resources\ffmpeg" -ErrorAction SilentlyContinue
           Add-MpPreference -ExclusionPath $dataDir -ErrorAction SilentlyContinue
           Write-Host "Defender exclusions added. Pre-warming bundle (triggers AV scan synchronously)..."
           # node --check only syntax-parses — it does NOT call require(), so Defender
