@@ -367,43 +367,45 @@ async function startServer() {
 
           // Check if a fix is already out before showing the crash dialog
           pushLog('Crash loop detected — checking for available update…', 'warn');
-          const updateCheck = await checkForUpdateNow();
-          if (updateCheck.available) {
-            const updateChoice = dialog.showMessageBoxSync({
-              type: 'warning',
-              title: 'HomeStream — Update available',
-              message: `v${updateCheck.version} is available and may fix this crash.`,
-              detail: 'Would you like to download and install it now?',
-              buttons: ['Download & Install', 'Submit Bug Report', 'Close'],
-              defaultId: 0,
-              cancelId: 2,
-            });
-            if (updateChoice === 0) {
-              downloadAndInstall()
-                .catch(() => shell.openExternal('https://github.com/HomeStream-co/homestream/releases/latest'));
-              return;
-            } else if (updateChoice === 1) {
-              await submitCrashReport('fast-crash', fullErrorText, (opts) => dialog.showMessageBoxSync(opts), clipboard);
+          (async () => {
+            const updateCheck = await checkForUpdateNow();
+            if (updateCheck.available) {
+              const updateChoice = dialog.showMessageBoxSync({
+                type: 'warning',
+                title: 'HomeStream — Update available',
+                message: `v${updateCheck.version} is available and may fix this crash.`,
+                detail: 'Would you like to download and install it now?',
+                buttons: ['Download & Install', 'Submit Bug Report', 'Close'],
+                defaultId: 0,
+                cancelId: 2,
+              });
+              if (updateChoice === 0) {
+                downloadAndInstall()
+                  .catch(() => shell.openExternal('https://github.com/HomeStream-co/homestream/releases/latest'));
+                return;
+              } else if (updateChoice === 1) {
+                await submitCrashReport('fast-crash', fullErrorText, (opts) => dialog.showMessageBoxSync(opts), clipboard);
+              }
+            } else {
+              const choice = dialog.showMessageBoxSync({
+                type: 'error',
+                title: 'HomeStream — Crash loop stopped',
+                message: 'HomeStream stopped after 3 instant crashes.',
+                detail:
+                  `Full error log saved to:\n  ${debugLogLocation}\n\n` +
+                  (crashDetail ? `Last lines:\n${crashDetail.slice(0, 800)}` : ''),
+                buttons: ['Submit Bug Report', 'Copy Error & Close', 'Close'],
+                defaultId: 0,
+                cancelId: 2,
+              });
+              if (choice === 0) {
+                await submitCrashReport('fast-crash', fullErrorText, (opts) => dialog.showMessageBoxSync(opts), clipboard);
+              } else if (choice === 1) {
+                clipboard.writeText(fullErrorText);
+              }
             }
-          } else {
-            const choice = dialog.showMessageBoxSync({
-              type: 'error',
-              title: 'HomeStream — Crash loop stopped',
-              message: 'HomeStream stopped after 3 instant crashes.',
-              detail:
-                `Full error log saved to:\n  ${debugLogLocation}\n\n` +
-                (crashDetail ? `Last lines:\n${crashDetail.slice(0, 800)}` : ''),
-              buttons: ['Submit Bug Report', 'Copy Error & Close', 'Close'],
-              defaultId: 0,
-              cancelId: 2,
-            });
-            if (choice === 0) {
-              await submitCrashReport('fast-crash', fullErrorText, (opts) => dialog.showMessageBoxSync(opts), clipboard);
-            } else if (choice === 1) {
-              clipboard.writeText(fullErrorText);
-            }
-          }
-          app.quit();
+            app.quit();
+          })();
           return;
         }
       } else {
@@ -445,12 +447,14 @@ async function startServer() {
           defaultId: 0,
           cancelId: 2,
         });
-        if (choice2 === 0) {
-          await submitCrashReport('watchdog', fullErrorText2, (opts) => dialog.showMessageBoxSync(opts), clipboard);
-        } else if (choice2 === 1) {
-          clipboard.writeText(fullErrorText2);
-        }
-        app.quit();
+        (async () => {
+          if (choice2 === 0) {
+            await submitCrashReport('watchdog', fullErrorText2, (opts) => dialog.showMessageBoxSync(opts), clipboard);
+          } else if (choice2 === 1) {
+            clipboard.writeText(fullErrorText2);
+          }
+          app.quit();
+        })();
         return;
       }
       watchdogRestarts++;
