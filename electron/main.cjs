@@ -19,7 +19,8 @@ const path = require('path');
 const http = require('http');
 const os = require('os');
 const fs = require('fs');
-const { setupAutoUpdater, teardown: teardownUpdater } = require('./updater.cjs');
+const { setupAutoUpdater, teardown: teardownUpdater, checkForUpdateNow, downloadAndInstall } = require('./updater.cjs');
+const { submitCrashReport } = require('./crashReporter.cjs');
 
 // ── Electron-side crash logger ────────────────────────────────────────────────
 // Captures crashes in the Electron main process itself (not the server child).
@@ -364,30 +365,43 @@ async function startServer() {
             `Full error log:\n  ${debugLogLocation}` +
             crashDetail;
 
-          const choice = dialog.showMessageBoxSync({
-            type: 'error',
-            title: 'HomeStream — Crash loop stopped',
-            message: 'HomeStream stopped after 3 instant crashes.',
-            detail:
-              `Full error log saved to:\n  ${debugLogLocation}\n\n` +
-              (crashDetail ? `Last lines:\n${crashDetail.slice(0, 800)}` : ''),
-            buttons: ['Submit Bug Report', 'Copy Error & Close', 'Close'],
-            defaultId: 0,
-            cancelId: 2,
-          });
-          if (choice === 0) {
-            // Open pre-filled GitHub issue in browser
-            const issueTitle = encodeURIComponent(`[Crash] Server crashed 3 times instantly on ${process.platform} v${app.getVersion()}`);
-            const issueBody = encodeURIComponent(
-              `**HomeStream version:** ${app.getVersion()}\n` +
-              `**Platform:** ${process.platform} (${process.arch})\n` +
-              `**Node:** ${process.versions.node}\n\n` +
-              `**Error log:**\n\`\`\`\n${fullErrorText.slice(0, 3000)}\n\`\`\`\n\n` +
-              `**Steps to reproduce:**\n1. \n2. \n3. \n`
-            );
-            shell.openExternal(`https://github.com/HomeStream-co/homestream/issues/new?title=${issueTitle}&body=${issueBody}&labels=crash`);
-          } else if (choice === 1) {
-            clipboard.writeText(fullErrorText);
+          // Check if a fix is already out before showing the crash dialog
+          pushLog('Crash loop detected — checking for available update…', 'warn');
+          const updateCheck = await checkForUpdateNow();
+          if (updateCheck.available) {
+            const updateChoice = dialog.showMessageBoxSync({
+              type: 'warning',
+              title: 'HomeStream — Update available',
+              message: `v${updateCheck.version} is available and may fix this crash.`,
+              detail: 'Would you like to download and install it now?',
+              buttons: ['Download & Install', 'Submit Bug Report', 'Close'],
+              defaultId: 0,
+              cancelId: 2,
+            });
+            if (updateChoice === 0) {
+              downloadAndInstall()
+                .catch(() => shell.openExternal('https://github.com/HomeStream-co/homestream/releases/latest'));
+              return;
+            } else if (updateChoice === 1) {
+              await submitCrashReport('fast-crash', fullErrorText, (opts) => dialog.showMessageBoxSync(opts), clipboard);
+            }
+          } else {
+            const choice = dialog.showMessageBoxSync({
+              type: 'error',
+              title: 'HomeStream — Crash loop stopped',
+              message: 'HomeStream stopped after 3 instant crashes.',
+              detail:
+                `Full error log saved to:\n  ${debugLogLocation}\n\n` +
+                (crashDetail ? `Last lines:\n${crashDetail.slice(0, 800)}` : ''),
+              buttons: ['Submit Bug Report', 'Copy Error & Close', 'Close'],
+              defaultId: 0,
+              cancelId: 2,
+            });
+            if (choice === 0) {
+              await submitCrashReport('fast-crash', fullErrorText, (opts) => dialog.showMessageBoxSync(opts), clipboard);
+            } else if (choice === 1) {
+              clipboard.writeText(fullErrorText);
+            }
           }
           app.quit();
           return;
@@ -432,15 +446,7 @@ async function startServer() {
           cancelId: 2,
         });
         if (choice2 === 0) {
-          const issueTitle = encodeURIComponent(`[Crash] Server crashed ${MAX_WATCHDOG_RESTARTS} times on ${process.platform} v${app.getVersion()}`);
-          const issueBody = encodeURIComponent(
-            `**HomeStream version:** ${app.getVersion()}\n` +
-            `**Platform:** ${process.platform} (${process.arch})\n` +
-            `**Node:** ${process.versions.node}\n\n` +
-            `**Error log:**\n\`\`\`\n${fullErrorText2.slice(0, 3000)}\n\`\`\`\n\n` +
-            `**Steps to reproduce:**\n1. \n2. \n3. \n`
-          );
-          shell.openExternal(`https://github.com/HomeStream-co/homestream/issues/new?title=${issueTitle}&body=${issueBody}&labels=crash`);
+          await submitCrashReport('watchdog', fullErrorText2, (opts) => dialog.showMessageBoxSync(opts), clipboard);
         } else if (choice2 === 1) {
           clipboard.writeText(fullErrorText2);
         }

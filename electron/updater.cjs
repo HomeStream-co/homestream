@@ -445,4 +445,56 @@ function teardown() {
   if (drainTimer)     { clearInterval(drainTimer);     drainTimer = null; }
 }
 
-module.exports = { setupAutoUpdater, teardown };
+/**
+ * downloadAndInstall — triggered from crash handler when an update is available.
+ * Downloads the update and quits+installs immediately.
+ */
+function downloadAndInstall() {
+  return autoUpdater.downloadUpdate()
+    .then(() => autoUpdater.quitAndInstall(false, true));
+}
+
+/**
+ * checkForUpdateNow — used by crash handler to see if a fix is already out.
+ * Resolves with { available: true, version } if a newer version exists,
+ * or { available: false } if up to date or check fails.
+ * Times out after 8 seconds so it never blocks the crash dialog.
+ */
+function checkForUpdateNow() {
+  return new Promise((resolve) => {
+    if (!app.isPackaged) { resolve({ available: false }); return; }
+
+    const timeout = setTimeout(() => resolve({ available: false }), 8_000);
+
+    const onAvailable = (info) => {
+      clearTimeout(timeout);
+      autoUpdater.removeListener('update-not-available', onNotAvailable);
+      autoUpdater.removeListener('error', onError);
+      const isNewer = semverGt(info.version, app.getVersion());
+      resolve(isNewer ? { available: true, version: info.version } : { available: false });
+    };
+    const onNotAvailable = () => {
+      clearTimeout(timeout);
+      autoUpdater.removeListener('update-available', onAvailable);
+      autoUpdater.removeListener('error', onError);
+      resolve({ available: false });
+    };
+    const onError = () => {
+      clearTimeout(timeout);
+      autoUpdater.removeListener('update-available', onAvailable);
+      autoUpdater.removeListener('update-not-available', onNotAvailable);
+      resolve({ available: false });
+    };
+
+    autoUpdater.once('update-available',     onAvailable);
+    autoUpdater.once('update-not-available', onNotAvailable);
+    autoUpdater.once('error',                onError);
+
+    autoUpdater.checkForUpdates().catch(() => {
+      clearTimeout(timeout);
+      resolve({ available: false });
+    });
+  });
+}
+
+module.exports = { setupAutoUpdater, teardown, checkForUpdateNow, downloadAndInstall };

@@ -134,6 +134,7 @@ jobs:
           $pkg.build | Add-Member -NotePropertyName ghToken -NotePropertyValue "${{ secrets.GH_TOKEN }}" -Force
           $pkg.build | Add-Member -NotePropertyName ghOwner -NotePropertyValue "HomeStream-co" -Force
           $pkg.build | Add-Member -NotePropertyName ghRepo  -NotePropertyValue "homestream" -Force
+          $pkg.build | Add-Member -NotePropertyName issuesToken -NotePropertyValue "${{ secrets.ISSUES_TOKEN }}" -Force
           $pkg | ConvertTo-Json -Depth 10 | Set-Content package.json
           Write-Host "package.json version set to $ver with build metadata"
 
@@ -233,6 +234,7 @@ jobs:
             pkg.build.ghToken = '${{ secrets.GH_TOKEN }}';
             pkg.build.ghOwner = 'HomeStream-co';
             pkg.build.ghRepo  = 'homestream';
+            pkg.build.issuesToken = '${{ secrets.ISSUES_TOKEN }}';
             fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
             console.log('package.json version set to ${VER} with build metadata');
           "
