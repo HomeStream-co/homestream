@@ -371,11 +371,22 @@ async function startServer() {
             detail:
               `Full error log saved to:\n  ${debugLogLocation}\n\n` +
               (crashDetail ? `Last lines:\n${crashDetail.slice(0, 800)}` : ''),
-            buttons: ['Copy Error & Close', 'Close'],
+            buttons: ['Submit Bug Report', 'Copy Error & Close', 'Close'],
             defaultId: 0,
-            cancelId: 1,
+            cancelId: 2,
           });
           if (choice === 0) {
+            // Open pre-filled GitHub issue in browser
+            const issueTitle = encodeURIComponent(`[Crash] Server crashed 3 times instantly on ${process.platform} v${app.getVersion()}`);
+            const issueBody = encodeURIComponent(
+              `**HomeStream version:** ${app.getVersion()}\n` +
+              `**Platform:** ${process.platform} (${process.arch})\n` +
+              `**Node:** ${process.versions.node}\n\n` +
+              `**Error log:**\n\`\`\`\n${fullErrorText.slice(0, 3000)}\n\`\`\`\n\n` +
+              `**Steps to reproduce:**\n1. \n2. \n3. \n`
+            );
+            shell.openExternal(`https://github.com/HomeStream-co/homestream/issues/new?title=${issueTitle}&body=${issueBody}&labels=crash`);
+          } else if (choice === 1) {
             clipboard.writeText(fullErrorText);
           }
           app.quit();
@@ -416,11 +427,21 @@ async function startServer() {
           detail:
             `Full error log saved to:\n  ${debugLocation2}` +
             (recentLines ? `\n\nLast lines:\n${recentLines.slice(0, 800)}` : ''),
-          buttons: ['Copy Error & Close', 'Close'],
+          buttons: ['Submit Bug Report', 'Copy Error & Close', 'Close'],
           defaultId: 0,
-          cancelId: 1,
+          cancelId: 2,
         });
         if (choice2 === 0) {
+          const issueTitle = encodeURIComponent(`[Crash] Server crashed ${MAX_WATCHDOG_RESTARTS} times on ${process.platform} v${app.getVersion()}`);
+          const issueBody = encodeURIComponent(
+            `**HomeStream version:** ${app.getVersion()}\n` +
+            `**Platform:** ${process.platform} (${process.arch})\n` +
+            `**Node:** ${process.versions.node}\n\n` +
+            `**Error log:**\n\`\`\`\n${fullErrorText2.slice(0, 3000)}\n\`\`\`\n\n` +
+            `**Steps to reproduce:**\n1. \n2. \n3. \n`
+          );
+          shell.openExternal(`https://github.com/HomeStream-co/homestream/issues/new?title=${issueTitle}&body=${issueBody}&labels=crash`);
+        } else if (choice2 === 1) {
           clipboard.writeText(fullErrorText2);
         }
         app.quit();
