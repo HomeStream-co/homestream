@@ -48,8 +48,15 @@ function clearScanCache(): void {
   try { fs.unlinkSync(getScanCachePath()); } catch { /* already gone */ }
 }
 
-/**
- * POST /api/setup
+/** Ensure a URL has a protocol prefix. Defaults to http:// if missing. */
+function normalizeUrl(url: string): string {
+  if (!url) return url;
+  const trimmed = url.trim();
+  if (/^https?:\/\//i.test(trimmed)) return trimmed.replace(/\/$/, '');
+  return `http://${trimmed}`.replace(/\/$/, '');
+}
+
+
  *
  * Handles all setup wizard steps:
  *   action: 'save'         — save config fields
@@ -108,6 +115,10 @@ export default async function handler(req: Request, res: Response) {
         for (const key of allowed) {
           if (fields[key] !== undefined) updates[key] = fields[key];
         }
+        // Normalise URL fields — add http:// if user typed bare host:port
+        if (updates.qbitUrl)     updates.qbitUrl     = normalizeUrl(updates.qbitUrl as string);
+        if (updates.prowlarrUrl) updates.prowlarrUrl = normalizeUrl(updates.prowlarrUrl as string);
+        if (updates.jellyfinUrl) updates.jellyfinUrl = normalizeUrl(updates.jellyfinUrl as string);
         // Hash admin password with bcrypt before saving.
         // DEVELOPER_LOCK: if the developer has locked ownership via the
         // DEVELOPER_LOCK=true env var, refuse to overwrite the seeded password.
@@ -202,17 +213,12 @@ export default async function handler(req: Request, res: Response) {
 
       case 'test_qbit': {
         const result = await testQbit({
-          url:      fields.qbitUrl      || undefined,
+          url:      normalizeUrl(fields.qbitUrl)      || undefined,
           username: fields.qbitUsername || undefined,
           password: fields.qbitPassword || undefined,
         });
-        // FIX (🔴): After a successful connection test, persist the credentials
-        // to process.env so the qBittorrent client uses them for the rest of
-        // the session. Previously the handler passed credentials directly to
-        // testQbit() but never updated process.env, so the live qBit client
-        // continued using the old (or empty) credentials after the wizard.
         if (result.ok) {
-          if (fields.qbitUrl)      process.env.QBIT_URL      = fields.qbitUrl;
+          if (fields.qbitUrl)      process.env.QBIT_URL      = normalizeUrl(fields.qbitUrl);
           if (fields.qbitUsername) process.env.QBIT_USERNAME = fields.qbitUsername;
           if (fields.qbitPassword) process.env.QBIT_PASSWORD = fields.qbitPassword;
         }
@@ -247,7 +253,7 @@ export default async function handler(req: Request, res: Response) {
 
       case 'test_prowlarr': {
         const config = readConfig();
-        const prowlarrUrl    = (fields.prowlarrUrl    || config.prowlarrUrl    || '').trim();
+        const prowlarrUrl    = normalizeUrl((fields.prowlarrUrl    || config.prowlarrUrl    || '').trim());
         const prowlarrApiKey = (fields.prowlarrApiKey || config.prowlarrApiKey || '').trim();
         if (!prowlarrUrl) {
           res.json({ ok: false, error: 'No Prowlarr URL provided' });

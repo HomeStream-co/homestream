@@ -50,6 +50,11 @@ export default function StepOptional({
   }, []);
 
   const testQbit = async () => {
+    // Auto-fix URL before testing — add http:// if missing
+    const rawUrl = form.qbitUrl.trim();
+    const fixedUrl = rawUrl && !/^https?:\/\//i.test(rawUrl) ? `http://${rawUrl}` : rawUrl;
+    if (fixedUrl !== form.qbitUrl) set('qbitUrl', fixedUrl);
+
     setQbitTest('testing'); setTestError('');
     try {
       let data: { ok: boolean; version?: string; error?: string };
@@ -59,7 +64,7 @@ export default function StepOptional({
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             action: 'test_qbit',
-            qbitUrl: form.qbitUrl,
+            qbitUrl: fixedUrl,
             qbitUsername: form.qbitUsername,
             qbitPassword: form.qbitPassword,
           }),
@@ -141,6 +146,11 @@ export default function StepOptional({
   };
 
   const testProwlarr = async () => {
+    // Auto-fix URL before testing — add http:// if missing
+    const rawUrl = form.prowlarrUrl.trim();
+    const fixedUrl = rawUrl && !/^https?:\/\//i.test(rawUrl) ? `http://${rawUrl}` : rawUrl;
+    if (fixedUrl !== form.prowlarrUrl) set('prowlarrUrl', fixedUrl);
+
     setProwlarrTest('testing');
     setProwlarrTestMsg('');
     try {
@@ -151,7 +161,7 @@ export default function StepOptional({
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             action: 'test_prowlarr',
-            prowlarrUrl: form.prowlarrUrl,
+            prowlarrUrl: fixedUrl,
             prowlarrApiKey: form.prowlarrApiKey,
           }),
         });
@@ -288,16 +298,18 @@ export default function StepOptional({
             <div className="flex items-start gap-2 p-2.5 rounded-lg bg-muted/40 border border-border">
               <Info className="w-3.5 h-3.5 text-muted-foreground mt-0.5 flex-shrink-0" />
               <div className="text-[11px] text-muted-foreground leading-snug">
-                <p className="font-semibold text-foreground/70 mb-1">Troubleshooting:</p>
-                <ul className="flex flex-col gap-0.5 list-none">
-                  <li>• Is qBittorrent open? Check your taskbar / system tray</li>
-                  <li>• Is the Web UI enabled? Tools → Options → Web UI → Enable</li>
-                  <li>• Is the port correct? Default is <code className="bg-background/60 px-1 rounded">8080</code></li>
-                  <li>• Try opening <code className="bg-background/60 px-1 rounded">http://localhost:8080</code> in your browser</li>
-                </ul>
+                <p className="font-semibold text-foreground/70 mb-1">How to fix:</p>
+                <ol className="flex flex-col gap-1 list-none">
+                  <li><span className="text-primary font-bold">1.</span> Open qBittorrent on this computer</li>
+                  <li><span className="text-primary font-bold">2.</span> Go to <strong>Tools → Options → Web UI</strong></li>
+                  <li><span className="text-primary font-bold">3.</span> Tick <strong>"Enable the Web User Interface"</strong></li>
+                  <li><span className="text-primary font-bold">4.</span> Note the port (default: <code className="bg-background/60 px-1 rounded">8080</code>)</li>
+                  <li><span className="text-primary font-bold">5.</span> Set username &amp; password, click <strong>Apply</strong></li>
+                  <li><span className="text-primary font-bold">6.</span> Enter <code className="bg-background/60 px-1 rounded">http://localhost:8080</code> above and test again</li>
+                </ol>
                 <a href="https://www.qbittorrent.org/download" target="_blank" rel="noopener noreferrer"
                   className="mt-1.5 flex items-center gap-1 text-primary hover:underline">
-                  <ExternalLink className="w-3 h-3" />Not installed? Download qBittorrent
+                  <ExternalLink className="w-3 h-3" />Not installed? Download qBittorrent free
                 </a>
               </div>
             </div>
@@ -490,8 +502,26 @@ export default function StepOptional({
             </div>
           )}
           {prowlarrTest === 'error' && (
-            <div className="flex items-center gap-1.5 text-[11px] text-destructive bg-destructive/10 border border-destructive/20 rounded-lg px-2.5 py-1.5">
-              <XCircle className="w-3.5 h-3.5 flex-shrink-0" />{prowlarrTestMsg}
+            <div className="flex flex-col gap-1.5">
+              <div className="flex items-center gap-1.5 text-[11px] text-destructive bg-destructive/10 border border-destructive/20 rounded-lg px-2.5 py-1.5">
+                <XCircle className="w-3.5 h-3.5 flex-shrink-0" />{prowlarrTestMsg}
+              </div>
+              <div className="flex items-start gap-2 p-2.5 rounded-lg bg-muted/40 border border-border">
+                <Info className="w-3.5 h-3.5 text-muted-foreground mt-0.5 flex-shrink-0" />
+                <div className="text-[11px] text-muted-foreground leading-snug">
+                  <p className="font-semibold text-foreground/70 mb-1">How to fix:</p>
+                  <ol className="flex flex-col gap-1 list-none">
+                    <li><span className="text-primary font-bold">1.</span> Make sure Prowlarr is running on this computer</li>
+                    <li><span className="text-primary font-bold">2.</span> Open <code className="bg-background/60 px-1 rounded">http://localhost:9696</code> in your browser to confirm</li>
+                    <li><span className="text-primary font-bold">3.</span> In Prowlarr go to <strong>Settings → General</strong> and copy the <strong>API Key</strong></li>
+                    <li><span className="text-primary font-bold">4.</span> Paste it in the API Key field above and test again</li>
+                  </ol>
+                  <a href="https://prowlarr.com" target="_blank" rel="noopener noreferrer"
+                    className="mt-1.5 flex items-center gap-1 text-primary hover:underline">
+                    <ExternalLink className="w-3 h-3" />Not installed? Download Prowlarr free
+                  </a>
+                </div>
+              </div>
             </div>
           )}
         </div>

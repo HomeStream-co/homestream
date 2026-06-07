@@ -77,10 +77,10 @@ function walkDir(dir: string, results: ScannedFile[] = []): ScannedFile[] {
       const ext = path.extname(entry.name).toLowerCase();
       if (!VIDEO_EXTENSIONS.has(ext)) continue;
 
-      // Skip tiny files — likely samples or trailers (< 50 MB)
+      // Skip tiny files — likely samples or trailers (< 5 MB)
       let size = 0;
       try { size = fs.statSync(fullPath).size; } catch { continue; }
-      if (size < 50 * 1024 * 1024) continue;
+      if (size < 5 * 1024 * 1024) continue;
 
       results.push({ path: fullPath, name: entry.name, size, ext });
     }
@@ -144,6 +144,9 @@ export async function importExistingMedia(
     const file = files[i];
 
     try {
+      // Guard: skip if path is somehow empty (shouldn't happen but be safe)
+      if (!file.path) { failed++; continue; }
+
       const { title: extractedTitle, year: extractedYear } = extractTitle(file.name);
 
       // 1. Fetch OMDB metadata (best-effort — null if offline or no key)

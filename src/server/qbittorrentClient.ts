@@ -49,8 +49,16 @@ export interface QbitAddOptions {
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
+/** Ensure a URL has a protocol prefix. Defaults to http:// if missing. */
+function normalizeUrl(url: string, defaultPort = '8080'): string {
+  if (!url) return `http://localhost:${defaultPort}`;
+  const trimmed = url.trim();
+  if (/^https?:\/\//i.test(trimmed)) return trimmed.replace(/\/$/, '');
+  return `http://${trimmed}`.replace(/\/$/, '');
+}
+
 function getQbitUrl(): string {
-  return process.env.QBIT_URL || 'http://localhost:8080';
+  return normalizeUrl(process.env.QBIT_URL || 'http://localhost:8080');
 }
 
 function getCredentials(): { username: string; password: string } {
@@ -154,7 +162,7 @@ export async function testConnection(overrides?: {
   try {
     if (overrides) {
       // Scoped test — build a one-shot login without touching process.env
-      const url      = overrides.url      || getQbitUrl();
+      const url      = normalizeUrl(overrides.url || getQbitUrl());
       const username = overrides.username || getCredentials().username;
       const password = overrides.password || getCredentials().password;
 
