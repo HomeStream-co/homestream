@@ -261,26 +261,46 @@ function setupAutoUpdater({ controlWindowGetter, pushLog, port = 3000 }) {
 
   log(`Auto-updater configured for ${owner}/${repo}`);
 
-  // ── Private repo: inject GitHub token ───────────────────────────────────────
-  // The repo is private so electron-updater must authenticate with a GitHub
-  // Personal Access Token (read:packages + contents scope) to:
-  //   1. Fetch the latest.yml release manifest
-  //   2. Download the delta/full installer asset
+  // ── Private repo: configure the feed URL with the token ─────────────────────
+  // For a private GitHub repo, electron-updater must use PrivateGitHubProvider
+  // (which routes through api.github.com) instead of the default GitHubProvider
+  // (which hits the public CDN and gets 404s on private repos).
+  //
+  // The provider is selected in providerFactory.js via this logic:
+  //   token = (options.private ? process.env.GH_TOKEN : null) || options.token
+  //   token == null → GitHubProvider (public, no auth)
+  //   token != null → PrivateGitHubProvider (api.github.com, authenticated)
+  //
+  // So we must call setFeedURL() with { private: true, token } to force
+  // PrivateGitHubProvider. Setting autoUpdater.requestHeaders alone is NOT
+  // enough — that only affects downloads, not the provider class instantiation.
   //
   // The token is baked into the app at build time via electron-builder
   // extraMetadata.ghToken (set from the GH_TOKEN CI secret).
-  // It is NOT a secret in the traditional sense — anyone who unpacks the asar
-  // can read it — so use a fine-grained PAT scoped to read-only release assets
-  // on this repo only. Never use a broad admin token here.
+  // Use a fine-grained PAT scoped to read-only release assets on this repo only.
   const ghToken = process.env.HOMESTREAM_GH_TOKEN || pkg?.build?.ghToken || '';
   if (ghToken) {
-    autoUpdater.requestHeaders = { Authorization: `token ${ghToken}` };
-    log('GitHub token configured for private repo update checks');
+    // setFeedURL forces PrivateGitHubProvider — the token field is passed
+    // directly to the provider constructor, bypassing the GH_TOKEN env var check.
+    autoUpdater.setFeedURL({
+      provider: 'github',
+      owner,
+      repo,
+      private: true,
+      token: ghToken,
+    });
+    log('GitHub token configured — using PrivateGitHubProvider (api.github.com)');
   } else {
+    // No token: fall back to public GitHubProvider. This will 404 on a private
+    // repo but is the best we can do without a token.
+    autoUpdater.setFeedURL({
+      provider: 'github',
+      owner,
+      repo,
+    });
     log('No GitHub token found — update checks will fail on private repos. Set GH_TOKEN in CI and add ghToken to extraMetadata.', 'warn');
   }
 
-  // electron-updater reads publish config from electron-builder.yml automatically.
   // Disable auto-download so the user controls when to download.
   autoUpdater.autoDownload = false;
   autoUpdater.autoInstallOnAppQuit = false;
