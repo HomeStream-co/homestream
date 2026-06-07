@@ -7,7 +7,33 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-## [2.0.1] - 2026-06-04
+## [2.0.4] - 2026-06-07
+
+### Fixed
+- **Auto-updater now works on private repos** — the updater was using
+  `autoUpdater.requestHeaders` to inject the GitHub token, which only affects
+  HTTP downloads and does nothing to change which provider class is instantiated.
+  `electron-updater` was silently selecting `GitHubProvider` (public CDN) instead
+  of `PrivateGitHubProvider` (api.github.com). Fixed by calling
+  `autoUpdater.setFeedURL({ provider: 'github', owner, repo, private: true, token })`
+  which forces `PrivateGitHubProvider` and routes all manifest fetches and installer
+  downloads through the authenticated GitHub API. Users on v2.0.3 will receive this
+  update automatically once the release is published.
+- **`private: true` added to `electron-builder.yml` publish block** — ensures
+  `app-update.yml` (bundled inside the asar) also carries `private: true` so
+  the provider selection logic works correctly even if `setFeedURL` is not called.
+- **Hardcoded `HARDCODED_OWNER` / `HARDCODED_REPO` fallbacks in updater** — the
+  updater no longer silently bails with "not configured" if `require('../package.json')`
+  fails inside the asar at runtime.
+- **Crash dialog now has "Copy Error & Close" button** — replaced both
+  `dialog.showErrorBox()` calls (no buttons, no clipboard) with
+  `dialog.showMessageBoxSync()` showing "Copy Error & Close" and "Close" buttons.
+  Clicking "Copy Error & Close" writes the full error text and last 20–30 log lines
+  to the Windows clipboard so users can paste it into a bug report.
+
+---
+
+## [2.0.3] - 2026-06-06
 
 ### Security
 - **Path traversal guard on `/api/stream/:filename`** — resolved file paths are now
