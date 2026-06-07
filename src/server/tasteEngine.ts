@@ -20,7 +20,6 @@
 // Lazy DB access — db/client throws at import time when the cloud DB config
 // file (/local/config.json) is absent (e.g. on a user's Windows/Linux desktop).
 // We defer the import to first use so the server starts cleanly without a DB.
-import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 type AnyDB = ReturnType<typeof import('drizzle-orm/mysql2').drizzle>;
 let _db: AnyDB | null = null;
 let _dbLoadAttempted = false;
