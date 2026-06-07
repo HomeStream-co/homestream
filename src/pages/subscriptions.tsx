@@ -19,7 +19,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import {
   Bell, BellOff, RefreshCw, Trash2, Library,
   Calendar, Clock, CheckCircle2, AlertCircle, Loader2,
-  ChevronDown, Play,
+  Play,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {

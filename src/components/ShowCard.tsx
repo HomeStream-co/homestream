@@ -12,7 +12,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
-import { Play, ChevronDown, Tv2, Star, Check, Trash2, Edit2, Bell, BellOff } from 'lucide-react';
+import { Play, ChevronDown, Tv2, Star, Check, Trash2, Edit2, Bell } from 'lucide-react';
 import type { MediaItem, Episode } from '@/types/media';
 import { toast } from 'sonner';
 
@@ -184,6 +184,9 @@ export default function ShowCard({
   const cardRef = useRef<HTMLDivElement>(null);
   const [subscribed, setSubscribed] = useState(false);
 
+  // Representative item — first one, used for poster/title/rating
+  const rep = items[0];
+
   // Check subscription status on mount
   useEffect(() => {
     const imdbId = rep.imdbId;
@@ -241,8 +244,6 @@ export default function ShowCard({
     }
   };
 
-  // Representative item — first one, used for poster/title/rating
-  const rep = items[0];
   const anySelected = items.some(m => selectedIds.has(m.id));
 
   // Total episode count across all items
