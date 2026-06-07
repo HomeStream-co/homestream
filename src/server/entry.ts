@@ -433,6 +433,7 @@ app.get("/sitemap.xml", (req, res) => {
 });
 
 if (import.meta.env.PROD) {
+	void (async () => {
 	const __dirname = dirname(fileURLToPath(import.meta.url));
 	// Bundle lives at dist/server/server.bundle.cjs → client files are one level up at dist/client/
 	const clientDir = join(__dirname, "..", "client");
@@ -483,10 +484,17 @@ if (import.meta.env.PROD) {
 		.replace("<!--app-head-->", "")
 		.replace("<!--app-html-->", "");
 
-	// Resolve the SSR module once into a stable render function. A failed
-	// load is unrecoverable at runtime - exiting lets the container
-	// scheduler restart with a clean slate rather than leaving the server
-	// to serve silent 503s indefinitely against a single startup log.
+	// Resolve the SSR module once into a stable render function BEFORE
+	// starting the HTTP server. In a CJS bundle, dynamic import() compiles
+	// to a synchronous require() deferred to the next microtask — if we
+	// fire-and-forget it and call app.listen() immediately, the server
+	// prints "Ready at" and starts accepting connections while the require()
+	// is still running synchronously, blocking the event loop. On Windows
+	// with Defender this can stall all requests for several minutes while
+	// the AV scanner processes the SSR chunk. Awaiting the import here
+	// means "Ready at" is only printed after the chunk is fully loaded and
+	// scanned, so the pre-warm step's "wait for Ready at" signal is a true
+	// readiness indicator and the smoke test can connect immediately.
 	type RenderResult = {
 		html: string;
 		head: string;
@@ -494,28 +502,24 @@ if (import.meta.env.PROD) {
 		redirect?: string;
 	};
 	let renderFn: ((url: string) => Promise<RenderResult>) | null = null;
-	const SSR_MODULE_LOAD_TIMEOUT_MS = 30_000;
-	const loadTimeout = setTimeout(() => {
-		if (renderFn !== null) return;
-		console.error("ssr.module.load-timeout", {
-			timeoutMs: SSR_MODULE_LOAD_TIMEOUT_MS,
+	const SSR_MODULE_LOAD_TIMEOUT_MS = 60_000;
+	try {
+		const ssrMod = await Promise.race([
+			import("../entry-server"),
+			new Promise<never>((_, reject) =>
+				setTimeout(
+					() => reject(new Error(`SSR module load timed out after ${SSR_MODULE_LOAD_TIMEOUT_MS}ms`)),
+					SSR_MODULE_LOAD_TIMEOUT_MS,
+				),
+			),
+		]);
+		renderFn = ssrMod.render;
+	} catch (err) {
+		console.error("ssr.module.load-failed", {
+			error: err instanceof Error ? err.stack : String(err),
 		});
 		process.exit(1);
-	}, SSR_MODULE_LOAD_TIMEOUT_MS);
-	loadTimeout.unref();
-	import("../entry-server").then(
-		(mod) => {
-			clearTimeout(loadTimeout);
-			renderFn = mod.render;
-		},
-		(err) => {
-			clearTimeout(loadTimeout);
-			console.error("ssr.module.load-failed", {
-				error: err instanceof Error ? err.stack : String(err),
-			});
-			process.exit(1);
-		},
-	);
+	}
 
 	app.get(/.*/, async (req, res, next) => {
 		if (req.method !== "GET") return next();
@@ -527,11 +531,10 @@ if (import.meta.env.PROD) {
 				.set("Content-Type", "text/html; charset=utf-8")
 				.set("Cache-Control", "no-store")
 				.send(fallbackShell);
-		if (renderFn === null) {
-			// Module not yet resolved; fall back without logging to avoid startup
-			// noise before the first render is even possible. A terminal load
-			// failure (import reject or 30s timeout) process.exit(1)s from the
-			// loader above, so this branch is only the brief warmup window.
+		// renderFn is always defined here — the server only starts after the
+		// SSR module is loaded (see await above). This branch is unreachable
+		// in practice but kept as a type-safe guard.
+		if (!renderFn) {
 			return sendFallback();
 		}
 		try {
@@ -651,6 +654,7 @@ if (import.meta.env.PROD) {
 		});
 		process.exit(1);
 	});
+	})(); // end async IIFE
 }
 
 export default app;

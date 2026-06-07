@@ -450,17 +450,23 @@ jobs:
 
           # ── Windows Defender pre-warm ──────────────────────────────────────
           # Defender scans new .cjs files on first execution, blocking Node for
-          # up to 5 minutes on GitHub-hosted runners. Running `node --check`
-          # forces a synchronous scan in THIS step so the scan is complete
-          # before Start-Process spawns the server. The exclusion is added first
-          # as a belt-and-suspenders measure for any other files Node loads.
+          # up to 5 minutes on GitHub-hosted runners. We add exclusions for the
+          # entire install dir (including the bin/ chunk subdirectory) and then
+          # execute the bundle so it loads all require()d chunks synchronously.
+          # The server only prints "Ready at" after the SSR chunk is fully loaded
+          # (see entry.ts — app.listen is called after awaiting entry-server),
+          # so "Ready at" is a true readiness signal and the real server starts
+          # instantly on the second spawn.
           Add-MpPreference -ExclusionPath "$env:INSTALL_DIR" -ErrorAction SilentlyContinue
+          Add-MpPreference -ExclusionPath "$env:INSTALL_DIR\resources\server\bin" -ErrorAction SilentlyContinue
           Add-MpPreference -ExclusionPath $dataDir -ErrorAction SilentlyContinue
           Write-Host "Defender exclusions added. Pre-warming bundle (triggers AV scan synchronously)..."
           # node --check only syntax-parses — it does NOT call require(), so Defender
-          # never scans the dependency tree. We must actually execute the bundle,
-          # wait for "Ready at" (all requires done = Defender scanned everything),
-          # kill it, then respawn on the real port. Second spawn is instant.
+          # never scans the dependency tree. We must actually execute the bundle and
+          # wait for "Ready at". Because entry.ts now awaits the SSR chunk import
+          # before calling app.listen, "Ready at" means ALL chunks (including the
+          # large entry-server chunk) have been require()d and Defender-scanned.
+          # Kill it, then respawn on the real port. Second spawn is instant.
           $warmEnv = @{
             NODE_ENV        = "production"
             PORT            = "3001"
