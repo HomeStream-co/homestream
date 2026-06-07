@@ -23,7 +23,9 @@ function StepCard({ number, title, description, children }: {
 }
 
 export default function SamsungTVPage() {
-  const lanBaseUrl = `${window.location.protocol}//${window.location.hostname}:${window.location.port || '3001'}`;
+  const lanBaseUrl = typeof window !== 'undefined'
+    ? `${window.location.protocol}//${window.location.hostname}:${window.location.port || '3001'}`
+    : 'http://localhost:3001';
   const [copied, setCopied] = useState(false);
 
   const tvUrl = `${lanBaseUrl}/tv`;

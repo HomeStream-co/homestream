@@ -335,7 +335,9 @@ function RemotePageInner({ onAuthExpired }: { onAuthExpired: () => void }) {
   }, []);
 
   // Read ?tab= from URL for PWA shortcut deep-linking
-  const initialTab = (new URLSearchParams(window.location.search).get('tab') ?? 'remote') as RemoteTab;
+  const initialTab = (typeof window !== 'undefined'
+    ? new URLSearchParams(window.location.search).get('tab') ?? 'remote'
+    : 'remote') as RemoteTab;
   const [activeTab, setActiveTab] = useState<RemoteTab>(initialTab);
 
   const [status, setStatus] = useState<ConnStatus>('connecting');

@@ -90,14 +90,16 @@ const capturedErrors: CapturedError[] = [];
     origError(...args);
   };
 
-  // Also capture unhandled promise rejections
-  window.addEventListener('unhandledrejection', (e) => {
-    capturedErrors.push({
-      ts: new Date().toISOString(),
-      msg: `[unhandledrejection] ${String(e.reason)}`.slice(0, 300),
+  // Also capture unhandled promise rejections (browser-only)
+  if (typeof window !== 'undefined') {
+    window.addEventListener('unhandledrejection', (e) => {
+      capturedErrors.push({
+        ts: new Date().toISOString(),
+        msg: `[unhandledrejection] ${String(e.reason)}`.slice(0, 300),
+      });
+      if (capturedErrors.length > MAX_CAPTURED) capturedErrors.shift();
     });
-    if (capturedErrors.length > MAX_CAPTURED) capturedErrors.shift();
-  });
+  }
 })();
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
