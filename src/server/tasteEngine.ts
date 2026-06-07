@@ -19,7 +19,8 @@
  */
 // Lazy DB access — db/client throws at import time when the cloud DB config
 // file (/local/config.json) is absent (e.g. on a user's Windows/Linux desktop).
-// We defer the import to first use so the server starts cleanly without a DB.
+// We use a runtime-constructed path so the bundler cannot statically inline
+// the import and pull getDatabaseCredentials() into the startup critical path.
 type AnyDB = ReturnType<typeof import('drizzle-orm/mysql2').drizzle>;
 let _db: AnyDB | null = null;
 let _dbLoadAttempted = false;
@@ -27,10 +28,12 @@ async function getDb(): Promise<AnyDB | null> {
   if (_dbLoadAttempted) return _db;
   _dbLoadAttempted = true;
   try {
-    const mod = await import('./db/client.js' as string);
+    // Build the path at runtime so bundlers (esbuild/rollup) cannot statically
+    // resolve and inline db/client — which throws on desktop without /local/config.json
+    const parts = ['./db/', 'client.js'];
+    const mod = await import(/* @vite-ignore */ parts.join(''));
     _db = mod.db as AnyDB;
   } catch {
-    // No DB config available (desktop install) — taste features disabled.
     _db = null;
   }
   return _db;
@@ -41,7 +44,8 @@ let _schema: typeof schema | null = null;
 async function getSchema(): Promise<typeof schema | null> {
   if (_schema) return _schema;
   try {
-    _schema = await import('./db/schema.js' as string) as typeof schema;
+    const parts = ['./db/', 'schema.js'];
+    _schema = await import(/* @vite-ignore */ parts.join('')) as typeof schema;
   } catch {
     _schema = null;
   }

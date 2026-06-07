@@ -31,11 +31,7 @@ import castSendPost from "./api/cast/send/POST";
 import castStopPost from "./api/cast/stop/POST";
 // chat
 import chatPost from "./api/chat/POST";
-// taste engine
-import tasteEventsPost  from "./api/taste/events/POST";
-import tasteProfileGet  from "./api/taste/profile/GET";
-import tasteScoresPost  from "./api/taste/scores/POST";
-import tasteEnrichPost  from "./api/taste/enrich/POST";
+// taste engine routes registered lazily below (after app is created)
 // crash-log
 import crashLogGet from "./api/crash-log/GET";
 import crashLogPost from "./api/crash-log/POST";
@@ -232,11 +228,27 @@ app.post("/api/cast/send", castSendPost);
 app.post("/api/cast/stop", castStopPost);
 // chat
 app.post("/api/chat", chatPost);
-// taste engine
-app.post("/api/taste/events",  tasteEventsPost);
-app.get( "/api/taste/profile", tasteProfileGet);
-app.post("/api/taste/scores",  tasteScoresPost);
-app.post("/api/taste/enrich",  tasteEnrichPost);
+// taste engine — lazy handlers so db/client is never required at startup
+// (db/client throws on desktop where /local/config.json is absent)
+{
+  const tasteRoutes: Array<{ method: 'get' | 'post'; path: string; file: string }> = [
+    { method: 'post', path: '/api/taste/events',  file: './api/taste/events/POST' },
+    { method: 'get',  path: '/api/taste/profile', file: './api/taste/profile/GET' },
+    { method: 'post', path: '/api/taste/scores',  file: './api/taste/scores/POST' },
+    { method: 'post', path: '/api/taste/enrich',  file: './api/taste/enrich/POST' },
+  ];
+  for (const { method, path, file } of tasteRoutes) {
+    const f = file; // capture for closure
+    app[method](path, async (req: import('express').Request, res: import('express').Response) => {
+      try {
+        const mod = await import(/* @vite-ignore */ f);
+        return mod.default(req, res);
+      } catch {
+        res.status(503).json({ error: 'Taste engine unavailable (no database config)' });
+      }
+    });
+  }
+}
 // crash-log
 app.get("/api/crash-log", crashLogGet);
 app.post("/api/crash-log", crashLogPost);

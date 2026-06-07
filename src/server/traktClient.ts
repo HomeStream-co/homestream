@@ -16,13 +16,17 @@ import { eq } from 'drizzle-orm';
 
 // Lazy DB — same pattern as tasteEngine: defer import so the server starts
 // cleanly on desktop installs that have no /local/config.json.
+// Runtime-constructed path prevents bundler from statically inlining db/client.
 type AnyDB = ReturnType<typeof import('drizzle-orm/mysql2').drizzle>;
 let _db: AnyDB | null = null;
 let _dbAttempted = false;
 async function getDb(): Promise<AnyDB | null> {
   if (_dbAttempted) return _db;
   _dbAttempted = true;
-  try { _db = ((await import('./db/client.js' as string)) as { db: AnyDB }).db; } catch { _db = null; }
+  try {
+    const parts = ['./db/', 'client.js'];
+    _db = ((await import(/* @vite-ignore */ parts.join(''))) as { db: AnyDB }).db;
+  } catch { _db = null; }
   return _db;
 }
 
@@ -30,7 +34,10 @@ import type * as schema from './db/schema.js';
 let _schema: typeof schema | null = null;
 async function getSchema(): Promise<typeof schema | null> {
   if (_schema) return _schema;
-  try { _schema = await import('./db/schema.js' as string) as typeof schema; } catch { _schema = null; }
+  try {
+    const parts = ['./db/', 'schema.js'];
+    _schema = await import(/* @vite-ignore */ parts.join('')) as typeof schema;
+  } catch { _schema = null; }
   return _schema;
 }
 
