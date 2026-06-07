@@ -4,6 +4,7 @@ import { HelmetProvider } from '@dr.pogodin/react-helmet';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import App from './App';
 import './styles/globals.css';
+import { connectNotificationStream } from './lib/notificationStore';
 
 if (import.meta.env.MODE === 'development') {
   const meta = document.createElement('meta');
@@ -45,3 +46,7 @@ if (rootElement.firstElementChild) {
 } else {
   createRoot(rootElement).render(tree);
 }
+
+// Connect to server notification stream (new episodes queued, etc.)
+// Runs after mount so it doesn't block hydration.
+connectNotificationStream();

@@ -146,6 +146,7 @@ import stremioStreamPost from "./api/stremio/stream/POST";
 import subscriptionsGet from "./api/subscriptions/GET";
 import subscriptionsPost from "./api/subscriptions/POST";
 import subscriptionCheckPost from "./api/subscriptions/[id]/check/POST";
+import notificationsStreamGet from "./api/notifications/stream/GET";
 // tmdb
 import tmdbGet from "./api/tmdb/GET";
 import tmdbCatalogGet from "./api/tmdb/catalog/GET";
@@ -346,6 +347,7 @@ app.post("/api/stremio/stream", stremioStreamPost);
 app.get("/api/subscriptions", subscriptionsGet);
 app.post("/api/subscriptions", subscriptionsPost);
 app.post("/api/subscriptions/:id/check", subscriptionCheckPost);
+app.get("/api/notifications/stream", notificationsStreamGet);
 // tmdb
 app.get("/api/tmdb", tmdbGet);
 app.get("/api/tmdb/catalog", tmdbCatalogGet);

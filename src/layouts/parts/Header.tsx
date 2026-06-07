@@ -3,7 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import {
   Search, Menu, X, Film, Bookmark, ChevronDown, Lock,
   Home, Compass, Download, Library, History, Settings2, BarChart3, Tv2,
-  Smartphone, QrCode, Copy, Check, RefreshCw,
+  Smartphone, QrCode, Copy, Check, RefreshCw, Bell,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'sonner';
@@ -519,6 +519,13 @@ export default function Header({ onChatOpen: _onChatOpen }: HeaderProps) {
                             Watch history
                           </button>
                           <button
+                            onClick={() => { setProfileMenuOpen(false); navigate('/subscriptions'); }}
+                            className="w-full px-3 py-2.5 text-xs text-muted-foreground hover:text-foreground hover:bg-white/8 transition-colors text-left flex items-center gap-2"
+                          >
+                            <Bell className="w-3.5 h-3.5" />
+                            My Shows
+                          </button>
+                          <button
                             onClick={() => { setProfileMenuOpen(false); navigate('/stats'); }}
                             className="w-full px-3 py-2.5 text-xs text-muted-foreground hover:text-foreground hover:bg-white/8 transition-colors text-left flex items-center gap-2"
                           >
@@ -582,6 +589,7 @@ export default function Header({ onChatOpen: _onChatOpen }: HeaderProps) {
                   { to: '/library',   label: 'My Library', Icon: Library },
                   { to: '/watchlist', label: 'Watchlist',  Icon: Bookmark, badge: watchlist.length },
                   { to: '/history',   label: 'History',    Icon: History },
+                  { to: '/subscriptions', label: 'My Shows', Icon: Bell },
                   { to: '/stats',     label: 'Stats',      Icon: BarChart3 },
                   { to: '/samsung-tv',label: 'Watch on TV',Icon: Tv2 },
                 ].map(({ to, label, Icon, badge }) => (

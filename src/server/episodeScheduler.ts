@@ -30,6 +30,7 @@ import {
   type ShowSubscription,
 } from './subscriptionStore.js';
 import { dataPath } from './dataDir.js';
+import { broadcastNotification } from './notificationBroadcaster.js';
 
 // ── Timer registry ────────────────────────────────────────────────────────────
 
@@ -256,6 +257,12 @@ async function checkSubscription(sub: ShowSubscription): Promise<void> {
 
   if (newEpisodesQueued > 0) {
     console.log(`[scheduler] "${sub.title}" — queued ${newEpisodesQueued} new episode(s)`);
+    broadcastNotification({
+      type: 'new_episode_queued',
+      title: sub.title,
+      message: `${newEpisodesQueued} new episode${newEpisodesQueued !== 1 ? 's' : ''} queued for download`,
+      poster: sub.poster,
+    });
   } else {
     console.log(`[scheduler] "${sub.title}" — no new episodes found`);
   }

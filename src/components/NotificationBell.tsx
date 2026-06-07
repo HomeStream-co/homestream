@@ -20,6 +20,7 @@ function NotifIcon({ type }: { type: NotificationType }) {
     case 'download_started':  return <Download className={`${cls} text-blue-400`} />;
     case 'download_error':    return <AlertCircle className={`${cls} text-red-400`} />;
     case 'library_added':     return <Plus className={`${cls} text-primary`} />;
+    case 'new_episode_queued': return <Film className={`${cls} text-purple-400`} />;
     case 'warning':           return <AlertCircle className={`${cls} text-yellow-400`} />;
     case 'error':             return <AlertCircle className={`${cls} text-red-400`} />;
     default:                  return <Info className={`${cls} text-muted-foreground`} />;
@@ -32,6 +33,7 @@ function notifBg(type: NotificationType): string {
     case 'download_started':  return 'bg-blue-500/10 border-blue-500/20';
     case 'download_error':    return 'bg-red-500/10 border-red-500/20';
     case 'library_added':     return 'bg-primary/10 border-primary/20';
+    case 'new_episode_queued': return 'bg-purple-500/10 border-purple-500/20';
     case 'warning':           return 'bg-yellow-500/10 border-yellow-500/20';
     case 'error':             return 'bg-red-500/10 border-red-500/20';
     default:                  return 'bg-muted/30 border-border';

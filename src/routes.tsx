@@ -22,6 +22,7 @@ const RemotePage = lazy(() => import('./pages/remote'));
 const StatsPage  = lazy(() => import('./pages/stats'));
 const SamsungTvPage = lazy(() => import('./pages/samsung-tv'));
 const TvPage = lazy(() => import('./pages/tv'));
+const SubscriptionsPage = lazy(() => import('./pages/subscriptions'));
 
 const NotFoundPage = lazy(() => import('./pages/_404'));
 
@@ -63,6 +64,7 @@ export const routes: RouteObject[] = [
   { path: '/stats', element: route(<StatsPage />, 'Stats') },
   { path: '/samsung-tv', element: route(<SamsungTvPage />, 'Samsung TV') },
   { path: '/tv', element: route(<TvPage />, 'TV Interface') },
+  { path: '/subscriptions', element: route(<SubscriptionsPage />, 'My Shows') },
   { path: '*', element: route(<NotFoundPage />, '404') },
 ];
 

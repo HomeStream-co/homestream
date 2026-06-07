@@ -24,6 +24,7 @@ export type NotificationType =
   | 'download_error'
   | 'download_started'
   | 'library_added'
+  | 'new_episode_queued'
   | 'info'
   | 'warning'
   | 'error';
@@ -132,5 +133,55 @@ export function useNotifications() {
     dismissAll: dismissAllFn,
     markRead: markReadFn,
     markAllRead: markAllReadFn,
+  };
+}
+
+// ── Server-Sent Events bridge ─────────────────────────────────────────────────
+//
+// Connects to GET /api/notifications/stream and feeds server-pushed events
+// (e.g. new episode queued by the scheduler) into the in-memory store.
+// Only runs in the browser (not during SSR).
+
+let _sseConnected = false;
+
+export function connectNotificationStream(): () => void {
+  if (typeof window === 'undefined' || _sseConnected) return () => {};
+  _sseConnected = true;
+
+  let es: EventSource | null = null;
+  let retryTimer: ReturnType<typeof setTimeout> | null = null;
+  let destroyed = false;
+
+  function connect() {
+    if (destroyed) return;
+    es = new EventSource('/api/notifications/stream', { withCredentials: true });
+
+    es.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data) as Omit<AppNotification, 'read'>;
+        // Avoid duplicates (server sends id)
+        if (_notifications.some(n => n.id === data.id)) return;
+        const n: AppNotification = { ...data, read: false, ttl: 0 }; // persistent
+        _notifications = [n, ..._notifications].slice(0, 50);
+        emit();
+      } catch { /* malformed event */ }
+    };
+
+    es.onerror = () => {
+      es?.close();
+      es = null;
+      if (!destroyed) {
+        retryTimer = setTimeout(connect, 5_000);
+      }
+    };
+  }
+
+  connect();
+
+  return () => {
+    destroyed = true;
+    _sseConnected = false;
+    if (retryTimer) clearTimeout(retryTimer);
+    es?.close();
   };
 }

@@ -12,8 +12,9 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
-import { Play, ChevronDown, Tv2, Star, Check, Trash2, Edit2 } from 'lucide-react';
+import { Play, ChevronDown, Tv2, Star, Check, Trash2, Edit2, Bell, BellOff } from 'lucide-react';
 import type { MediaItem, Episode } from '@/types/media';
+import { toast } from 'sonner';
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -181,6 +182,64 @@ export default function ShowCard({
   const navigate = useNavigate();
   const [pickerOpen, setPickerOpen] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
+  const [subscribed, setSubscribed] = useState(false);
+
+  // Check subscription status on mount
+  useEffect(() => {
+    const imdbId = rep.imdbId;
+    if (!imdbId) return;
+    fetch('/api/subscriptions', { credentials: 'include' })
+      .then(r => r.json())
+      .then((data: { subscriptions?: Array<{ imdbId: string }> }) => {
+        setSubscribed(!!data.subscriptions?.find(s => s.imdbId === imdbId));
+      })
+      .catch(() => {});
+  }, [rep.imdbId]);
+
+  const handleSubscribeToggle = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const imdbId = rep.imdbId;
+    if (!imdbId) return;
+
+    if (subscribed) {
+      try {
+        await fetch('/api/subscriptions', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ imdbId, action: 'unsubscribe' }),
+        });
+        setSubscribed(false);
+        toast.success(`Unsubscribed from ${rep.title}`);
+      } catch {
+        toast.error('Failed to unsubscribe');
+      }
+    } else {
+      const totalSeasons = Math.max(
+        ...items.flatMap(m => m.episodes?.map(ep => ep.season) ?? [1]),
+        1,
+      );
+      try {
+        await fetch('/api/subscriptions', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            imdbId,
+            title: rep.title,
+            poster: rep.poster,
+            totalSeasons,
+            schedule: 'daily',
+            enabled: true,
+          }),
+        });
+        setSubscribed(true);
+        toast.success(`Subscribed to ${rep.title} — new episodes will auto-download`);
+      } catch {
+        toast.error('Failed to subscribe');
+      }
+    }
+  };
 
   // Representative item — first one, used for poster/title/rating
   const rep = items[0];
@@ -287,6 +346,22 @@ export default function ShowCard({
               >
                 <Edit2 className="w-3.5 h-3.5 text-white" />
               </button>
+              {rep.imdbId && (
+                <button
+                  onClick={handleSubscribeToggle}
+                  className={`p-1.5 rounded-full transition-colors backdrop-blur-sm ${
+                    subscribed
+                      ? 'bg-primary/80 hover:bg-primary'
+                      : 'bg-white/15 hover:bg-white/25'
+                  }`}
+                  title={subscribed ? 'Unsubscribe from auto-download' : 'Subscribe to auto-download new episodes'}
+                >
+                  {subscribed
+                    ? <Bell className="w-3.5 h-3.5 text-white fill-white" />
+                    : <Bell className="w-3.5 h-3.5 text-white" />
+                  }
+                </button>
+              )}
               <button
                 onClick={e => { e.stopPropagation(); onDelete(rep.id); }}
                 className="p-1.5 bg-destructive/70 hover:bg-destructive rounded-full transition-colors"
