@@ -636,7 +636,7 @@ if (import.meta.env.PROD) {
 	}
 	const host = process.env.HOST || "0.0.0.0";
 	const server = app.listen(port, host, () => {
-		console.log(`Server listening on http://${host}:${port}`);
+		console.log(`Ready at http://${host}:${port}`);
 		// Start background watchers after the server is ready
 		startQbitCompletionWatcher();
 		// Scan for pre-downloaded media and backfill missing captions
