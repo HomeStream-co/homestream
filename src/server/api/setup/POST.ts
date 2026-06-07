@@ -129,8 +129,16 @@ export default async function handler(req: Request, res: Response) {
 
         // Create media directories if mediaDir provided
         if (fields.mediaDir) {
-          // Expand tilde (~/path) then normalise path separators
-          const mediaDir = expandTilde(fields.mediaDir).replace(/\\/g, path.sep).replace(/\//g, path.sep);
+          // Expand tilde then normalise: on Windows convert / to \, on Linux/macOS convert \ to /
+          let mediaDir = expandTilde(fields.mediaDir.trim());
+          if (process.platform === 'win32') {
+            mediaDir = mediaDir.replace(/\//g, '\\');
+          } else {
+            mediaDir = mediaDir.replace(/\\/g, '/');
+          }
+          // Remove any duplicate separators but preserve leading slash on Linux/macOS
+          mediaDir = mediaDir.replace(/([^:])[/\\]{2,}/g, '$1' + path.sep);
+
           const downloadsDir = path.join(mediaDir, 'downloads');
           const libraryDir   = path.join(mediaDir, 'library');
           const dirs = [
@@ -141,7 +149,32 @@ export default async function handler(req: Request, res: Response) {
             path.join(libraryDir, 'tv'),
           ];
           for (const dir of dirs) {
-            try { fs.mkdirSync(dir, { recursive: true }); } catch { /* ignore */ }
+            try {
+              fs.mkdirSync(dir, { recursive: true });
+            } catch (mkdirErr) {
+              // Surface permission errors immediately so the user sees them in the wizard
+              const e = mkdirErr as NodeJS.ErrnoException;
+              if (e.code === 'EACCES' || e.code === 'EPERM') {
+                res.status(400).json({
+                  error: `Permission denied creating folder: ${dir}. Please choose a folder you have write access to.`,
+                });
+                return;
+              }
+              // Other errors (ENOTDIR etc.) — surface them too
+              if (e.code !== 'EEXIST') {
+                res.status(400).json({
+                  error: `Could not create folder: ${dir}. ${e.message}`,
+                });
+                return;
+              }
+            }
+          }
+          // Verify the root dir actually exists before saving to config
+          if (!fs.existsSync(mediaDir)) {
+            res.status(400).json({
+              error: `Folder could not be created at: ${mediaDir}. Please check the path and try again.`,
+            });
+            return;
           }
           updates.mediaDir     = mediaDir;
           updates.downloadsDir = downloadsDir;
