@@ -233,7 +233,7 @@ export function SettingsVpnWrapper() {
   const [bindMsg, setBindMsg] = useState('');
 
   useEffect(() => {
-    fetch('/api/network/interfaces', { credentials: 'include' })
+    fetch('/api/vpn/interfaces', { credentials: 'include' })
       .then(r => r.ok ? r.json() : null)
       .then((d: { interfaces: VpnInterface[]; current: string | null } | null) => {
         if (d) { setInterfaces(d.interfaces); setCurrent(d.current); setSelected(d.current ?? ''); }
@@ -244,7 +244,7 @@ export function SettingsVpnWrapper() {
   const handleBind = async () => {
     setBindState('saving');
     try {
-      const r = await fetch('/api/network/bind', {
+      const r = await fetch('/api/vpn/bind', {
         method: 'POST', credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ interface: selected }),
