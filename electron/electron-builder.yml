@@ -45,7 +45,7 @@ publish:
   owner: HomeStream-co
   repo: homestream
   releaseType: release
-  private: true
+  private: false
   # publishAutoUpdate: true is the default — electron-builder publishes latest.yml
   # alongside the installer. electron-updater reads latest.yml to check for updates.
   # NOTE: draft:false is NOT a valid electron-builder publish field — un-drafting
