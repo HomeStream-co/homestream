@@ -15,6 +15,7 @@ import type { SetupStepProps } from './types';
 
 interface NetworkInterface {
   name: string;
+  displayName?: string;
   address: string;
   family: 'IPv4' | 'IPv6';
   internal: boolean;
@@ -427,7 +428,7 @@ export default function StepOptional({
               <option value="">— Skip / No VPN binding —</option>
               {interfaces.map(i => (
                 <option key={`${i.name}-${i.address}`} value={i.name}>
-                  {i.likelyVpn ? '🔒 ' : ''}{i.name} ({i.address})
+                  {i.likelyVpn ? '🔒 ' : ''}{i.displayName || i.name} ({i.address})
                 </option>
               ))}
             </select>

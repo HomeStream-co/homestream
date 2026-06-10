@@ -3,6 +3,7 @@ import { SectionHeader } from './shared';
 
 export interface VpnInterface {
   name: string;
+  displayName?: string;
   address: string;
   likelyVpn: boolean;
   internal: boolean;
@@ -77,7 +78,7 @@ export default function SettingsVpn({
             <option value="">— Disable kill-switch —</option>
             {vpnInterfaces.map(i => (
               <option key={`${i.name}-${i.address}`} value={i.name}>
-                {i.likelyVpn ? '🔒 ' : ''}{i.name} ({i.address})
+                {i.likelyVpn ? '🔒 ' : ''}{i.displayName || i.name} ({i.address})
               </option>
             ))}
           </select>
