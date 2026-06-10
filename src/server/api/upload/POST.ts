@@ -14,16 +14,17 @@ import {
   runCaptionFetchInBackground,
 } from '../../mediaUtils.js';
 import { dataDir } from '../../dataDir.js';
+import { readConfig } from '../../configStore.js';
 
-// Uploads live inside the data directory so they are writable in packaged
-// Electron on Linux (AppImage mounts read-only; process.cwd() is not writable).
-const UPLOADS_DIR = path.join(dataDir(), 'uploads');
-if (!fs.existsSync(UPLOADS_DIR)) {
-  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
-}
-
+// Uploads now default to mediaDir to avoid filling up the OS drive
 const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, UPLOADS_DIR),
+  destination: (_req, _file, cb) => {
+    const config = readConfig();
+    const baseDir = config.mediaDir || dataDir();
+    const upDir = path.join(baseDir, 'uploads');
+    if (!fs.existsSync(upDir)) fs.mkdirSync(upDir, { recursive: true });
+    cb(null, upDir);
+  },
   filename: (_req, file, cb) => {
     const safeName = `${Date.now()}-${file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
     cb(null, safeName);
@@ -48,10 +49,16 @@ export default function handler(req: Request, res: Response) {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
     try {
 
+    const config = readConfig();
+    const baseDir = config.mediaDir || dataDir();
+    const upDir = path.join(baseDir, 'uploads');
+    const libDir = config.libraryDir || path.join(baseDir, 'library');
+    if (!fs.existsSync(libDir)) fs.mkdirSync(libDir, { recursive: true });
+
     const inputFilename  = req.file.filename;
     const outputFilename = inputFilename.replace(/\.[^.]+$/, '') + '_tc.mp4';
-    const inputPath      = path.join(UPLOADS_DIR, inputFilename);
-    const outputPath     = path.join(UPLOADS_DIR, outputFilename);
+    const inputPath      = path.join(upDir, inputFilename);
+    const outputPath     = path.join(libDir, outputFilename);
 
     // ── 1. Parse title — prefer manual override from form body ──
     const { title: extractedTitle, year: extractedYear } = extractTitle(req.file.originalname);
@@ -94,14 +101,31 @@ export default function handler(req: Request, res: Response) {
     // ── 7. Transcode in background ──
     transcodeFile(mediaItem.id, inputPath, outputPath)
       .then(result => {
-        // Determine the final absolute path (may revert to input if output was larger)
-        const finalPath = result.outputFilename === outputFilename ? outputPath : inputPath;
+        // Determine the final absolute path
+        let finalPath = outputPath;
+        let finalFilename = outputFilename;
+
+        // If it reverted to input, the input is still in the 'uploads' folder! Move it to library.
+        if (result.outputFilename === inputFilename) {
+          const ext = path.extname(inputFilename);
+          finalFilename = inputFilename.replace(/\.[^.]+$/, '') + ext;
+          finalPath = path.join(libDir, finalFilename);
+          if (fs.existsSync(inputPath)) {
+            fs.renameSync(inputPath, finalPath);
+          }
+        } else {
+          // It transcoded successfully. Delete the original input file from uploads.
+          if (fs.existsSync(inputPath)) {
+            fs.unlink(inputPath, () => {});
+          }
+        }
+
         writeLibrary(lib => {
           const idx = lib.findIndex(m => (m as { id: string }).id === mediaItem.id);
           if (idx !== -1) {
             const item = lib[idx] as Record<string, unknown>;
             item.transcoding      = false;
-            item.filename         = result.outputFilename;
+            item.filename         = finalFilename;
             item.filepath         = finalPath;
             item.filePath         = finalPath;
             item.fileSize         = result.finalSize;

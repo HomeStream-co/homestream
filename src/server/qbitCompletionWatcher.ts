@@ -17,6 +17,7 @@
 import { getAllTorrents, isReachable } from './qbittorrentClient.js';
 import { getAllPersistedJobs, upsertJob, updateJobStatus } from './downloadJobStore.js';
 import { runPostDownloadPipeline } from './postDownloadPipeline.js';
+import { syncVPNState } from './vpnService.js';
 
 // ── State ─────────────────────────────────────────────────────────────────────
 
@@ -95,6 +96,9 @@ async function poll(): Promise<void> {
         processing.delete(job.infoHash);
       });
   }
+
+  // Ensure VPN kill switch is perfectly synced with active downloads every 15 seconds
+  await syncVPNState();
 }
 
 // ── Startup ───────────────────────────────────────────────────────────────────

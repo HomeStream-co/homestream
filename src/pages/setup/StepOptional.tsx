@@ -504,6 +504,9 @@ export default function StepOptional({
               placeholder="Prowlarr → Settings → General → API Key"
               className="w-full bg-background border border-border rounded-lg px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary font-mono"
             />
+            <p className="text-[10px] text-muted-foreground mt-1.5 flex items-center gap-1">
+              <Info className="w-3 h-3" /> Find your API key in Prowlarr under Settings → General → Security.
+            </p>
           </div>
           {prowlarrTest === 'ok' && (
             <div className="flex items-center gap-1.5 text-[11px] text-green-400 bg-green-500/10 border border-green-500/20 rounded-lg px-2.5 py-1.5">

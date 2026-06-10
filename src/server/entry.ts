@@ -162,6 +162,7 @@ import updaterPushPost from "./api/updater/push/POST";
 import updaterStatusGet from "./api/updater/status/GET";
 // upload
 import uploadPost from "./api/upload/POST";
+import uploadLocalPost from "./api/upload-local/POST";
 // vpn
 import vpnGet from "./api/vpn/GET";
 import vpnPost from "./api/vpn/POST";
@@ -197,8 +198,8 @@ const app = express();
 // the sitemap origin in robots.txt.
 app.set("trust proxy", true);
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: "500mb" }));
+app.use(express.urlencoded({ extended: true, limit: "500mb" }));
 app.use(cookieParser());
 
 const upload = multer({ dest: "/tmp/uploads" });
@@ -378,7 +379,9 @@ app.get("/api/updater/drain", updaterDrainGet);
 app.post("/api/updater/push", updaterPushPost);
 app.get("/api/updater/status", updaterStatusGet);
 // upload
-app.post("/api/upload", upload.single("file"), uploadPost);
+// Let the upload endpoint handle its own multer middleware to avoid conflicts
+app.post("/api/upload", uploadPost);
+app.post("/api/upload-local", express.json(), uploadLocalPost);
 // vpn
 app.get("/api/vpn", vpnGet);
 app.post("/api/vpn", vpnPost);
@@ -394,14 +397,24 @@ app.delete("/api/watchlist/:id", watchlistDeleteById);
 
 // Error middleware must be registered AFTER the routes it protects; Express
 // only passes errors to middleware defined later in the stack.
+import fs from 'fs';
+import path from 'path';
+
 app.use("/api", (err: unknown, req: Request, res: Response, _next: NextFunction) => {
-	// Always respond JSON on /api so clients parsing response.json() don't
-	// receive Express's default HTML error page for non-Error throws.
-	console.error("ssr.api.error", {
+	const errInfo = {
 		url: req.url,
 		error: err instanceof Error ? err.stack : String(err),
-	});
-	res.status(500).json({ error: "Internal server error" });
+		body: req.body,
+		time: new Date().toISOString()
+	};
+	console.error("ssr.api.error", errInfo);
+	
+	try {
+		const logPath = path.join(process.cwd(), 'api-error.log');
+		fs.appendFileSync(logPath, JSON.stringify(errInfo) + '\\n');
+	} catch(e) {}
+	
+	res.status(500).json({ error: "Internal server error: " + (err instanceof Error ? err.message : String(err)) });
 });
 
 function baseUrl(req: Request): string {

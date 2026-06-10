@@ -3,7 +3,7 @@ import { pickBestStream } from '../../../torrentManager.js';
 import { addMagnet, isReachable } from '../../../qbittorrentClient.js';
 import { readConfig, DEFAULT_TORRENT_SOURCES } from '../../../configStore.js';
 import { runPreDownloadScan } from '../../../security/threatScanner.js';
-import { connectForDownload, disconnectAfterDownload } from '../../../vpnService.js';
+import { connectForDownload, syncVPNState } from '../../../vpnService.js';
 import type { VPNConfig } from '../../../vpnService.js';
 import { upsertJob, getAllPersistedJobs, findJobByInfoHash, updateJobProgress } from '../../../downloadJobStore.js';
 import { requireAuth } from '../../../authMiddleware.js';
@@ -496,8 +496,8 @@ export default async function handler(req: Request, res: Response) {
   }
 
   const releaseVPN = async () => {
-    if (vpnConnected && vpnCfg) {
-      await disconnectAfterDownload(vpnCfg);
+    if (vpnCfg) {
+      await syncVPNState();
     }
   };
 
@@ -579,6 +579,8 @@ export default async function handler(req: Request, res: Response) {
       } catch (err) {
         console.error(`[rd] ✗ ${jobTitle} failed:`, err);
         upsertJob({ ...jobEntry, status: 'error' });
+      } finally {
+        await syncVPNState();
       }
     })();
   }

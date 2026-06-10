@@ -54,6 +54,13 @@ export interface RemoteHandlers {
   onDlnaCastStarted?: (info: { deviceLocation: string; deviceName: string }) => void;
   /** Phone remote stopped a DLNA cast */
   onDlnaCastStopped?: () => void;
+  // â”€â”€ D-Pad navigation commands â”€â”€
+  onDpadUp?: () => void;
+  onDpadDown?: () => void;
+  onDpadLeft?: () => void;
+  onDpadRight?: () => void;
+  onDpadEnter?: () => void;
+  onDpadBack?: () => void;
 }
 
 export interface PlayerStatePayload {
@@ -146,6 +153,12 @@ export function useRemoteControl(
             case 'subtitle':          h.onSubtitle?.(msg.track ?? -1); break;
             case 'cast':              h.onCast?.(); break;
             case 'launch':            h.onLaunch?.(msg.mediaId ?? ''); break;
+            case 'dpad_up':           h.onDpadUp?.(); break;
+            case 'dpad_down':         h.onDpadDown?.(); break;
+            case 'dpad_left':         h.onDpadLeft?.(); break;
+            case 'dpad_right':        h.onDpadRight?.(); break;
+            case 'dpad_enter':        h.onDpadEnter?.(); break;
+            case 'dpad_back':         h.onDpadBack?.(); break;
             // Cast session commands — forwarded from phone CastPanel
             case 'cast_playpause':    h.onCastPlayPause?.(); break;
             case 'cast_stop':         h.onCastStop?.(); break;

@@ -37,7 +37,13 @@ export type RemoteCommand =
   | { type: 'skip_back'; seconds: number }
   | { type: 'fullscreen' }
   | { type: 'next_episode' }
-  | { type: 'speed'; rate: number };
+  | { type: 'speed'; rate: number }
+  | { type: 'dpad_up' }
+  | { type: 'dpad_down' }
+  | { type: 'dpad_left' }
+  | { type: 'dpad_right' }
+  | { type: 'dpad_enter' }
+  | { type: 'dpad_back' };
 
 export type PlayerState = {
   type: 'state';

@@ -31,6 +31,7 @@ import {
 } from 'lucide-react';
 import { useMedia } from '@/context/MediaContext';
 import { useProfile } from '@/context/ProfileContext';
+import { useRemoteControl } from '@/hooks/useRemoteControl';
 import type { Profile } from '@/context/ProfileContext';
 import type { MediaItem } from '@/types/media';
 
@@ -625,6 +626,16 @@ export default function TvPage() {
   // 'unreachable' = network error / wrong address
   const [serverReady, setServerReady] = useState<boolean | null | 'unreachable'>(null);
   const [serverIP, setServerIP] = useState('');
+
+  // Connect TV screen to the remote control websocket to receive D-Pad commands
+  useRemoteControl('*', {
+    onDpadUp: () => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp' })),
+    onDpadDown: () => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown' })),
+    onDpadLeft: () => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft' })),
+    onDpadRight: () => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight' })),
+    onDpadEnter: () => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' })),
+    onDpadBack: () => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })),
+  });
 
   useEffect(() => {
     // Use /api/health — always unauthenticated, includes setupComplete flag.

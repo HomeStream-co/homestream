@@ -538,41 +538,62 @@ export default function LibraryPage() {
       enrichmentDone: false,
     }]);
 
-    const formData = new FormData();
-    formData.append('video', file);
-
     try {
-      // XHR for real upload progress
-      const result = await new Promise<{ transcodeId: string } & MediaItem>((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhr.open('POST', '/api/upload');
+      let result: { transcodeId: string } & MediaItem;
+      const localPath = (file as any).path;
 
-        xhr.upload.onprogress = (e) => {
-          if (e.lengthComputable) {
-            const pct = Math.round((e.loaded / e.total) * 100);
-            setUploading(prev => prev.map(u =>
-              u.id === uiId ? { ...u, uploadProgress: pct } : u
-            ));
-          }
-        };
+      if (localPath) {
+        // Fast path for Electron — skips network upload entirely
+        const res = await fetch('/api/upload-local', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ localPath, originalName: file.name }),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || `Upload failed (${res.status})`);
+        }
+        result = await res.json();
+        // Instantly finish upload phase in UI
+        setUploading(prev => prev.map(u =>
+          u.id === uiId ? { ...u, uploadProgress: 100 } : u
+        ));
+      } else {
+        const formData = new FormData();
+        formData.append('video', file);
 
-        xhr.onload = () => {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            try { resolve(JSON.parse(xhr.responseText)); }
-            catch { reject(new Error('Invalid server response')); }
-          } else {
-            try {
-              const err = JSON.parse(xhr.responseText);
-              reject(new Error(err.error || 'Upload failed'));
-            } catch { // non-fatal — JSON parse failed, fall through to generic error
-              reject(new Error(`Upload failed (${xhr.status})`));
+        // XHR for real upload progress
+        result = await new Promise<{ transcodeId: string } & MediaItem>((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.open('POST', '/api/upload');
+
+          xhr.upload.onprogress = (e) => {
+            if (e.lengthComputable) {
+              const pct = Math.round((e.loaded / e.total) * 100);
+              setUploading(prev => prev.map(u =>
+                u.id === uiId ? { ...u, uploadProgress: pct } : u
+              ));
             }
-          }
-        };
+          };
 
-        xhr.onerror = () => reject(new Error('Network error during upload'));
-        xhr.send(formData);
-      });
+          xhr.onload = () => {
+            if (xhr.status >= 200 && xhr.status < 300) {
+              try { resolve(JSON.parse(xhr.responseText)); }
+              catch { reject(new Error('Invalid server response')); }
+            } else {
+              try {
+                const err = JSON.parse(xhr.responseText);
+                reject(new Error(err.error || 'Upload failed'));
+              } catch { // non-fatal — JSON parse failed, fall through to generic error
+                reject(new Error(`Upload failed (${xhr.status})`));
+              }
+            }
+          };
+
+          xhr.onerror = () => reject(new Error('Network error during upload'));
+          xhr.send(formData);
+        });
+      }
 
       // Upload done — move to metadata phase briefly, then transcode
       const uploadResult = result as typeof result & { needsMetadata?: boolean; metadataAvailable?: boolean };
@@ -1434,3 +1455,4 @@ export default function LibraryPage() {
     </div>
   );
 }
+
