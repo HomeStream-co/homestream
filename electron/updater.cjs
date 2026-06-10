@@ -159,7 +159,7 @@ function handleInstall() {
     return;
   }
   pushLogFn?.('[updater] Restarting to install update…', 'warn');
-  setImmediate(() => autoUpdater.quitAndInstall(false, true));
+  setImmediate(() => autoUpdater.quitAndInstall(true, true));
 }
 
 // Beta channel opt-in — persisted to a simple JSON file next to the app data.
@@ -392,7 +392,7 @@ function setupAutoUpdater({ controlWindowGetter, pushLog, port = 3000 }) {
       return;
     }
     log('Restarting to install update…', 'warn');
-    setImmediate(() => autoUpdater.quitAndInstall(false, true));
+    setImmediate(() => autoUpdater.quitAndInstall(true, true));
   });
 
   // Beta channel toggle — renderer sends { enabled: boolean }
@@ -451,7 +451,7 @@ function teardown() {
  */
 function downloadAndInstall() {
   return autoUpdater.downloadUpdate()
-    .then(() => autoUpdater.quitAndInstall(false, true));
+    .then(() => autoUpdater.quitAndInstall(true, true));
 }
 
 /**
