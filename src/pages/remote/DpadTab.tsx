@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { ChevronUp, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronUp, ChevronDown, ChevronLeft, ChevronRight, ArrowLeft } from 'lucide-react';
 function haptic(pattern: number | number[] = 30) {
   if (typeof navigator !== 'undefined' && navigator.vibrate) {
     try { navigator.vibrate(pattern); } catch { /* ignore */ }
