@@ -82,6 +82,7 @@ export default async function handler(req: Request, res: Response) {
     // VPN binding — returned so the Settings panel can show the current bound interface
     vpnInterface: config.vpnInterface ?? null,
     vpnKillSwitch: config.vpnKillSwitch ?? false,
+    hasRealDebridKey: !!config.realDebridApiKey,
     // FFmpeg availability — shown in setup wizard and settings
     ffmpeg,
     // Nested config object for the Settings panel API Keys section
@@ -90,6 +91,7 @@ export default async function handler(req: Request, res: Response) {
       googleAiApiKey: mask(config.googleAiApiKey),
       tmdbApiKey: mask(config.tmdbApiKey),
       virusTotalApiKey: mask(config.virusTotalApiKey),
+      realDebridApiKey: mask(config.realDebridApiKey),
       prowlarrUrl: config.prowlarrUrl ?? '',
       hasProwlarrKey: !!config.prowlarrApiKey,
       // Timestamps for lifespan countdown in Settings

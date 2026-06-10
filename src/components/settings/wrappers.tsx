@@ -34,15 +34,27 @@ export function SettingsApiKeysWrapper() {
   const [savedState, setSavedState] = useState<ApiKeysSavedState>({
     omdb: false, googleAi: false, tmdb: false, realDebrid: false,
   });
-  const [timestamps] = useState({ omdb: null, googleAi: null, tmdb: null });
+  const [timestamps, setTimestamps] = useState<{omdb: string|null, googleAi: string|null, tmdb: string|null}>({ omdb: null, googleAi: null, tmdb: null });
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    fetch('/api/settings/api-keys', { credentials: 'include' })
+    fetch('/api/setup', { credentials: 'include' })
       .then(r => r.ok ? r.json() : null)
-      .then((d: Partial<ApiKeysState> | null) => {
-        if (d) setApiKeys(prev => ({ ...prev, ...d }));
+      .then((d: any) => {
+        if (d && d.config) {
+          setSavedState({
+            omdb: !!d.config.omdbApiKey,
+            googleAi: !!d.config.googleAiApiKey,
+            tmdb: !!d.config.tmdbApiKey,
+            realDebrid: !!d.hasRealDebridKey
+          });
+          setTimestamps({
+            omdb: d.config.omdbApiKeySavedAt ?? null,
+            googleAi: d.config.googleAiApiKeySavedAt ?? null,
+            tmdb: d.config.tmdbApiKeySavedAt ?? null,
+          });
+        }
       })
       .catch(() => {});
   }, []);
@@ -50,10 +62,10 @@ export function SettingsApiKeysWrapper() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      await fetch('/api/settings/api-keys', {
+      await fetch('/api/setup', {
         method: 'POST', credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(apiKeys),
+        body: JSON.stringify({ action: 'save', ...apiKeys, aiProvider: 'gemini' }),
       });
       setSaved(true);
       setSavedState({ omdb: !!apiKeys.omdbApiKey, googleAi: !!apiKeys.googleAiApiKey, tmdb: !!apiKeys.tmdbApiKey, realDebrid: !!apiKeys.realDebridApiKey });
@@ -64,7 +76,24 @@ export function SettingsApiKeysWrapper() {
 
   const makeTest = (key: string) => async () => {
     try {
-      const r = await fetch(`/api/settings/test-key?key=${key}`, { credentials: 'include' });
+      if (key === 'realDebrid') {
+        const r = await fetch('/api/setup', {
+          method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'test_real_debrid', realDebridApiKey: apiKeys.realDebridApiKey })
+        });
+        const d = await r.json() as any;
+        if (d.ok && d.user) {
+          const days = Math.floor((d.user.premium ?? 0) / 86400);
+          return { ok: days > 0, message: days > 0 ? `${d.user.username} — ${days} days remaining` : 'Expired' };
+        }
+        return { ok: false, message: d.error || 'Failed' };
+      }
+
+      const val = apiKeys[`${key}ApiKey` as keyof ApiKeysState] || '';
+      const r = await fetch('/api/setup/test-keys', { 
+        method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key, value: val }) 
+      });
       const d = await r.json() as { ok: boolean; message?: string };
       return d;
     } catch { return { ok: false, message: 'Network error' }; }
@@ -156,7 +185,7 @@ export function SettingsStorageWrapper() {
   const [allocSaved, setAllocSaved] = useState(false);
 
   useEffect(() => {
-    fetch('/api/storage/stats', { credentials: 'include' })
+    fetch('/api/library/storage', { credentials: 'include' })
       .then(r => r.ok ? r.json() : null)
       .then((d: StorageStats | null) => { if (d) setStats(d); })
       .catch(() => {})
@@ -179,8 +208,8 @@ export function SettingsStorageWrapper() {
   const handleSaveAlloc = async () => {
     setAllocSaving(true);
     try {
-      await fetch('/api/settings/storage', {
-        method: 'POST', credentials: 'include',
+      await fetch('/api/library/storage', {
+        method: 'PATCH', credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ allocMovies, allocTv }),
       });
