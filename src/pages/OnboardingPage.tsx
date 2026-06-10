@@ -92,19 +92,28 @@ function LibraryStep({ onNext }: { onNext: () => void }) {
     const files = e.target.files;
     if (!files?.length) return;
     setUploading(true);
-    const formData = new FormData();
-    Array.from(files).forEach(f => formData.append('video', f));
-    const xhr = new XMLHttpRequest();
-    xhr.upload.onprogress = ev => {
-      if (ev.lengthComputable) setProgress(Math.round((ev.loaded / ev.total) * 100));
-    };
-    await new Promise<void>((resolve, reject) => {
-      xhr.onload = () => xhr.status < 400 ? resolve() : reject();
-      xhr.onerror = reject;
-      xhr.open('POST', '/api/upload');
-      xhr.withCredentials = true;
-      xhr.send(formData);
-    }).catch(() => {});
+    
+    for (let i = 0; i < files.length; i++) {
+      const f = files[i];
+      const formData = new FormData();
+      formData.append('video', f);
+      
+      const xhr = new XMLHttpRequest();
+      xhr.upload.onprogress = ev => {
+        if (ev.lengthComputable) {
+          const fileProg = ev.loaded / ev.total;
+          setProgress(Math.round(((i + fileProg) / files.length) * 100));
+        }
+      };
+      await new Promise<void>((resolve, reject) => {
+        xhr.onload = () => xhr.status < 400 ? resolve() : reject();
+        xhr.onerror = reject;
+        xhr.open('POST', '/api/upload');
+        xhr.withCredentials = true;
+        xhr.send(formData);
+      }).catch(() => {});
+    }
+
     setUploading(false);
     toast.success('Media uploaded!');
     onNext();

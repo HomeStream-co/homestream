@@ -33,14 +33,33 @@ export default function handler(_req: Request, res: Response) {
 
   // On Windows, enumerate available fixed drives so the setup wizard can
   // offer a drive selector (D:, E:, etc.) instead of hard-coding C:.
-  let availableDrives: string[] = [];
+  let availableDrives: { path: string; freeSpaceGB?: number }[] = [];
   if (platform === 'win32') {
     try {
       const out = execSync(
-        'wmic logicaldisk where "DriveType=3" get DeviceID /value',
+        'wmic logicaldisk where "DriveType=3" get DeviceID,FreeSpace /value',
         { encoding: 'utf8', timeout: 3000 }
       );
-      availableDrives = (out.match(/[A-Z]:/g) ?? []).map(d => d + '\\');
+      const lines = out.split('\\n').map(l => l.trim()).filter(Boolean);
+      let currentDevice = '';
+      let currentFreeSpace: number | undefined = undefined;
+      for (const line of lines) {
+        if (line.startsWith('DeviceID=')) {
+          if (currentDevice) {
+            availableDrives.push({ path: currentDevice + '\\\\', freeSpaceGB: currentFreeSpace });
+          }
+          currentDevice = line.split('=')[1];
+          currentFreeSpace = undefined;
+        } else if (line.startsWith('FreeSpace=')) {
+          const bytes = parseInt(line.split('=')[1], 10);
+          if (!isNaN(bytes)) {
+            currentFreeSpace = Math.round(bytes / 1024 / 1024 / 1024);
+          }
+        }
+      }
+      if (currentDevice) {
+        availableDrives.push({ path: currentDevice + '\\\\', freeSpaceGB: currentFreeSpace });
+      }
     } catch {
       // WMIC unavailable — leave empty, wizard falls back to text input only
     }

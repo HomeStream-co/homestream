@@ -77,20 +77,28 @@ export default function LibraryPage() {
     if (!files?.length) return;
     setUploading(true);
     setUploadProgress(0);
-    const formData = new FormData();
-    Array.from(files).forEach(f => formData.append('video', f));
+    
     try {
-      const xhr = new XMLHttpRequest();
-      xhr.upload.onprogress = e => {
-        if (e.lengthComputable) setUploadProgress(Math.round((e.loaded / e.total) * 100));
-      };
-      await new Promise<void>((resolve, reject) => {
-        xhr.onload = () => xhr.status < 400 ? resolve() : reject(new Error(`HTTP ${xhr.status}`));
-        xhr.onerror = () => reject(new Error('Network error'));
-        xhr.open('POST', '/api/upload');
-        xhr.withCredentials = true;
-        xhr.send(formData);
-      });
+      for (let i = 0; i < files.length; i++) {
+        const f = files[i];
+        const formData = new FormData();
+        formData.append('video', f);
+        
+        const xhr = new XMLHttpRequest();
+        xhr.upload.onprogress = e => {
+          if (e.lengthComputable) {
+            const currentFileProgress = e.loaded / e.total;
+            setUploadProgress(Math.round(((i + currentFileProgress) / files.length) * 100));
+          }
+        };
+        await new Promise<void>((resolve, reject) => {
+          xhr.onload = () => xhr.status < 400 ? resolve() : reject(new Error(`HTTP ${xhr.status}`));
+          xhr.onerror = () => reject(new Error('Network error'));
+          xhr.open('POST', '/api/upload');
+          xhr.withCredentials = true;
+          xhr.send(formData);
+        });
+      }
       await refreshLibrary();
     } catch (err) {
       console.error('Upload failed:', err);

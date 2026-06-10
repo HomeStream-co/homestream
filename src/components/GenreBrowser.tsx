@@ -212,6 +212,8 @@ function DownloadModal({ target, onClose }: { target: DownloadTarget; onClose: (
           title: target.title,
           type: target.type,
           imdbId: target.imdbId ?? undefined,
+          season: target.type === 'series' ? 1 : undefined,
+          episode: target.type === 'series' ? 1 : undefined,
         }),
       });
       const data = await res.json() as { streams?: { name: string; title: string; infoHash: string; imdbId?: string }[]; error?: string };
