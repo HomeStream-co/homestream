@@ -301,9 +301,9 @@ function setupAutoUpdater({ controlWindowGetter, pushLog, port = 3000 }) {
     log('No GitHub token found — update checks will fail on private repos. Set GH_TOKEN in CI and add ghToken to extraMetadata.', 'warn');
   }
 
-  // Disable auto-download so the user controls when to download.
-  autoUpdater.autoDownload = false;
-  autoUpdater.autoInstallOnAppQuit = false;
+  // Enable auto-download so updates download seamlessly in the background (1-click update process)
+  autoUpdater.autoDownload = true;
+  autoUpdater.autoInstallOnAppQuit = true;
 
   // Apply beta channel preference
   autoUpdater.allowPrerelease = betaChannelEnabled;
