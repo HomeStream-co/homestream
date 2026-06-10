@@ -262,7 +262,7 @@ export default function StepOptional({
 
         <div className="grid grid-cols-2 gap-2">
           <div className="col-span-2">
-            <label className="text-[10px] font-medium text-muted-foreground mb-1 block">Web UI URL</label>
+            <label className="text-[10px] font-medium text-muted-foreground mb-1 block">Web UI URL <span className="text-muted-foreground/60">(Usually http://localhost:8080)</span></label>
             <input type="text" value={form.qbitUrl} onChange={e => { set('qbitUrl', e.target.value); setQbitTest('idle'); }}
               placeholder="http://localhost:8080"
               className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary font-mono" />
