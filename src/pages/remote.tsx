@@ -33,7 +33,6 @@ import DownloadTab from './remote/DownloadTab';
 import BrowseTab from './remote/BrowseTab';
 import CastTab from './remote/CastTab';
 import DpadTab from './remote/DpadTab';
-import DpadTab from './remote/DpadTab';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 // Re-exported from ./remote/types for use in sub-components
@@ -982,7 +981,6 @@ function RemotePageInner({ onAuthExpired }: { onAuthExpired: () => void }) {
                 key="dpad"
                 initial={{ opacity: 0, y: 16 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0 }}
                 exit={{ opacity: 0, y: 16 }}
                 className="flex-1 flex flex-col items-center justify-center pt-8"
               >
