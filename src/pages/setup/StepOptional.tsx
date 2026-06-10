@@ -66,6 +66,7 @@ export default function StepOptional({
           body: JSON.stringify({
             action: 'test_qbit',
             qbitUrl: fixedUrl,
+            qbitApiKey: form.qbitApiKey,
             qbitUsername: form.qbitUsername,
             qbitPassword: form.qbitPassword,
           }),
