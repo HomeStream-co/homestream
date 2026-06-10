@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { ChevronUp, ChevronDown, ChevronLeft, ChevronRight, ArrowLeft } from 'lucide-react';
+import { ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Volume2, Volume1 } from 'lucide-react';
 function haptic(pattern: number | number[] = 30) {
   if (typeof navigator !== 'undefined' && navigator.vibrate) {
     try { navigator.vibrate(pattern); } catch { /* ignore */ }
@@ -68,6 +68,23 @@ export default function DpadTab({ send }: { send: (cmd: Record<string, unknown>)
         >
           <ArrowLeft className="w-8 h-8 mb-1" />
           <span className="text-[10px] font-bold uppercase tracking-wider">Back</span>
+        </button>
+      </div>
+
+      {/* Volume Controls */}
+      <div className="flex items-center gap-6 mt-4">
+        <button
+          onClick={() => sendCmd('volume_down')}
+          className="w-16 h-16 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-white/70 hover:text-white active:bg-white/20 transition-colors"
+        >
+          <Volume1 className="w-7 h-7" />
+        </button>
+        <span className="text-white/30 text-xs font-medium tracking-widest uppercase">Volume</span>
+        <button
+          onClick={() => sendCmd('volume_up')}
+          className="w-16 h-16 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-white/70 hover:text-white active:bg-white/20 transition-colors"
+        >
+          <Volume2 className="w-7 h-7" />
         </button>
       </div>
     </div>

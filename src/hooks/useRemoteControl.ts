@@ -21,6 +21,8 @@ export interface RemoteHandlers {
   onPause?: () => void;
   onSeek?: (position: number) => void;
   onVolume?: (level: number) => void;
+  onVolumeUp?: () => void;
+  onVolumeDown?: () => void;
   onSkipForward?: (seconds: number) => void;
   onSkipBack?: (seconds: number) => void;
   onSkipIntro?: () => void;
@@ -144,6 +146,8 @@ export function useRemoteControl(
             case 'pause':             h.onPause?.(); break;
             case 'seek':              h.onSeek?.(msg.position ?? 0); break;
             case 'volume':            h.onVolume?.(msg.level ?? 1); break;
+            case 'volume_up':         h.onVolumeUp?.(); break;
+            case 'volume_down':       h.onVolumeDown?.(); break;
             case 'skip_forward':      h.onSkipForward?.(msg.seconds ?? 10); break;
             case 'skip_back':         h.onSkipBack?.(msg.seconds ?? 10); break;
             case 'skip_intro':        h.onSkipIntro?.(); break;
