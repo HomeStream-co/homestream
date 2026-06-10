@@ -268,7 +268,9 @@ function runFFmpeg(args: string[], mediaId: string, durationSecs: number): Promi
 
     ff.on('close', code => {
       if (code === 0) { resolve(); }
-      else { reject(new Error(`FFmpeg exited with code ${code}`)); }
+      else { 
+        reject(new Error(`FFmpeg exited with code ${code}. Last output: ${stderrBuf}`)); 
+      }
     });
 
     ff.on('error', err => {

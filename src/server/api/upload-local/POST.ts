@@ -76,33 +76,34 @@ export default async function handler(req: Request, res: Response) {
     });
 
     // â”€â”€ 5. Respond to client right away â”€â”€
+    // ——— 5. Respond to client right away ———
     res.status(201).json({ ...mediaItem, transcodeId: mediaItem.id });
 
-    // â”€â”€ 6. Kick off enrichment + CC in background â”€â”€
+    // ——— 6. Kick off enrichment + CC in background ———
     runEnrichmentInBackground(mediaItem.id).catch(() => {});
     runCaptionFetchInBackground(mediaItem.id).catch(() => {});
 
-    // â”€â”€ 7. Transcode in background â”€â”€
-    transcodeFile(mediaItem.id, localPath, outputPath)
+    // ——— 7. Copy file to library first, then Transcode in background ———
+    const finalOriginalPath = path.join(libDir, safeName.replace(/\.[^.]+$/, '') + path.extname(localPath));
+    try {
+      if (!fs.existsSync(finalOriginalPath) && localPath !== finalOriginalPath) {
+        fs.copyFileSync(localPath, finalOriginalPath);
+      }
+      try {
+        fs.unlinkSync(localPath);
+      } catch (e) {} // ignore unlink error if they didn't want to move it
+    } catch(e) {
+      console.error('[upload-local] Failed to copy local file', e);
+    }
+
+    transcodeFile(mediaItem.id, finalOriginalPath, outputPath)
       .then(result => {
-        // Since we are operating on the user's local path directly, we NEVER delete the original
-        // input file here unless explicitly configured to move rather than copy.
-        // For safety, the transcode worker outputs a new file in libraryDir, leaving the original alone.
-        
-        // If transcode was skipped/reverted, the output is still the input file!
-        // But the input file is NOT in the libraryDir. So we MUST copy it into the libraryDir.
         let finalPath = outputPath;
         let finalFilename = outputFilename;
 
-        if (result.outputFilename === safeName || result.outputFilename === localPath || result.outputFilename === path.basename(localPath)) {
-          // Output is larger or transcode skipped, copy the original file to libraryDir
-          const ext = path.extname(localPath);
-          finalFilename = safeName.replace(/\.[^.]+$/, '') + ext;
-          finalPath = path.join(libDir, finalFilename);
-          
-          if (!fs.existsSync(finalPath) && localPath !== finalPath) {
-            fs.copyFileSync(localPath, finalPath);
-          }
+        if (result.outputFilename === path.basename(finalOriginalPath) || result.outputFilename === finalOriginalPath || result.outputFilename === path.basename(localPath)) {
+          finalPath = finalOriginalPath;
+          finalFilename = path.basename(finalOriginalPath);
         }
 
         writeLibrary(lib => {
@@ -120,18 +121,6 @@ export default async function handler(req: Request, res: Response) {
           }
           return lib;
         });
-        
-        // Now that it's successfully copied/transcoded, we automatically delete the user's 
-        // original file because they dragged it to "Move" it.
-        // Wait, the user was asked: "do you want HomeStream to automatically delete your original file"
-        // User replied: "which I'd rather just it move the file over, which seems like it would be way faster than doing a whole re-download and uninstall"
-        // Ah, the user explicitly asked to MOVE the file!
-        try {
-          fs.unlinkSync(localPath);
-        } catch (e) {
-          console.error('[upload-local] Failed to delete original file after moving:', e);
-        }
-
       })
       .catch((transcodeErr: Error) => {
         console.error(`[transcode] Error for ${mediaItem.id}:`, transcodeErr.message);
@@ -139,9 +128,9 @@ export default async function handler(req: Request, res: Response) {
           const idx = lib.findIndex(m => (m as { id: string }).id === mediaItem.id);
           if (idx !== -1) {
             const item = lib[idx] as Record<string, unknown>;
-            item.filename         = originalName;
-            item.filepath         = localPath;
-            item.filePath         = localPath;
+            item.filename         = path.basename(finalOriginalPath);
+            item.filepath         = finalOriginalPath;
+            item.filePath         = finalOriginalPath;
             item.transcoding      = false;
             item.transcodeError   = transcodeErr.message;
           }
