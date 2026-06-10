@@ -33,7 +33,7 @@ export default function handler(_req: Request, res: Response) {
 
   // On Windows, enumerate available fixed drives so the setup wizard can
   // offer a drive selector (D:, E:, etc.) instead of hard-coding C:.
-  let availableDrives: { path: string; freeSpaceGB?: number }[] = [];
+  const availableDrives: { path: string; freeSpaceGB?: number }[] = [];
   if (platform === 'win32') {
     try {
       const out = execSync(
