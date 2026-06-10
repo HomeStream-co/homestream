@@ -1399,7 +1399,7 @@ export default function DownloadsPage() {
   const [savingAlloc, setSavingAlloc] = useState(false);
 
   // Drive / media directory switcher
-  const [availableDrives, setAvailableDrives] = useState<string[]>([]);
+  const [availableDrives, setAvailableDrives] = useState<{ path: string; freeSpaceGB?: number }[]>([]);
   const [showDrivePicker, setShowDrivePicker] = useState(false);
   const [customDirInput, setCustomDirInput] = useState('');
   const [switchingDrive, setSwitchingDrive] = useState(false);
@@ -1445,7 +1445,7 @@ export default function DownloadsPage() {
     // Fetch available drives from Electron (Windows only — empty on other platforms)
     fetch('/api/electron', { credentials: 'include' })
       .then(r => r.json())
-      .then((d: { availableDrives?: string[] }) => {
+      .then((d: { availableDrives?: { path: string; freeSpaceGB?: number }[] }) => {
         if (Array.isArray(d.availableDrives) && d.availableDrives.length > 0) {
           setAvailableDrives(d.availableDrives);
         }
@@ -1911,7 +1911,8 @@ export default function DownloadsPage() {
                       {/* Windows drive buttons */}
                       {availableDrives.length > 0 && (
                         <div className="flex flex-wrap gap-2 mb-3">
-                          {availableDrives.map(drive => {
+                          {availableDrives.map(driveObj => {
+                            const drive = driveObj.path;
                             const isActive = storage.mediaDir?.startsWith(drive) ?? false;
                             return (
                               <button
@@ -1926,6 +1927,7 @@ export default function DownloadsPage() {
                               >
                                 <HardDrive className="w-3 h-3" />
                                 {drive}
+                                {driveObj.freeSpaceGB !== undefined && <span className="text-[9px] text-muted-foreground ml-1">({driveObj.freeSpaceGB}GB free)</span>}
                                 {isActive && <span className="text-[9px] text-primary ml-1">Active</span>}
                               </button>
                             );
