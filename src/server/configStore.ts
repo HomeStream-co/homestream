@@ -44,6 +44,7 @@ export interface AppConfig {
   downloadsDir: string;       // mediaDir/downloads
   libraryDir: string;         // mediaDir/library
   qbitUrl: string;            // e.g. http://localhost:8080
+  qbitApiKey: string;
   qbitUsername: string;
   qbitPassword: string;
   jellyfinUrl: string;        // e.g. http://localhost:8096
@@ -127,6 +128,7 @@ const DEFAULTS: AppConfig = {
   downloadsDir: '',
   libraryDir: '',
   qbitUrl: process.env.QBIT_URL || 'http://localhost:8080',
+  qbitApiKey: process.env.QBIT_API_KEY || '',
   qbitUsername: process.env.QBIT_USERNAME || 'admin',
   qbitPassword: process.env.QBIT_PASSWORD || 'homestream',
   jellyfinUrl: process.env.JELLYFIN_URL || 'http://localhost:8096',

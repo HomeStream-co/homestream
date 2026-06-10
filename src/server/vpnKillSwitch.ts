@@ -22,22 +22,26 @@ function isInterfaceUp(name: string): boolean {
   return !!(addrs && addrs.some(a => a.family === 'IPv4'));
 }
 
-async function qbitPauseAll(qbitUrl: string, username: string, password: string): Promise<void> {
+async function qbitPauseAll(qbitUrl: string, apiKey: string, username: string, password: string): Promise<void> {
   try {
-    const loginRes = await fetch(`${qbitUrl}/api/v2/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({ username, password }).toString(),
-      signal: AbortSignal.timeout(4000),
-    });
-    if (!loginRes.ok) return;
-    const cookie = loginRes.headers.get('set-cookie') ?? '';
+    const headers: Record<string, string> = { 'Content-Type': 'application/x-www-form-urlencoded' };
+    
+    if (apiKey) {
+      headers['Authorization'] = `Bearer ${apiKey}`;
+    } else {
+      const loginRes = await fetch(`${qbitUrl}/api/v2/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ username, password }).toString(),
+        signal: AbortSignal.timeout(4000),
+      });
+      if (!loginRes.ok) return;
+      headers['Cookie'] = loginRes.headers.get('set-cookie') ?? '';
+    }
+
     await fetch(`${qbitUrl}/api/v2/torrents/pause`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        Cookie: cookie,
-      },
+      headers,
       body: new URLSearchParams({ hashes: 'all' }).toString(),
       signal: AbortSignal.timeout(4000),
     });
@@ -47,22 +51,26 @@ async function qbitPauseAll(qbitUrl: string, username: string, password: string)
   }
 }
 
-async function qbitResumeAll(qbitUrl: string, username: string, password: string): Promise<void> {
+async function qbitResumeAll(qbitUrl: string, apiKey: string, username: string, password: string): Promise<void> {
   try {
-    const loginRes = await fetch(`${qbitUrl}/api/v2/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({ username, password }).toString(),
-      signal: AbortSignal.timeout(4000),
-    });
-    if (!loginRes.ok) return;
-    const cookie = loginRes.headers.get('set-cookie') ?? '';
+    const headers: Record<string, string> = { 'Content-Type': 'application/x-www-form-urlencoded' };
+    
+    if (apiKey) {
+      headers['Authorization'] = `Bearer ${apiKey}`;
+    } else {
+      const loginRes = await fetch(`${qbitUrl}/api/v2/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ username, password }).toString(),
+        signal: AbortSignal.timeout(4000),
+      });
+      if (!loginRes.ok) return;
+      headers['Cookie'] = loginRes.headers.get('set-cookie') ?? '';
+    }
+
     await fetch(`${qbitUrl}/api/v2/torrents/resume`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        Cookie: cookie,
-      },
+      headers,
       body: new URLSearchParams({ hashes: 'all' }).toString(),
       signal: AbortSignal.timeout(4000),
     });
@@ -81,14 +89,14 @@ async function poll(): Promise<void> {
   if (wasUp && !up) {
     // VPN just dropped — pause everything
     wasUp = false;
-    if (cfg.qbitUrl && cfg.qbitUsername) {
-      await qbitPauseAll(cfg.qbitUrl, cfg.qbitUsername, cfg.qbitPassword ?? '');
+    if (cfg.qbitUrl && (cfg.qbitApiKey || cfg.qbitUsername)) {
+      await qbitPauseAll(cfg.qbitUrl, cfg.qbitApiKey ?? '', cfg.qbitUsername, cfg.qbitPassword ?? '');
     }
   } else if (!wasUp && up) {
     // VPN came back — resume
     wasUp = true;
-    if (cfg.qbitUrl && cfg.qbitUsername) {
-      await qbitResumeAll(cfg.qbitUrl, cfg.qbitUsername, cfg.qbitPassword ?? '');
+    if (cfg.qbitUrl && (cfg.qbitApiKey || cfg.qbitUsername)) {
+      await qbitResumeAll(cfg.qbitUrl, cfg.qbitApiKey ?? '', cfg.qbitUsername, cfg.qbitPassword ?? '');
     }
   }
 }

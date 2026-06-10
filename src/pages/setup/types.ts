@@ -16,6 +16,7 @@ export interface StepStatus {
 export interface FormData {
   mediaDir: string;
   qbitUrl: string;
+  qbitApiKey: string;
   qbitUsername: string;
   qbitPassword: string;
   jellyfinUrl: string;

@@ -97,7 +97,7 @@ export default async function handler(req: Request, res: Response) {
       case 'save': {
         // Save any config fields passed in the body
         const allowed = [
-          'mediaDir', 'qbitUrl', 'qbitUsername', 'qbitPassword',
+          'mediaDir', 'qbitUrl', 'qbitApiKey', 'qbitUsername', 'qbitPassword',
           'jellyfinUrl', 'jellyfinApiKey', 'adminPassword',
           'omdbApiKey', 'googleAiApiKey', 'tmdbApiKey', 'virusTotalApiKey',
           'aiApiKey', 'openaiApiKey', 'anthropicApiKey',
@@ -215,11 +215,13 @@ export default async function handler(req: Request, res: Response) {
       case 'test_qbit': {
         const result = await testQbit({
           url:      normalizeUrl(fields.qbitUrl)      || undefined,
+          apiKey:   fields.qbitApiKey   || undefined,
           username: fields.qbitUsername || undefined,
           password: fields.qbitPassword || undefined,
         });
         if (result.ok) {
           if (fields.qbitUrl)      process.env.QBIT_URL      = normalizeUrl(fields.qbitUrl);
+          if (fields.qbitApiKey)   process.env.QBIT_API_KEY  = fields.qbitApiKey;
           if (fields.qbitUsername) process.env.QBIT_USERNAME = fields.qbitUsername;
           if (fields.qbitPassword) process.env.QBIT_PASSWORD = fields.qbitPassword;
         }

@@ -69,6 +69,8 @@ export default async function handler(req: Request, res: Response) {
     libraryDir: config.libraryDir,
     qbitUrl: config.qbitUrl,
     qbitUsername: config.qbitUsername,
+    hasQbitPassword: !!config.qbitPassword,
+    hasQbitApiKey: !!config.qbitApiKey,
     jellyfinUrl: config.jellyfinUrl,
     jellyfinApiKey: config.jellyfinApiKey ? '••••••••' : '',
     watchFolderEnabled: config.watchFolderEnabled,

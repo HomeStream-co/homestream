@@ -267,14 +267,21 @@ export default function StepOptional({
               placeholder="http://localhost:8080"
               className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary font-mono" />
           </div>
+          <div className="col-span-2">
+            <label className="text-[10px] font-medium text-muted-foreground mb-1 block">API Key <span className="text-muted-foreground/60">(v5.2.0+)</span></label>
+            <input type="text" value={form.qbitApiKey} onChange={e => { set('qbitApiKey', e.target.value); setQbitTest('idle'); }}
+              placeholder="qbt_..."
+              className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary font-mono" />
+            <p className="text-[9px] text-muted-foreground mt-1">Found in qBittorrent Options → Web UI. If you provide this, username/password below are ignored.</p>
+          </div>
           <div>
-            <label className="text-[10px] font-medium text-muted-foreground mb-1 block">Username</label>
+            <label className="text-[10px] font-medium text-muted-foreground mb-1 block">Username <span className="text-muted-foreground/60">(Legacy)</span></label>
             <input type="text" value={form.qbitUsername} onChange={e => { set('qbitUsername', e.target.value); setQbitTest('idle'); }}
               placeholder="admin"
               className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary" />
           </div>
           <div>
-            <label className="text-[10px] font-medium text-muted-foreground mb-1 block">Password</label>
+            <label className="text-[10px] font-medium text-muted-foreground mb-1 block">Password <span className="text-muted-foreground/60">(Legacy)</span></label>
             <div className="relative">
               <input type={showQbitPass ? 'text' : 'password'} value={form.qbitPassword} onChange={e => { set('qbitPassword', e.target.value); setQbitTest('idle'); }}
                 placeholder="••••••••"
@@ -304,8 +311,8 @@ export default function StepOptional({
                   <li><span className="text-primary font-bold">2.</span> Go to <strong>Tools → Options → Web UI</strong></li>
                   <li><span className="text-primary font-bold">3.</span> Tick <strong>"Enable the Web User Interface"</strong></li>
                   <li><span className="text-primary font-bold">4.</span> Note the port (default: <code className="bg-background/60 px-1 rounded">8080</code>)</li>
-                  <li><span className="text-primary font-bold">5.</span> Set username &amp; password, click <strong>Apply</strong></li>
-                  <li><span className="text-primary font-bold">6.</span> Enter <code className="bg-background/60 px-1 rounded">http://localhost:8080</code> above and test again</li>
+                  <li><span className="text-primary font-bold">5.</span> Either generate an <strong>API Key</strong> OR set a username &amp; password</li>
+                  <li><span className="text-primary font-bold">6.</span> Click <strong>Apply</strong>, enter the details above, and test again</li>
                 </ol>
                 <a href="https://www.qbittorrent.org/download" target="_blank" rel="noopener noreferrer"
                   className="mt-1.5 flex items-center gap-1 text-primary hover:underline">

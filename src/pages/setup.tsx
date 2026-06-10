@@ -59,6 +59,7 @@ export default function SetupPage() {
   const [form, setForm] = useState<FormData>({
     mediaDir: '',
     qbitUrl: 'http://localhost:8080',
+    qbitApiKey: '',
     qbitUsername: 'admin',
     qbitPassword: 'homestream',
     jellyfinUrl: 'http://localhost:8096',
