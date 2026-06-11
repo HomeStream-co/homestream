@@ -86,7 +86,7 @@ function resolveCategory(
 // ── Main pipeline ─────────────────────────────────────────────────────────────
 
 export async function runPostDownloadPipeline(params: PostDownloadParams): Promise<void> {
-  const {
+  let {
     filePath, title, quality, type, season, episode,
     imdbId, poster, year, jobId, backend,
   } = params;
@@ -96,6 +96,58 @@ export async function runPostDownloadPipeline(params: PostDownloadParams): Promi
     const existing = getPersistedJob(jobId);
     if (existing) upsertJob({ ...existing, status: 'error' });
     return;
+  }
+
+  const stat = fs.statSync(filePath);
+  if (stat.isDirectory()) {
+    let largestFile: string | null = null;
+    let maxSize = 0;
+    
+    let episodeFile: string | null = null;
+    let epMaxSize = 0;
+
+    const exts = ['.mkv', '.mp4', '.avi', '.mov', '.webm', '.ts', '.m4v'];
+
+    function walk(dir: string) {
+      for (const f of fs.readdirSync(dir)) {
+        const full = path.join(dir, f);
+        const st = fs.statSync(full);
+        if (st.isDirectory()) {
+          walk(full);
+        } else if (exts.includes(path.extname(full).toLowerCase())) {
+          // Track largest overall
+          if (st.size > maxSize) {
+            maxSize = st.size;
+            largestFile = full;
+          }
+          // If series, track largest file matching SXXEYY
+          if (type === 'series' && season != null && episode != null) {
+            const name = f.toLowerCase();
+            const sFormat = `s${String(season).padStart(2, '0')}`;
+            const eFormat = `e${String(episode).padStart(2, '0')}`;
+            if (name.includes(sFormat) && name.includes(eFormat)) {
+              if (st.size > epMaxSize) {
+                epMaxSize = st.size;
+                episodeFile = full;
+              }
+            }
+          }
+        }
+      }
+    }
+    walk(filePath);
+
+    // Prefer episode-matching file for series, fallback to largest file overall
+    const targetFile = episodeFile || largestFile;
+
+    if (!targetFile) {
+      console.error(`[pipeline] No video file found in directory: ${filePath}`);
+      const existing = getPersistedJob(jobId);
+      if (existing) upsertJob({ ...existing, status: 'error' });
+      return;
+    }
+    filePath = targetFile;
+    console.log(`[pipeline] Resolved directory to video file: ${filePath}`);
   }
 
   const mediaId = randomUUID();

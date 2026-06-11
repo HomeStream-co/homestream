@@ -50,7 +50,8 @@ async function poll(): Promise<void> {
     if (!torrent) continue;
 
     // Update progress for downloading torrents
-    if (torrent.progress < 1 && torrent.state.toLowerCase().includes('download')) {
+    const isDownloadingState = ['downloading', 'metaDL', 'stalledDL', 'checkingDL', 'allocating'].includes(torrent.state);
+    if (torrent.progress < 1 && isDownloadingState) {
       upsertJob({ ...job, status: 'downloading', progress: Math.round(torrent.progress * 100) });
       continue;
     }
