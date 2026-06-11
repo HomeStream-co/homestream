@@ -65,10 +65,7 @@ files:
   - from: "."
     to: "."
     filter:
-      - "electron/main.cjs"
-      - "electron/updater.cjs"
-      - "electron/preload.cjs"
-      - "electron/crashReporter.cjs"
+      - "electron/*.cjs"
       - "electron/tray-icon.png"
       - "package.json"
       - "node_modules/electron-updater/**/*"
