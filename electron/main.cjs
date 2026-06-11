@@ -223,6 +223,7 @@ async function startServer() {
       SERVER_HOST: '0.0.0.0',
       NODE_ENV: 'production',
       ELECTRON: '1',
+      NODE_TLS_REJECT_UNAUTHORIZED: '0', // Fixes TMDB fetch failing due to Norton VPN intercepting SSL
       // Pass resourcesPath so the server bundle can locate client files.
       // process.resourcesPath is Electron-only and does NOT exist in the
       // child Node.js process — we must inject it explicitly.
