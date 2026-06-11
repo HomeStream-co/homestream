@@ -1146,7 +1146,7 @@ const CONTROL_PANEL_HTML = `<!DOCTYPE html>
     const url = which === 'lan' ? lanUrl : localUrl;
     if (!url) return;
     navigator.clipboard?.writeText(url).catch(() => {});
-    const btn = document.querySelector('.copy-btn[onclick="copyUrl(\\''+which+'\\')"]');
+    const btn = document.querySelector(".copy-btn[onclick=\"copyUrl('" + which + "')\"]");
     if (btn) {
       btn.textContent = 'Copied!';
       btn.classList.add('copied');
