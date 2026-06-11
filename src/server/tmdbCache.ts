@@ -324,7 +324,9 @@ export async function getGenreMustSee(genreId: number): Promise<TMDBMovie[]> {
       .map(normaliseMovie)
       .slice(0, 20);
     return attachGenres(results);
-  } catch { return []; }
+  } catch {
+    return [];
+  }
 }
 
 /**
@@ -446,8 +448,6 @@ export function getCacheAge(): { fetchedAt: number | null; stale: boolean } {
   const cached = readCache(CACHE_KEY);
   if (!cached) return { fetchedAt: null, stale: true };
   return { fetchedAt: cached.fetchedAt, stale: !isFresh(cached) };
-}
-
 /**
  * Periodically syncs catalogs for major streaming providers to support offline browsing.
  */
@@ -456,7 +456,8 @@ export function startOfflineCatalogSync() {
     console.info('[tmdbCache] Starting offline catalog sync...');
     const providers = [8, 9, 337, 1899, 15, 386]; // Netflix, Prime, Disney+, Max, Hulu, Peacock
     const types = ['movie', 'tv'];
-    
+
+    // 1. Sync streaming providers
     for (const providerId of providers) {
       for (const type of types) {
         for (let page = 1; page <= 5; page++) {
@@ -476,6 +477,24 @@ export function startOfflineCatalogSync() {
         }
       }
     }
+
+    // 2. Sync common genres
+    const commonGenres = [28, 12, 16, 35, 80, 99, 18, 10751, 14, 36, 27, 10402, 9648, 10749, 878, 10770, 53, 10752, 37];
+    for (const genreId of commonGenres) {
+      try {
+        await getGenreMustSee(genreId);
+        await new Promise(r => setTimeout(r, 500));
+        await getGenreTopRated(genreId);
+        await new Promise(r => setTimeout(r, 500));
+        await getGenreMustSeeTv(genreId);
+        await new Promise(r => setTimeout(r, 500));
+        await getGenreTopRatedTv(genreId);
+        await new Promise(r => setTimeout(r, 500));
+      } catch (err) {
+        console.warn(`[tmdbCache] Failed to sync genre ${genreId}`);
+      }
+    }
+
     console.info('[tmdbCache] Offline catalog sync complete.');
   };
 

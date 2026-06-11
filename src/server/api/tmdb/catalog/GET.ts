@@ -17,6 +17,7 @@
 import type { Request, Response } from 'express';
 import { requireAuth } from '../../../authMiddleware.js';
 import { readConfig } from '../../../configStore.js';
+import { tmdbGet } from '../../../tmdbCache.js';
 import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
@@ -72,38 +73,13 @@ export default async function handler(req: Request, res: Response) {
   }
 
   try {
-    const url = new URL(`${TMDB_BASE}/discover/${type}`);
-    url.searchParams.set('api_key', apiKey);
-    url.searchParams.set('language', 'en-US');
-    url.searchParams.set('sort_by', sortBy);
-    url.searchParams.set('watch_region', 'US');
-    url.searchParams.set('with_watch_providers', String(providerId));
-    url.searchParams.set('page', String(page));
-    // Only include titles with a reasonable vote count so junk doesn't surface
-    url.searchParams.set('vote_count.gte', '20');
-
-    const cacheDir = resolveClientPath('..', '.homestream-cache');
-    if (!fs.existsSync(cacheDir)) fs.mkdirSync(cacheDir, { recursive: true });
-    const cacheFile = path.join(cacheDir, `catalog-${providerId}-${type}-${page}-${sortBy}.json`);
-
-    let data: any = null;
-    let fromCache = false;
-
-    try {
-      const tmdbRes = await fetch(url.toString(), { signal: AbortSignal.timeout(8000) });
-      if (!tmdbRes.ok) throw new Error(`TMDB ${tmdbRes.status}: ${tmdbRes.statusText}`);
-      data = await tmdbRes.json();
-      
-      // Write to cache
-      fs.writeFileSync(cacheFile, JSON.stringify(data), 'utf-8');
-    } catch (err) {
-      if (fs.existsSync(cacheFile)) {
-        data = JSON.parse(fs.readFileSync(cacheFile, 'utf-8'));
-        fromCache = true;
-      } else {
-        throw err;
-      }
-    }
+    const data: any = await tmdbGet(`/discover/${type}`, {
+      sort_by: sortBy,
+      watch_region: 'US',
+      with_watch_providers: String(providerId),
+      page: String(page),
+      'vote_count.gte': '20',
+    });
 
     const results = (data.results ?? []).map((m: any) => {
       const posterPath = (m.poster_path as string | null) ?? null;
@@ -131,9 +107,13 @@ export default async function handler(req: Request, res: Response) {
       results,
       totalPages: Math.min(data.total_pages ?? 1, 20), // cap at 20 pages
       page: data.page ?? 1,
-      fromCache,
     });
   } catch (err) {
-    res.status(500).json({ error: String(err) });
+    console.warn('[TMDB Catalog] fetch failed:', err);
+    res.json({
+      results: [],
+      totalPages: 1,
+      page: 1
+    });
   }
 }
