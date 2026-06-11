@@ -85,58 +85,67 @@ export default async function handler(req: Request, res: Response) {
 
     // ——— 7. Copy file to library first, then Transcode in background ———
     const finalOriginalPath = path.join(libDir, safeName.replace(/\.[^.]+$/, '') + path.extname(localPath));
-    try {
-      if (!fs.existsSync(finalOriginalPath) && localPath !== finalOriginalPath) {
-        fs.copyFileSync(localPath, finalOriginalPath);
-      }
+    
+    (async () => {
       try {
-        fs.unlinkSync(localPath);
-      } catch (e) {} // ignore unlink error if they didn't want to move it
-    } catch(e) {
-      console.error('[upload-local] Failed to copy local file', e);
-    }
-
-    transcodeFile(mediaItem.id, finalOriginalPath, outputPath)
-      .then(result => {
-        let finalPath = outputPath;
-        let finalFilename = outputFilename;
-
-        if (result.outputFilename === path.basename(finalOriginalPath) || result.outputFilename === finalOriginalPath || result.outputFilename === path.basename(localPath)) {
-          finalPath = finalOriginalPath;
-          finalFilename = path.basename(finalOriginalPath);
+        if (!fs.existsSync(finalOriginalPath) && localPath !== finalOriginalPath) {
+          try {
+            await fs.promises.rename(localPath, finalOriginalPath);
+          } catch (renameErr: any) {
+            if (renameErr.code === 'EXDEV') {
+              await fs.promises.copyFile(localPath, finalOriginalPath);
+              try { await fs.promises.unlink(localPath); } catch (e) {}
+            } else {
+              throw renameErr;
+            }
+          }
         }
+      } catch(e) {
+        console.error('[upload-local] Failed to move local file', e);
+      }
 
-        writeLibrary(lib => {
-          const idx = lib.findIndex(m => (m as { id: string }).id === mediaItem.id);
-          if (idx !== -1) {
-            const item = lib[idx] as Record<string, unknown>;
-            item.transcoding      = false;
-            item.filename         = finalFilename;
-            item.filepath         = finalPath;
-            item.filePath         = finalPath;
-            item.fileSize         = result.finalSize;
-            item.originalSize     = result.originalSize;
-            item.savedBytes       = result.savedBytes;
-            item.transcodeStrategy = result.strategy;
+      transcodeFile(mediaItem.id, finalOriginalPath, outputPath)
+        .then(result => {
+          let finalPath = outputPath;
+          let finalFilename = outputFilename;
+
+          if (result.outputFilename === path.basename(finalOriginalPath) || result.outputFilename === finalOriginalPath || result.outputFilename === path.basename(localPath)) {
+            finalPath = finalOriginalPath;
+            finalFilename = path.basename(finalOriginalPath);
           }
-          return lib;
+
+          writeLibrary(lib => {
+            const idx = lib.findIndex(m => (m as { id: string }).id === mediaItem.id);
+            if (idx !== -1) {
+              const item = lib[idx] as Record<string, unknown>;
+              item.transcoding      = false;
+              item.filename         = finalFilename;
+              item.filepath         = finalPath;
+              item.filePath         = finalPath;
+              item.fileSize         = result.finalSize;
+              item.originalSize     = result.originalSize;
+              item.savedBytes       = result.savedBytes;
+              item.transcodeStrategy = result.strategy;
+            }
+            return lib;
+          });
+        })
+        .catch((transcodeErr: Error) => {
+          console.error(`[transcode] Error for ${mediaItem.id}:`, transcodeErr.message);
+          writeLibrary(lib => {
+            const idx = lib.findIndex(m => (m as { id: string }).id === mediaItem.id);
+            if (idx !== -1) {
+              const item = lib[idx] as Record<string, unknown>;
+              item.filename         = path.basename(finalOriginalPath);
+              item.filepath         = finalOriginalPath;
+              item.filePath         = finalOriginalPath;
+              item.transcoding      = false;
+              item.transcodeError   = transcodeErr.message;
+            }
+            return lib;
+          });
         });
-      })
-      .catch((transcodeErr: Error) => {
-        console.error(`[transcode] Error for ${mediaItem.id}:`, transcodeErr.message);
-        writeLibrary(lib => {
-          const idx = lib.findIndex(m => (m as { id: string }).id === mediaItem.id);
-          if (idx !== -1) {
-            const item = lib[idx] as Record<string, unknown>;
-            item.filename         = path.basename(finalOriginalPath);
-            item.filepath         = finalOriginalPath;
-            item.filePath         = finalOriginalPath;
-            item.transcoding      = false;
-            item.transcodeError   = transcodeErr.message;
-          }
-          return lib;
-        });
-      });
+    })();
   } catch (err) {
     console.error('[upload-local] Unexpected error:', err);
     if (!res.headersSent) {
