@@ -187,7 +187,7 @@ function normaliseMovie(m: Record<string, unknown>): TMDBMovie {
   };
 }
 
-async function tmdbGet(endpoint: string, params: Record<string, string> = {}): Promise<unknown> {
+export async function tmdbGet(endpoint: string, params: Record<string, string> = {}): Promise<unknown> {
   const cfg = (await import('./configStore.js')).readConfig();
   const apiKey = cfg.tmdbApiKey || process.env.TMDB_API_KEY || '';
   if (!apiKey) throw new Error('TMDB_API_KEY not configured');
@@ -448,6 +448,8 @@ export function getCacheAge(): { fetchedAt: number | null; stale: boolean } {
   const cached = readCache(CACHE_KEY);
   if (!cached) return { fetchedAt: null, stale: true };
   return { fetchedAt: cached.fetchedAt, stale: !isFresh(cached) };
+}
+
 /**
  * Periodically syncs catalogs for major streaming providers to support offline browsing.
  */
