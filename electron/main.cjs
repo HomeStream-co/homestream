@@ -213,6 +213,7 @@ async function startServer() {
   for (const key of BUILD_TIME_SECRETS) delete cleanEnv[key];
 
   serverProcess = utilityProcess.fork(serverPath, [], {
+    execArgv: ['--use-system-ca'],
     env: {
       ...cleanEnv,
       PORT: String(activePort),

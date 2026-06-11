@@ -176,7 +176,11 @@ function transcodeStrategy(info: VideoInfo, inputFilename: string): EncodeStrate
   const isH264 = info.codec === 'h264';
   const isMp4Container = inputFilename.toLowerCase().endsWith('.mp4');
 
-  if (!isH264) return 'encode_h264';
+  // FAST UPLOAD BYPASS:
+  // Instead of re-encoding HEVC/VP9 to H.264 (which takes hours of CPU time),
+  // we now just copy the video stream into an MP4 container (remux).
+  // Most modern browsers and smart TVs support HEVC MP4s natively, and this makes uploads instant!
+  if (!isH264) return 'remux';
 
   // H.264 in a non-MP4 container → remux (copy video, re-encode audio, add faststart)
   if (!isMp4Container) return 'remux';
