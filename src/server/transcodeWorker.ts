@@ -35,6 +35,7 @@ import { spawn } from 'child_process';
 import { createRequire } from 'module';
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
 import { updateJob, broadcast, getJob } from './transcodeStore.js';
 import { dataDir } from './dataDir.js';
 import { detectHwEncoder } from './hwEncoderDetect.js';
@@ -418,9 +419,11 @@ export async function transcodeFile(
       ];
     } else {
       // Software libx264 fallback
-      console.log(`[transcode] Using software libx264 CRF=${crf} for ${info.height}p`);
+      const threads = Math.max(1, Math.floor(os.cpus().length / 2));
+      console.log(`[transcode] Using software libx264 CRF=${crf} for ${info.height}p with ${threads} threads`);
       ffmpegArgs = [
         '-i', resolvedInput,
+        '-threads', String(threads),
         '-c:v', 'libx264',
         '-crf', String(crf),
         '-preset', 'medium',
