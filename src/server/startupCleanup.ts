@@ -265,15 +265,27 @@ function cleanupUpdaterCache(): void {
   const localAppData = process.env.LOCALAPPDATA;
   if (!localAppData) return;
 
-  const updaterDir = path.join(localAppData, 'homestream-updater');
-  if (!fs.existsSync(updaterDir)) return;
+  const dirsToClean = [
+    path.join(localAppData, 'homestream-updater'),
+    path.join(localAppData, 'HomeStream-updater'),
+    path.join(localAppData, 'electron-builder'),
+    path.join(localAppData, 'v8-app-template-updater')
+  ];
 
-  try {
-    // Delete the entire updater folder recursively
-    fs.rmSync(updaterDir, { recursive: true, force: true });
-    console.log('[startup] 🧹 Wiped homestream-updater cache directory to reclaim storage.');
-  } catch (err) {
-    console.warn(`[startup] ⚠ Could not wipe updater cache directory: ${err}`);
+  let cleaned = false;
+  for (const dir of dirsToClean) {
+    if (fs.existsSync(dir)) {
+      try {
+        fs.rmSync(dir, { recursive: true, force: true });
+        cleaned = true;
+      } catch (err) {
+        console.warn(`[startup] ⚠ Could not wipe updater cache directory ${dir}: ${err}`);
+      }
+    }
+  }
+
+  if (cleaned) {
+    console.log('[startup] 🧹 Wiped updater cache directories to reclaim storage.');
   }
 }
 
