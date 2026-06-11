@@ -201,6 +201,23 @@ export function findJobByInfoHash(infoHash: string): PersistedJob | undefined {
 }
 
 /**
+ * Used for duplicate detection by Title/IMDb ID instead of just infoHash.
+ * Prevents queueing multiple copies of the same movie/episode from different torrents.
+ */
+export function findJobByMetadata(imdbId: string, season?: number, episode?: number): PersistedJob | undefined {
+  return readRaw().find(j => {
+    if (j.status !== 'queued' && j.status !== 'downloading' && j.status !== 'transcoding') {
+      return false;
+    }
+    if (j.imdbId !== imdbId) return false;
+    if (j.type === 'series') {
+      return j.season === season && j.episode === episode;
+    }
+    return true; // movie matched imdbId
+  });
+}
+
+/**
  * Mark a job as interrupted so the UI can offer a resume/retry button.
  * Called when a download is interrupted mid-way (server restart, network drop).
  */

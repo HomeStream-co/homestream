@@ -90,6 +90,7 @@ export default function SetupPage() {
     vpnKnownServers: '',
     prowlarrUrl: 'http://localhost:9696',
     prowlarrApiKey: '',
+    torrentioUrl: 'https://torrentio.strem.fun',
     realDebridApiKey: '',
   });
 

@@ -178,6 +178,7 @@ import watchlistDeleteById from "./api/watchlist/[id]/DELETE";
 import { seoRoutes } from "../lib/seo-routes";
 import { startQbitCompletionWatcher } from "./qbitCompletionWatcher";
 import { runStartupMediaSync } from "./startupMediaSync";
+import { startOfflineCatalogSync } from "./tmdbCache.js";
 
 function normalizeCommerceApiBaseUrlEnv() {
 	if (process.env.GODADDY_API_BASE_URL) return;
@@ -677,6 +678,8 @@ if (import.meta.env.PROD) {
 		startQbitCompletionWatcher();
 		// Scan for pre-downloaded media and backfill missing captions
 		runStartupMediaSync();
+		// Start offline TMDB catalog sync
+		startOfflineCatalogSync();
 	});
 	server.on("error", (err: NodeJS.ErrnoException) => {
 		console.error("ssr.server.listen-failed", {

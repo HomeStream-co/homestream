@@ -195,9 +195,26 @@ async function tmdbGet(endpoint: string, params: Record<string, string> = {}): P
   url.searchParams.set('api_key', apiKey);
   url.searchParams.set('language', 'en-US');
   Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
-  const res = await fetch(url.toString(), { signal: AbortSignal.timeout(8000) });
-  if (!res.ok) throw new Error(`TMDB ${res.status}: ${String(res.statusText)}`);
-  return res.json() as Promise<unknown>;
+
+  const cacheKeyStr = `${endpoint}-${JSON.stringify(params)}`;
+  const hash = crypto.createHash('md5').update(cacheKeyStr).digest('hex');
+  const cacheFile = path.join(CACHE_DIR, `tmdb-get-${hash}.json`);
+
+  try {
+    const res = await fetch(url.toString(), { signal: AbortSignal.timeout(8000) });
+    if (!res.ok) throw new Error(`TMDB ${res.status}: ${String(res.statusText)}`);
+    const data = await res.json();
+    if (!fs.existsSync(CACHE_DIR)) fs.mkdirSync(CACHE_DIR, { recursive: true });
+    fs.writeFileSync(cacheFile, JSON.stringify(data), 'utf-8');
+    return data;
+  } catch (err) {
+    if (fs.existsSync(cacheFile)) {
+      try {
+        return JSON.parse(fs.readFileSync(cacheFile, 'utf-8'));
+      } catch { /* ignore cache parse error */ }
+    }
+    throw err;
+  }
 }
 
 // ── Genre map (static — TMDB genre IDs don't change) ─────────────────────────
@@ -429,4 +446,40 @@ export function getCacheAge(): { fetchedAt: number | null; stale: boolean } {
   const cached = readCache(CACHE_KEY);
   if (!cached) return { fetchedAt: null, stale: true };
   return { fetchedAt: cached.fetchedAt, stale: !isFresh(cached) };
+}
+
+/**
+ * Periodically syncs catalogs for major streaming providers to support offline browsing.
+ */
+export function startOfflineCatalogSync() {
+  const syncProviders = async () => {
+    console.info('[tmdbCache] Starting offline catalog sync...');
+    const providers = [8, 9, 337, 1899, 15, 386]; // Netflix, Prime, Disney+, Max, Hulu, Peacock
+    const types = ['movie', 'tv'];
+    
+    for (const providerId of providers) {
+      for (const type of types) {
+        for (let page = 1; page <= 5; page++) {
+          try {
+            await tmdbGet(`/discover/${type}`, {
+              sort_by: 'popularity.desc',
+              watch_region: 'US',
+              with_watch_providers: String(providerId),
+              page: String(page),
+              'vote_count.gte': '20',
+            });
+            // Delay to avoid rate limits
+            await new Promise(r => setTimeout(r, 500));
+          } catch (err) {
+            console.warn(`[tmdbCache] Failed to sync ${type} catalog for provider ${providerId} page ${page}`);
+          }
+        }
+      }
+    }
+    console.info('[tmdbCache] Offline catalog sync complete.');
+  };
+
+  // Run once on startup (after 5 min delay to not slow down boot), then every 30 days
+  setTimeout(syncProviders, 5 * 60 * 1000);
+  setInterval(syncProviders, 30 * 24 * 60 * 60 * 1000);
 }

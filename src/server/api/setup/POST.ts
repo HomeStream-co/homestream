@@ -109,6 +109,8 @@ export default async function handler(req: Request, res: Response) {
           'vpnConfigContent', 'vpnUsername', 'vpnPassword', 'vpnAutoConnect',
           // Prowlarr
           'prowlarrUrl', 'prowlarrApiKey',
+          // Torrentio
+          'torrentioUrl',
           // Real-Debrid
           'realDebridApiKey',
         ];
@@ -119,6 +121,7 @@ export default async function handler(req: Request, res: Response) {
         // Normalise URL fields — add http:// if user typed bare host:port
         if (updates.qbitUrl)     updates.qbitUrl     = normalizeUrl(updates.qbitUrl as string);
         if (updates.prowlarrUrl) updates.prowlarrUrl = normalizeUrl(updates.prowlarrUrl as string);
+        if (updates.torrentioUrl) updates.torrentioUrl = normalizeUrl(updates.torrentioUrl as string);
         if (updates.jellyfinUrl) updates.jellyfinUrl = normalizeUrl(updates.jellyfinUrl as string);
         // Hash admin password with bcrypt before saving.
         // DEVELOPER_LOCK: if the developer has locked ownership via the

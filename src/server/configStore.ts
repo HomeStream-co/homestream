@@ -89,6 +89,8 @@ export interface AppConfig {
   // Prowlarr — self-hosted indexer aggregator (queries 500+ trackers)
   prowlarrUrl: string;        // e.g. http://localhost:9696
   prowlarrApiKey: string;     // Settings → General → API Key in Prowlarr UI
+  // Torrentio - Custom Manifest URL (e.g. for Real-Debrid configured Torrentio)
+  torrentioUrl: string;       // default: https://torrentio.strem.fun
   // Real-Debrid — premium link hoster used as preferred download backend
   // When set, downloads go via RD (no qBittorrent or WebTorrent needed)
   realDebridApiKey: string;
@@ -158,6 +160,7 @@ const DEFAULTS: AppConfig = {
   storageTvPct: 30,
   prowlarrUrl: process.env.PROWLARR_URL || 'http://localhost:9696',
   prowlarrApiKey: process.env.PROWLARR_API_KEY || '',
+  torrentioUrl: process.env.TORRENTIO_URL || 'https://torrentio.strem.fun',
   realDebridApiKey: process.env.REAL_DEBRID_API_KEY || '',
   torrentSources: DEFAULT_TORRENT_SOURCES,
 };

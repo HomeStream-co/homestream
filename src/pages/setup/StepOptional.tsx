@@ -199,6 +199,7 @@ export default function StepOptional({
         qbitPassword: form.qbitPassword,
         jellyfinUrl: form.jellyfinUrl,
         jellyfinApiKey: form.jellyfinApiKey,
+        torrentioUrl: form.torrentioUrl,
         prowlarrUrl: form.prowlarrUrl,
         prowlarrApiKey: form.prowlarrApiKey,
       });
@@ -464,6 +465,31 @@ export default function StepOptional({
             )}
           </div>
         )}
+      </div>
+
+      {/* ── Torrentio ─────────────────────────────────────────────────────── */}
+      <div className="p-4 rounded-xl border border-border bg-muted/20">
+        <div className="flex items-center gap-2 mb-1">
+          <Search className="w-4 h-4 text-primary" />
+          <p className="text-sm font-semibold text-foreground">Torrentio (Real-Debrid / Custom Indexers)</p>
+          <span className="text-[10px] bg-muted text-muted-foreground px-1.5 py-0.5 rounded font-medium">Recommended</span>
+        </div>
+        <p className="text-xs text-muted-foreground mb-3">
+          HomeStream uses Torrentio's public server by default. To unlock maximum quality (4K) and avoid rate limits, we strongly recommend configuring Real-Debrid via Torrentio.
+          <br/><br/>
+          <strong>1.</strong> Go to <a href="https://torrentio.strem.fun" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">torrentio.strem.fun</a> and configure your Debrid provider.<br/>
+          <strong>2.</strong> Right click the purple <strong>Install</strong> button and select <strong>Copy Link Address</strong>.<br/>
+          <strong>3.</strong> Paste it below:
+        </p>
+        <div className="flex flex-col gap-2">
+          <input
+            type="text"
+            value={form.torrentioUrl}
+            onChange={e => set('torrentioUrl', e.target.value)}
+            placeholder="https://torrentio.strem.fun/..."
+            className="w-full bg-background border border-border rounded-lg px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary font-mono"
+          />
+        </div>
       </div>
 
       {/* ── Prowlarr ─────────────────────────────────────────────────────── */}

@@ -60,6 +60,8 @@ export interface FormData {
   // Prowlarr — self-hosted indexer aggregator
   prowlarrUrl: string;
   prowlarrApiKey: string;
+  // Torrentio - custom manifest URL
+  torrentioUrl: string;
   // Real-Debrid — premium download backend
   realDebridApiKey: string;
 }

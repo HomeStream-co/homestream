@@ -82,16 +82,30 @@ export default async function handler(req: Request, res: Response) {
     // Only include titles with a reasonable vote count so junk doesn't surface
     url.searchParams.set('vote_count.gte', '20');
 
-    const tmdbRes = await fetch(url.toString(), { signal: AbortSignal.timeout(8000) });
-    if (!tmdbRes.ok) throw new Error(`TMDB ${tmdbRes.status}: ${tmdbRes.statusText}`);
+    const cacheDir = resolveClientPath('..', '.homestream-cache');
+    if (!fs.existsSync(cacheDir)) fs.mkdirSync(cacheDir, { recursive: true });
+    const cacheFile = path.join(cacheDir, `catalog-${providerId}-${type}-${page}-${sortBy}.json`);
 
-    const data = await tmdbRes.json() as {
-      results: Array<Record<string, unknown>>;
-      total_pages: number;
-      page: number;
-    };
+    let data: any = null;
+    let fromCache = false;
 
-    const results = (data.results ?? []).map(m => {
+    try {
+      const tmdbRes = await fetch(url.toString(), { signal: AbortSignal.timeout(8000) });
+      if (!tmdbRes.ok) throw new Error(`TMDB ${tmdbRes.status}: ${tmdbRes.statusText}`);
+      data = await tmdbRes.json();
+      
+      // Write to cache
+      fs.writeFileSync(cacheFile, JSON.stringify(data), 'utf-8');
+    } catch (err) {
+      if (fs.existsSync(cacheFile)) {
+        data = JSON.parse(fs.readFileSync(cacheFile, 'utf-8'));
+        fromCache = true;
+      } else {
+        throw err;
+      }
+    }
+
+    const results = (data.results ?? []).map((m: any) => {
       const posterPath = (m.poster_path as string | null) ?? null;
       const backdropPath = (m.backdrop_path as string | null) ?? null;
       const genreIds = (m.genre_ids as number[]) ?? [];
@@ -117,6 +131,7 @@ export default async function handler(req: Request, res: Response) {
       results,
       totalPages: Math.min(data.total_pages ?? 1, 20), // cap at 20 pages
       page: data.page ?? 1,
+      fromCache,
     });
   } catch (err) {
     res.status(500).json({ error: String(err) });
