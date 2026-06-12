@@ -163,7 +163,10 @@ export default function StremioPanel() {
 
   // ── Persist login ──
   useEffect(() => {
-    const saved = localStorage.getItem('stremio_account');
+    let saved = null;
+    try {
+      saved = localStorage.getItem('stremio_account');
+    } catch { /* ignore */ }
     if (saved) {
       try { setAccount(JSON.parse(saved)); } catch { /* ignore */ }
     }
@@ -224,7 +227,9 @@ export default function StremioPanel() {
       if (data.result?.user) {
         const acc: StremioAccount = { email: data.result.user.email, avatar: data.result.user.avatar };
         setAccount(acc);
-        localStorage.setItem('stremio_account', JSON.stringify(acc));
+        try {
+          localStorage.setItem('stremio_account', JSON.stringify(acc));
+        } catch { /* ignore */ }
         setLoginEmail('');
         setLoginPassword('');
         setView('search');

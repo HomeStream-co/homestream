@@ -231,7 +231,7 @@ function DownloadModal({ target, onClose }: { target: DownloadTarget; onClose: (
   const startDownload = async (stream: { name: string; title: string; url: string; imdbId: string }) => {
     setDownloading(stream.url);
     try {
-      await fetch('/api/stremio/download', {
+      const res = await fetch('/api/stremio/download', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
@@ -245,6 +245,7 @@ function DownloadModal({ target, onClose }: { target: DownloadTarget; onClose: (
           streams: [{ infoHash: stream.url, magnet: `magnet:?xt=urn:btih:${stream.url}`, quality: stream.name, name: stream.name, size: '', seeds: '' }],
         }),
       });
+      if (!res.ok) throw new Error('Failed to start download');
       onClose();
     } catch {
       setDownloading(null);

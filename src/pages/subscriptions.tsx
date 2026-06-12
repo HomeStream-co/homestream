@@ -302,6 +302,7 @@ export default function SubscriptionsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ imdbId, action: 'toggle' }),
       });
+      if (!res.ok) throw new Error('Toggle failed');
       const data = await res.json() as { enabled: boolean };
       setSubs(prev => prev.map(s =>
         s.imdbId === imdbId ? { ...s, enabled: data.enabled } : s
@@ -316,7 +317,7 @@ export default function SubscriptionsPage() {
     const sub = subs.find(s => s.imdbId === imdbId);
     if (!sub) return;
     try {
-      await fetch('/api/subscriptions', {
+      const res = await fetch('/api/subscriptions', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
@@ -329,6 +330,7 @@ export default function SubscriptionsPage() {
           enabled: sub.enabled,
         }),
       });
+      if (!res.ok) throw new Error('Schedule update failed');
       setSubs(prev => prev.map(s =>
         s.imdbId === imdbId ? { ...s, schedule } : s
       ));
@@ -344,6 +346,7 @@ export default function SubscriptionsPage() {
         method: 'POST',
         credentials: 'include',
       });
+      if (!res.ok) throw new Error('Check failed');
       const data = await res.json() as { message: string };
       toast.success(data.message ?? 'Check complete');
       // Refresh to pick up updated lastCheckedAt
@@ -356,12 +359,13 @@ export default function SubscriptionsPage() {
   const handleUnsubscribe = async (imdbId: string) => {
     const sub = subs.find(s => s.imdbId === imdbId);
     try {
-      await fetch('/api/subscriptions', {
+      const res = await fetch('/api/subscriptions', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ imdbId, action: 'unsubscribe' }),
       });
+      if (!res.ok) throw new Error('Unsubscribe failed');
       setSubs(prev => prev.filter(s => s.imdbId !== imdbId));
       toast.success(`Unsubscribed from ${sub?.title ?? 'show'}`);
     } catch {

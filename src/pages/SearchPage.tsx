@@ -5,6 +5,7 @@ import { useSearchParams } from 'react-router-dom';
 import { useMedia } from '@/context/MediaContext';
 import MediaCard from '@/components/MediaCard';
 import Spinner from '@/components/Spinner';
+import { toActorsString } from '@/lib/utils';
 
 export default function SearchPage() {
   const { library, loading } = useMedia();
@@ -40,10 +41,10 @@ export default function SearchPage() {
       if (genreFilter && !m.genre.includes(genreFilter)) return false;
       return (
         m.title.toLowerCase().includes(q) ||
-        m.director.toLowerCase().includes(q) ||
-        (typeof m.actors === 'string' ? m.actors : m.actors.join(', ')).toLowerCase().includes(q) ||
+        (m.director ?? '').toLowerCase().includes(q) ||
+        toActorsString(m.actors).toLowerCase().includes(q) ||
         m.genre.some(g => g.toLowerCase().includes(q)) ||
-        m.plot.toLowerCase().includes(q) ||
+        (m.plot ?? '').toLowerCase().includes(q) ||
         m.enrichment?.tags.some(t => t.toLowerCase().includes(q)) ||
         m.enrichment?.mood.some(t => t.toLowerCase().includes(q))
       );

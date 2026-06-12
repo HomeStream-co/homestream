@@ -143,7 +143,7 @@ export default function ShowPage() {
     if (!item || !showImdbId) return;
     setSubStatus('loading');
     try {
-      await fetch('/api/subscriptions', {
+      const res = await fetch('/api/subscriptions', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
@@ -156,6 +156,7 @@ export default function ShowPage() {
           enabled: true,
         }),
       });
+      if (!res.ok) throw new Error('Subscribe failed');
       setSubStatus('subscribed');
       setSubDialogOpen(false);
     } catch {
@@ -166,20 +167,29 @@ export default function ShowPage() {
 
   const handleUnsubscribe = async () => {
     if (!showImdbId) return;
-    await fetch('/api/subscriptions', {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ imdbId: showImdbId, action: 'unsubscribe' }),
-    });
-    setSubStatus('idle');
+    try {
+      const res = await fetch('/api/subscriptions', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imdbId: showImdbId, action: 'unsubscribe' }),
+      });
+      if (!res.ok) throw new Error('Unsubscribe failed');
+      setSubStatus('idle');
+    } catch {
+      toast.error('Failed to unsubscribe — check your connection');
+    }
   };
 
   const handleCheckNow = async () => {
     if (!showImdbId) return;
     setCheckingNow(true);
     try {
-      await fetch(`/api/subscriptions/${showImdbId}/check`, { method: 'POST', credentials: 'include' });
+      const res = await fetch(`/api/subscriptions/${showImdbId}/check`, { method: 'POST', credentials: 'include' });
+      if (!res.ok) throw new Error('Check failed');
+      toast.success('Check started');
+    } catch {
+      toast.error('Failed to run check');
     } finally {
       setCheckingNow(false);
     }

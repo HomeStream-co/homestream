@@ -119,7 +119,10 @@ export default function CookieBanner() {
   useEffect(function checkConsent() {
     if (typeof window === 'undefined') return;
 
-    const consentData = localStorage.getItem(COOKIE_CONSENT_KEY);
+    let consentData: string | null = null;
+    try {
+      consentData = localStorage.getItem(COOKIE_CONSENT_KEY);
+    } catch { /* ignore */ }
 
     if (!consentData) {
       setShowBanner(true);
@@ -132,13 +135,13 @@ export default function CookieBanner() {
       const daysSinceConsent = (Date.now() - consent.timestamp) / (1000 * 60 * 60 * 24);
 
       if (daysSinceConsent > COOKIE_CONSENT_EXPIRES_DAYS) {
-        localStorage.removeItem(COOKIE_CONSENT_KEY);
+        try { localStorage.removeItem(COOKIE_CONSENT_KEY); } catch { /* ignore */ }
         setShowBanner(true);
       } else if (consent.analytics) {
         initC2Tracking();
       }
     } catch {
-      localStorage.removeItem(COOKIE_CONSENT_KEY);
+      try { localStorage.removeItem(COOKIE_CONSENT_KEY); } catch { /* ignore */ }
       setShowBanner(true);
     }
 
@@ -146,14 +149,18 @@ export default function CookieBanner() {
   }, []);
 
   function saveConsent(analytics: boolean) {
-    localStorage.setItem(COOKIE_CONSENT_KEY, JSON.stringify({ analytics, timestamp: Date.now() }));
+    try {
+      localStorage.setItem(COOKIE_CONSENT_KEY, JSON.stringify({ analytics, timestamp: Date.now() }));
+    } catch { /* ignore */ }
     if (analytics) initC2Tracking();
     setShowBanner(false);
   }
 
   function revokeConsent() {
     if (typeof window === 'undefined') return;
-    localStorage.removeItem(COOKIE_CONSENT_KEY);
+    try {
+      localStorage.removeItem(COOKIE_CONSENT_KEY);
+    } catch { /* ignore */ }
     setShowBanner(true);
   }
 

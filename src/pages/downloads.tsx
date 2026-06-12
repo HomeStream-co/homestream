@@ -1317,12 +1317,13 @@ export default function DownloadsPage() {
 
   const handleUnsubscribe = async (imdbId: string) => {
     try {
-      await fetch('/api/subscriptions', {
+      const res = await fetch('/api/subscriptions', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ imdbId, action: 'unsubscribe' }),
       });
+      if (!res.ok) throw new Error('Unsubscribe failed');
       setSubscriptions(s => s.filter(x => x.imdbId !== imdbId));
       toast.success('Unsubscribed');
     } catch {
@@ -1332,12 +1333,13 @@ export default function DownloadsPage() {
 
   const handleToggle = async (imdbId: string) => {
     try {
-      await fetch('/api/subscriptions', {
+      const res = await fetch('/api/subscriptions', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ imdbId, action: 'toggle' }),
       });
+      if (!res.ok) throw new Error('Toggle failed');
       fetchSubscriptions();
     } catch {
       toast.error('Failed to update subscription — check your connection');
@@ -1347,7 +1349,8 @@ export default function DownloadsPage() {
   const handleCheckNow = async (imdbId: string, title: string) => {
     setCheckingId(imdbId);
     try {
-      await fetch(`/api/subscriptions/${imdbId}/check`, { method: 'POST', credentials: 'include' });
+      const res = await fetch(`/api/subscriptions/${imdbId}/check`, { method: 'POST', credentials: 'include' });
+      if (!res.ok) throw new Error('Check failed');
       toast.success(`Checked "${title}" — see downloads for new episodes`);
       fetchSubscriptions();
     } catch {

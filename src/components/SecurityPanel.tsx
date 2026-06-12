@@ -18,6 +18,7 @@ import {
   Info, ChevronLeft,
 } from 'lucide-react';
 import { fmtBytes } from '@/components/settings/shared';
+import { toast } from 'sonner';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -272,38 +273,54 @@ export default function SecurityPanel({ open, onClose, onBack }: SecurityPanelPr
   }, [open, fetchQuarantine]);
 
   const handleDelete = async (id: string) => {
-    await fetch('/api/security/quarantine', {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'delete', id }),
-    });
-    setQuarantine(q => q.filter(e => e.id !== id));
+    try {
+      const res = await fetch('/api/security/quarantine', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'delete', id }),
+      });
+      if (!res.ok) throw new Error('Delete failed');
+      setQuarantine(q => q.filter(e => e.id !== id));
+      toast.success('File deleted permanently');
+    } catch {
+      toast.error('Failed to delete file');
+    }
   };
 
   const handleRestore = async (id: string) => {
-    await fetch('/api/security/quarantine', {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'restore', id }),
-    });
-    setQuarantine(q => q.filter(e => e.id !== id));
+    try {
+      const res = await fetch('/api/security/quarantine', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'restore', id }),
+      });
+      if (!res.ok) throw new Error('Restore failed');
+      setQuarantine(q => q.filter(e => e.id !== id));
+      toast.success('File restored to library');
+    } catch {
+      toast.error('Failed to restore file');
+    }
   };
 
   const saveVtKey = async () => {
     setVtSaving(true);
     try {
-      await fetch('/api/setup', {
+      const res = await fetch('/api/setup', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'save', virusTotalApiKey: vtKey }),
       });
+      if (!res.ok) throw new Error('Save failed');
       setVtSaved(true);
       setVtHasKey(!!vtKey);
       setTimeout(() => setVtSaved(false), 3000);
-    } catch { /* ignore */ } finally {
+      toast.success('VirusTotal API key updated');
+    } catch {
+      toast.error('Failed to save VirusTotal key');
+    } finally {
       setVtSaving(false);
     }
   };

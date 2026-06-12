@@ -11,6 +11,7 @@ import MediaCard from '@/components/MediaCard';
 import Spinner from '@/components/Spinner';
 import EnrichmentWizard from '@/components/EnrichmentWizard';
 import type { MediaItem } from '@/types/media';
+import { toActorsString } from '@/lib/utils';
 
 type SortKey = 'title' | 'year' | 'rating' | 'added' | 'progress';
 type ViewMode = 'grid' | 'list';
@@ -29,7 +30,7 @@ function sortItems(items: MediaItem[], key: SortKey): MediaItem[] {
       case 'title':    return a.title.localeCompare(b.title);
       case 'year':     return parseInt(b.year) - parseInt(a.year);
       case 'rating':   return (parseFloat(b.imdbRating) || 0) - (parseFloat(a.imdbRating) || 0);
-      case 'added':    return new Date(b.addedAt).getTime() - new Date(a.addedAt).getTime();
+      case 'added':    return new Date(b.addedAt ?? 0).getTime() - new Date(a.addedAt ?? 0).getTime();
       case 'progress': return (b.watchProgress ?? 0) - (a.watchProgress ?? 0);
       default:         return 0;
     }
@@ -66,8 +67,8 @@ export default function LibraryPage() {
       const q = query.toLowerCase();
       items = items.filter(m =>
         m.title.toLowerCase().includes(q) ||
-        m.director.toLowerCase().includes(q) ||
-        (typeof m.actors === 'string' ? m.actors : m.actors.join(', ')).toLowerCase().includes(q)
+        (m.director ?? '').toLowerCase().includes(q) ||
+        toActorsString(m.actors).toLowerCase().includes(q)
       );
     }
     return sortItems(items, sortKey);

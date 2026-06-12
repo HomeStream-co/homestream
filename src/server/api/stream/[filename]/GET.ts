@@ -117,7 +117,15 @@ function isPathAllowed(resolvedPath: string): boolean {
     if (cfg.libraryDir)   allowedRoots.push(path.resolve(cfg.libraryDir));
   } catch { /* config unreadable — only uploads dir is allowed */ }
 
-  return allowedRoots.some(root => normalised.startsWith(root + path.sep) || normalised === root);
+  const isWindows = process.platform === 'win32';
+  return allowedRoots.some(root => {
+    if (isWindows) {
+      const normLower = normalised.toLowerCase();
+      const rootLower = root.toLowerCase();
+      return normLower.startsWith(rootLower + path.sep) || normLower === rootLower;
+    }
+    return normalised.startsWith(root + path.sep) || normalised === root;
+  });
 }
 
 // ── Demo mode — royalty-free Blender Foundation clips ────────────────────────

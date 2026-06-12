@@ -934,17 +934,17 @@ function TvPageInner() {
   );
 
   const recentlyAdded = useMemo(() =>
-    [...library].sort((a, b) => b.addedAt.localeCompare(a.addedAt)).slice(0, 20),
+    [...library].sort((a, b) => (b.addedAt ?? '').localeCompare(a.addedAt ?? '')).slice(0, 20),
     [library]
   );
 
   const movies = useMemo(() =>
-    library.filter(m => m.type === 'movie').sort((a, b) => b.addedAt.localeCompare(a.addedAt)),
+    library.filter(m => m.type === 'movie').sort((a, b) => (b.addedAt ?? '').localeCompare(a.addedAt ?? '')),
     [library]
   );
 
   const shows = useMemo(() =>
-    library.filter(m => m.type === 'series').sort((a, b) => b.addedAt.localeCompare(a.addedAt)),
+    library.filter(m => m.type === 'series').sort((a, b) => (b.addedAt ?? '').localeCompare(a.addedAt ?? '')),
     [library]
   );
 

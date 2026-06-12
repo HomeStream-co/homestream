@@ -1,6 +1,6 @@
 import type { Request, Response } from 'express';
 import { pickBestStream } from '../../../torrentManager.js';
-import { addMagnet, isReachable } from '../../../qbittorrentClient.js';
+import { addMagnet, testConnection } from '../../../qbittorrentClient.js';
 import { readConfig, DEFAULT_TORRENT_SOURCES } from '../../../configStore.js';
 import { runPreDownloadScan } from '../../../security/threatScanner.js';
 import { connectForDownload, disconnectAfterDownload } from '../../../vpnService.js';
@@ -466,7 +466,7 @@ export default async function handler(req: Request, res: Response) {
 
   let useQbit = false;
   if (!useRD) {
-    useQbit = await isReachable();
+    useQbit = (await testConnection()).ok;
     if (!useQbit) {
       res.status(503).json({
         error: 'No download backend available',

@@ -77,7 +77,7 @@ export default function ShowsPage() {
         });
         break;
       default:
-        items.sort((a, b) => new Date(b.addedAt).getTime() - new Date(a.addedAt).getTime());
+        items.sort((a, b) => new Date(b.addedAt ?? 0).getTime() - new Date(a.addedAt ?? 0).getTime());
     }
 
     return items;

@@ -206,12 +206,13 @@ export default function ShowCard({
 
     if (subscribed) {
       try {
-        await fetch('/api/subscriptions', {
+        const res = await fetch('/api/subscriptions', {
           method: 'POST',
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ imdbId, action: 'unsubscribe' }),
         });
+        if (!res.ok) throw new Error('Unsubscribe failed');
         setSubscribed(false);
         toast.success(`Unsubscribed from ${rep.title}`);
       } catch {
@@ -223,7 +224,7 @@ export default function ShowCard({
         1,
       );
       try {
-        await fetch('/api/subscriptions', {
+        const res = await fetch('/api/subscriptions', {
           method: 'POST',
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
@@ -236,6 +237,7 @@ export default function ShowCard({
             enabled: true,
           }),
         });
+        if (!res.ok) throw new Error('Subscribe failed');
         setSubscribed(true);
         toast.success(`Subscribed to ${rep.title} — new episodes will auto-download`);
       } catch {
