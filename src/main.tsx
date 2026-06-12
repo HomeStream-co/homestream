@@ -13,20 +13,6 @@ if (import.meta.env.MODE === 'development') {
   document.head.appendChild(meta);
 }
 
-// Global handler for Vite dynamic import chunk failures (e.g., after an app update)
-window.addEventListener('vite:preloadError', (event) => {
-  if (sessionStorage.getItem('preload-error-reloaded')) {
-    console.error('Preload error loop detected. Not reloading.');
-    return;
-  }
-  sessionStorage.setItem('preload-error-reloaded', 'true');
-  window.location.reload();
-});
-if (sessionStorage.getItem('preload-error-reloaded')) {
-  sessionStorage.removeItem('preload-error-reloaded');
-}
-
-
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {

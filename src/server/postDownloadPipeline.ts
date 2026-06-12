@@ -32,6 +32,7 @@ import { transcodeFile } from './transcodeWorker.js';
 import { fetchOMDB } from './mediaUtils.js';
 import { runEnrichmentInBackground, runCaptionFetchInBackground } from './mediaUtils.js';
 import { upsertJob, getPersistedJob } from './downloadJobStore.js';
+import { readConfig } from './configStore.js';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -86,7 +87,7 @@ function resolveCategory(
 // ── Main pipeline ─────────────────────────────────────────────────────────────
 
 export async function runPostDownloadPipeline(params: PostDownloadParams): Promise<void> {
-  let {
+  const {
     filePath, title, quality, type, season, episode,
     imdbId, poster, year, jobId, backend,
   } = params;
@@ -98,69 +99,14 @@ export async function runPostDownloadPipeline(params: PostDownloadParams): Promi
     return;
   }
 
-  const stat = fs.statSync(filePath);
-  if (stat.isDirectory()) {
-    let largestFile: string | null = null;
-    let maxSize = 0;
-    
-    let episodeFile: string | null = null;
-    let epMaxSize = 0;
-
-    const exts = ['.mkv', '.mp4', '.avi', '.mov', '.webm', '.ts', '.m4v'];
-
-    function walk(dir: string) {
-      for (const f of fs.readdirSync(dir)) {
-        const full = path.join(dir, f);
-        const st = fs.statSync(full);
-        if (st.isDirectory()) {
-          walk(full);
-        } else if (exts.includes(path.extname(full).toLowerCase())) {
-          // Track largest overall
-          if (st.size > maxSize) {
-            maxSize = st.size;
-            largestFile = full;
-          }
-          // If series, track largest file matching SXXEYY
-          if (type === 'series' && season != null && episode != null) {
-            const name = f.toLowerCase();
-            const sFormat = `s${String(season).padStart(2, '0')}`;
-            const eFormat = `e${String(episode).padStart(2, '0')}`;
-            if (name.includes(sFormat) && name.includes(eFormat)) {
-              if (st.size > epMaxSize) {
-                epMaxSize = st.size;
-                episodeFile = full;
-              }
-            }
-          }
-        }
-      }
-    }
-    walk(filePath);
-
-    // Prefer episode-matching file for series, fallback to largest file overall
-    const targetFile = episodeFile || largestFile;
-
-    if (!targetFile) {
-      console.error(`[pipeline] No video file found in directory: ${filePath}`);
-      const existing = getPersistedJob(jobId);
-      if (existing) upsertJob({ ...existing, status: 'error' });
-      return;
-    }
-    filePath = targetFile;
-    console.log(`[pipeline] Resolved directory to video file: ${filePath}`);
-  }
-
   const mediaId = randomUUID();
   const filename = path.basename(filePath);
-  const outputFilename = filename.replace(/\.[^.]+$/, '') + '_tc.mp4';
-  const outputPath = path.join(path.dirname(filePath), outputFilename);
 
-  // ── 1. Mark job as transcoding ────────────────────────────────────────────
+  // ── 1. Mark job as transcoding ──
   const existingJob = getPersistedJob(jobId);
   if (existingJob) upsertJob({ ...existingJob, status: 'transcoding' });
 
-  // ── 2. Fetch OMDB metadata ────────────────────────────────────────────────
-  // Use the clean title (strip episode label for OMDB lookup)
+  // ── 2. Fetch OMDB metadata ──
   const lookupTitle = type === 'series'
     ? title.replace(/\s+S\d{2}E\d{2}$/i, '').trim()
     : title;
@@ -178,7 +124,63 @@ export async function runPostDownloadPipeline(params: PostDownloadParams): Promi
 
   const fileSize = fs.statSync(filePath).size;
 
-  // ── 3. Build initial library item (transcoding: true) ─────────────────────
+  const cfg = readConfig();
+  if (cfg.autoTranscode === false) {
+    // Skip transcoding — add file directly to the library in-place
+    const mediaItem: Record<string, unknown> = {
+      id: mediaId,
+      filename,
+      originalFilename: filename,
+      filepath: filePath,
+      filePath,
+      title: omdb?.Title || title,
+      year: omdb?.Year || year || 'Unknown',
+      genre: genres,
+      plot: omdb?.Plot || '',
+      director: omdb?.Director || '',
+      actors: omdb?.Actors || '',
+      imdbRating: omdb?.imdbRating || 'N/A',
+      poster: (omdb?.Poster && omdb.Poster !== 'N/A') ? omdb.Poster : (poster || ''),
+      type,
+      runtime: omdb?.Runtime || 'Unknown',
+      rated: omdb?.Rated && omdb.Rated !== 'N/A' ? omdb.Rated.trim() : 'NR',
+      addedAt: new Date().toISOString(),
+      watchProgress: 0,
+      fileSize,
+      originalSize: fileSize,
+      transcoding: false,
+      needsMetadata: !omdb,
+      metadataAvailable: !!omdb,
+      imdbId: imdbId || '',
+      season,
+      episode,
+      episodeLabel,
+      category,
+      downloadedVia: backend,
+      quality,
+      ccStatus: 'none',
+      enriching: false,
+    };
+
+    await writeLibrary(lib => {
+      lib.unshift(mediaItem);
+      return lib;
+    });
+
+    console.log(`[pipeline] Added "${title}" to library (no transcode, category: ${category})`);
+
+    const doneJob = getPersistedJob(jobId);
+    if (doneJob) upsertJob({ ...doneJob, status: 'done', progress: 100, completedAt: new Date().toISOString() });
+
+    runEnrichmentInBackground(mediaId).catch(() => {});
+    runCaptionFetchInBackground(mediaId).catch(() => {});
+    return;
+  }
+
+  const outputFilename = filename.replace(/\.[^.]+$/, '') + '_tc.mp4';
+  const outputPath = path.join(path.dirname(filePath), outputFilename);
+
+  // ── 3. Build initial library item (transcoding: true) ──
   const mediaItem: Record<string, unknown> = {
     id: mediaId,
     filename,
@@ -214,7 +216,7 @@ export async function runPostDownloadPipeline(params: PostDownloadParams): Promi
     enriching: false,
   };
 
-  // ── 4. Register transcode job + write to library ──────────────────────────
+  // ── 4. Register transcode job + write to library ──
   createJob(mediaId, filename, outputFilename);
 
   await writeLibrary(lib => {
@@ -224,7 +226,7 @@ export async function runPostDownloadPipeline(params: PostDownloadParams): Promi
 
   console.log(`[pipeline] Added "${title}" to library (category: ${category}, transcoding…)`);
 
-  // ── 5. Transcode ──────────────────────────────────────────────────────────
+  // ── 5. Transcode ──
   try {
     const result = await transcodeFile(mediaId, filePath, outputPath);
     const finalPath = path.join(path.dirname(filePath), result.outputFilename);
@@ -258,11 +260,11 @@ export async function runPostDownloadPipeline(params: PostDownloadParams): Promi
     });
   }
 
-  // ── 6. Mark job done ──────────────────────────────────────────────────────
+  // ── 6. Mark job done ──
   const doneJob = getPersistedJob(jobId);
   if (doneJob) upsertJob({ ...doneJob, status: 'done', progress: 100, completedAt: new Date().toISOString() });
 
-  // ── 7. Background enrichment + captions ──────────────────────────────────
+  // ── 7. Background enrichment + captions ──
   runEnrichmentInBackground(mediaId).catch(() => {});
   runCaptionFetchInBackground(mediaId).catch(() => {});
 }

@@ -62,42 +62,20 @@ export default function StepMediaFolder({
         <div>
           <label className="text-xs font-medium text-muted-foreground mb-2 block">Drive</label>
           <div className="flex gap-2 flex-wrap">
-            {availableDrives.map(({ path: drive, freeSpaceGB }) => {
-              const isActive = currentDrive === drive.toUpperCase().replace(/\\\\/g, '\\\\');
-              const isLowSpace = freeSpaceGB !== undefined && freeSpaceGB < 10;
-              return (
-                <button
-                  key={drive}
-                  onClick={() => switchDrive(drive)}
-                  className={`flex flex-col items-start px-3 py-2 rounded-lg border transition-colors ${
-                    isActive
-                      ? 'bg-primary border-primary text-primary-foreground'
-                      : isLowSpace
-                      ? 'bg-destructive/10 border-destructive/30 text-destructive hover:bg-destructive/20'
-                      : 'bg-background border-border text-muted-foreground hover:border-primary/50 hover:text-foreground'
-                  }`}
-                >
-                  <span className="text-xs font-mono font-semibold">{drive}</span>
-                  {freeSpaceGB !== undefined && (
-                    <span className={`text-[10px] mt-0.5 ${isActive ? 'text-primary-foreground/80' : isLowSpace ? 'text-destructive font-bold' : 'text-muted-foreground/70'}`}>
-                      {freeSpaceGB} GB free
-                    </span>
-                  )}
-                </button>
-              );
-            })}
+            {availableDrives.map(drive => (
+              <button
+                key={drive}
+                onClick={() => switchDrive(drive)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-mono font-semibold border transition-colors ${
+                  currentDrive === drive.toUpperCase().replace(/\\/g, '\\')
+                    ? 'bg-primary border-primary text-primary-foreground'
+                    : 'bg-background border-border text-muted-foreground hover:border-primary/50 hover:text-foreground'
+                }`}
+              >
+                {drive}
+              </button>
+            ))}
           </div>
-          {(() => {
-            const activeDriveObj = availableDrives.find(d => d.path.toUpperCase().replace(/\\\\/g, '\\\\') === currentDrive);
-            if (activeDriveObj?.freeSpaceGB !== undefined && activeDriveObj.freeSpaceGB < 10) {
-              return (
-                <p className="text-[11px] text-destructive font-semibold mt-2">
-                  Warning: The selected drive has less than 10GB of free space. Video downloads may fail.
-                </p>
-              );
-            }
-            return null;
-          })()}
         </div>
       )}
 

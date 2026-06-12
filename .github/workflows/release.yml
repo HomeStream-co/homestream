@@ -31,7 +31,7 @@ jobs:
     steps:
       - name: Delete existing GitHub Release for this tag
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: |
           TAG="${{ github.ref_name }}"
           HEADERS=(-H "Authorization: token $GH_TOKEN" -H "Accept: application/vnd.github+json")
@@ -94,7 +94,7 @@ jobs:
         run: npm run build
         env:
           CI: true
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
 
       - name: Verify build artifacts
         shell: pwsh
@@ -131,7 +131,7 @@ jobs:
           if (-not $pkg.PSObject.Properties['build']) {
             $pkg | Add-Member -NotePropertyName build -NotePropertyValue ([PSCustomObject]@{})
           }
-          $pkg.build | Add-Member -NotePropertyName ghToken -NotePropertyValue "${{ secrets.GITHUB_TOKEN }}" -Force
+          $pkg.build | Add-Member -NotePropertyName ghToken -NotePropertyValue "${{ secrets.GH_TOKEN }}" -Force
           $pkg.build | Add-Member -NotePropertyName ghOwner -NotePropertyValue "HomeStream-co" -Force
           $pkg.build | Add-Member -NotePropertyName ghRepo  -NotePropertyValue "homestream" -Force
           $pkg.build | Add-Member -NotePropertyName issuesToken -NotePropertyValue "${{ secrets.ISSUES_TOKEN }}" -Force
@@ -143,7 +143,7 @@ jobs:
       - name: Package & publish NSIS installer
         run: npx electron-builder --win --config electron/electron-builder.yml --config.win.target=nsis --publish always
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
           DEBUG: electron-builder
 
       # Portable - NO auto-updater support. For smoke testing only.
@@ -152,7 +152,7 @@ jobs:
         if: success()
         run: npx electron-builder --win --config electron/electron-builder.yml --config.win.target=portable --publish never
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
 
   # -- Linux build --------------------------------------------------------------
   # Produces:
@@ -205,7 +205,7 @@ jobs:
         run: npm run build
         env:
           CI: true
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
 
       - name: Verify build artifacts
         run: |
@@ -231,7 +231,7 @@ jobs:
             const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
             pkg.version = '${VER}';
             pkg.build = pkg.build || {};
-            pkg.build.ghToken = '${{ secrets.GITHUB_TOKEN }}';
+            pkg.build.ghToken = '${{ secrets.GH_TOKEN }}';
             pkg.build.ghOwner = 'HomeStream-co';
             pkg.build.ghRepo  = 'homestream';
             pkg.build.issuesToken = '${{ secrets.ISSUES_TOKEN }}';
@@ -244,27 +244,27 @@ jobs:
       - name: Package & publish AppImage (x64)
         run: npx electron-builder --linux AppImage --config electron/electron-builder.yml --publish always
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
           APPIMAGE_EXTRACT_AND_RUN: 1
 
       - name: Package & publish AppImage (arm64)
         run: npx electron-builder --linux AppImage --arm64 --config electron/electron-builder.yml --publish always
         continue-on-error: true
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
           APPIMAGE_EXTRACT_AND_RUN: 1
 
       - name: Package & publish .deb (x64)
         run: npx electron-builder --linux deb --config electron/electron-builder.yml --publish always
         continue-on-error: true
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
 
       - name: Package & publish pacman .pkg.tar.zst (x64)
         run: npx electron-builder --linux pacman --config electron/electron-builder.yml --publish always
         continue-on-error: true
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
 
   # -- Publish release (un-draft + mark latest) ---------------------------------
   # Runs after BOTH platform builds complete so the release is fully populated
@@ -282,7 +282,7 @@ jobs:
     steps:
       - name: Un-draft and mark as latest
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: |
           TAG="${{ github.ref_name }}"
           HEADERS=(-H "Authorization: token $GH_TOKEN" \

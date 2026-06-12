@@ -17,7 +17,6 @@
 import type { Request, Response } from 'express';
 import { requireAuth } from '../../../authMiddleware.js';
 import { readConfig } from '../../../configStore.js';
-import { tmdbGet } from '../../../tmdbCache.js';
 import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
@@ -73,15 +72,26 @@ export default async function handler(req: Request, res: Response) {
   }
 
   try {
-    const data: any = await tmdbGet(`/discover/${type}`, {
-      sort_by: sortBy,
-      watch_region: 'US',
-      with_watch_providers: String(providerId),
-      page: String(page),
-      'vote_count.gte': '20',
-    });
+    const url = new URL(`${TMDB_BASE}/discover/${type}`);
+    url.searchParams.set('api_key', apiKey);
+    url.searchParams.set('language', 'en-US');
+    url.searchParams.set('sort_by', sortBy);
+    url.searchParams.set('watch_region', 'US');
+    url.searchParams.set('with_watch_providers', String(providerId));
+    url.searchParams.set('page', String(page));
+    // Only include titles with a reasonable vote count so junk doesn't surface
+    url.searchParams.set('vote_count.gte', '20');
 
-    const results = (data.results ?? []).map((m: any) => {
+    const tmdbRes = await fetch(url.toString(), { signal: AbortSignal.timeout(8000) });
+    if (!tmdbRes.ok) throw new Error(`TMDB ${tmdbRes.status}: ${tmdbRes.statusText}`);
+
+    const data = await tmdbRes.json() as {
+      results: Array<Record<string, unknown>>;
+      total_pages: number;
+      page: number;
+    };
+
+    const results = (data.results ?? []).map(m => {
       const posterPath = (m.poster_path as string | null) ?? null;
       const backdropPath = (m.backdrop_path as string | null) ?? null;
       const genreIds = (m.genre_ids as number[]) ?? [];
@@ -109,11 +119,6 @@ export default async function handler(req: Request, res: Response) {
       page: data.page ?? 1,
     });
   } catch (err) {
-    console.warn('[TMDB Catalog] fetch failed:', err);
-    res.json({
-      results: [],
-      totalPages: 1,
-      page: 1
-    });
+    res.status(500).json({ error: String(err) });
   }
 }

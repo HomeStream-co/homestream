@@ -3,9 +3,9 @@ import { pickBestStream } from '../../../torrentManager.js';
 import { addMagnet, isReachable } from '../../../qbittorrentClient.js';
 import { readConfig, DEFAULT_TORRENT_SOURCES } from '../../../configStore.js';
 import { runPreDownloadScan } from '../../../security/threatScanner.js';
-import { connectForDownload, syncVPNState } from '../../../vpnService.js';
+import { connectForDownload, disconnectAfterDownload } from '../../../vpnService.js';
 import type { VPNConfig } from '../../../vpnService.js';
-import { upsertJob, getAllPersistedJobs, findJobByInfoHash, findJobByMetadata, updateJobProgress } from '../../../downloadJobStore.js';
+import { upsertJob, getAllPersistedJobs, findJobByInfoHash, updateJobProgress } from '../../../downloadJobStore.js';
 import { requireAuth } from '../../../authMiddleware.js';
 import { resolvemagnet, downloadUrl } from '../../../realDebridClient.js';
 import { runPostDownloadPipeline } from '../../../postDownloadPipeline.js';
@@ -496,21 +496,21 @@ export default async function handler(req: Request, res: Response) {
   }
 
   const releaseVPN = async () => {
-    if (vpnCfg) {
-      await syncVPNState();
+    if (vpnConnected && vpnCfg) {
+      await disconnectAfterDownload(vpnCfg);
     }
   };
 
   // ── Duplicate detection ────────────────────────────────────────────────────
   const activeInThisRequest = new Set<string>();
-  const checkDuplicate = (infoHash: string, label: string, finalImdbId: string, season?: number, episode?: number): boolean => {
+  const checkDuplicate = (infoHash: string, label: string): boolean => {
     const normalized = (infoHash ?? '').toLowerCase();
     if (!normalized) return false;
     if (activeInThisRequest.has(normalized)) {
       res.status(409).json({ error: 'duplicate', message: `"${label}" is already being queued`, infoHash });
       return true;
     }
-    const existing = findJobByInfoHash(infoHash) || findJobByMetadata(finalImdbId, season, episode);
+    const existing = findJobByInfoHash(infoHash);
     if (existing && existing.status !== 'error') {
       res.status(409).json({
         error: 'duplicate',
@@ -579,8 +579,6 @@ export default async function handler(req: Request, res: Response) {
       } catch (err) {
         console.error(`[rd] ✗ ${jobTitle} failed:`, err);
         upsertJob({ ...jobEntry, status: 'error' });
-      } finally {
-        await syncVPNState();
       }
     })();
   }
@@ -599,7 +597,7 @@ export default async function handler(req: Request, res: Response) {
       }
 
       if (useRD) {
-        if (checkDuplicate(best.infoHash, title, finalImdbId)) { await releaseVPN(); return; }
+        if (checkDuplicate(best.infoHash, title)) { await releaseVPN(); return; }
         const scan = await runPreDownloadScan({ infoHash: best.infoHash, title });
         if (!scan.allowed) {
           await releaseVPN();
@@ -618,7 +616,7 @@ export default async function handler(req: Request, res: Response) {
         fireRdDownload({ jobEntry, magnet: best.magnet });
 
       } else {
-        if (checkDuplicate(best.infoHash, title, finalImdbId)) { await releaseVPN(); return; }
+        if (checkDuplicate(best.infoHash, title)) { await releaseVPN(); return; }
         const scan = await runPreDownloadScan({ infoHash: best.infoHash, title });
         if (!scan.allowed) {
           await releaseVPN();
@@ -649,7 +647,7 @@ export default async function handler(req: Request, res: Response) {
         }
 
         if (useRD) {
-          if (checkDuplicate(best.infoHash, epTitle, finalImdbId, season, episode)) { await releaseVPN(); return; }
+          if (checkDuplicate(best.infoHash, epTitle)) { await releaseVPN(); return; }
           const jobId = `rd-${best.infoHash}-${Date.now()}`;
           const jobEntry = {
             jobId, infoHash: best.infoHash, title: epTitle, quality: best.quality,
@@ -661,7 +659,7 @@ export default async function handler(req: Request, res: Response) {
           await releaseVPN();
           fireRdDownload({ jobEntry, magnet: best.magnet });
         } else {
-          if (checkDuplicate(best.infoHash, epTitle, finalImdbId, season, episode)) { await releaseVPN(); return; }
+          if (checkDuplicate(best.infoHash, epTitle)) { await releaseVPN(); return; }
           const job = await queueViaQbit({ infoHash: best.infoHash, magnet: best.magnet, quality: best.quality, title: epTitle, type: 'series', season, episode, imdbId: finalImdbId, poster });
           await releaseVPN();
           res.json({ queued: 1, jobs: [job], backend: 'qbittorrent', vpnUsed: vpnConnected });

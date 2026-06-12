@@ -16,15 +16,15 @@ import {
 import { dataDir } from '../../dataDir.js';
 import { readConfig } from '../../configStore.js';
 
-// Uploads now default to mediaDir to avoid filling up the OS drive
+// Uploads live inside the data directory so they are writable in packaged
+// Electron on Linux (AppImage mounts read-only; process.cwd() is not writable).
+const UPLOADS_DIR = path.join(dataDir(), 'uploads');
+if (!fs.existsSync(UPLOADS_DIR)) {
+  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+}
+
 const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => {
-    const config = readConfig();
-    const baseDir = config.mediaDir || dataDir();
-    const upDir = path.join(baseDir, 'uploads');
-    if (!fs.existsSync(upDir)) fs.mkdirSync(upDir, { recursive: true });
-    cb(null, upDir);
-  },
+  destination: (_req, _file, cb) => cb(null, UPLOADS_DIR),
   filename: (_req, file, cb) => {
     const safeName = `${Date.now()}-${file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
     cb(null, safeName);
@@ -48,112 +48,113 @@ export default function handler(req: Request, res: Response) {
     if (err) return res.status(400).json({ error: err.message });
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
     try {
+      const cfg = readConfig();
+      const inputFilename  = req.file.filename;
+      const inputPath      = path.join(UPLOADS_DIR, inputFilename);
 
-    const config = readConfig();
-    const baseDir = config.mediaDir || dataDir();
-    const upDir = path.join(baseDir, 'uploads');
-    const libDir = config.libraryDir || path.join(baseDir, 'library');
-    if (!fs.existsSync(libDir)) fs.mkdirSync(libDir, { recursive: true });
+      // ── 1. Parse title — prefer manual override from form body ──
+      const { title: extractedTitle, year: extractedYear } = extractTitle(req.file.originalname);
+      const manualTitle = (req.body as Record<string, string>).title;
+      const manualYear  = (req.body as Record<string, string>).year;
+      const searchTitle = manualTitle || extractedTitle;
+      const searchYear  = manualYear  || extractedYear;
 
-    const inputFilename  = req.file.filename;
-    const outputFilename = inputFilename.replace(/\.[^.]+$/, '') + '_tc.mp4';
-    const inputPath      = path.join(upDir, inputFilename);
-    const outputPath     = path.join(libDir, outputFilename);
+      // ── 2. Fetch OMDB metadata (graceful — works offline) ──
+      const omdb = await fetchOMDB(searchTitle, searchYear);
 
-    // ── 1. Parse title — prefer manual override from form body ──
-    const { title: extractedTitle, year: extractedYear } = extractTitle(req.file.originalname);
-    const manualTitle = (req.body as Record<string, string>).title;
-    const manualYear  = (req.body as Record<string, string>).year;
-    const searchTitle = manualTitle || extractedTitle;
-    const searchYear  = manualYear  || extractedYear;
+      if (cfg.autoTranscode === false) {
+        // Skip transcoding — add file directly to the library in-place
+        const mediaItem = buildMediaItem({
+          filename: inputFilename,
+          originalFilename: req.file.originalname,
+          filePath: inputPath,   // absolute path — stream endpoint uses this directly
+          fileSize: req.file.size,
+          omdb,
+          extractedTitle: searchTitle,
+          extractedYear: searchYear,
+          transcoding: false,
+          importedFrom: 'upload',
+        });
 
-    // ── 2. Fetch OMDB metadata (graceful — works offline) ──
-    const omdb = await fetchOMDB(searchTitle, searchYear);
-
-    // ── 3. Register transcode job ──
-    const mediaItem = buildMediaItem({
-      filename: outputFilename,
-      originalFilename: req.file.originalname,
-      filePath: outputPath,   // absolute path — stream endpoint uses this directly
-      fileSize: req.file.size,
-      omdb,
-      extractedTitle: searchTitle,
-      extractedYear: searchYear,
-      transcoding: true,
-      importedFrom: 'upload',
-    });
-
-    createJob(mediaItem.id, inputFilename, outputFilename);
-
-    // ── 4. Write to library immediately (via queue — concurrent-safe) ──
-    await writeLibrary(lib => {
-      lib.unshift(mediaItem as unknown as Record<string, unknown>);
-      return lib;
-    });
-
-    // ── 5. Respond to client right away ──
-    res.status(201).json({ ...mediaItem, transcodeId: mediaItem.id });
-
-    // ── 6. Kick off enrichment + CC in background ──
-    runEnrichmentInBackground(mediaItem.id).catch(() => {});
-    runCaptionFetchInBackground(mediaItem.id).catch(() => {});
-
-    // ── 7. Transcode in background ──
-    transcodeFile(mediaItem.id, inputPath, outputPath)
-      .then(result => {
-        // Determine the final absolute path
-        let finalPath = outputPath;
-        let finalFilename = outputFilename;
-
-        // If it reverted to input, the input is still in the 'uploads' folder! Move it to library.
-        if (result.outputFilename === inputFilename) {
-          const ext = path.extname(inputFilename);
-          finalFilename = inputFilename.replace(/\.[^.]+$/, '') + ext;
-          finalPath = path.join(libDir, finalFilename);
-          if (fs.existsSync(inputPath)) {
-            fs.renameSync(inputPath, finalPath);
-          }
-        } else {
-          // It transcoded successfully. Delete the original input file from uploads.
-          if (fs.existsSync(inputPath)) {
-            fs.unlink(inputPath, () => {});
-          }
-        }
-
-        writeLibrary(lib => {
-          const idx = lib.findIndex(m => (m as { id: string }).id === mediaItem.id);
-          if (idx !== -1) {
-            const item = lib[idx] as Record<string, unknown>;
-            item.transcoding      = false;
-            item.filename         = finalFilename;
-            item.filepath         = finalPath;
-            item.filePath         = finalPath;
-            item.fileSize         = result.finalSize;
-            item.originalSize     = result.originalSize;
-            item.savedBytes       = result.savedBytes;
-            item.transcodeStrategy = result.strategy;
-          }
+        await writeLibrary(lib => {
+          lib.unshift(mediaItem as unknown as Record<string, unknown>);
           return lib;
         });
-      })
-      .catch((transcodeErr: Error) => {
-        console.error(`[transcode] Error for ${mediaItem.id}:`, transcodeErr.message);
-        // IMPORTANT: use absolute path here — the stream endpoint resolves by
-        // absolute path via fs.existsSync(). A relative URL like /uploads/...
-        // would cause existsSync to return false → 404 on playback.
-        writeLibrary(lib => {
-          const idx = lib.findIndex(m => (m as { id: string }).id === mediaItem.id);
-          if (idx !== -1) {
-            const item = lib[idx] as Record<string, unknown>;
-            item.filename         = inputFilename;
-            item.filepath         = inputPath;   // absolute path
-            item.filePath         = inputPath;   // absolute path
-            item.transcoding      = false;
-            item.transcodeError   = transcodeErr.message;
-          }
-          return lib;
-        });
+
+        res.status(201).json({ ...mediaItem, transcodeId: mediaItem.id });
+
+        runEnrichmentInBackground(mediaItem.id).catch(() => {});
+        runCaptionFetchInBackground(mediaItem.id).catch(() => {});
+        return;
+      }
+
+      const outputFilename = inputFilename.replace(/\.[^.]+$/, '') + '_tc.mp4';
+      const outputPath     = path.join(UPLOADS_DIR, outputFilename);
+
+      // ── 3. Register transcode job ──
+      const mediaItem = buildMediaItem({
+        filename: outputFilename,
+        originalFilename: req.file.originalname,
+        filePath: outputPath,   // absolute path — stream endpoint uses this directly
+        fileSize: req.file.size,
+        omdb,
+        extractedTitle: searchTitle,
+        extractedYear: searchYear,
+        transcoding: true,
+        importedFrom: 'upload',
       });
+
+      createJob(mediaItem.id, inputFilename, outputFilename);
+
+      // ── 4. Write to library immediately (via queue — concurrent-safe) ──
+      await writeLibrary(lib => {
+        lib.unshift(mediaItem as unknown as Record<string, unknown>);
+        return lib;
+      });
+
+      // ── 5. Respond to client right away ──
+      res.status(201).json({ ...mediaItem, transcodeId: mediaItem.id });
+
+      // ── 6. Kick off enrichment + CC in background ──
+      runEnrichmentInBackground(mediaItem.id).catch(() => {});
+      runCaptionFetchInBackground(mediaItem.id).catch(() => {});
+
+      // ── 7. Transcode in background ──
+      transcodeFile(mediaItem.id, inputPath, outputPath)
+        .then(result => {
+          // Determine the final absolute path (may revert to input if output was larger)
+          const finalPath = result.outputFilename === outputFilename ? outputPath : inputPath;
+          writeLibrary(lib => {
+            const idx = lib.findIndex(m => (m as { id: string }).id === mediaItem.id);
+            if (idx !== -1) {
+              const item = lib[idx] as Record<string, unknown>;
+              item.transcoding      = false;
+              item.filename         = result.outputFilename;
+              item.filepath         = finalPath;
+              item.filePath         = finalPath;
+              item.fileSize         = result.finalSize;
+              item.originalSize     = result.originalSize;
+              item.savedBytes       = result.savedBytes;
+              item.transcodeStrategy = result.strategy;
+            }
+            return lib;
+          });
+        })
+        .catch((transcodeErr: Error) => {
+          console.error(`[transcode] Error for ${mediaItem.id}:`, transcodeErr.message);
+          writeLibrary(lib => {
+            const idx = lib.findIndex(m => (m as { id: string }).id === mediaItem.id);
+            if (idx !== -1) {
+              const item = lib[idx] as Record<string, unknown>;
+              item.filename         = inputFilename;
+              item.filepath         = inputPath;   // absolute path
+              item.filePath         = inputPath;   // absolute path
+              item.transcoding      = false;
+              item.transcodeError   = transcodeErr.message;
+            }
+            return lib;
+          });
+        });
     } catch (uploadErr) {
       console.error('[upload] Unexpected error in upload handler:', uploadErr);
       if (!res.headersSent) {

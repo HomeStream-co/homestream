@@ -34,8 +34,6 @@ import os from 'os';
 import path from 'path';
 import { execAsync } from './execHelper.js';
 import { pickFastestServer, patchOvpnRemote } from './vpnServerRanker.js';
-import { getAllPersistedJobs } from './downloadJobStore.js';
-import { readConfig } from './configStore.js';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -512,28 +510,6 @@ export async function connectVPN(
 export async function disconnectVPN(config: VPNConfig): Promise<void> {
   activeDownloadCount = 0;
   await bringDown(config.protocol).catch(() => {});
-}
-
-export async function syncVPNState(): Promise<void> {
-  const config = readConfig() as any;
-  const vpnConfig = config?.vpn;
-  if (!vpnConfig?.enabled) return;
-
-  const activeJobs = getAllPersistedJobs().filter(j => j.status === 'downloading' || j.status === 'queued');
-  activeDownloadCount = activeJobs.length;
-
-  if (activeDownloadCount > 0) {
-    const isConnected = await isUp(vpnConfig.protocol);
-    if (!isConnected) {
-      if (vpnConfig.autoFastest) {
-        await bringUpFastest(vpnConfig).catch(console.error);
-      } else {
-        await bringUp(vpnConfig).catch(console.error);
-      }
-    }
-  } else {
-    await bringDown(vpnConfig.protocol).catch(() => {});
-  }
 }
 
 // ── Status ────────────────────────────────────────────────────────────────────

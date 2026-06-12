@@ -97,7 +97,7 @@ export default async function handler(req: Request, res: Response) {
       case 'save': {
         // Save any config fields passed in the body
         const allowed = [
-          'mediaDir', 'qbitUrl', 'qbitApiKey', 'qbitUsername', 'qbitPassword',
+          'mediaDir', 'qbitUrl', 'qbitUsername', 'qbitPassword',
           'jellyfinUrl', 'jellyfinApiKey', 'adminPassword',
           'omdbApiKey', 'googleAiApiKey', 'tmdbApiKey', 'virusTotalApiKey',
           'aiApiKey', 'openaiApiKey', 'anthropicApiKey',
@@ -109,8 +109,6 @@ export default async function handler(req: Request, res: Response) {
           'vpnConfigContent', 'vpnUsername', 'vpnPassword', 'vpnAutoConnect',
           // Prowlarr
           'prowlarrUrl', 'prowlarrApiKey',
-          // Torrentio
-          'torrentioUrl',
           // Real-Debrid
           'realDebridApiKey',
         ];
@@ -121,7 +119,6 @@ export default async function handler(req: Request, res: Response) {
         // Normalise URL fields — add http:// if user typed bare host:port
         if (updates.qbitUrl)     updates.qbitUrl     = normalizeUrl(updates.qbitUrl as string);
         if (updates.prowlarrUrl) updates.prowlarrUrl = normalizeUrl(updates.prowlarrUrl as string);
-        if (updates.torrentioUrl) updates.torrentioUrl = normalizeUrl(updates.torrentioUrl as string);
         if (updates.jellyfinUrl) updates.jellyfinUrl = normalizeUrl(updates.jellyfinUrl as string);
         // Hash admin password with bcrypt before saving.
         // DEVELOPER_LOCK: if the developer has locked ownership via the
@@ -218,13 +215,11 @@ export default async function handler(req: Request, res: Response) {
       case 'test_qbit': {
         const result = await testQbit({
           url:      normalizeUrl(fields.qbitUrl)      || undefined,
-          apiKey:   fields.qbitApiKey   || undefined,
           username: fields.qbitUsername || undefined,
           password: fields.qbitPassword || undefined,
         });
         if (result.ok) {
           if (fields.qbitUrl)      process.env.QBIT_URL      = normalizeUrl(fields.qbitUrl);
-          if (fields.qbitApiKey)   process.env.QBIT_API_KEY  = fields.qbitApiKey;
           if (fields.qbitUsername) process.env.QBIT_USERNAME = fields.qbitUsername;
           if (fields.qbitPassword) process.env.QBIT_PASSWORD = fields.qbitPassword;
         }

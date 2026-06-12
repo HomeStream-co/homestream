@@ -17,7 +17,6 @@
 import { getAllTorrents, isReachable } from './qbittorrentClient.js';
 import { getAllPersistedJobs, upsertJob, updateJobStatus } from './downloadJobStore.js';
 import { runPostDownloadPipeline } from './postDownloadPipeline.js';
-import { syncVPNState } from './vpnService.js';
 
 // ── State ─────────────────────────────────────────────────────────────────────
 
@@ -50,8 +49,7 @@ async function poll(): Promise<void> {
     if (!torrent) continue;
 
     // Update progress for downloading torrents
-    const isDownloadingState = ['downloading', 'metaDL', 'stalledDL', 'checkingDL', 'allocating'].includes(torrent.state);
-    if (torrent.progress < 1 && isDownloadingState) {
+    if (torrent.progress < 1 && torrent.state.toLowerCase().includes('download')) {
       upsertJob({ ...job, status: 'downloading', progress: Math.round(torrent.progress * 100) });
       continue;
     }
@@ -97,9 +95,6 @@ async function poll(): Promise<void> {
         processing.delete(job.infoHash);
       });
   }
-
-  // Ensure VPN kill switch is perfectly synced with active downloads every 15 seconds
-  await syncVPNState();
 }
 
 // ── Startup ───────────────────────────────────────────────────────────────────

@@ -35,7 +35,6 @@ import { spawn } from 'child_process';
 import { createRequire } from 'module';
 import fs from 'fs';
 import path from 'path';
-import os from 'os';
 import { updateJob, broadcast, getJob } from './transcodeStore.js';
 import { dataDir } from './dataDir.js';
 import { detectHwEncoder } from './hwEncoderDetect.js';
@@ -176,11 +175,7 @@ function transcodeStrategy(info: VideoInfo, inputFilename: string): EncodeStrate
   const isH264 = info.codec === 'h264';
   const isMp4Container = inputFilename.toLowerCase().endsWith('.mp4');
 
-  // FAST UPLOAD BYPASS:
-  // Instead of re-encoding HEVC/VP9 to H.264 (which takes hours of CPU time),
-  // we now just copy the video stream into an MP4 container (remux).
-  // Most modern browsers and smart TVs support HEVC MP4s natively, and this makes uploads instant!
-  if (!isH264) return 'remux';
+  if (!isH264) return 'encode_h264';
 
   // H.264 in a non-MP4 container → remux (copy video, re-encode audio, add faststart)
   if (!isMp4Container) return 'remux';
@@ -273,9 +268,7 @@ function runFFmpeg(args: string[], mediaId: string, durationSecs: number): Promi
 
     ff.on('close', code => {
       if (code === 0) { resolve(); }
-      else { 
-        reject(new Error(`FFmpeg exited with code ${code}. Last output: ${stderrBuf}`)); 
-      }
+      else { reject(new Error(`FFmpeg exited with code ${code}`)); }
     });
 
     ff.on('error', err => {
@@ -423,11 +416,9 @@ export async function transcodeFile(
       ];
     } else {
       // Software libx264 fallback
-      const threads = Math.max(1, Math.floor(os.cpus().length / 2));
-      console.log(`[transcode] Using software libx264 CRF=${crf} for ${info.height}p with ${threads} threads`);
+      console.log(`[transcode] Using software libx264 CRF=${crf} for ${info.height}p`);
       ffmpegArgs = [
         '-i', resolvedInput,
-        '-threads', String(threads),
         '-c:v', 'libx264',
         '-crf', String(crf),
         '-preset', 'medium',

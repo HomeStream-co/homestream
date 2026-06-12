@@ -162,7 +162,6 @@ import updaterPushPost from "./api/updater/push/POST";
 import updaterStatusGet from "./api/updater/status/GET";
 // upload
 import uploadPost from "./api/upload/POST";
-import uploadLocalPost from "./api/upload-local/POST";
 // vpn
 import vpnGet from "./api/vpn/GET";
 import vpnPost from "./api/vpn/POST";
@@ -178,7 +177,6 @@ import watchlistDeleteById from "./api/watchlist/[id]/DELETE";
 import { seoRoutes } from "../lib/seo-routes";
 import { startQbitCompletionWatcher } from "./qbitCompletionWatcher";
 import { runStartupMediaSync } from "./startupMediaSync";
-import { startOfflineCatalogSync } from "./tmdbCache.js";
 
 function normalizeCommerceApiBaseUrlEnv() {
 	if (process.env.GODADDY_API_BASE_URL) return;
@@ -199,8 +197,8 @@ const app = express();
 // the sitemap origin in robots.txt.
 app.set("trust proxy", true);
 
-app.use(express.json({ limit: "500mb" }));
-app.use(express.urlencoded({ extended: true, limit: "500mb" }));
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
 const upload = multer({ dest: "/tmp/uploads" });
@@ -380,9 +378,7 @@ app.get("/api/updater/drain", updaterDrainGet);
 app.post("/api/updater/push", updaterPushPost);
 app.get("/api/updater/status", updaterStatusGet);
 // upload
-// Let the upload endpoint handle its own multer middleware to avoid conflicts
-app.post("/api/upload", uploadPost);
-app.post("/api/upload-local", express.json(), uploadLocalPost);
+app.post("/api/upload", upload.single("file"), uploadPost);
 // vpn
 app.get("/api/vpn", vpnGet);
 app.post("/api/vpn", vpnPost);
@@ -398,24 +394,14 @@ app.delete("/api/watchlist/:id", watchlistDeleteById);
 
 // Error middleware must be registered AFTER the routes it protects; Express
 // only passes errors to middleware defined later in the stack.
-import fs from 'fs';
-import path from 'path';
-
 app.use("/api", (err: unknown, req: Request, res: Response, _next: NextFunction) => {
-	const errInfo = {
+	// Always respond JSON on /api so clients parsing response.json() don't
+	// receive Express's default HTML error page for non-Error throws.
+	console.error("ssr.api.error", {
 		url: req.url,
 		error: err instanceof Error ? err.stack : String(err),
-		body: req.body,
-		time: new Date().toISOString()
-	};
-	console.error("ssr.api.error", errInfo);
-	
-	try {
-		const logPath = path.join(process.cwd(), 'api-error.log');
-		fs.appendFileSync(logPath, JSON.stringify(errInfo) + '\\n');
-	} catch(e) {}
-	
-	res.status(500).json({ error: "Internal server error: " + (err instanceof Error ? err.message : String(err)) });
+	});
+	res.status(500).json({ error: "Internal server error" });
 });
 
 function baseUrl(req: Request): string {
@@ -678,8 +664,6 @@ if (import.meta.env.PROD) {
 		startQbitCompletionWatcher();
 		// Scan for pre-downloaded media and backfill missing captions
 		runStartupMediaSync();
-		// Start offline TMDB catalog sync
-		startOfflineCatalogSync();
 	});
 	server.on("error", (err: NodeJS.ErrnoException) => {
 		console.error("ssr.server.listen-failed", {

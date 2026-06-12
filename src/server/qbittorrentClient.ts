@@ -61,12 +61,10 @@ function getQbitUrl(): string {
   return normalizeUrl(process.env.QBIT_URL || 'http://localhost:8080');
 }
 
-function getCredentials(): { apiKey: string; username: string; password: string } {
-  const k = process.env.QBIT_API_KEY ?? '';
+function getCredentials(): { username: string; password: string } {
   const u = process.env.QBIT_USERNAME ?? 'admin';
   const p = process.env.QBIT_PASSWORD ?? 'homestream';
   return {
-    apiKey: typeof k === 'string' ? k : '',
     username: typeof u === 'string' ? u : 'admin',
     password: typeof p === 'string' ? p : 'homestream',
   };
@@ -78,9 +76,6 @@ let sessionCookie: string | null = null;
 let loginPromise: Promise<void> | null = null;
 
 async function login(): Promise<void> {
-  const { apiKey } = getCredentials();
-  if (apiKey) return; // Stateless auth
-
   if (loginPromise) return loginPromise;
 
   loginPromise = (async () => {
@@ -120,30 +115,19 @@ async function request<T = unknown>(
   options: RequestInit = {},
   retried = false,
 ): Promise<T> {
-  const { apiKey } = getCredentials();
-  
-  if (!apiKey && !sessionCookie) {
-    await login();
-  }
-
-  const headers: Record<string, string> = {
-    ...options.headers as Record<string, string>,
-  };
-  
-  if (apiKey) {
-    headers['Authorization'] = `Bearer ${apiKey}`;
-  } else if (sessionCookie) {
-    headers['Cookie'] = sessionCookie;
-  }
+  if (!sessionCookie) await login();
 
   const res = await fetch(`${getQbitUrl()}${path}`, {
     ...options,
-    headers,
+    headers: {
+      ...options.headers,
+      Cookie: sessionCookie ?? '',
+    },
     signal: AbortSignal.timeout(15_000),
   });
 
-  // Session expired — re-login once (only applicable for cookie auth)
-  if (!apiKey && res.status === 403 && !retried) {
+  // Session expired — re-login once
+  if (res.status === 403 && !retried) {
     sessionCookie = null;
     await login();
     return request<T>(path, options, true);
@@ -172,7 +156,6 @@ async function request<T = unknown>(
  */
 export async function testConnection(overrides?: {
   url?: string;
-  apiKey?: string;
   username?: string;
   password?: string;
 }): Promise<{ ok: boolean; version?: string; error?: string }> {
@@ -180,40 +163,30 @@ export async function testConnection(overrides?: {
     if (overrides) {
       // Scoped test — build a one-shot login without touching process.env
       const url      = normalizeUrl(overrides.url || getQbitUrl());
-      const apiKey   = overrides.apiKey ?? getCredentials().apiKey;
       const username = overrides.username || getCredentials().username;
       const password = overrides.password || getCredentials().password;
 
-      const headers: Record<string, string> = {};
+      const body = new URLSearchParams({ username, password });
+      const loginRes = await fetch(`${url}/api/v2/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: body.toString(),
+        signal: AbortSignal.timeout(10_000),
+      });
+      const text = await loginRes.text();
+      if (text !== 'Ok.') throw new Error(`qBittorrent login failed: ${text}`);
 
-      if (apiKey) {
-        headers['Authorization'] = `Bearer ${apiKey}`;
-      } else {
-        const body = new URLSearchParams({ username, password });
-        const loginRes = await fetch(`${url}/api/v2/auth/login`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: body.toString(),
-          signal: AbortSignal.timeout(10_000),
-        });
-        const text = await loginRes.text();
-        if (text !== 'Ok.') throw new Error(`qBittorrent login failed: ${text}`);
-
-        const setCookie = loginRes.headers.get('set-cookie');
-        if (setCookie) {
-          const match = setCookie.match(/SID=([^;]+)/);
-          if (match) headers['Cookie'] = `SID=${match[1]}`;
-        }
+      const setCookie = loginRes.headers.get('set-cookie');
+      let cookie = '';
+      if (setCookie) {
+        const match = setCookie.match(/SID=([^;]+)/);
+        if (match) cookie = `SID=${match[1]}`;
       }
 
       const versionRes = await fetch(`${url}/api/v2/app/version`, {
-        headers,
+        headers: cookie ? { Cookie: cookie } : {},
         signal: AbortSignal.timeout(10_000),
       });
-      if (!versionRes.ok) {
-        const text = await versionRes.text().catch(() => '');
-        throw new Error(`qBittorrent API error ${versionRes.status}: ${text}`);
-      }
       const version = await versionRes.text();
       return { ok: true, version: version.trim() };
     }

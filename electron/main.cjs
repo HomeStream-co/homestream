@@ -213,7 +213,6 @@ async function startServer() {
   for (const key of BUILD_TIME_SECRETS) delete cleanEnv[key];
 
   serverProcess = utilityProcess.fork(serverPath, [], {
-    execArgv: ['--use-system-ca'],
     env: {
       ...cleanEnv,
       PORT: String(activePort),
@@ -223,7 +222,6 @@ async function startServer() {
       SERVER_HOST: '0.0.0.0',
       NODE_ENV: 'production',
       ELECTRON: '1',
-      NODE_TLS_REJECT_UNAUTHORIZED: '0', // Fixes TMDB fetch failing due to Norton VPN intercepting SSL
       // Pass resourcesPath so the server bundle can locate client files.
       // process.resourcesPath is Electron-only and does NOT exist in the
       // child Node.js process — we must inject it explicitly.
@@ -1148,7 +1146,7 @@ const CONTROL_PANEL_HTML = `<!DOCTYPE html>
     const url = which === 'lan' ? lanUrl : localUrl;
     if (!url) return;
     navigator.clipboard?.writeText(url).catch(() => {});
-    const btn = document.querySelector(".copy-btn[onclick=\"copyUrl('" + which + "')\"]");
+    const btn = document.querySelector('.copy-btn[onclick="copyUrl(\\''+which+'\\')"]');
     if (btn) {
       btn.textContent = 'Copied!';
       btn.classList.add('copied');

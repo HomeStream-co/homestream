@@ -251,43 +251,7 @@ function cleanupOrphanedUploads(library: MediaRecord[]): void {
   console.log(`[startup] Orphaned upload cleanup: removed ${removed} file(s) (${mb} MB reclaimed).`);
 }
 
-// ── Updater Cache Cleanup ─────────────────────────────────────────────────────
 
-/**
- * electron-updater downloads full .exe installer files into %LOCALAPPDATA%\homestream-updater
- * and sometimes leaves them behind after a successful update. Because each update is ~150MB,
- * these can quickly consume gigabytes of storage over many releases.
- * We safely wipe this directory on startup since any new update will just re-download.
- */
-function cleanupUpdaterCache(): void {
-  // Only applies to Windows where %LOCALAPPDATA% is used
-  if (process.platform !== 'win32') return;
-  const localAppData = process.env.LOCALAPPDATA;
-  if (!localAppData) return;
-
-  const dirsToClean = [
-    path.join(localAppData, 'homestream-updater'),
-    path.join(localAppData, 'HomeStream-updater'),
-    path.join(localAppData, 'electron-builder'),
-    path.join(localAppData, 'v8-app-template-updater')
-  ];
-
-  let cleaned = false;
-  for (const dir of dirsToClean) {
-    if (fs.existsSync(dir)) {
-      try {
-        fs.rmSync(dir, { recursive: true, force: true });
-        cleaned = true;
-      } catch (err) {
-        console.warn(`[startup] ⚠ Could not wipe updater cache directory ${dir}: ${err}`);
-      }
-    }
-  }
-
-  if (cleaned) {
-    console.log('[startup] 🧹 Wiped updater cache directories to reclaim storage.');
-  }
-}
 
 export function runHlsPeriodicCleanup(): void {
   console.log('[hls-cleanup] Running periodic HLS segment cleanup…');
@@ -311,9 +275,6 @@ export function runStartupCleanup(): void {
   // The in-memory cache and baked cache are unaffected — only stale file-backed
   // entries are pruned. Keeps the cache dir from growing unbounded over time.
   pruneStaleTmdbCache();
-
-  // ── Updater Cache Cleanup ────────────────────────────────────────────────────
-  cleanupUpdaterCache();
 
   // ── probeCache TTL eviction ───────────────────────────────────────────────────
   // Evicts in-memory ffprobe results not accessed in the last 24 hours.

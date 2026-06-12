@@ -63,7 +63,7 @@ if !NODE_MAJOR! LSS 18 (
 echo  [OK] Node.js v!NODE_MAJOR! found
 
 :: ── Install dependencies (first run only) ─────────────────
-if not exist "node_modules\express" (
+if not exist "node_modules\express\package.json" (
     echo.
     echo  [1/2] Installing packages... (first run, ~2 minutes)
     echo.
@@ -79,7 +79,7 @@ if not exist "node_modules\express" (
 )
 
 :: ── Build (first run or after updates) ────────────────────
-if not exist "dist\server.bundle.mjs" (
+if not exist "dist\server\server.bundle.cjs" (
     echo.
     echo  [2/2] Building HomeStream... (first run, ~1 minute)
     echo.
@@ -121,11 +121,11 @@ echo  =====================================================
 echo.
 
 :: Open browser after a short delay (server needs ~3s to start)
-start "" cmd /c "timeout /t 4 /nobreak >nul && start http://localhost:3000"
+start /b "" cmd /c "ping -n 5 127.0.0.1 >nul && start http://localhost:3000"
 
 :: Run the server (keeps this window open as the log console)
 set PORT=3000
-node dist\server.bundle.mjs
+node dist\server\server.bundle.cjs
 
 :: If we get here the server exited
 echo.

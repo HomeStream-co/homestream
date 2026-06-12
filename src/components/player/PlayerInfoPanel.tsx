@@ -5,11 +5,8 @@
  */
 
 import { motion } from 'motion/react';
-import { Star, Download, Trash2, Loader2, CheckCircle2 } from 'lucide-react';
+import { Star } from 'lucide-react';
 import { toActorsString } from '@/lib/utils';
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { toast } from 'sonner';
 
 interface Enrichment {
   whyWatch?: string;
@@ -30,8 +27,6 @@ interface MediaItem {
   actors?: string | string[];
   poster?: string;
   enrichment?: Enrichment;
-  id: string;
-  filename?: string;
 }
 
 interface Props {
@@ -39,23 +34,6 @@ interface Props {
 }
 
 export default function PlayerInfoPanel({ item }: Props) {
-  const navigate = useNavigate();
-  const [isDeleting, setIsDeleting] = useState(false);
-
-  const handleDelete = async () => {
-    if (!confirm(`Are you sure you want to delete "${item.title}" from your library?`)) return;
-    setIsDeleting(true);
-    try {
-      const res = await fetch(`/api/media/${item.id}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error('Failed to delete');
-      toast.success('Deleted from library');
-      navigate('/');
-    } catch (err) {
-      toast.error('Could not delete media');
-      setIsDeleting(false);
-    }
-  };
-
   return (
     <motion.div
       initial={{ x: '100%' }}
@@ -90,27 +68,6 @@ export default function PlayerInfoPanel({ item }: Props) {
       {item.actors !== 'Unknown' && (
         <p className="text-xs text-white/50 mt-1"><span className="text-white/70">Cast:</span> {toActorsString(item.actors)}</p>
       )}
-
-      {item.filename && (
-        <div className="flex flex-col gap-2 mt-5">
-          <a
-            href={`/api/stream/${encodeURIComponent(item.filename)}`}
-            download={item.filename}
-            className="flex items-center justify-center gap-2 py-2.5 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-semibold transition-colors"
-          >
-            <Download className="w-4 h-4" /> Download to Device
-          </a>
-          <button
-            onClick={handleDelete}
-            disabled={isDeleting}
-            className="flex items-center justify-center gap-2 py-2.5 rounded-lg bg-destructive/20 hover:bg-destructive/40 text-red-400 text-xs font-semibold transition-colors disabled:opacity-50"
-          >
-            {isDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-            Delete from Library
-          </button>
-        </div>
-      )}
-
       <div className="mt-4 pt-4 border-t border-white/10">
         <p className="text-white/30 text-[10px] uppercase tracking-widest mb-2">Keyboard Shortcuts</p>
         {[

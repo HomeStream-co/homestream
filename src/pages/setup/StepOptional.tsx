@@ -15,7 +15,6 @@ import type { SetupStepProps } from './types';
 
 interface NetworkInterface {
   name: string;
-  displayName?: string;
   address: string;
   family: 'IPv4' | 'IPv6';
   internal: boolean;
@@ -66,7 +65,6 @@ export default function StepOptional({
           body: JSON.stringify({
             action: 'test_qbit',
             qbitUrl: fixedUrl,
-            qbitApiKey: form.qbitApiKey,
             qbitUsername: form.qbitUsername,
             qbitPassword: form.qbitPassword,
           }),
@@ -199,7 +197,6 @@ export default function StepOptional({
         qbitPassword: form.qbitPassword,
         jellyfinUrl: form.jellyfinUrl,
         jellyfinApiKey: form.jellyfinApiKey,
-        torrentioUrl: form.torrentioUrl,
         prowlarrUrl: form.prowlarrUrl,
         prowlarrApiKey: form.prowlarrApiKey,
       });
@@ -265,26 +262,19 @@ export default function StepOptional({
 
         <div className="grid grid-cols-2 gap-2">
           <div className="col-span-2">
-            <label className="text-[10px] font-medium text-muted-foreground mb-1 block">Web UI URL <span className="text-muted-foreground/60">(Usually http://localhost:8080)</span></label>
+            <label className="text-[10px] font-medium text-muted-foreground mb-1 block">Web UI URL</label>
             <input type="text" value={form.qbitUrl} onChange={e => { set('qbitUrl', e.target.value); setQbitTest('idle'); }}
               placeholder="http://localhost:8080"
               className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary font-mono" />
           </div>
-          <div className="col-span-2">
-            <label className="text-[10px] font-medium text-muted-foreground mb-1 block">API Key <span className="text-muted-foreground/60">(v5.2.0+)</span></label>
-            <input type="text" value={form.qbitApiKey} onChange={e => { set('qbitApiKey', e.target.value); setQbitTest('idle'); }}
-              placeholder="qbt_..."
-              className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary font-mono" />
-            <p className="text-[9px] text-muted-foreground mt-1">Found in qBittorrent Options → Web UI. If you provide this, username/password below are ignored.</p>
-          </div>
           <div>
-            <label className="text-[10px] font-medium text-muted-foreground mb-1 block">Username <span className="text-muted-foreground/60">(Legacy)</span></label>
+            <label className="text-[10px] font-medium text-muted-foreground mb-1 block">Username</label>
             <input type="text" value={form.qbitUsername} onChange={e => { set('qbitUsername', e.target.value); setQbitTest('idle'); }}
               placeholder="admin"
               className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary" />
           </div>
           <div>
-            <label className="text-[10px] font-medium text-muted-foreground mb-1 block">Password <span className="text-muted-foreground/60">(Legacy)</span></label>
+            <label className="text-[10px] font-medium text-muted-foreground mb-1 block">Password</label>
             <div className="relative">
               <input type={showQbitPass ? 'text' : 'password'} value={form.qbitPassword} onChange={e => { set('qbitPassword', e.target.value); setQbitTest('idle'); }}
                 placeholder="••••••••"
@@ -314,8 +304,8 @@ export default function StepOptional({
                   <li><span className="text-primary font-bold">2.</span> Go to <strong>Tools → Options → Web UI</strong></li>
                   <li><span className="text-primary font-bold">3.</span> Tick <strong>"Enable the Web User Interface"</strong></li>
                   <li><span className="text-primary font-bold">4.</span> Note the port (default: <code className="bg-background/60 px-1 rounded">8080</code>)</li>
-                  <li><span className="text-primary font-bold">5.</span> Either generate an <strong>API Key</strong> OR set a username &amp; password</li>
-                  <li><span className="text-primary font-bold">6.</span> Click <strong>Apply</strong>, enter the details above, and test again</li>
+                  <li><span className="text-primary font-bold">5.</span> Set username &amp; password, click <strong>Apply</strong></li>
+                  <li><span className="text-primary font-bold">6.</span> Enter <code className="bg-background/60 px-1 rounded">http://localhost:8080</code> above and test again</li>
                 </ol>
                 <a href="https://www.qbittorrent.org/download" target="_blank" rel="noopener noreferrer"
                   className="mt-1.5 flex items-center gap-1 text-primary hover:underline">
@@ -430,7 +420,7 @@ export default function StepOptional({
               <option value="">— Skip / No VPN binding —</option>
               {interfaces.map(i => (
                 <option key={`${i.name}-${i.address}`} value={i.name}>
-                  {i.likelyVpn ? '🔒 ' : ''}{i.displayName || i.name} ({i.address})
+                  {i.likelyVpn ? '🔒 ' : ''}{i.name} ({i.address})
                 </option>
               ))}
             </select>
@@ -465,31 +455,6 @@ export default function StepOptional({
             )}
           </div>
         )}
-      </div>
-
-      {/* ── Torrentio ─────────────────────────────────────────────────────── */}
-      <div className="p-4 rounded-xl border border-border bg-muted/20">
-        <div className="flex items-center gap-2 mb-1">
-          <Search className="w-4 h-4 text-primary" />
-          <p className="text-sm font-semibold text-foreground">Torrentio (Real-Debrid / Custom Indexers)</p>
-          <span className="text-[10px] bg-muted text-muted-foreground px-1.5 py-0.5 rounded font-medium">Recommended</span>
-        </div>
-        <p className="text-xs text-muted-foreground mb-3">
-          HomeStream uses Torrentio's public server by default. To unlock maximum quality (4K) and avoid rate limits, we strongly recommend configuring Real-Debrid via Torrentio.
-          <br/><br/>
-          <strong>1.</strong> Go to <a href="https://torrentio.strem.fun" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">torrentio.strem.fun</a> and configure your Debrid provider.<br/>
-          <strong>2.</strong> Right click the purple <strong>Install</strong> button and select <strong>Copy Link Address</strong>.<br/>
-          <strong>3.</strong> Paste it below:
-        </p>
-        <div className="flex flex-col gap-2">
-          <input
-            type="text"
-            value={form.torrentioUrl}
-            onChange={e => set('torrentioUrl', e.target.value)}
-            placeholder="https://torrentio.strem.fun/..."
-            className="w-full bg-background border border-border rounded-lg px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary font-mono"
-          />
-        </div>
       </div>
 
       {/* ── Prowlarr ─────────────────────────────────────────────────────── */}
@@ -530,9 +495,6 @@ export default function StepOptional({
               placeholder="Prowlarr → Settings → General → API Key"
               className="w-full bg-background border border-border rounded-lg px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary font-mono"
             />
-            <p className="text-[10px] text-muted-foreground mt-1.5 flex items-center gap-1">
-              <Info className="w-3 h-3" /> Find your API key in Prowlarr under Settings → General → Security.
-            </p>
           </div>
           {prowlarrTest === 'ok' && (
             <div className="flex items-center gap-1.5 text-[11px] text-green-400 bg-green-500/10 border border-green-500/20 rounded-lg px-2.5 py-1.5">

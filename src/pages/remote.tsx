@@ -32,7 +32,6 @@ import AITab from './remote/AITab';
 import DownloadTab from './remote/DownloadTab';
 import BrowseTab from './remote/BrowseTab';
 import CastTab from './remote/CastTab';
-import DpadTab from './remote/DpadTab';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 // Re-exported from ./remote/types for use in sub-components
@@ -722,7 +721,6 @@ function RemotePageInner({ onAuthExpired }: { onAuthExpired: () => void }) {
           <AnimatePresence>
             {activeTab === 'remote' && status === 'connected' && state && (
               <motion.div
-                key="player"
                 initial={{ opacity: 0, y: 16 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0 }}
@@ -970,21 +968,6 @@ function RemotePageInner({ onAuthExpired }: { onAuthExpired: () => void }) {
                 <p className="text-center text-[10px] text-muted-foreground/50">
                   ← swipe controls area to seek · ↕ swipe for volume
                 </p>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          {/* D-Pad controls — only on remote tab when connected but no video is playing */}
-          <AnimatePresence>
-            {activeTab === 'remote' && status === 'connected' && !state && (
-              <motion.div
-                key="dpad"
-                initial={{ opacity: 0, y: 16 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 16 }}
-                className="flex-1 flex flex-col items-center justify-center pt-8"
-              >
-                <DpadTab send={send} />
               </motion.div>
             )}
           </AnimatePresence>

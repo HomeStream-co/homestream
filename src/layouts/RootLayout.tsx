@@ -21,8 +21,8 @@ function FirstRunGuard() {
   const location = useLocation();
 
   useEffect(() => {
-    // Don't redirect if already on /setup, /profiles, or /remote
-    if (location.pathname === '/setup' || location.pathname === '/profiles' || location.pathname.startsWith('/remote')) return;
+    // Don't redirect if already on /setup or /profiles
+    if (location.pathname === '/setup' || location.pathname === '/profiles') return;
 
     fetch('/api/setup', { credentials: 'include' })
       .then(r => r.json())

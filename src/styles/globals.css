@@ -4,26 +4,26 @@
 
 @layer base {
   :root {
-    /* HomeStream — Deep Cinematic Dark Mode */
-    --background: 240 10% 3%;
-    --foreground: 210 20% 98%;
-    --card: 240 10% 5%;
-    --card-foreground: 210 20% 98%;
-    --popover: 240 10% 5%;
-    --popover-foreground: 210 20% 98%;
-    --primary: 190 90% 50%; /* Neon Cyan */
-    --primary-foreground: 240 10% 3%;
-    --secondary: 240 8% 12%;
-    --secondary-foreground: 210 20% 98%;
-    --muted: 240 8% 12%;
-    --muted-foreground: 240 5% 65%;
-    --accent: 280 80% 60%; /* Electric Purple */
-    --accent-foreground: 210 20% 98%;
+    /* HomeStream — Forest Green (default; overridden at runtime by ThemeContext) */
+    --background: 0 0% 3%;
+    --foreground: 140 8% 94%;
+    --card: 140 10% 6%;
+    --card-foreground: 140 8% 94%;
+    --popover: 140 10% 6%;
+    --popover-foreground: 140 8% 94%;
+    --primary: 145 60% 22%;
+    --primary-foreground: 140 8% 94%;
+    --secondary: 140 8% 11%;
+    --secondary-foreground: 140 8% 94%;
+    --muted: 140 8% 11%;
+    --muted-foreground: 140 5% 48%;
+    --accent: 145 45% 30%;
+    --accent-foreground: 140 8% 94%;
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
-    --border: 240 10% 12%;
-    --input: 240 10% 12%;
-    --ring: 190 90% 50%;
+    --border: 140 8% 14%;
+    --input: 140 8% 14%;
+    --ring: 145 60% 22%;
 
     /* Extended Colors */
     --chart-1: 0 86% 47%;

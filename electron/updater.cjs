@@ -159,7 +159,7 @@ function handleInstall() {
     return;
   }
   pushLogFn?.('[updater] Restarting to install update…', 'warn');
-  setImmediate(() => autoUpdater.quitAndInstall(true, true));
+  setImmediate(() => autoUpdater.quitAndInstall(false, true));
 }
 
 // Beta channel opt-in — persisted to a simple JSON file next to the app data.
@@ -301,9 +301,9 @@ function setupAutoUpdater({ controlWindowGetter, pushLog, port = 3000 }) {
     log('No GitHub token found — update checks will fail on private repos. Set GH_TOKEN in CI and add ghToken to extraMetadata.', 'warn');
   }
 
-  // Enable auto-download so updates download seamlessly in the background (1-click update process)
-  autoUpdater.autoDownload = true;
-  autoUpdater.autoInstallOnAppQuit = true;
+  // Disable auto-download so the user controls when to download.
+  autoUpdater.autoDownload = false;
+  autoUpdater.autoInstallOnAppQuit = false;
 
   // Apply beta channel preference
   autoUpdater.allowPrerelease = betaChannelEnabled;
@@ -392,7 +392,7 @@ function setupAutoUpdater({ controlWindowGetter, pushLog, port = 3000 }) {
       return;
     }
     log('Restarting to install update…', 'warn');
-    setImmediate(() => autoUpdater.quitAndInstall(true, true));
+    setImmediate(() => autoUpdater.quitAndInstall(false, true));
   });
 
   // Beta channel toggle — renderer sends { enabled: boolean }
@@ -451,7 +451,7 @@ function teardown() {
  */
 function downloadAndInstall() {
   return autoUpdater.downloadUpdate()
-    .then(() => autoUpdater.quitAndInstall(true, true));
+    .then(() => autoUpdater.quitAndInstall(false, true));
 }
 
 /**

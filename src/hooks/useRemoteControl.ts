@@ -21,8 +21,6 @@ export interface RemoteHandlers {
   onPause?: () => void;
   onSeek?: (position: number) => void;
   onVolume?: (level: number) => void;
-  onVolumeUp?: () => void;
-  onVolumeDown?: () => void;
   onSkipForward?: (seconds: number) => void;
   onSkipBack?: (seconds: number) => void;
   onSkipIntro?: () => void;
@@ -56,13 +54,6 @@ export interface RemoteHandlers {
   onDlnaCastStarted?: (info: { deviceLocation: string; deviceName: string }) => void;
   /** Phone remote stopped a DLNA cast */
   onDlnaCastStopped?: () => void;
-  // â”€â”€ D-Pad navigation commands â”€â”€
-  onDpadUp?: () => void;
-  onDpadDown?: () => void;
-  onDpadLeft?: () => void;
-  onDpadRight?: () => void;
-  onDpadEnter?: () => void;
-  onDpadBack?: () => void;
 }
 
 export interface PlayerStatePayload {
@@ -146,8 +137,6 @@ export function useRemoteControl(
             case 'pause':             h.onPause?.(); break;
             case 'seek':              h.onSeek?.(msg.position ?? 0); break;
             case 'volume':            h.onVolume?.(msg.level ?? 1); break;
-            case 'volume_up':         h.onVolumeUp?.(); break;
-            case 'volume_down':       h.onVolumeDown?.(); break;
             case 'skip_forward':      h.onSkipForward?.(msg.seconds ?? 10); break;
             case 'skip_back':         h.onSkipBack?.(msg.seconds ?? 10); break;
             case 'skip_intro':        h.onSkipIntro?.(); break;
@@ -157,12 +146,6 @@ export function useRemoteControl(
             case 'subtitle':          h.onSubtitle?.(msg.track ?? -1); break;
             case 'cast':              h.onCast?.(); break;
             case 'launch':            h.onLaunch?.(msg.mediaId ?? ''); break;
-            case 'dpad_up':           h.onDpadUp?.(); break;
-            case 'dpad_down':         h.onDpadDown?.(); break;
-            case 'dpad_left':         h.onDpadLeft?.(); break;
-            case 'dpad_right':        h.onDpadRight?.(); break;
-            case 'dpad_enter':        h.onDpadEnter?.(); break;
-            case 'dpad_back':         h.onDpadBack?.(); break;
             // Cast session commands — forwarded from phone CastPanel
             case 'cast_playpause':    h.onCastPlayPause?.(); break;
             case 'cast_stop':         h.onCastStop?.(); break;

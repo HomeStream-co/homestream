@@ -38,6 +38,7 @@ import {
   runEnrichmentInBackground,
   runCaptionFetchInBackground,
 } from './mediaUtils.js';
+import { readConfig } from './configStore.js';
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
@@ -83,14 +84,40 @@ async function importFile(filePath: string): Promise<void> {
   // Fetch OMDB metadata
   const omdb = await fetchOMDB(extractedTitle, extractedYear);
 
+  const fileSize = (() => {
+    try { return fs.statSync(filePath).size; } catch { return 0; }
+  })();
+
+  const cfg = readConfig();
+  if (cfg.autoTranscode === false) {
+    // Skip transcoding — register source file directly in library
+    const mediaItem = buildMediaItem({
+      filename,
+      originalFilename: filename,
+      filePath,
+      fileSize,
+      omdb,
+      extractedTitle,
+      extractedYear,
+      transcoding: false,
+      importedFrom: 'folder_watcher',
+    });
+
+    await writeLibrary(lib => {
+      lib.unshift(mediaItem as unknown as Record<string, unknown>);
+      return lib;
+    });
+
+    console.log(`[watcher] Added to library (no transcode): "${mediaItem.title}" (${mediaItem.id})`);
+    runEnrichmentInBackground(mediaItem.id).catch(() => {});
+    runCaptionFetchInBackground(mediaItem.id).catch(() => {});
+    return;
+  }
+
   // Determine output path for transcoded file
   // Transcoded file lives alongside the source in the downloads folder
   const outputFilename = filename.replace(/\.[^.]+$/, '') + '_tc.mp4';
   const outputPath = path.join(path.dirname(filePath), outputFilename);
-
-  const fileSize = (() => {
-    try { return fs.statSync(filePath).size; } catch { return 0; }
-  })();
 
   // Build library record — initially points at source file.
   // Always mark transcoding:true so the UI shows "Optimizing…" while the

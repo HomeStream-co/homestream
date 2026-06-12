@@ -512,8 +512,6 @@ function DownloadModal({ target, onClose }: { target: DownloadTarget; onClose: (
           imdbId: target.imdbId ?? null,
           title: target.title,
           type: target.type,
-          season: target.type === 'series' ? 1 : undefined,
-          episode: target.type === 'series' ? 1 : undefined,
         }),
       });
 

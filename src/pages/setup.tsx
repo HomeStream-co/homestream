@@ -59,7 +59,6 @@ export default function SetupPage() {
   const [form, setForm] = useState<FormData>({
     mediaDir: '',
     qbitUrl: 'http://localhost:8080',
-    qbitApiKey: '',
     qbitUsername: 'admin',
     qbitPassword: 'homestream',
     jellyfinUrl: 'http://localhost:8096',
@@ -90,7 +89,6 @@ export default function SetupPage() {
     vpnKnownServers: '',
     prowlarrUrl: 'http://localhost:9696',
     prowlarrApiKey: '',
-    torrentioUrl: 'https://torrentio.strem.fun',
     realDebridApiKey: '',
   });
 
@@ -139,8 +137,8 @@ export default function SetupPage() {
   // StepMediaFolder disables its "Save & Continue" button until this resolves
   // so the user can't accidentally save the hardcoded fallback path.
   const [platformDefaultsReady, setPlatformDefaultsReady] = useState(false);
-  // Available fixed drives on Windows. Empty on macOS/Linux.
-  const [availableDrives, setAvailableDrives] = useState<{ path: string; freeSpaceGB?: number }[]>([]);
+  // Available fixed drives on Windows (e.g. ["C:\\", "D:\\"]). Empty on macOS/Linux.
+  const [availableDrives, setAvailableDrives] = useState<string[]>([]);
   const [serverPlatform, setServerPlatform] = useState<string | undefined>(undefined);
   const [isElectron, setIsElectron] = useState(false);
 
@@ -171,7 +169,7 @@ export default function SetupPage() {
   useEffect(() => {
     fetch('/api/electron')
       .then(r => r.json())
-      .then((data: { defaultMediaDir?: string; availableDrives?: { path: string; freeSpaceGB?: number }[]; platform?: string; isElectron?: boolean }) => {
+      .then((data: { defaultMediaDir?: string; availableDrives?: string[]; platform?: string; isElectron?: boolean }) => {
         if (data.defaultMediaDir) {
           setForm(f => ({ ...f, mediaDir: data.defaultMediaDir! }));
         }

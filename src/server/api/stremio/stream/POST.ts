@@ -96,15 +96,13 @@ function formatBytes(bytes: number): string {
 // ── Source fetchers ───────────────────────────────────────────────────────────
 
 async function fetchTorrentio(
-  imdbId: string, type: string, season: number | undefined, episode: number | undefined,
-  torrentioUrl: string
+  imdbId: string, type: string, season?: number, episode?: number,
 ): Promise<StreamResult[]> {
   const streamId =
     type === 'series' && season != null && episode != null
       ? `${imdbId}:${season}:${episode}`
       : imdbId;
-  const baseUrl = torrentioUrl || 'https://torrentio.strem.fun';
-  const url = `${baseUrl.replace(/\/$/, '')}/stream/${type}/${streamId}.json`;
+  const url = `${TORRENTIO}/stream/${type}/${streamId}.json`;
   const controller = new AbortController();
   const t = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {
@@ -264,9 +262,9 @@ export default async function handler(req: Request, res: Response) {
     searchQuery = `${title ?? imdbId} S${s}E${e}`;
   }
 
-  // Fire all enabled sources in parallel - failures are isolated via allSettled
+  // Fire all enabled sources in parallel — failures are isolated via allSettled
   const [torrentioRes, prowlarrRes, nyaaRes, customRes] = await Promise.allSettled([
-    srcEnabled('torrentio') ? fetchTorrentio(imdbId, type, season, episode, config.torrentioUrl) : Promise.resolve([]),
+    srcEnabled('torrentio') ? fetchTorrentio(imdbId, type, season, episode) : Promise.resolve([]),
     srcEnabled('prowlarr')  ? fetchProwlarr(searchQuery, config.prowlarrUrl, config.prowlarrApiKey) : Promise.resolve([]),
     srcEnabled('nyaa')      ? fetchNyaa(searchQuery) : Promise.resolve([]),
     fetchAllCustomSources(sources, searchQuery),

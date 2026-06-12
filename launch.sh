@@ -77,7 +77,7 @@ fi
 ok "Node.js $(node --version)"
 
 # ── Install dependencies (first run only) ─────────────────
-if [ ! -d "node_modules/express" ]; then
+if [ ! -f "node_modules/express/package.json" ]; then
   echo ""
   info "Installing packages... (first run, ~2 minutes)"
   echo ""
@@ -86,7 +86,7 @@ if [ ! -d "node_modules/express" ]; then
 fi
 
 # ── Build (first run or after updates) ────────────────────
-if [ ! -f "dist/server.bundle.mjs" ]; then
+if [ ! -f "dist/server/server.bundle.cjs" ]; then
   echo ""
   info "Building HomeStream... (first run, ~1 minute)"
   echo ""
@@ -132,4 +132,4 @@ echo ""
 
 # Run the server
 export PORT=3000
-node dist/server.bundle.mjs
+node dist/server/server.bundle.cjs

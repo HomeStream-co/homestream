@@ -5,19 +5,9 @@
 
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Search, X, Mic, Film, Star, Tv2, Download } from 'lucide-react';
+import { Search, X, Mic, Film, Star, Tv2 } from 'lucide-react';
 import type { LibraryItem } from './types';
 import { remoteAuthHeaders } from './types';
-
-interface CinemetaItem {
-  id: string;
-  name: string;
-  year?: string;
-  poster?: string;
-  type: 'movie' | 'series';
-  imdbRating?: string;
-}
-
 
 // Extend window type for Web Speech API (not in all TypeScript lib versions)
 declare global {
@@ -52,8 +42,6 @@ export default function SearchTab({ send }: SearchTabProps) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<LibraryItem[]>([]);
   const [allItems, setAllItems] = useState<LibraryItem[]>([]);
-  const [stremioResults, setStremioResults] = useState<CinemetaItem[]>([]);
-  const [downloading, setDownloading] = useState<string | null>(null);
   const [listening, setListening] = useState(false);
   const [voiceSupported, setVoiceSupported] = useState(false);
   const [launching, setLaunching] = useState<string | null>(null);
@@ -81,22 +69,6 @@ export default function SearchTab({ send }: SearchTabProps) {
       ).slice(0, 30)
     );
   }, [query, allItems]);
-
-  useEffect(() => {
-    const q = query.trim();
-    if (!q) { setStremioResults([]); return; }
-    const t = setTimeout(() => {
-      fetch('/api/stremio/search', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...remoteAuthHeaders() },
-        body: JSON.stringify({ query: q })
-      })
-      .then(r => r.json())
-      .then(d => setStremioResults(d.results || []))
-      .catch(() => {});
-    }, 600);
-    return () => clearTimeout(t);
-  }, [query]);
 
   const startVoice = useCallback(() => {
     const SR = window.SpeechRecognition ?? window.webkitSpeechRecognition;
@@ -142,24 +114,6 @@ export default function SearchTab({ send }: SearchTabProps) {
     send({ type: 'launch', mediaId: item.id, title: item.title });
     setTimeout(() => setLaunching(null), 2000);
   }, [send]);
-
-  const downloadTorrent = useCallback(async (item: CinemetaItem) => {
-    haptic([30, 20]);
-    setDownloading(item.id);
-    try {
-      await fetch('/api/stremio/download', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...remoteAuthHeaders() },
-        body: JSON.stringify({
-          imdbId: item.id,
-          type: item.type,
-          title: item.name,
-          poster: item.poster || '',
-        })
-      });
-    } catch {}
-    setTimeout(() => setDownloading(null), 2000);
-  }, []);
 
   return (
     <div className="flex flex-col gap-4">
@@ -242,7 +196,7 @@ export default function SearchTab({ send }: SearchTabProps) {
 
       {results.length > 0 && (
         <div className="flex flex-col gap-2">
-          <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">In Library</p>
+          <p className="text-xs text-muted-foreground">{results.length} result{results.length !== 1 ? 's' : ''}</p>
           <div className="flex flex-col gap-1.5">
             {results.map(item => (
               <motion.button
@@ -290,57 +244,7 @@ export default function SearchTab({ send }: SearchTabProps) {
         </div>
       )}
 
-      {stremioResults.length > 0 && (
-        <div className="flex flex-col gap-2 mt-4">
-          <p className="text-xs font-bold text-primary uppercase tracking-widest">Download Torrents</p>
-          <div className="flex flex-col gap-1.5">
-            {stremioResults.map(item => (
-              <motion.button
-                key={item.id}
-                onClick={() => downloadTorrent(item)}
-                whileTap={{ scale: 0.98 }}
-                className="relative flex items-center gap-3 bg-card border border-border rounded-xl p-3 text-left hover:border-primary/40 transition-colors overflow-hidden"
-              >
-                {item.poster ? (
-                  <img src={item.poster} alt="" className="w-10 h-14 object-cover rounded-lg flex-shrink-0" />
-                ) : (
-                  <div className="w-10 h-14 bg-muted rounded-lg flex items-center justify-center flex-shrink-0">
-                    <Film className="w-4 h-4 text-muted-foreground" />
-                  </div>
-                )}
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-foreground truncate">{item.name}</p>
-                  <p className="text-xs text-muted-foreground">{item.year} · {item.type === 'series' ? 'TV Show' : 'Movie'}</p>
-                  {item.imdbRating && item.imdbRating !== 'N/A' && (
-                    <div className="flex items-center gap-1 mt-0.5">
-                      <Star className="w-3 h-3 text-yellow-400 fill-yellow-400" />
-                      <span className="text-[10px] text-muted-foreground">{item.imdbRating}</span>
-                    </div>
-                  )}
-                </div>
-                <div className="flex-shrink-0 bg-primary/20 p-2 rounded-full text-primary">
-                  <Download className="w-4 h-4" />
-                </div>
-                <AnimatePresence>
-                  {downloading === item.id && (
-                    <motion.div
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                      className="absolute inset-0 bg-primary/90 flex items-center justify-center gap-2 rounded-xl"
-                    >
-                      <Download className="w-5 h-5 text-white animate-bounce" />
-                      <span className="text-white text-sm font-semibold">Sent to Server!</span>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </motion.button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {query && results.length === 0 && stremioResults.length === 0 && (
+      {query && results.length === 0 && (
         <div className="text-center py-10">
           <p className="text-muted-foreground text-sm">No results for "{query}"</p>
           <p className="text-xs text-muted-foreground mt-1">Try a different title or genre</p>

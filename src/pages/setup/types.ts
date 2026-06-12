@@ -16,7 +16,6 @@ export interface StepStatus {
 export interface FormData {
   mediaDir: string;
   qbitUrl: string;
-  qbitApiKey: string;
   qbitUsername: string;
   qbitPassword: string;
   jellyfinUrl: string;
@@ -60,8 +59,6 @@ export interface FormData {
   // Prowlarr — self-hosted indexer aggregator
   prowlarrUrl: string;
   prowlarrApiKey: string;
-  // Torrentio - custom manifest URL
-  torrentioUrl: string;
   // Real-Debrid — premium download backend
   realDebridApiKey: string;
 }
@@ -134,8 +131,8 @@ export interface SetupStepProps {
   setRdTestMsg: (v: string) => void;
   /** True once /api/electron has responded — prevents saving stale mediaDir on fast clicks */
   platformDefaultsReady: boolean;
-  /** Available fixed drives on Windows. Empty on macOS/Linux. */
-  availableDrives: { path: string; freeSpaceGB?: number }[];
+  /** Available fixed drives on Windows (e.g. ["C:\\", "D:\\"]). Empty on macOS/Linux. */
+  availableDrives: string[];
   /**
    * Server platform string from HOMESTREAM_PLATFORM env var ('win32' | 'linux' | 'darwin').
    * Undefined until /api/electron responds. Use getIsLinux(serverPlatform) from

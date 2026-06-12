@@ -9,8 +9,8 @@
 import type { Request, Response } from 'express';
 import { requireAuth } from '../../../authMiddleware.js';
 import { readConfig } from '../../../configStore.js';
-import { tmdbGet } from '../../../tmdbCache.js';
 
+const TMDB_BASE = 'https://api.themoviedb.org/3';
 const TMDB_LOGO = 'https://image.tmdb.org/t/p/w92';
 
 export default async function handler(req: Request, res: Response) {
@@ -32,19 +32,25 @@ export default async function handler(req: Request, res: Response) {
   }
 
   try {
-    const data: any = await tmdbGet(`/${type}/${tmdbId}/watch/providers`);
+    const url = new URL(`${TMDB_BASE}/${type}/${tmdbId}/watch/providers`);
+    url.searchParams.set('api_key', apiKey);
+
+    const tmdbRes = await fetch(url.toString(), { signal: AbortSignal.timeout(6000) });
+    if (!tmdbRes.ok) throw new Error(`TMDB ${tmdbRes.status}`);
+
+    const data = await tmdbRes.json() as {
+      results?: {
+        US?: {
+          flatrate?: Array<{ provider_id: number; provider_name: string; logo_path: string }>;
+          free?: Array<{ provider_id: number; provider_name: string; logo_path: string }>;
+        };
+      };
+    };
 
     const us = data.results?.US ?? {};
+    const flatrate = [...(us.flatrate ?? []), ...(us.free ?? [])];
 
-    const flatrate = (us.flatrate ?? []) as Array<{ provider_id: number; provider_name: string; logo_path: string }>;
-    const free = (us.free ?? []) as Array<{ provider_id: number; provider_name: string; logo_path: string }>;
-
-    // We merge flatrate (subscriptions) and free (ad-supported)
-    // We ignore 'buy' or 'rent' as users of this app typically only care about
-    // what they can watch for "free" with their existing subscriptions.
-    const all = [...flatrate, ...free];
-
-    const providers = all.map(p => ({
+    const providers = flatrate.map(p => ({
       id: p.provider_id,
       name: p.provider_name,
       logo: `${TMDB_LOGO}${p.logo_path}`,
