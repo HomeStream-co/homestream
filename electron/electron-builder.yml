@@ -91,6 +91,12 @@ extraResources:
     filter:
       - "ffmpeg"
       - "ffmpeg.exe"
+  # FFprobe binary
+  - from: node_modules/ffprobe-static
+    to: ffmpeg
+    filter:
+      - "ffprobe"
+      - "ffprobe.exe"
 
 # ── Windows ───────────────────────────────────────────────────────────────────
 # Default target is zip — builds cleanly from Linux (no NSIS/7zip toolchain needed).

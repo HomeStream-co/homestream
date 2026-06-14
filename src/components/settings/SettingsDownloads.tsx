@@ -5,7 +5,7 @@
  * the setup wizard.  Reads/writes `preferredQuality` via POST /api/setup.
  */
 import { useEffect, useState, useCallback } from 'react';
-import { Download, Check, Loader2 } from 'lucide-react';
+import { Download, Check, Loader2, Info } from 'lucide-react';
 import { SectionHeader } from './shared';
 
 type Quality = '720p' | '1080p' | '4k' | 'best';
@@ -96,6 +96,30 @@ export default function SettingsDownloads() {
             {QUALITY_OPTIONS.find(o => o.value === quality)?.hint}
           </p>
         )}
+      </div>
+
+      {/* Auto-Seeding Instructions */}
+      <div className="px-4 pb-4 border-t border-border/20 pt-3 flex flex-col gap-2">
+        <div>
+          <p className="text-sm font-semibold text-foreground leading-tight">qBittorrent Auto-Seeding</p>
+          <p className="text-[11px] text-muted-foreground mt-0.5">
+            How to stop seeding/sharing downloads automatically
+          </p>
+        </div>
+        <div className="flex items-start gap-2.5 p-3 rounded-xl bg-muted/30 border border-border">
+          <Info className="w-4 h-4 text-amber-400 mt-0.5 flex-shrink-0" />
+          <div className="text-[11.5px] text-muted-foreground leading-snug">
+            <p className="font-semibold text-foreground/80 mb-1.5">To disable auto-seeding:</p>
+            <ol className="flex flex-col gap-1 list-none pl-0">
+              <li><span className="text-primary font-bold mr-1">1.</span> Open the <strong>qBittorrent</strong> application</li>
+              <li><span className="text-primary font-bold mr-1">2.</span> Go to <strong>Tools → Options → BitTorrent</strong> (or Preferences on macOS)</li>
+              <li><span className="text-primary font-bold mr-1">3.</span> Under <strong>Share Ratio Limit</strong>, tick the box <strong>"Limit share ratio to"</strong></li>
+              <li><span className="text-primary font-bold mr-1">4.</span> Set the value to <code className="bg-background/80 px-1 py-0.5 rounded font-mono text-foreground font-bold">0</code></li>
+              <li><span className="text-primary font-bold mr-1">5.</span> For <strong>"When ratio limit is reached"</strong>, select <strong>"Pause torrent"</strong> (or "Remove torrent")</li>
+              <li><span className="text-primary font-bold mr-1">6.</span> Click <strong>Apply</strong> and then <strong>OK</strong></li>
+            </ol>
+          </div>
+        </div>
       </div>
     </div>
   );

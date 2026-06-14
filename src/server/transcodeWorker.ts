@@ -65,6 +65,15 @@ function resolveFfprobe(): string {
     const candidate = path.join(dir, `ffprobe${ext}`);
     if (fs.existsSync(candidate)) return candidate;
   }
+  // Try loading ffprobe-static first
+  try {
+    const req = createRequire(import.meta.url);
+    const ffprobeStatic = req('ffprobe-static') as { path: string } | null;
+    if (ffprobeStatic?.path && fs.existsSync(ffprobeStatic.path)) {
+      return ffprobeStatic.path;
+    }
+  } catch { /* not installed */ }
+  // Legacy fallback (same folder as ffmpeg-static)
   try {
     const req = createRequire(import.meta.url);
     const ffmpegPath = req('ffmpeg-static') as string | null;

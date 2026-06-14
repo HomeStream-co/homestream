@@ -324,6 +324,17 @@ export default function StepOptional({
             </p>
           </div>
         )}
+
+        {/* Auto-Seeding Tip */}
+        <div className="flex items-start gap-2 p-2.5 rounded-lg bg-muted/40 border border-border/80">
+          <Info className="w-3.5 h-3.5 text-amber-400 mt-0.5 flex-shrink-0" />
+          <div className="text-[11px] text-muted-foreground leading-snug">
+            <p className="font-semibold text-foreground/80 mb-0.5">Tip: Disable Auto-Seeding</p>
+            <p className="text-[10.5px] leading-normal text-muted-foreground">
+              To stop sharing files once downloaded: In qBittorrent, go to <strong>Tools → Options → BitTorrent</strong>. Under <strong>Share Ratio Limit</strong>, tick <strong>"Limit share ratio to"</strong>, set it to <code className="bg-background/80 px-1 rounded font-mono text-foreground font-bold">0</code>, and select <strong>"Pause torrent"</strong>.
+            </p>
+          </div>
+        </div>
       </div>
 
       {/* ── Jellyfin ── */}
