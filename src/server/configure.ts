@@ -63,6 +63,10 @@ function gzipMiddleware(req: express.Request, res: express.Response, next: expre
 
 export const viteServerBefore = (server: express.Express, _viteServer: ViteDevServer) => {
   console.log('[HomeStream] Dev server starting...');
+  import('./configStore.js').then(({ detectAndSyncProwlarrApiKey }) => {
+    detectAndSyncProwlarrApiKey();
+  }).catch((err: Error) => console.warn('[startup] Prowlarr key sync failed in dev:', err.message));
+
   import('./ownershipSeed.js').then(({ runOwnershipSeed }) => {
     runOwnershipSeed().catch((err: Error) => {
       console.warn('[ownership] Dev seed failed (non-fatal):', err.message);
@@ -92,8 +96,9 @@ export const serverBefore = (server: express.Express) => {
     console.error('[startup] Cleanup failed:', err.message);
   });
 
-  import('./configStore.js').then(({ isSetupComplete, readConfig }) => {
+  import('./configStore.js').then(({ isSetupComplete, readConfig, detectAndSyncProwlarrApiKey }) => {
     if (!isSetupComplete()) return;
+    detectAndSyncProwlarrApiKey();
     const cfg = readConfig();
     if (cfg.watchFolderEnabled && cfg.downloadsDir) {
       import('./folderWatcher.js').then(({ startWatcher }) => {

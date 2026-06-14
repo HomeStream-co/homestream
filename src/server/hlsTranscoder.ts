@@ -61,6 +61,14 @@ function resolveFfprobe(): string {
   }
   try {
     const req = createRequire(import.meta.url);
+    const ffprobeStatic = req('ffprobe-static') as { path: string } | null;
+    if (ffprobeStatic?.path && fs.existsSync(ffprobeStatic.path)) {
+      _ffprobe = ffprobeStatic.path;
+      return _ffprobe;
+    }
+  } catch { /* not installed */ }
+  try {
+    const req = createRequire(import.meta.url);
     // ffmpeg-static exports the ffmpeg path; ffprobe is in the same dir
     const ffmpegPath = req('ffmpeg-static') as string | null;
     if (ffmpegPath) {

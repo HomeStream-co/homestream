@@ -11,6 +11,7 @@
 
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
 import { randomUUID } from 'crypto';
 
 import { dataPath } from './dataDir.js';
@@ -247,6 +248,14 @@ export function writeConfig(updates: Partial<AppConfig>): AppConfig {
     next.libraryDir   = path.join(updates.mediaDir, 'library');
   }
 
+  // Auto-enable/disable Prowlarr built-in source based on credentials configuration
+  if (updates.prowlarrApiKey !== undefined || updates.prowlarrUrl !== undefined) {
+    const hasCreds = !!(next.prowlarrUrl && next.prowlarrApiKey);
+    next.torrentSources = (next.torrentSources ?? DEFAULT_TORRENT_SOURCES).map(s =>
+      s.type === 'prowlarr' ? { ...s, enabled: hasCreds } : s
+    );
+  }
+
   // Invalidate cache before writing so any concurrent readConfig() call that
   // races with the rename gets a fresh disk read rather than stale cached data.
   invalidateConfigCache();
@@ -275,4 +284,47 @@ export function isSetupComplete(): boolean {
   // stale build-time env var bypass the wizard entirely.
   if (!process.env.ELECTRON && process.env.SETUP_COMPLETE === 'true') return true;
   return readConfig().setupComplete;
+}
+
+export function detectLocalProwlarrApiKey(): string | null {
+  const candidates = [];
+  if (process.platform === 'win32') {
+    candidates.push('C:\\ProgramData\\Prowlarr\\config.xml');
+    candidates.push(path.join(os.homedir(), 'AppData', 'Local', 'Prowlarr', 'config.xml'));
+    candidates.push(path.join(os.homedir(), 'AppData', 'Roaming', 'Prowlarr', 'config.xml'));
+  } else {
+    candidates.push(path.join(os.homedir(), '.config', 'Prowlarr', 'config.xml'));
+    candidates.push('/var/lib/prowlarr/config.xml');
+  }
+
+  for (const c of candidates) {
+    try {
+      if (fs.existsSync(c)) {
+        const content = fs.readFileSync(c, 'utf8');
+        const match = content.match(/<ApiKey>(.*?)<\/ApiKey>/);
+        if (match && match[1]) {
+          return match[1].trim();
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }
+  return null;
+}
+
+export function detectAndSyncProwlarrApiKey(): void {
+  try {
+    const config = readConfig();
+    const isLocal = !config.prowlarrUrl || config.prowlarrUrl.includes('localhost') || config.prowlarrUrl.includes('127.0.0.1');
+    if (!isLocal) return;
+
+    const detectedKey = detectLocalProwlarrApiKey();
+    if (detectedKey && detectedKey !== config.prowlarrApiKey) {
+      console.log(`[prowlarr] Auto-detected local Prowlarr API key: ${detectedKey.slice(0, 4)}...`);
+      writeConfig({ prowlarrApiKey: detectedKey });
+    }
+  } catch (err) {
+    console.warn('[prowlarr] Auto-detection failed:', err);
+  }
 }
