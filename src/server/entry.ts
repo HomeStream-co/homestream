@@ -5,7 +5,7 @@ import { readFileSync } from "node:fs";
 
 // <api-imports>
 import cookieParser from "cookie-parser";
-import multer from "multer";
+
 
 // admin
 import adminStatusGet from "./api/admin/status/GET";
@@ -197,11 +197,22 @@ const app = express();
 // the sitemap origin in robots.txt.
 app.set("trust proxy", true);
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+const jsonParser = express.json();
+const urlencodedParser = express.urlencoded({ extended: true });
+
+app.use((req, res, next) => {
+  if (req.path === '/api/upload' || req.path.match(/^\/api\/captions\/[^/]+\/upload$/)) {
+    next();
+  } else {
+    jsonParser(req, res, (err) => {
+      if (err) return next(err);
+      urlencodedParser(req, res, next);
+    });
+  }
+});
 app.use(cookieParser());
 
-const upload = multer({ dest: "/tmp/uploads" });
+
 
 // <api-registrations>
 // admin
@@ -218,7 +229,7 @@ app.post("/api/backup/restore", backupRestorePost);
 // captions
 app.get("/api/captions/:id/:lang", captionsLangGet);
 app.post("/api/captions/:id/fetch", captionsFetchPost);
-app.post("/api/captions/:id/upload", upload.single("file"), captionsUploadPost);
+app.post("/api/captions/:id/upload", captionsUploadPost);
 // cast
 app.post("/api/cast/control", castControlPost);
 app.get("/api/cast/devices", castDevicesGet);
@@ -378,7 +389,7 @@ app.get("/api/updater/drain", updaterDrainGet);
 app.post("/api/updater/push", updaterPushPost);
 app.get("/api/updater/status", updaterStatusGet);
 // upload
-app.post("/api/upload", upload.single("file"), uploadPost);
+app.post("/api/upload", uploadPost);
 // vpn
 app.get("/api/vpn", vpnGet);
 app.post("/api/vpn", vpnPost);

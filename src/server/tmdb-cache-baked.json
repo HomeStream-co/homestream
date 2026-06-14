@@ -1,0 +1,316 @@
+{
+  "fetchedAt": 1781236310721,
+  "upcoming": [
+    {
+      "id": 823464,
+      "title": "Godzilla x Kong: The New Empire",
+      "overview": "Following their explosive showdown, Godzilla and Kong must reunite against a colossal undiscovered threat hidden within our world, challenging their very existence—and our own.",
+      "poster_path": "/z1p3517Rz6d2146RTTJ0as6tGz2.jpg",
+      "backdrop_path": "/jv4TIUg2cxwbA1JBYJj37iwZ7ta.jpg",
+      "release_date": "2024-03-27",
+      "vote_average": 7.2,
+      "vote_count": 3100,
+      "genre_ids": [
+        28,
+        878,
+        12
+      ],
+      "popularity": 2000,
+      "posterUrl": "https://image.tmdb.org/t/p/w500/z1p3517Rz6d2146RTTJ0as6tGz2.jpg",
+      "backdropUrl": "https://image.tmdb.org/t/p/original/jv4TIUg2cxwbA1JBYJj37iwZ7ta.jpg",
+      "genres": []
+    },
+    {
+      "id": 1011985,
+      "title": "Kung Fu Panda 4",
+      "overview": "Po is geared up to become the Spiritual Leader of the Valley of Peace, but needs to find and train a new Dragon Warrior before he can do so. Meanwhile, a wicked sorceress plans to re-summon all the master villains Po has defeated.",
+      "poster_path": "/kDp1vUBUPe2eW86Gl368wCcjOA5.jpg",
+      "backdrop_path": "/1XgrevYm3n6R48KRsL79z6t26t9.jpg",
+      "release_date": "2024-03-02",
+      "vote_average": 7.1,
+      "vote_count": 2100,
+      "genre_ids": [
+        16,
+        35,
+        10751,
+        14
+      ],
+      "popularity": 1800,
+      "posterUrl": "https://image.tmdb.org/t/p/w500/kDp1vUBUPe2eW86Gl368wCcjOA5.jpg",
+      "backdropUrl": "https://image.tmdb.org/t/p/original/1XgrevYm3n6R48KRsL79z6t26t9.jpg",
+      "genres": []
+    },
+    {
+      "id": 507089,
+      "title": "Dune: Part Two",
+      "overview": "Follow the mythic journey of Paul Atreides as he unites with Chani and the Fremen while on a path of revenge against the conspirators who destroyed his family. Facing a choice between the love of his life and the fate of the universe, he endeavors to prevent a terrible future only he can foresee.",
+      "poster_path": "/czembDcB205qiQDiiWn24e9585s.jpg",
+      "backdrop_path": "/xOMo8BRK7PzsJ2406JgIaIS558M.jpg",
+      "release_date": "2024-02-27",
+      "vote_average": 8.2,
+      "vote_count": 4500,
+      "genre_ids": [
+        878,
+        12
+      ],
+      "popularity": 1500,
+      "posterUrl": "https://image.tmdb.org/t/p/w500/czembDcB205qiQDiiWn24e9585s.jpg",
+      "backdropUrl": "https://image.tmdb.org/t/p/original/xOMo8BRK7PzsJ2406JgIaIS558M.jpg",
+      "genres": []
+    },
+    {
+      "id": 533535,
+      "title": "Deadpool & Wolverine",
+      "overview": "A listless Wade Wilson toils in civilian life with his days as the morally flexible mercenary, Deadpool, behind him. But when his homeworld faces an existential threat, he must reluctantly suit-up again with an even more reluctant Wolverine.",
+      "poster_path": "/8cdWjvZ431MA6H7596l9tM3Chq5.jpg",
+      "backdrop_path": "/yD1t2367fd317079MCH3f36t26b.jpg",
+      "release_date": "2024-07-24",
+      "vote_average": 7.9,
+      "vote_count": 1200,
+      "genre_ids": [
+        28,
+        35,
+        878
+      ],
+      "popularity": 2500,
+      "posterUrl": "https://image.tmdb.org/t/p/w500/8cdWjvZ431MA6H7596l9tM3Chq5.jpg",
+      "backdropUrl": "https://image.tmdb.org/t/p/original/yD1t2367fd317079MCH3f36t26b.jpg",
+      "genres": []
+    }
+  ],
+  "trending": [
+    {
+      "id": 653346,
+      "title": "Kingdom of the Planet of the Apes",
+      "overview": "Several generations in the future following Caesar's reign, apes are now the dominant species living harmoniously while humans have been reduced to living in the shadows. As a new tyrannical ape leader builds his empire, one young ape undertakes a harrowing journey.",
+      "poster_path": "/gKCoJR12RCv4nN1VTLdCc9m88jF.jpg",
+      "backdrop_path": "/fqSyMCH3f36t2367fd3170791Xg.jpg",
+      "release_date": "2024-05-08",
+      "vote_average": 7,
+      "vote_count": 1500,
+      "genre_ids": [
+        878,
+        12,
+        28
+      ],
+      "popularity": 1700,
+      "posterUrl": "https://image.tmdb.org/t/p/w500/gKCoJR12RCv4nN1VTLdCc9m88jF.jpg",
+      "backdropUrl": "https://image.tmdb.org/t/p/original/fqSyMCH3f36t2367fd3170791Xg.jpg",
+      "genres": []
+    },
+    {
+      "id": 1022789,
+      "title": "Inside Out 2",
+      "overview": "Teenager Riley's mind headquarters is undergoing a sudden demolition to make room for something entirely unexpected: new Emotions! Joy, Sadness, Anger, Fear and Disgust aren't sure how to feel when Anxiety shows up.",
+      "poster_path": "/vpnVM9B62m48DndJWwwZ67g20aa.jpg",
+      "backdrop_path": "/stKG2KoUBUPe2eW86Gl368wCcjO.jpg",
+      "release_date": "2024-06-12",
+      "vote_average": 8,
+      "vote_count": 900,
+      "genre_ids": [
+        16,
+        10751,
+        35,
+        18
+      ],
+      "popularity": 2200,
+      "posterUrl": "https://image.tmdb.org/t/p/w500/vpnVM9B62m48DndJWwwZ67g20aa.jpg",
+      "backdropUrl": "https://image.tmdb.org/t/p/original/stKG2KoUBUPe2eW86Gl368wCcjO.jpg",
+      "genres": []
+    },
+    {
+      "id": 929590,
+      "title": "Civil War",
+      "overview": "In a near-future America, a team of military-embedded journalists races against time to reach Washington, D.C., before rebel factions descend upon the White House.",
+      "poster_path": "/sh7596l9tM3Chq58cdWjvZ431MA.jpg",
+      "backdrop_path": "/t2yyOv40HZeVlLjYsCsPHnWLk4W.jpg",
+      "release_date": "2024-04-10",
+      "vote_average": 7.1,
+      "vote_count": 1400,
+      "genre_ids": [
+        28,
+        18,
+        53
+      ],
+      "popularity": 1200,
+      "posterUrl": "https://image.tmdb.org/t/p/w500/sh7596l9tM3Chq58cdWjvZ431MA.jpg",
+      "backdropUrl": "https://image.tmdb.org/t/p/original/t2yyOv40HZeVlLjYsCsPHnWLk4W.jpg",
+      "genres": []
+    },
+    {
+      "id": 746036,
+      "title": "The Fall Guy",
+      "overview": "Fresh off an almost career-ending accident, stuntman Colt Seavers has to track down a missing movie star, solve a conspiracy and try to win back the love of his life while still doing his day job.",
+      "poster_path": "/e12789kDp1vUBUPe2eW86Gl368w.jpg",
+      "backdrop_path": "/emthp39XA2YScoYL1p0sdbAH2WA.jpg",
+      "release_date": "2024-04-24",
+      "vote_average": 7.3,
+      "vote_count": 1100,
+      "genre_ids": [
+        28,
+        35,
+        10749
+      ],
+      "popularity": 1100,
+      "posterUrl": "https://image.tmdb.org/t/p/w500/e12789kDp1vUBUPe2eW86Gl368w.jpg",
+      "backdropUrl": "https://image.tmdb.org/t/p/original/emthp39XA2YScoYL1p0sdbAH2WA.jpg",
+      "genres": []
+    }
+  ],
+  "trendingShows": [
+    {
+      "id": 111110,
+      "title": "Shōgun",
+      "overview": "In Japan in the year 1600, Lord Yoshii Toranaga is fighting for his life as his enemies on the Council of Regents unite against him, when a mysterious European ship is found marooned in a nearby fishing village.",
+      "poster_path": "/z99t2367fd317079MCH3f36t26b.jpg",
+      "backdrop_path": "/yD1t2367fd317079MCH3f36t26b.jpg",
+      "release_date": "2024-02-27",
+      "vote_average": 8.7,
+      "vote_count": 850,
+      "genre_ids": [
+        18,
+        10759,
+        10768
+      ],
+      "popularity": 1400,
+      "posterUrl": "https://image.tmdb.org/t/p/w500/z99t2367fd317079MCH3f36t26b.jpg",
+      "backdropUrl": "https://image.tmdb.org/t/p/original/yD1t2367fd317079MCH3f36t26b.jpg",
+      "genres": []
+    },
+    {
+      "id": 126298,
+      "title": "Fallout",
+      "overview": "The story of haves and have-nots in a world in which there's almost nothing left to have. 200 years after the apocalypse, a peaceful dweller from a cozy fallout shelter is forced to return to the surface.",
+      "poster_path": "/v9B62m48DndJWwwZ67g20aaL1vU.jpg",
+      "backdrop_path": "/stKG2KoUBUPe2eW86Gl368wCcjO.jpg",
+      "release_date": "2024-04-10",
+      "vote_average": 8.4,
+      "vote_count": 1200,
+      "genre_ids": [
+        10765,
+        10759,
+        18
+      ],
+      "popularity": 1600,
+      "posterUrl": "https://image.tmdb.org/t/p/w500/v9B62m48DndJWwwZ67g20aaL1vU.jpg",
+      "backdropUrl": "https://image.tmdb.org/t/p/original/stKG2KoUBUPe2eW86Gl368wCcjO.jpg",
+      "genres": []
+    }
+  ],
+  "topRatedShows": [
+    {
+      "id": 94997,
+      "title": "House of the Dragon",
+      "overview": "The Targaryen dynasty is at the absolute pinnacle of its power, with more than 10 dragons under their control. Most empires crumble from such heights. In the case of the Targaryens, their slow fall begins when King Viserys breaks with a century of tradition.",
+      "poster_path": "/z2y7rwgEs15FwyR9NPQ5vpzxTj1.jpg",
+      "backdrop_path": "/7rwgEs15tFwyR9NPQ5vpzxTj19d.jpg",
+      "release_date": "2022-08-21",
+      "vote_average": 8.5,
+      "vote_count": 3800,
+      "genre_ids": [
+        18,
+        10765,
+        10759
+      ],
+      "popularity": 1900,
+      "posterUrl": "https://image.tmdb.org/t/p/w500/z2y7rwgEs15FwyR9NPQ5vpzxTj1.jpg",
+      "backdropUrl": "https://image.tmdb.org/t/p/original/7rwgEs15tFwyR9NPQ5vpzxTj19d.jpg",
+      "genres": []
+    },
+    {
+      "id": 100088,
+      "title": "The Last of Us",
+      "overview": "Twenty years after modern civilization has been destroyed, Joel, a hardened survivor, is hired to smuggle Ellie, a 14-year-old girl, out of an oppressive quarantine zone.",
+      "poster_path": "/uKvPHnWLk4WAjqyt5aNxNx9pi2R.jpg",
+      "backdrop_path": "/Ajqyt5aNxNx9pi2RvNFLHaLeSgx.jpg",
+      "release_date": "2023-01-15",
+      "vote_average": 8.6,
+      "vote_count": 4200,
+      "genre_ids": [
+        18,
+        10759
+      ],
+      "popularity": 1100,
+      "posterUrl": "https://image.tmdb.org/t/p/w500/uKvPHnWLk4WAjqyt5aNxNx9pi2R.jpg",
+      "backdropUrl": "https://image.tmdb.org/t/p/original/Ajqyt5aNxNx9pi2RvNFLHaLeSgx.jpg",
+      "genres": []
+    }
+  ],
+  "popularShows": [
+    {
+      "id": 111110,
+      "title": "Shōgun",
+      "overview": "In Japan in the year 1600, Lord Yoshii Toranaga is fighting for his life as his enemies on the Council of Regents unite against him, when a mysterious European ship is found marooned in a nearby fishing village.",
+      "poster_path": "/z99t2367fd317079MCH3f36t26b.jpg",
+      "backdrop_path": "/yD1t2367fd317079MCH3f36t26b.jpg",
+      "release_date": "2024-02-27",
+      "vote_average": 8.7,
+      "vote_count": 850,
+      "genre_ids": [
+        18,
+        10759,
+        10768
+      ],
+      "popularity": 1400,
+      "posterUrl": "https://image.tmdb.org/t/p/w500/z99t2367fd317079MCH3f36t26b.jpg",
+      "backdropUrl": "https://image.tmdb.org/t/p/original/yD1t2367fd317079MCH3f36t26b.jpg",
+      "genres": []
+    },
+    {
+      "id": 126298,
+      "title": "Fallout",
+      "overview": "The story of haves and have-nots in a world in which there's almost nothing left to have. 200 years after the apocalypse, a peaceful dweller from a cozy fallout shelter is forced to return to the surface.",
+      "poster_path": "/v9B62m48DndJWwwZ67g20aaL1vU.jpg",
+      "backdrop_path": "/stKG2KoUBUPe2eW86Gl368wCcjO.jpg",
+      "release_date": "2024-04-10",
+      "vote_average": 8.4,
+      "vote_count": 1200,
+      "genre_ids": [
+        10765,
+        10759,
+        18
+      ],
+      "popularity": 1600,
+      "posterUrl": "https://image.tmdb.org/t/p/w500/v9B62m48DndJWwwZ67g20aaL1vU.jpg",
+      "backdropUrl": "https://image.tmdb.org/t/p/original/stKG2KoUBUPe2eW86Gl368wCcjO.jpg",
+      "genres": []
+    },
+    {
+      "id": 94997,
+      "title": "House of the Dragon",
+      "overview": "The Targaryen dynasty is at the absolute pinnacle of its power, with more than 10 dragons under their control. Most empires crumble from such heights. In the case of the Targaryens, their slow fall begins when King Viserys breaks with a century of tradition.",
+      "poster_path": "/z2y7rwgEs15FwyR9NPQ5vpzxTj1.jpg",
+      "backdrop_path": "/7rwgEs15tFwyR9NPQ5vpzxTj19d.jpg",
+      "release_date": "2022-08-21",
+      "vote_average": 8.5,
+      "vote_count": 3800,
+      "genre_ids": [
+        18,
+        10765,
+        10759
+      ],
+      "popularity": 1900,
+      "posterUrl": "https://image.tmdb.org/t/p/w500/z2y7rwgEs15FwyR9NPQ5vpzxTj1.jpg",
+      "backdropUrl": "https://image.tmdb.org/t/p/original/7rwgEs15tFwyR9NPQ5vpzxTj19d.jpg",
+      "genres": []
+    },
+    {
+      "id": 100088,
+      "title": "The Last of Us",
+      "overview": "Twenty years after modern civilization has been destroyed, Joel, a hardened survivor, is hired to smuggle Ellie, a 14-year-old girl, out of an oppressive quarantine zone.",
+      "poster_path": "/uKvPHnWLk4WAjqyt5aNxNx9pi2R.jpg",
+      "backdrop_path": "/Ajqyt5aNxNx9pi2RvNFLHaLeSgx.jpg",
+      "release_date": "2023-01-15",
+      "vote_average": 8.6,
+      "vote_count": 4200,
+      "genre_ids": [
+        18,
+        10759
+      ],
+      "popularity": 1100,
+      "posterUrl": "https://image.tmdb.org/t/p/w500/uKvPHnWLk4WAjqyt5aNxNx9pi2R.jpg",
+      "backdropUrl": "https://image.tmdb.org/t/p/original/Ajqyt5aNxNx9pi2RvNFLHaLeSgx.jpg",
+      "genres": []
+    }
+  ]
+}

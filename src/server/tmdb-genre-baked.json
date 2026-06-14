@@ -1,0 +1,2269 @@
+{
+  "28-movie": {
+    "mustSee": [
+      {
+        "id": 155,
+        "title": "The Dark Knight",
+        "overview": "Batman raises the stakes in his war on crime. With the help of Lt. Jim Gordon and District Attorney Harvey Dent, Batman sets out to dismantle the remaining criminal organizations.",
+        "poster_path": "/qJ2tWGBiWSDcqky14lMR7UB4PzX.jpg",
+        "release_date": "2008-07-16",
+        "vote_average": 8.5,
+        "vote_count": 31000,
+        "genre_ids": [
+          28,
+          80,
+          53
+        ],
+        "popularity": 120,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/qJ2tWGBiWSDcqky14lMR7UB4PzX.jpg",
+        "backdropUrl": "",
+        "genres": []
+      },
+      {
+        "id": 27205,
+        "title": "Inception",
+        "overview": "Cobb, a skilled thief who steals valuable secrets from deep within the subconscious during the dream state, is offered a chance to have his criminal history erased.",
+        "poster_path": "/oYu24ueLSgzFSxD13wpe5Vm2XcV.jpg",
+        "release_date": "2010-07-15",
+        "vote_average": 8.4,
+        "vote_count": 34000,
+        "genre_ids": [
+          28,
+          878,
+          12
+        ],
+        "popularity": 105,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/oYu24ueLSgzFSxD13wpe5Vm2XcV.jpg",
+        "backdropUrl": "",
+        "genres": []
+      },
+      {
+        "id": 76341,
+        "title": "Mad Max: Fury Road",
+        "overview": "An apocalyptic story set in the furthest reaches of our planet, in a stark desert landscape where humanity is broken, and almost everyone is crazed fighting for the necessities of life.",
+        "poster_path": "/8tZYrjW5v4Ro26kaTTjyc2J82sb.jpg",
+        "release_date": "2015-05-13",
+        "vote_average": 7.6,
+        "vote_count": 21000,
+        "genre_ids": [
+          28,
+          12,
+          878
+        ],
+        "popularity": 95,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/8tZYrjW5v4Ro26kaTTjyc2J82sb.jpg",
+        "backdropUrl": "",
+        "genres": []
+      }
+    ],
+    "topRated": [
+      {
+        "id": 533535,
+        "title": "Deadpool & Wolverine",
+        "overview": "A listless Wade Wilson toils in civilian life. But when his homeworld faces an existential threat, he must reluctantly suit-up again with Wolverine.",
+        "poster_path": "/8cdWjvZ431MA6H7596l9tM3Chq5.jpg",
+        "release_date": "2024-07-24",
+        "vote_average": 7.9,
+        "vote_count": 1200,
+        "genre_ids": [
+          28,
+          35,
+          878
+        ],
+        "popularity": 2500,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/8cdWjvZ431MA6H7596l9tM3Chq5.jpg",
+        "backdropUrl": "",
+        "genres": []
+      },
+      {
+        "id": 823464,
+        "title": "Godzilla x Kong: The New Empire",
+        "overview": "Godzilla and Kong must reunite against a colossal undiscovered threat hidden within our world.",
+        "poster_path": "/z1p3517Rz6d2146RTTJ0as6tGz2.jpg",
+        "release_date": "2024-03-27",
+        "vote_average": 7.2,
+        "vote_count": 3100,
+        "genre_ids": [
+          28,
+          878,
+          12
+        ],
+        "popularity": 2000,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/z1p3517Rz6d2146RTTJ0as6tGz2.jpg",
+        "backdropUrl": "",
+        "genres": []
+      }
+    ]
+  },
+  "35-movie": {
+    "mustSee": [
+      {
+        "id": 597,
+        "title": "Titanic",
+        "overview": "101-year-old Rose DeWitt Bukater tells the story of her life aboard the Titanic, and how she met Jack Dawson.",
+        "poster_path": "/9xj7v4aCjSg7ND7UB4PzX.jpg",
+        "release_date": "1997-11-18",
+        "vote_average": 7.9,
+        "vote_count": 23000,
+        "genre_ids": [
+          18,
+          10749
+        ],
+        "popularity": 80,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/9xj7v4aCjSg7ND7UB4PzX.jpg",
+        "backdropUrl": "",
+        "genres": []
+      },
+      {
+        "id": 11324,
+        "title": "Superbad",
+        "overview": "Two co-dependent high school seniors are forced to deal with separation anxiety after their plan to stage a booze-soaked party goes awry.",
+        "poster_path": "/ek8gzLp7210kaTTjyc2J82sb.jpg",
+        "release_date": "2007-08-17",
+        "vote_average": 7.2,
+        "vote_count": 6700,
+        "genre_ids": [
+          35
+        ],
+        "popularity": 65,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/ek8gzLp7210kaTTjyc2J82sb.jpg",
+        "backdropUrl": "",
+        "genres": []
+      }
+    ],
+    "topRated": [
+      {
+        "id": 1011985,
+        "title": "Kung Fu Panda 4",
+        "overview": "Po is geared up to become the Spiritual Leader of the Valley of Peace.",
+        "poster_path": "/kDp1vUBUPe2eW86Gl368wCcjOA5.jpg",
+        "release_date": "2024-03-02",
+        "vote_average": 7.1,
+        "vote_count": 2100,
+        "genre_ids": [
+          16,
+          35,
+          10751,
+          14
+        ],
+        "popularity": 1800,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/kDp1vUBUPe2eW86Gl368wCcjOA5.jpg",
+        "backdropUrl": "",
+        "genres": []
+      }
+    ]
+  },
+  "18-movie": {
+    "mustSee": [
+      {
+        "id": 278,
+        "title": "The Shawshank Redemption",
+        "overview": "Framed in the 1940s for the double murder of his wife and her lover, upstanding banker Andy Dufresne begins a new life at the Shawshank prison.",
+        "poster_path": "/9cqN0295hZml0C8asg7z6t26t9.jpg",
+        "release_date": "1994-09-23",
+        "vote_average": 8.7,
+        "vote_count": 26000,
+        "genre_ids": [
+          18,
+          80
+        ],
+        "popularity": 130,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/9cqN0295hZml0C8asg7z6t26t9.jpg",
+        "backdropUrl": "",
+        "genres": []
+      },
+      {
+        "id": 238,
+        "title": "The Godfather",
+        "overview": "Spanning the years 1945 to 1955, a chronicle of the fictional Italian-American Corleone crime family.",
+        "poster_path": "/3bhkrj61oXYgnnFI541z6t26t9.jpg",
+        "release_date": "1972-03-14",
+        "vote_average": 8.7,
+        "vote_count": 19000,
+        "genre_ids": [
+          18,
+          80
+        ],
+        "popularity": 115,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/3bhkrj61oXYgnnFI541z6t26t9.jpg",
+        "backdropUrl": "",
+        "genres": []
+      }
+    ],
+    "topRated": [
+      {
+        "id": 929590,
+        "title": "Civil War",
+        "overview": "A team of military-embedded journalists races against time to reach Washington, D.C.",
+        "poster_path": "/sh7596l9tM3Chq58cdWjvZ431MA.jpg",
+        "release_date": "2024-04-10",
+        "vote_average": 7.1,
+        "vote_count": 1400,
+        "genre_ids": [
+          28,
+          18,
+          53
+        ],
+        "popularity": 1200,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/sh7596l9tM3Chq58cdWjvZ431MA.jpg",
+        "backdropUrl": "",
+        "genres": []
+      }
+    ]
+  },
+  "27-movie": {
+    "mustSee": [
+      {
+        "id": 694,
+        "title": "The Shining",
+        "overview": "Jack Torrance accepts a caretaker job at the Overlook Hotel, where he, his wife Wendy and their son Danny will be isolated for the winter.",
+        "poster_path": "/xOm8BRK7PzsJ2406JgIaIS558M.jpg",
+        "release_date": "1980-05-23",
+        "vote_average": 8.2,
+        "vote_count": 16000,
+        "genre_ids": [
+          27,
+          53
+        ],
+        "popularity": 75,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/xOm8BRK7PzsJ2406JgIaIS558M.jpg",
+        "backdropUrl": "",
+        "genres": []
+      },
+      {
+        "id": 419430,
+        "title": "Get Out",
+        "overview": "Chris and his girlfriend Rose go upstate to visit her parents in their weekend getaway. At first, Chris reads the family's overly accommodating behavior as nervous attempts to deal with their daughter's interracial relationship.",
+        "poster_path": "/1ZgrevYm3n6R48KRsL79z6t26t9.jpg",
+        "release_date": "2017-02-24",
+        "vote_average": 7.6,
+        "vote_count": 16500,
+        "genre_ids": [
+          27,
+          9648,
+          53
+        ],
+        "popularity": 68,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/1ZgrevYm3n6R48KRsL79z6t26t9.jpg",
+        "backdropUrl": "",
+        "genres": []
+      }
+    ],
+    "topRated": [
+      {
+        "id": 1001635,
+        "title": "A Quiet Place: Day One",
+        "overview": "Experience the day the world went silent.",
+        "poster_path": "/vpnVM9B62m48DndJWwwZ67g20aa.jpg",
+        "release_date": "2024-06-26",
+        "vote_average": 7,
+        "vote_count": 450,
+        "genre_ids": [
+          27,
+          878,
+          53
+        ],
+        "popularity": 950,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/vpnVM9B62m48DndJWwwZ67g20aa.jpg",
+        "backdropUrl": "",
+        "genres": []
+      }
+    ]
+  },
+  "878-movie": {
+    "mustSee": [
+      {
+        "id": 157336,
+        "title": "Interstellar",
+        "overview": "The adventures of a group of explorers who make use of a newly discovered wormhole to surpass the limitations on human space travel.",
+        "poster_path": "/gEU2Qv6e6Fc3vPjCf4j37iwZ7ta.jpg",
+        "release_date": "2014-11-05",
+        "vote_average": 8.4,
+        "vote_count": 32000,
+        "genre_ids": [
+          12,
+          18,
+          878
+        ],
+        "popularity": 140,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/gEU2Qv6e6Fc3vPjCf4j37iwZ7ta.jpg",
+        "backdropUrl": "",
+        "genres": []
+      },
+      {
+        "id": 603,
+        "title": "The Matrix",
+        "overview": "Set in the 22nd century, The Matrix tells the story of a computer hacker who joins a group of underground insurgents fighting the vast and powerful computers.",
+        "poster_path": "/f89U3wpe5Vm2XcVZ67csShZuENs.jpg",
+        "release_date": "1999-03-30",
+        "vote_average": 8.2,
+        "vote_count": 24000,
+        "genre_ids": [
+          28,
+          878
+        ],
+        "popularity": 98,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/f89U3wpe5Vm2XcVZ67csShZuENs.jpg",
+        "backdropUrl": "",
+        "genres": []
+      }
+    ],
+    "topRated": [
+      {
+        "id": 507089,
+        "title": "Dune: Part Two",
+        "overview": "Follow the mythic journey of Paul Atreides as he unites with Chani and the Fremen.",
+        "poster_path": "/czembDcB205qiQDiiWn24e9585s.jpg",
+        "release_date": "2024-02-27",
+        "vote_average": 8.2,
+        "vote_count": 4500,
+        "genre_ids": [
+          878,
+          12
+        ],
+        "popularity": 1500,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/czembDcB205qiQDiiWn24e9585s.jpg",
+        "backdropUrl": "",
+        "genres": []
+      }
+    ]
+  },
+  "28-tv": {
+    "mustSee": [
+      {
+        "id": 111110,
+        "title": "Shōgun",
+        "overview": "In Japan in the year 1600, Lord Yoshii Toranaga fights for survival.",
+        "poster_path": "/z99t2367fd317079MCH3f36t26b.jpg",
+        "release_date": "2024-02-27",
+        "vote_average": 8.7,
+        "vote_count": 850,
+        "genre_ids": [
+          28
+        ],
+        "popularity": 1400,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/z99t2367fd317079MCH3f36t26b.jpg",
+        "backdropUrl": "",
+        "genres": []
+      }
+    ],
+    "topRated": [
+      {
+        "id": 126298,
+        "title": "Fallout",
+        "overview": "A peaceful dweller from a cozy fallout shelter returns to the surface.",
+        "poster_path": "/v9B62m48DndJWwwZ67g20aaL1vU.jpg",
+        "release_date": "2024-04-10",
+        "vote_average": 8.4,
+        "vote_count": 1200,
+        "genre_ids": [
+          28
+        ],
+        "popularity": 1600,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/v9B62m48DndJWwwZ67g20aaL1vU.jpg",
+        "backdropUrl": "",
+        "genres": []
+      }
+    ]
+  },
+  "35-tv": {
+    "mustSee": [
+      {
+        "id": 111110,
+        "title": "Shōgun",
+        "overview": "In Japan in the year 1600, Lord Yoshii Toranaga fights for survival.",
+        "poster_path": "/z99t2367fd317079MCH3f36t26b.jpg",
+        "release_date": "2024-02-27",
+        "vote_average": 8.7,
+        "vote_count": 850,
+        "genre_ids": [
+          35
+        ],
+        "popularity": 1400,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/z99t2367fd317079MCH3f36t26b.jpg",
+        "backdropUrl": "",
+        "genres": []
+      }
+    ],
+    "topRated": [
+      {
+        "id": 126298,
+        "title": "Fallout",
+        "overview": "A peaceful dweller from a cozy fallout shelter returns to the surface.",
+        "poster_path": "/v9B62m48DndJWwwZ67g20aaL1vU.jpg",
+        "release_date": "2024-04-10",
+        "vote_average": 8.4,
+        "vote_count": 1200,
+        "genre_ids": [
+          35
+        ],
+        "popularity": 1600,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/v9B62m48DndJWwwZ67g20aaL1vU.jpg",
+        "backdropUrl": "",
+        "genres": []
+      }
+    ]
+  },
+  "18-tv": {
+    "mustSee": [
+      {
+        "id": 111110,
+        "title": "Shōgun",
+        "overview": "In Japan in the year 1600, Lord Yoshii Toranaga fights for survival.",
+        "poster_path": "/z99t2367fd317079MCH3f36t26b.jpg",
+        "release_date": "2024-02-27",
+        "vote_average": 8.7,
+        "vote_count": 850,
+        "genre_ids": [
+          18
+        ],
+        "popularity": 1400,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/z99t2367fd317079MCH3f36t26b.jpg",
+        "backdropUrl": "",
+        "genres": []
+      }
+    ],
+    "topRated": [
+      {
+        "id": 126298,
+        "title": "Fallout",
+        "overview": "A peaceful dweller from a cozy fallout shelter returns to the surface.",
+        "poster_path": "/v9B62m48DndJWwwZ67g20aaL1vU.jpg",
+        "release_date": "2024-04-10",
+        "vote_average": 8.4,
+        "vote_count": 1200,
+        "genre_ids": [
+          18
+        ],
+        "popularity": 1600,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/v9B62m48DndJWwwZ67g20aaL1vU.jpg",
+        "backdropUrl": "",
+        "genres": []
+      }
+    ]
+  },
+  "27-tv": {
+    "mustSee": [
+      {
+        "id": 111110,
+        "title": "Shōgun",
+        "overview": "In Japan in the year 1600, Lord Yoshii Toranaga fights for survival.",
+        "poster_path": "/z99t2367fd317079MCH3f36t26b.jpg",
+        "release_date": "2024-02-27",
+        "vote_average": 8.7,
+        "vote_count": 850,
+        "genre_ids": [
+          27
+        ],
+        "popularity": 1400,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/z99t2367fd317079MCH3f36t26b.jpg",
+        "backdropUrl": "",
+        "genres": []
+      }
+    ],
+    "topRated": [
+      {
+        "id": 126298,
+        "title": "Fallout",
+        "overview": "A peaceful dweller from a cozy fallout shelter returns to the surface.",
+        "poster_path": "/v9B62m48DndJWwwZ67g20aaL1vU.jpg",
+        "release_date": "2024-04-10",
+        "vote_average": 8.4,
+        "vote_count": 1200,
+        "genre_ids": [
+          27
+        ],
+        "popularity": 1600,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/v9B62m48DndJWwwZ67g20aaL1vU.jpg",
+        "backdropUrl": "",
+        "genres": []
+      }
+    ]
+  },
+  "878-tv": {
+    "mustSee": [
+      {
+        "id": 111110,
+        "title": "Shōgun",
+        "overview": "In Japan in the year 1600, Lord Yoshii Toranaga fights for survival.",
+        "poster_path": "/z99t2367fd317079MCH3f36t26b.jpg",
+        "release_date": "2024-02-27",
+        "vote_average": 8.7,
+        "vote_count": 850,
+        "genre_ids": [
+          878
+        ],
+        "popularity": 1400,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/z99t2367fd317079MCH3f36t26b.jpg",
+        "backdropUrl": "",
+        "genres": []
+      }
+    ],
+    "topRated": [
+      {
+        "id": 126298,
+        "title": "Fallout",
+        "overview": "A peaceful dweller from a cozy fallout shelter returns to the surface.",
+        "poster_path": "/v9B62m48DndJWwwZ67g20aaL1vU.jpg",
+        "release_date": "2024-04-10",
+        "vote_average": 8.4,
+        "vote_count": 1200,
+        "genre_ids": [
+          878
+        ],
+        "popularity": 1600,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/v9B62m48DndJWwwZ67g20aaL1vU.jpg",
+        "backdropUrl": "",
+        "genres": []
+      }
+    ]
+  },
+  "53-movie": {
+    "mustSee": [
+      {
+        "id": 27205,
+        "title": "Inception",
+        "overview": "A skilled thief steals secrets from within dreams.",
+        "poster_path": "/oYu24ueLSgzFSxD13wpe5Vm2XcV.jpg",
+        "release_date": "2010-07-15",
+        "vote_average": 8.4,
+        "vote_count": 34000,
+        "genre_ids": [
+          53
+        ],
+        "popularity": 100,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/oYu24ueLSgzFSxD13wpe5Vm2XcV.jpg",
+        "backdropUrl": "",
+        "genres": []
+      },
+      {
+        "id": 157336,
+        "title": "Interstellar",
+        "overview": "Explorers travel through a wormhole in space.",
+        "poster_path": "/gEU2Qv6e6Fc3vPjCf4j37iwZ7ta.jpg",
+        "release_date": "2014-11-05",
+        "vote_average": 8.4,
+        "vote_count": 32000,
+        "genre_ids": [
+          53
+        ],
+        "popularity": 140,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/gEU2Qv6e6Fc3vPjCf4j37iwZ7ta.jpg",
+        "backdropUrl": "",
+        "genres": []
+      }
+    ],
+    "topRated": [
+      {
+        "id": 507089,
+        "title": "Dune: Part Two",
+        "overview": "Mythic journey of Paul Atreides continues.",
+        "poster_path": "/czembDcB205qiQDiiWn24e9585s.jpg",
+        "release_date": "2024-02-27",
+        "vote_average": 8.2,
+        "vote_count": 4500,
+        "genre_ids": [
+          53
+        ],
+        "popularity": 1500,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/czembDcB205qiQDiiWn24e9585s.jpg",
+        "backdropUrl": "",
+        "genres": []
+      }
+    ]
+  },
+  "53-tv": {
+    "mustSee": [
+      {
+        "id": 111110,
+        "title": "Shōgun",
+        "overview": "In Japan in the year 1600, Lord Yoshii Toranaga fights for survival.",
+        "poster_path": "/z99t2367fd317079MCH3f36t26b.jpg",
+        "release_date": "2024-02-27",
+        "vote_average": 8.7,
+        "vote_count": 850,
+        "genre_ids": [
+          53
+        ],
+        "popularity": 1400,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/z99t2367fd317079MCH3f36t26b.jpg",
+        "backdropUrl": "",
+        "genres": []
+      }
+    ],
+    "topRated": [
+      {
+        "id": 126298,
+        "title": "Fallout",
+        "overview": "A peaceful dweller from a cozy fallout shelter returns to the surface.",
+        "poster_path": "/v9B62m48DndJWwwZ67g20aaL1vU.jpg",
+        "release_date": "2024-04-10",
+        "vote_average": 8.4,
+        "vote_count": 1200,
+        "genre_ids": [
+          53
+        ],
+        "popularity": 1600,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/v9B62m48DndJWwwZ67g20aaL1vU.jpg",
+        "backdropUrl": "",
+        "genres": []
+      }
+    ]
+  },
+  "10749-movie": {
+    "mustSee": [
+      {
+        "id": 27205,
+        "title": "Inception",
+        "overview": "A skilled thief steals secrets from within dreams.",
+        "poster_path": "/oYu24ueLSgzFSxD13wpe5Vm2XcV.jpg",
+        "release_date": "2010-07-15",
+        "vote_average": 8.4,
+        "vote_count": 34000,
+        "genre_ids": [
+          10749
+        ],
+        "popularity": 100,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/oYu24ueLSgzFSxD13wpe5Vm2XcV.jpg",
+        "backdropUrl": "",
+        "genres": []
+      },
+      {
+        "id": 157336,
+        "title": "Interstellar",
+        "overview": "Explorers travel through a wormhole in space.",
+        "poster_path": "/gEU2Qv6e6Fc3vPjCf4j37iwZ7ta.jpg",
+        "release_date": "2014-11-05",
+        "vote_average": 8.4,
+        "vote_count": 32000,
+        "genre_ids": [
+          10749
+        ],
+        "popularity": 140,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/gEU2Qv6e6Fc3vPjCf4j37iwZ7ta.jpg",
+        "backdropUrl": "",
+        "genres": []
+      }
+    ],
+    "topRated": [
+      {
+        "id": 507089,
+        "title": "Dune: Part Two",
+        "overview": "Mythic journey of Paul Atreides continues.",
+        "poster_path": "/czembDcB205qiQDiiWn24e9585s.jpg",
+        "release_date": "2024-02-27",
+        "vote_average": 8.2,
+        "vote_count": 4500,
+        "genre_ids": [
+          10749
+        ],
+        "popularity": 1500,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/czembDcB205qiQDiiWn24e9585s.jpg",
+        "backdropUrl": "",
+        "genres": []
+      }
+    ]
+  },
+  "10749-tv": {
+    "mustSee": [
+      {
+        "id": 111110,
+        "title": "Shōgun",
+        "overview": "In Japan in the year 1600, Lord Yoshii Toranaga fights for survival.",
+        "poster_path": "/z99t2367fd317079MCH3f36t26b.jpg",
+        "release_date": "2024-02-27",
+        "vote_average": 8.7,
+        "vote_count": 850,
+        "genre_ids": [
+          10749
+        ],
+        "popularity": 1400,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/z99t2367fd317079MCH3f36t26b.jpg",
+        "backdropUrl": "",
+        "genres": []
+      }
+    ],
+    "topRated": [
+      {
+        "id": 126298,
+        "title": "Fallout",
+        "overview": "A peaceful dweller from a cozy fallout shelter returns to the surface.",
+        "poster_path": "/v9B62m48DndJWwwZ67g20aaL1vU.jpg",
+        "release_date": "2024-04-10",
+        "vote_average": 8.4,
+        "vote_count": 1200,
+        "genre_ids": [
+          10749
+        ],
+        "popularity": 1600,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/v9B62m48DndJWwwZ67g20aaL1vU.jpg",
+        "backdropUrl": "",
+        "genres": []
+      }
+    ]
+  },
+  "16-movie": {
+    "mustSee": [
+      {
+        "id": 27205,
+        "title": "Inception",
+        "overview": "A skilled thief steals secrets from within dreams.",
+        "poster_path": "/oYu24ueLSgzFSxD13wpe5Vm2XcV.jpg",
+        "release_date": "2010-07-15",
+        "vote_average": 8.4,
+        "vote_count": 34000,
+        "genre_ids": [
+          16
+        ],
+        "popularity": 100,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/oYu24ueLSgzFSxD13wpe5Vm2XcV.jpg",
+        "backdropUrl": "",
+        "genres": []
+      },
+      {
+        "id": 157336,
+        "title": "Interstellar",
+        "overview": "Explorers travel through a wormhole in space.",
+        "poster_path": "/gEU2Qv6e6Fc3vPjCf4j37iwZ7ta.jpg",
+        "release_date": "2014-11-05",
+        "vote_average": 8.4,
+        "vote_count": 32000,
+        "genre_ids": [
+          16
+        ],
+        "popularity": 140,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/gEU2Qv6e6Fc3vPjCf4j37iwZ7ta.jpg",
+        "backdropUrl": "",
+        "genres": []
+      }
+    ],
+    "topRated": [
+      {
+        "id": 507089,
+        "title": "Dune: Part Two",
+        "overview": "Mythic journey of Paul Atreides continues.",
+        "poster_path": "/czembDcB205qiQDiiWn24e9585s.jpg",
+        "release_date": "2024-02-27",
+        "vote_average": 8.2,
+        "vote_count": 4500,
+        "genre_ids": [
+          16
+        ],
+        "popularity": 1500,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/czembDcB205qiQDiiWn24e9585s.jpg",
+        "backdropUrl": "",
+        "genres": []
+      }
+    ]
+  },
+  "16-tv": {
+    "mustSee": [
+      {
+        "id": 111110,
+        "title": "Shōgun",
+        "overview": "In Japan in the year 1600, Lord Yoshii Toranaga fights for survival.",
+        "poster_path": "/z99t2367fd317079MCH3f36t26b.jpg",
+        "release_date": "2024-02-27",
+        "vote_average": 8.7,
+        "vote_count": 850,
+        "genre_ids": [
+          16
+        ],
+        "popularity": 1400,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/z99t2367fd317079MCH3f36t26b.jpg",
+        "backdropUrl": "",
+        "genres": []
+      }
+    ],
+    "topRated": [
+      {
+        "id": 126298,
+        "title": "Fallout",
+        "overview": "A peaceful dweller from a cozy fallout shelter returns to the surface.",
+        "poster_path": "/v9B62m48DndJWwwZ67g20aaL1vU.jpg",
+        "release_date": "2024-04-10",
+        "vote_average": 8.4,
+        "vote_count": 1200,
+        "genre_ids": [
+          16
+        ],
+        "popularity": 1600,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/v9B62m48DndJWwwZ67g20aaL1vU.jpg",
+        "backdropUrl": "",
+        "genres": []
+      }
+    ]
+  },
+  "12-movie": {
+    "mustSee": [
+      {
+        "id": 27205,
+        "title": "Inception",
+        "overview": "A skilled thief steals secrets from within dreams.",
+        "poster_path": "/oYu24ueLSgzFSxD13wpe5Vm2XcV.jpg",
+        "release_date": "2010-07-15",
+        "vote_average": 8.4,
+        "vote_count": 34000,
+        "genre_ids": [
+          12
+        ],
+        "popularity": 100,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/oYu24ueLSgzFSxD13wpe5Vm2XcV.jpg",
+        "backdropUrl": "",
+        "genres": []
+      },
+      {
+        "id": 157336,
+        "title": "Interstellar",
+        "overview": "Explorers travel through a wormhole in space.",
+        "poster_path": "/gEU2Qv6e6Fc3vPjCf4j37iwZ7ta.jpg",
+        "release_date": "2014-11-05",
+        "vote_average": 8.4,
+        "vote_count": 32000,
+        "genre_ids": [
+          12
+        ],
+        "popularity": 140,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/gEU2Qv6e6Fc3vPjCf4j37iwZ7ta.jpg",
+        "backdropUrl": "",
+        "genres": []
+      }
+    ],
+    "topRated": [
+      {
+        "id": 507089,
+        "title": "Dune: Part Two",
+        "overview": "Mythic journey of Paul Atreides continues.",
+        "poster_path": "/czembDcB205qiQDiiWn24e9585s.jpg",
+        "release_date": "2024-02-27",
+        "vote_average": 8.2,
+        "vote_count": 4500,
+        "genre_ids": [
+          12
+        ],
+        "popularity": 1500,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/czembDcB205qiQDiiWn24e9585s.jpg",
+        "backdropUrl": "",
+        "genres": []
+      }
+    ]
+  },
+  "12-tv": {
+    "mustSee": [
+      {
+        "id": 111110,
+        "title": "Shōgun",
+        "overview": "In Japan in the year 1600, Lord Yoshii Toranaga fights for survival.",
+        "poster_path": "/z99t2367fd317079MCH3f36t26b.jpg",
+        "release_date": "2024-02-27",
+        "vote_average": 8.7,
+        "vote_count": 850,
+        "genre_ids": [
+          12
+        ],
+        "popularity": 1400,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/z99t2367fd317079MCH3f36t26b.jpg",
+        "backdropUrl": "",
+        "genres": []
+      }
+    ],
+    "topRated": [
+      {
+        "id": 126298,
+        "title": "Fallout",
+        "overview": "A peaceful dweller from a cozy fallout shelter returns to the surface.",
+        "poster_path": "/v9B62m48DndJWwwZ67g20aaL1vU.jpg",
+        "release_date": "2024-04-10",
+        "vote_average": 8.4,
+        "vote_count": 1200,
+        "genre_ids": [
+          12
+        ],
+        "popularity": 1600,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/v9B62m48DndJWwwZ67g20aaL1vU.jpg",
+        "backdropUrl": "",
+        "genres": []
+      }
+    ]
+  },
+  "80-movie": {
+    "mustSee": [
+      {
+        "id": 27205,
+        "title": "Inception",
+        "overview": "A skilled thief steals secrets from within dreams.",
+        "poster_path": "/oYu24ueLSgzFSxD13wpe5Vm2XcV.jpg",
+        "release_date": "2010-07-15",
+        "vote_average": 8.4,
+        "vote_count": 34000,
+        "genre_ids": [
+          80
+        ],
+        "popularity": 100,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/oYu24ueLSgzFSxD13wpe5Vm2XcV.jpg",
+        "backdropUrl": "",
+        "genres": []
+      },
+      {
+        "id": 157336,
+        "title": "Interstellar",
+        "overview": "Explorers travel through a wormhole in space.",
+        "poster_path": "/gEU2Qv6e6Fc3vPjCf4j37iwZ7ta.jpg",
+        "release_date": "2014-11-05",
+        "vote_average": 8.4,
+        "vote_count": 32000,
+        "genre_ids": [
+          80
+        ],
+        "popularity": 140,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/gEU2Qv6e6Fc3vPjCf4j37iwZ7ta.jpg",
+        "backdropUrl": "",
+        "genres": []
+      }
+    ],
+    "topRated": [
+      {
+        "id": 507089,
+        "title": "Dune: Part Two",
+        "overview": "Mythic journey of Paul Atreides continues.",
+        "poster_path": "/czembDcB205qiQDiiWn24e9585s.jpg",
+        "release_date": "2024-02-27",
+        "vote_average": 8.2,
+        "vote_count": 4500,
+        "genre_ids": [
+          80
+        ],
+        "popularity": 1500,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/czembDcB205qiQDiiWn24e9585s.jpg",
+        "backdropUrl": "",
+        "genres": []
+      }
+    ]
+  },
+  "80-tv": {
+    "mustSee": [
+      {
+        "id": 111110,
+        "title": "Shōgun",
+        "overview": "In Japan in the year 1600, Lord Yoshii Toranaga fights for survival.",
+        "poster_path": "/z99t2367fd317079MCH3f36t26b.jpg",
+        "release_date": "2024-02-27",
+        "vote_average": 8.7,
+        "vote_count": 850,
+        "genre_ids": [
+          80
+        ],
+        "popularity": 1400,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/z99t2367fd317079MCH3f36t26b.jpg",
+        "backdropUrl": "",
+        "genres": []
+      }
+    ],
+    "topRated": [
+      {
+        "id": 126298,
+        "title": "Fallout",
+        "overview": "A peaceful dweller from a cozy fallout shelter returns to the surface.",
+        "poster_path": "/v9B62m48DndJWwwZ67g20aaL1vU.jpg",
+        "release_date": "2024-04-10",
+        "vote_average": 8.4,
+        "vote_count": 1200,
+        "genre_ids": [
+          80
+        ],
+        "popularity": 1600,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/v9B62m48DndJWwwZ67g20aaL1vU.jpg",
+        "backdropUrl": "",
+        "genres": []
+      }
+    ]
+  },
+  "14-movie": {
+    "mustSee": [
+      {
+        "id": 27205,
+        "title": "Inception",
+        "overview": "A skilled thief steals secrets from within dreams.",
+        "poster_path": "/oYu24ueLSgzFSxD13wpe5Vm2XcV.jpg",
+        "release_date": "2010-07-15",
+        "vote_average": 8.4,
+        "vote_count": 34000,
+        "genre_ids": [
+          14
+        ],
+        "popularity": 100,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/oYu24ueLSgzFSxD13wpe5Vm2XcV.jpg",
+        "backdropUrl": "",
+        "genres": []
+      },
+      {
+        "id": 157336,
+        "title": "Interstellar",
+        "overview": "Explorers travel through a wormhole in space.",
+        "poster_path": "/gEU2Qv6e6Fc3vPjCf4j37iwZ7ta.jpg",
+        "release_date": "2014-11-05",
+        "vote_average": 8.4,
+        "vote_count": 32000,
+        "genre_ids": [
+          14
+        ],
+        "popularity": 140,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/gEU2Qv6e6Fc3vPjCf4j37iwZ7ta.jpg",
+        "backdropUrl": "",
+        "genres": []
+      }
+    ],
+    "topRated": [
+      {
+        "id": 507089,
+        "title": "Dune: Part Two",
+        "overview": "Mythic journey of Paul Atreides continues.",
+        "poster_path": "/czembDcB205qiQDiiWn24e9585s.jpg",
+        "release_date": "2024-02-27",
+        "vote_average": 8.2,
+        "vote_count": 4500,
+        "genre_ids": [
+          14
+        ],
+        "popularity": 1500,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/czembDcB205qiQDiiWn24e9585s.jpg",
+        "backdropUrl": "",
+        "genres": []
+      }
+    ]
+  },
+  "14-tv": {
+    "mustSee": [
+      {
+        "id": 111110,
+        "title": "Shōgun",
+        "overview": "In Japan in the year 1600, Lord Yoshii Toranaga fights for survival.",
+        "poster_path": "/z99t2367fd317079MCH3f36t26b.jpg",
+        "release_date": "2024-02-27",
+        "vote_average": 8.7,
+        "vote_count": 850,
+        "genre_ids": [
+          14
+        ],
+        "popularity": 1400,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/z99t2367fd317079MCH3f36t26b.jpg",
+        "backdropUrl": "",
+        "genres": []
+      }
+    ],
+    "topRated": [
+      {
+        "id": 126298,
+        "title": "Fallout",
+        "overview": "A peaceful dweller from a cozy fallout shelter returns to the surface.",
+        "poster_path": "/v9B62m48DndJWwwZ67g20aaL1vU.jpg",
+        "release_date": "2024-04-10",
+        "vote_average": 8.4,
+        "vote_count": 1200,
+        "genre_ids": [
+          14
+        ],
+        "popularity": 1600,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/v9B62m48DndJWwwZ67g20aaL1vU.jpg",
+        "backdropUrl": "",
+        "genres": []
+      }
+    ]
+  },
+  "9648-movie": {
+    "mustSee": [
+      {
+        "id": 27205,
+        "title": "Inception",
+        "overview": "A skilled thief steals secrets from within dreams.",
+        "poster_path": "/oYu24ueLSgzFSxD13wpe5Vm2XcV.jpg",
+        "release_date": "2010-07-15",
+        "vote_average": 8.4,
+        "vote_count": 34000,
+        "genre_ids": [
+          9648
+        ],
+        "popularity": 100,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/oYu24ueLSgzFSxD13wpe5Vm2XcV.jpg",
+        "backdropUrl": "",
+        "genres": []
+      },
+      {
+        "id": 157336,
+        "title": "Interstellar",
+        "overview": "Explorers travel through a wormhole in space.",
+        "poster_path": "/gEU2Qv6e6Fc3vPjCf4j37iwZ7ta.jpg",
+        "release_date": "2014-11-05",
+        "vote_average": 8.4,
+        "vote_count": 32000,
+        "genre_ids": [
+          9648
+        ],
+        "popularity": 140,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/gEU2Qv6e6Fc3vPjCf4j37iwZ7ta.jpg",
+        "backdropUrl": "",
+        "genres": []
+      }
+    ],
+    "topRated": [
+      {
+        "id": 507089,
+        "title": "Dune: Part Two",
+        "overview": "Mythic journey of Paul Atreides continues.",
+        "poster_path": "/czembDcB205qiQDiiWn24e9585s.jpg",
+        "release_date": "2024-02-27",
+        "vote_average": 8.2,
+        "vote_count": 4500,
+        "genre_ids": [
+          9648
+        ],
+        "popularity": 1500,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/czembDcB205qiQDiiWn24e9585s.jpg",
+        "backdropUrl": "",
+        "genres": []
+      }
+    ]
+  },
+  "9648-tv": {
+    "mustSee": [
+      {
+        "id": 111110,
+        "title": "Shōgun",
+        "overview": "In Japan in the year 1600, Lord Yoshii Toranaga fights for survival.",
+        "poster_path": "/z99t2367fd317079MCH3f36t26b.jpg",
+        "release_date": "2024-02-27",
+        "vote_average": 8.7,
+        "vote_count": 850,
+        "genre_ids": [
+          9648
+        ],
+        "popularity": 1400,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/z99t2367fd317079MCH3f36t26b.jpg",
+        "backdropUrl": "",
+        "genres": []
+      }
+    ],
+    "topRated": [
+      {
+        "id": 126298,
+        "title": "Fallout",
+        "overview": "A peaceful dweller from a cozy fallout shelter returns to the surface.",
+        "poster_path": "/v9B62m48DndJWwwZ67g20aaL1vU.jpg",
+        "release_date": "2024-04-10",
+        "vote_average": 8.4,
+        "vote_count": 1200,
+        "genre_ids": [
+          9648
+        ],
+        "popularity": 1600,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/v9B62m48DndJWwwZ67g20aaL1vU.jpg",
+        "backdropUrl": "",
+        "genres": []
+      }
+    ]
+  },
+  "99-movie": {
+    "mustSee": [
+      {
+        "id": 27205,
+        "title": "Inception",
+        "overview": "A skilled thief steals secrets from within dreams.",
+        "poster_path": "/oYu24ueLSgzFSxD13wpe5Vm2XcV.jpg",
+        "release_date": "2010-07-15",
+        "vote_average": 8.4,
+        "vote_count": 34000,
+        "genre_ids": [
+          99
+        ],
+        "popularity": 100,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/oYu24ueLSgzFSxD13wpe5Vm2XcV.jpg",
+        "backdropUrl": "",
+        "genres": []
+      },
+      {
+        "id": 157336,
+        "title": "Interstellar",
+        "overview": "Explorers travel through a wormhole in space.",
+        "poster_path": "/gEU2Qv6e6Fc3vPjCf4j37iwZ7ta.jpg",
+        "release_date": "2014-11-05",
+        "vote_average": 8.4,
+        "vote_count": 32000,
+        "genre_ids": [
+          99
+        ],
+        "popularity": 140,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/gEU2Qv6e6Fc3vPjCf4j37iwZ7ta.jpg",
+        "backdropUrl": "",
+        "genres": []
+      }
+    ],
+    "topRated": [
+      {
+        "id": 507089,
+        "title": "Dune: Part Two",
+        "overview": "Mythic journey of Paul Atreides continues.",
+        "poster_path": "/czembDcB205qiQDiiWn24e9585s.jpg",
+        "release_date": "2024-02-27",
+        "vote_average": 8.2,
+        "vote_count": 4500,
+        "genre_ids": [
+          99
+        ],
+        "popularity": 1500,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/czembDcB205qiQDiiWn24e9585s.jpg",
+        "backdropUrl": "",
+        "genres": []
+      }
+    ]
+  },
+  "99-tv": {
+    "mustSee": [
+      {
+        "id": 111110,
+        "title": "Shōgun",
+        "overview": "In Japan in the year 1600, Lord Yoshii Toranaga fights for survival.",
+        "poster_path": "/z99t2367fd317079MCH3f36t26b.jpg",
+        "release_date": "2024-02-27",
+        "vote_average": 8.7,
+        "vote_count": 850,
+        "genre_ids": [
+          99
+        ],
+        "popularity": 1400,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/z99t2367fd317079MCH3f36t26b.jpg",
+        "backdropUrl": "",
+        "genres": []
+      }
+    ],
+    "topRated": [
+      {
+        "id": 126298,
+        "title": "Fallout",
+        "overview": "A peaceful dweller from a cozy fallout shelter returns to the surface.",
+        "poster_path": "/v9B62m48DndJWwwZ67g20aaL1vU.jpg",
+        "release_date": "2024-04-10",
+        "vote_average": 8.4,
+        "vote_count": 1200,
+        "genre_ids": [
+          99
+        ],
+        "popularity": 1600,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/v9B62m48DndJWwwZ67g20aaL1vU.jpg",
+        "backdropUrl": "",
+        "genres": []
+      }
+    ]
+  },
+  "10751-movie": {
+    "mustSee": [
+      {
+        "id": 27205,
+        "title": "Inception",
+        "overview": "A skilled thief steals secrets from within dreams.",
+        "poster_path": "/oYu24ueLSgzFSxD13wpe5Vm2XcV.jpg",
+        "release_date": "2010-07-15",
+        "vote_average": 8.4,
+        "vote_count": 34000,
+        "genre_ids": [
+          10751
+        ],
+        "popularity": 100,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/oYu24ueLSgzFSxD13wpe5Vm2XcV.jpg",
+        "backdropUrl": "",
+        "genres": []
+      },
+      {
+        "id": 157336,
+        "title": "Interstellar",
+        "overview": "Explorers travel through a wormhole in space.",
+        "poster_path": "/gEU2Qv6e6Fc3vPjCf4j37iwZ7ta.jpg",
+        "release_date": "2014-11-05",
+        "vote_average": 8.4,
+        "vote_count": 32000,
+        "genre_ids": [
+          10751
+        ],
+        "popularity": 140,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/gEU2Qv6e6Fc3vPjCf4j37iwZ7ta.jpg",
+        "backdropUrl": "",
+        "genres": []
+      }
+    ],
+    "topRated": [
+      {
+        "id": 507089,
+        "title": "Dune: Part Two",
+        "overview": "Mythic journey of Paul Atreides continues.",
+        "poster_path": "/czembDcB205qiQDiiWn24e9585s.jpg",
+        "release_date": "2024-02-27",
+        "vote_average": 8.2,
+        "vote_count": 4500,
+        "genre_ids": [
+          10751
+        ],
+        "popularity": 1500,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/czembDcB205qiQDiiWn24e9585s.jpg",
+        "backdropUrl": "",
+        "genres": []
+      }
+    ]
+  },
+  "10751-tv": {
+    "mustSee": [
+      {
+        "id": 111110,
+        "title": "Shōgun",
+        "overview": "In Japan in the year 1600, Lord Yoshii Toranaga fights for survival.",
+        "poster_path": "/z99t2367fd317079MCH3f36t26b.jpg",
+        "release_date": "2024-02-27",
+        "vote_average": 8.7,
+        "vote_count": 850,
+        "genre_ids": [
+          10751
+        ],
+        "popularity": 1400,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/z99t2367fd317079MCH3f36t26b.jpg",
+        "backdropUrl": "",
+        "genres": []
+      }
+    ],
+    "topRated": [
+      {
+        "id": 126298,
+        "title": "Fallout",
+        "overview": "A peaceful dweller from a cozy fallout shelter returns to the surface.",
+        "poster_path": "/v9B62m48DndJWwwZ67g20aaL1vU.jpg",
+        "release_date": "2024-04-10",
+        "vote_average": 8.4,
+        "vote_count": 1200,
+        "genre_ids": [
+          10751
+        ],
+        "popularity": 1600,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/v9B62m48DndJWwwZ67g20aaL1vU.jpg",
+        "backdropUrl": "",
+        "genres": []
+      }
+    ]
+  },
+  "37-movie": {
+    "mustSee": [
+      {
+        "id": 27205,
+        "title": "Inception",
+        "overview": "A skilled thief steals secrets from within dreams.",
+        "poster_path": "/oYu24ueLSgzFSxD13wpe5Vm2XcV.jpg",
+        "release_date": "2010-07-15",
+        "vote_average": 8.4,
+        "vote_count": 34000,
+        "genre_ids": [
+          37
+        ],
+        "popularity": 100,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/oYu24ueLSgzFSxD13wpe5Vm2XcV.jpg",
+        "backdropUrl": "",
+        "genres": []
+      },
+      {
+        "id": 157336,
+        "title": "Interstellar",
+        "overview": "Explorers travel through a wormhole in space.",
+        "poster_path": "/gEU2Qv6e6Fc3vPjCf4j37iwZ7ta.jpg",
+        "release_date": "2014-11-05",
+        "vote_average": 8.4,
+        "vote_count": 32000,
+        "genre_ids": [
+          37
+        ],
+        "popularity": 140,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/gEU2Qv6e6Fc3vPjCf4j37iwZ7ta.jpg",
+        "backdropUrl": "",
+        "genres": []
+      }
+    ],
+    "topRated": [
+      {
+        "id": 507089,
+        "title": "Dune: Part Two",
+        "overview": "Mythic journey of Paul Atreides continues.",
+        "poster_path": "/czembDcB205qiQDiiWn24e9585s.jpg",
+        "release_date": "2024-02-27",
+        "vote_average": 8.2,
+        "vote_count": 4500,
+        "genre_ids": [
+          37
+        ],
+        "popularity": 1500,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/czembDcB205qiQDiiWn24e9585s.jpg",
+        "backdropUrl": "",
+        "genres": []
+      }
+    ]
+  },
+  "37-tv": {
+    "mustSee": [
+      {
+        "id": 111110,
+        "title": "Shōgun",
+        "overview": "In Japan in the year 1600, Lord Yoshii Toranaga fights for survival.",
+        "poster_path": "/z99t2367fd317079MCH3f36t26b.jpg",
+        "release_date": "2024-02-27",
+        "vote_average": 8.7,
+        "vote_count": 850,
+        "genre_ids": [
+          37
+        ],
+        "popularity": 1400,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/z99t2367fd317079MCH3f36t26b.jpg",
+        "backdropUrl": "",
+        "genres": []
+      }
+    ],
+    "topRated": [
+      {
+        "id": 126298,
+        "title": "Fallout",
+        "overview": "A peaceful dweller from a cozy fallout shelter returns to the surface.",
+        "poster_path": "/v9B62m48DndJWwwZ67g20aaL1vU.jpg",
+        "release_date": "2024-04-10",
+        "vote_average": 8.4,
+        "vote_count": 1200,
+        "genre_ids": [
+          37
+        ],
+        "popularity": 1600,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/v9B62m48DndJWwwZ67g20aaL1vU.jpg",
+        "backdropUrl": "",
+        "genres": []
+      }
+    ]
+  },
+  "10752-movie": {
+    "mustSee": [
+      {
+        "id": 27205,
+        "title": "Inception",
+        "overview": "A skilled thief steals secrets from within dreams.",
+        "poster_path": "/oYu24ueLSgzFSxD13wpe5Vm2XcV.jpg",
+        "release_date": "2010-07-15",
+        "vote_average": 8.4,
+        "vote_count": 34000,
+        "genre_ids": [
+          10752
+        ],
+        "popularity": 100,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/oYu24ueLSgzFSxD13wpe5Vm2XcV.jpg",
+        "backdropUrl": "",
+        "genres": []
+      },
+      {
+        "id": 157336,
+        "title": "Interstellar",
+        "overview": "Explorers travel through a wormhole in space.",
+        "poster_path": "/gEU2Qv6e6Fc3vPjCf4j37iwZ7ta.jpg",
+        "release_date": "2014-11-05",
+        "vote_average": 8.4,
+        "vote_count": 32000,
+        "genre_ids": [
+          10752
+        ],
+        "popularity": 140,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/gEU2Qv6e6Fc3vPjCf4j37iwZ7ta.jpg",
+        "backdropUrl": "",
+        "genres": []
+      }
+    ],
+    "topRated": [
+      {
+        "id": 507089,
+        "title": "Dune: Part Two",
+        "overview": "Mythic journey of Paul Atreides continues.",
+        "poster_path": "/czembDcB205qiQDiiWn24e9585s.jpg",
+        "release_date": "2024-02-27",
+        "vote_average": 8.2,
+        "vote_count": 4500,
+        "genre_ids": [
+          10752
+        ],
+        "popularity": 1500,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/czembDcB205qiQDiiWn24e9585s.jpg",
+        "backdropUrl": "",
+        "genres": []
+      }
+    ]
+  },
+  "10752-tv": {
+    "mustSee": [
+      {
+        "id": 111110,
+        "title": "Shōgun",
+        "overview": "In Japan in the year 1600, Lord Yoshii Toranaga fights for survival.",
+        "poster_path": "/z99t2367fd317079MCH3f36t26b.jpg",
+        "release_date": "2024-02-27",
+        "vote_average": 8.7,
+        "vote_count": 850,
+        "genre_ids": [
+          10752
+        ],
+        "popularity": 1400,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/z99t2367fd317079MCH3f36t26b.jpg",
+        "backdropUrl": "",
+        "genres": []
+      }
+    ],
+    "topRated": [
+      {
+        "id": 126298,
+        "title": "Fallout",
+        "overview": "A peaceful dweller from a cozy fallout shelter returns to the surface.",
+        "poster_path": "/v9B62m48DndJWwwZ67g20aaL1vU.jpg",
+        "release_date": "2024-04-10",
+        "vote_average": 8.4,
+        "vote_count": 1200,
+        "genre_ids": [
+          10752
+        ],
+        "popularity": 1600,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/v9B62m48DndJWwwZ67g20aaL1vU.jpg",
+        "backdropUrl": "",
+        "genres": []
+      }
+    ]
+  },
+  "10759-movie": {
+    "mustSee": [
+      {
+        "id": 27205,
+        "title": "Inception",
+        "overview": "A skilled thief steals secrets from within dreams.",
+        "poster_path": "/oYu24ueLSgzFSxD13wpe5Vm2XcV.jpg",
+        "release_date": "2010-07-15",
+        "vote_average": 8.4,
+        "vote_count": 34000,
+        "genre_ids": [
+          10759
+        ],
+        "popularity": 100,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/oYu24ueLSgzFSxD13wpe5Vm2XcV.jpg",
+        "backdropUrl": "",
+        "genres": []
+      },
+      {
+        "id": 157336,
+        "title": "Interstellar",
+        "overview": "Explorers travel through a wormhole in space.",
+        "poster_path": "/gEU2Qv6e6Fc3vPjCf4j37iwZ7ta.jpg",
+        "release_date": "2014-11-05",
+        "vote_average": 8.4,
+        "vote_count": 32000,
+        "genre_ids": [
+          10759
+        ],
+        "popularity": 140,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/gEU2Qv6e6Fc3vPjCf4j37iwZ7ta.jpg",
+        "backdropUrl": "",
+        "genres": []
+      }
+    ],
+    "topRated": [
+      {
+        "id": 507089,
+        "title": "Dune: Part Two",
+        "overview": "Mythic journey of Paul Atreides continues.",
+        "poster_path": "/czembDcB205qiQDiiWn24e9585s.jpg",
+        "release_date": "2024-02-27",
+        "vote_average": 8.2,
+        "vote_count": 4500,
+        "genre_ids": [
+          10759
+        ],
+        "popularity": 1500,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/czembDcB205qiQDiiWn24e9585s.jpg",
+        "backdropUrl": "",
+        "genres": []
+      }
+    ]
+  },
+  "10759-tv": {
+    "mustSee": [
+      {
+        "id": 111110,
+        "title": "Shōgun",
+        "overview": "In Japan in the year 1600, Lord Yoshii Toranaga fights for survival.",
+        "poster_path": "/z99t2367fd317079MCH3f36t26b.jpg",
+        "release_date": "2024-02-27",
+        "vote_average": 8.7,
+        "vote_count": 850,
+        "genre_ids": [
+          10759
+        ],
+        "popularity": 1400,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/z99t2367fd317079MCH3f36t26b.jpg",
+        "backdropUrl": "",
+        "genres": []
+      }
+    ],
+    "topRated": [
+      {
+        "id": 126298,
+        "title": "Fallout",
+        "overview": "A peaceful dweller from a cozy fallout shelter returns to the surface.",
+        "poster_path": "/v9B62m48DndJWwwZ67g20aaL1vU.jpg",
+        "release_date": "2024-04-10",
+        "vote_average": 8.4,
+        "vote_count": 1200,
+        "genre_ids": [
+          10759
+        ],
+        "popularity": 1600,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/v9B62m48DndJWwwZ67g20aaL1vU.jpg",
+        "backdropUrl": "",
+        "genres": []
+      }
+    ]
+  },
+  "10765-movie": {
+    "mustSee": [
+      {
+        "id": 27205,
+        "title": "Inception",
+        "overview": "A skilled thief steals secrets from within dreams.",
+        "poster_path": "/oYu24ueLSgzFSxD13wpe5Vm2XcV.jpg",
+        "release_date": "2010-07-15",
+        "vote_average": 8.4,
+        "vote_count": 34000,
+        "genre_ids": [
+          10765
+        ],
+        "popularity": 100,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/oYu24ueLSgzFSxD13wpe5Vm2XcV.jpg",
+        "backdropUrl": "",
+        "genres": []
+      },
+      {
+        "id": 157336,
+        "title": "Interstellar",
+        "overview": "Explorers travel through a wormhole in space.",
+        "poster_path": "/gEU2Qv6e6Fc3vPjCf4j37iwZ7ta.jpg",
+        "release_date": "2014-11-05",
+        "vote_average": 8.4,
+        "vote_count": 32000,
+        "genre_ids": [
+          10765
+        ],
+        "popularity": 140,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/gEU2Qv6e6Fc3vPjCf4j37iwZ7ta.jpg",
+        "backdropUrl": "",
+        "genres": []
+      }
+    ],
+    "topRated": [
+      {
+        "id": 507089,
+        "title": "Dune: Part Two",
+        "overview": "Mythic journey of Paul Atreides continues.",
+        "poster_path": "/czembDcB205qiQDiiWn24e9585s.jpg",
+        "release_date": "2024-02-27",
+        "vote_average": 8.2,
+        "vote_count": 4500,
+        "genre_ids": [
+          10765
+        ],
+        "popularity": 1500,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/czembDcB205qiQDiiWn24e9585s.jpg",
+        "backdropUrl": "",
+        "genres": []
+      }
+    ]
+  },
+  "10765-tv": {
+    "mustSee": [
+      {
+        "id": 111110,
+        "title": "Shōgun",
+        "overview": "In Japan in the year 1600, Lord Yoshii Toranaga fights for survival.",
+        "poster_path": "/z99t2367fd317079MCH3f36t26b.jpg",
+        "release_date": "2024-02-27",
+        "vote_average": 8.7,
+        "vote_count": 850,
+        "genre_ids": [
+          10765
+        ],
+        "popularity": 1400,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/z99t2367fd317079MCH3f36t26b.jpg",
+        "backdropUrl": "",
+        "genres": []
+      }
+    ],
+    "topRated": [
+      {
+        "id": 126298,
+        "title": "Fallout",
+        "overview": "A peaceful dweller from a cozy fallout shelter returns to the surface.",
+        "poster_path": "/v9B62m48DndJWwwZ67g20aaL1vU.jpg",
+        "release_date": "2024-04-10",
+        "vote_average": 8.4,
+        "vote_count": 1200,
+        "genre_ids": [
+          10765
+        ],
+        "popularity": 1600,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/v9B62m48DndJWwwZ67g20aaL1vU.jpg",
+        "backdropUrl": "",
+        "genres": []
+      }
+    ]
+  },
+  "10768-movie": {
+    "mustSee": [
+      {
+        "id": 27205,
+        "title": "Inception",
+        "overview": "A skilled thief steals secrets from within dreams.",
+        "poster_path": "/oYu24ueLSgzFSxD13wpe5Vm2XcV.jpg",
+        "release_date": "2010-07-15",
+        "vote_average": 8.4,
+        "vote_count": 34000,
+        "genre_ids": [
+          10768
+        ],
+        "popularity": 100,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/oYu24ueLSgzFSxD13wpe5Vm2XcV.jpg",
+        "backdropUrl": "",
+        "genres": []
+      },
+      {
+        "id": 157336,
+        "title": "Interstellar",
+        "overview": "Explorers travel through a wormhole in space.",
+        "poster_path": "/gEU2Qv6e6Fc3vPjCf4j37iwZ7ta.jpg",
+        "release_date": "2014-11-05",
+        "vote_average": 8.4,
+        "vote_count": 32000,
+        "genre_ids": [
+          10768
+        ],
+        "popularity": 140,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/gEU2Qv6e6Fc3vPjCf4j37iwZ7ta.jpg",
+        "backdropUrl": "",
+        "genres": []
+      }
+    ],
+    "topRated": [
+      {
+        "id": 507089,
+        "title": "Dune: Part Two",
+        "overview": "Mythic journey of Paul Atreides continues.",
+        "poster_path": "/czembDcB205qiQDiiWn24e9585s.jpg",
+        "release_date": "2024-02-27",
+        "vote_average": 8.2,
+        "vote_count": 4500,
+        "genre_ids": [
+          10768
+        ],
+        "popularity": 1500,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/czembDcB205qiQDiiWn24e9585s.jpg",
+        "backdropUrl": "",
+        "genres": []
+      }
+    ]
+  },
+  "10768-tv": {
+    "mustSee": [
+      {
+        "id": 111110,
+        "title": "Shōgun",
+        "overview": "In Japan in the year 1600, Lord Yoshii Toranaga fights for survival.",
+        "poster_path": "/z99t2367fd317079MCH3f36t26b.jpg",
+        "release_date": "2024-02-27",
+        "vote_average": 8.7,
+        "vote_count": 850,
+        "genre_ids": [
+          10768
+        ],
+        "popularity": 1400,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/z99t2367fd317079MCH3f36t26b.jpg",
+        "backdropUrl": "",
+        "genres": []
+      }
+    ],
+    "topRated": [
+      {
+        "id": 126298,
+        "title": "Fallout",
+        "overview": "A peaceful dweller from a cozy fallout shelter returns to the surface.",
+        "poster_path": "/v9B62m48DndJWwwZ67g20aaL1vU.jpg",
+        "release_date": "2024-04-10",
+        "vote_average": 8.4,
+        "vote_count": 1200,
+        "genre_ids": [
+          10768
+        ],
+        "popularity": 1600,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/v9B62m48DndJWwwZ67g20aaL1vU.jpg",
+        "backdropUrl": "",
+        "genres": []
+      }
+    ]
+  },
+  "10762-movie": {
+    "mustSee": [
+      {
+        "id": 27205,
+        "title": "Inception",
+        "overview": "A skilled thief steals secrets from within dreams.",
+        "poster_path": "/oYu24ueLSgzFSxD13wpe5Vm2XcV.jpg",
+        "release_date": "2010-07-15",
+        "vote_average": 8.4,
+        "vote_count": 34000,
+        "genre_ids": [
+          10762
+        ],
+        "popularity": 100,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/oYu24ueLSgzFSxD13wpe5Vm2XcV.jpg",
+        "backdropUrl": "",
+        "genres": []
+      },
+      {
+        "id": 157336,
+        "title": "Interstellar",
+        "overview": "Explorers travel through a wormhole in space.",
+        "poster_path": "/gEU2Qv6e6Fc3vPjCf4j37iwZ7ta.jpg",
+        "release_date": "2014-11-05",
+        "vote_average": 8.4,
+        "vote_count": 32000,
+        "genre_ids": [
+          10762
+        ],
+        "popularity": 140,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/gEU2Qv6e6Fc3vPjCf4j37iwZ7ta.jpg",
+        "backdropUrl": "",
+        "genres": []
+      }
+    ],
+    "topRated": [
+      {
+        "id": 507089,
+        "title": "Dune: Part Two",
+        "overview": "Mythic journey of Paul Atreides continues.",
+        "poster_path": "/czembDcB205qiQDiiWn24e9585s.jpg",
+        "release_date": "2024-02-27",
+        "vote_average": 8.2,
+        "vote_count": 4500,
+        "genre_ids": [
+          10762
+        ],
+        "popularity": 1500,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/czembDcB205qiQDiiWn24e9585s.jpg",
+        "backdropUrl": "",
+        "genres": []
+      }
+    ]
+  },
+  "10762-tv": {
+    "mustSee": [
+      {
+        "id": 111110,
+        "title": "Shōgun",
+        "overview": "In Japan in the year 1600, Lord Yoshii Toranaga fights for survival.",
+        "poster_path": "/z99t2367fd317079MCH3f36t26b.jpg",
+        "release_date": "2024-02-27",
+        "vote_average": 8.7,
+        "vote_count": 850,
+        "genre_ids": [
+          10762
+        ],
+        "popularity": 1400,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/z99t2367fd317079MCH3f36t26b.jpg",
+        "backdropUrl": "",
+        "genres": []
+      }
+    ],
+    "topRated": [
+      {
+        "id": 126298,
+        "title": "Fallout",
+        "overview": "A peaceful dweller from a cozy fallout shelter returns to the surface.",
+        "poster_path": "/v9B62m48DndJWwwZ67g20aaL1vU.jpg",
+        "release_date": "2024-04-10",
+        "vote_average": 8.4,
+        "vote_count": 1200,
+        "genre_ids": [
+          10762
+        ],
+        "popularity": 1600,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/v9B62m48DndJWwwZ67g20aaL1vU.jpg",
+        "backdropUrl": "",
+        "genres": []
+      }
+    ]
+  },
+  "10763-movie": {
+    "mustSee": [
+      {
+        "id": 27205,
+        "title": "Inception",
+        "overview": "A skilled thief steals secrets from within dreams.",
+        "poster_path": "/oYu24ueLSgzFSxD13wpe5Vm2XcV.jpg",
+        "release_date": "2010-07-15",
+        "vote_average": 8.4,
+        "vote_count": 34000,
+        "genre_ids": [
+          10763
+        ],
+        "popularity": 100,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/oYu24ueLSgzFSxD13wpe5Vm2XcV.jpg",
+        "backdropUrl": "",
+        "genres": []
+      },
+      {
+        "id": 157336,
+        "title": "Interstellar",
+        "overview": "Explorers travel through a wormhole in space.",
+        "poster_path": "/gEU2Qv6e6Fc3vPjCf4j37iwZ7ta.jpg",
+        "release_date": "2014-11-05",
+        "vote_average": 8.4,
+        "vote_count": 32000,
+        "genre_ids": [
+          10763
+        ],
+        "popularity": 140,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/gEU2Qv6e6Fc3vPjCf4j37iwZ7ta.jpg",
+        "backdropUrl": "",
+        "genres": []
+      }
+    ],
+    "topRated": [
+      {
+        "id": 507089,
+        "title": "Dune: Part Two",
+        "overview": "Mythic journey of Paul Atreides continues.",
+        "poster_path": "/czembDcB205qiQDiiWn24e9585s.jpg",
+        "release_date": "2024-02-27",
+        "vote_average": 8.2,
+        "vote_count": 4500,
+        "genre_ids": [
+          10763
+        ],
+        "popularity": 1500,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/czembDcB205qiQDiiWn24e9585s.jpg",
+        "backdropUrl": "",
+        "genres": []
+      }
+    ]
+  },
+  "10763-tv": {
+    "mustSee": [
+      {
+        "id": 111110,
+        "title": "Shōgun",
+        "overview": "In Japan in the year 1600, Lord Yoshii Toranaga fights for survival.",
+        "poster_path": "/z99t2367fd317079MCH3f36t26b.jpg",
+        "release_date": "2024-02-27",
+        "vote_average": 8.7,
+        "vote_count": 850,
+        "genre_ids": [
+          10763
+        ],
+        "popularity": 1400,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/z99t2367fd317079MCH3f36t26b.jpg",
+        "backdropUrl": "",
+        "genres": []
+      }
+    ],
+    "topRated": [
+      {
+        "id": 126298,
+        "title": "Fallout",
+        "overview": "A peaceful dweller from a cozy fallout shelter returns to the surface.",
+        "poster_path": "/v9B62m48DndJWwwZ67g20aaL1vU.jpg",
+        "release_date": "2024-04-10",
+        "vote_average": 8.4,
+        "vote_count": 1200,
+        "genre_ids": [
+          10763
+        ],
+        "popularity": 1600,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/v9B62m48DndJWwwZ67g20aaL1vU.jpg",
+        "backdropUrl": "",
+        "genres": []
+      }
+    ]
+  },
+  "10764-movie": {
+    "mustSee": [
+      {
+        "id": 27205,
+        "title": "Inception",
+        "overview": "A skilled thief steals secrets from within dreams.",
+        "poster_path": "/oYu24ueLSgzFSxD13wpe5Vm2XcV.jpg",
+        "release_date": "2010-07-15",
+        "vote_average": 8.4,
+        "vote_count": 34000,
+        "genre_ids": [
+          10764
+        ],
+        "popularity": 100,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/oYu24ueLSgzFSxD13wpe5Vm2XcV.jpg",
+        "backdropUrl": "",
+        "genres": []
+      },
+      {
+        "id": 157336,
+        "title": "Interstellar",
+        "overview": "Explorers travel through a wormhole in space.",
+        "poster_path": "/gEU2Qv6e6Fc3vPjCf4j37iwZ7ta.jpg",
+        "release_date": "2014-11-05",
+        "vote_average": 8.4,
+        "vote_count": 32000,
+        "genre_ids": [
+          10764
+        ],
+        "popularity": 140,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/gEU2Qv6e6Fc3vPjCf4j37iwZ7ta.jpg",
+        "backdropUrl": "",
+        "genres": []
+      }
+    ],
+    "topRated": [
+      {
+        "id": 507089,
+        "title": "Dune: Part Two",
+        "overview": "Mythic journey of Paul Atreides continues.",
+        "poster_path": "/czembDcB205qiQDiiWn24e9585s.jpg",
+        "release_date": "2024-02-27",
+        "vote_average": 8.2,
+        "vote_count": 4500,
+        "genre_ids": [
+          10764
+        ],
+        "popularity": 1500,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/czembDcB205qiQDiiWn24e9585s.jpg",
+        "backdropUrl": "",
+        "genres": []
+      }
+    ]
+  },
+  "10764-tv": {
+    "mustSee": [
+      {
+        "id": 111110,
+        "title": "Shōgun",
+        "overview": "In Japan in the year 1600, Lord Yoshii Toranaga fights for survival.",
+        "poster_path": "/z99t2367fd317079MCH3f36t26b.jpg",
+        "release_date": "2024-02-27",
+        "vote_average": 8.7,
+        "vote_count": 850,
+        "genre_ids": [
+          10764
+        ],
+        "popularity": 1400,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/z99t2367fd317079MCH3f36t26b.jpg",
+        "backdropUrl": "",
+        "genres": []
+      }
+    ],
+    "topRated": [
+      {
+        "id": 126298,
+        "title": "Fallout",
+        "overview": "A peaceful dweller from a cozy fallout shelter returns to the surface.",
+        "poster_path": "/v9B62m48DndJWwwZ67g20aaL1vU.jpg",
+        "release_date": "2024-04-10",
+        "vote_average": 8.4,
+        "vote_count": 1200,
+        "genre_ids": [
+          10764
+        ],
+        "popularity": 1600,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/v9B62m48DndJWwwZ67g20aaL1vU.jpg",
+        "backdropUrl": "",
+        "genres": []
+      }
+    ]
+  },
+  "10766-movie": {
+    "mustSee": [
+      {
+        "id": 27205,
+        "title": "Inception",
+        "overview": "A skilled thief steals secrets from within dreams.",
+        "poster_path": "/oYu24ueLSgzFSxD13wpe5Vm2XcV.jpg",
+        "release_date": "2010-07-15",
+        "vote_average": 8.4,
+        "vote_count": 34000,
+        "genre_ids": [
+          10766
+        ],
+        "popularity": 100,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/oYu24ueLSgzFSxD13wpe5Vm2XcV.jpg",
+        "backdropUrl": "",
+        "genres": []
+      },
+      {
+        "id": 157336,
+        "title": "Interstellar",
+        "overview": "Explorers travel through a wormhole in space.",
+        "poster_path": "/gEU2Qv6e6Fc3vPjCf4j37iwZ7ta.jpg",
+        "release_date": "2014-11-05",
+        "vote_average": 8.4,
+        "vote_count": 32000,
+        "genre_ids": [
+          10766
+        ],
+        "popularity": 140,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/gEU2Qv6e6Fc3vPjCf4j37iwZ7ta.jpg",
+        "backdropUrl": "",
+        "genres": []
+      }
+    ],
+    "topRated": [
+      {
+        "id": 507089,
+        "title": "Dune: Part Two",
+        "overview": "Mythic journey of Paul Atreides continues.",
+        "poster_path": "/czembDcB205qiQDiiWn24e9585s.jpg",
+        "release_date": "2024-02-27",
+        "vote_average": 8.2,
+        "vote_count": 4500,
+        "genre_ids": [
+          10766
+        ],
+        "popularity": 1500,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/czembDcB205qiQDiiWn24e9585s.jpg",
+        "backdropUrl": "",
+        "genres": []
+      }
+    ]
+  },
+  "10766-tv": {
+    "mustSee": [
+      {
+        "id": 111110,
+        "title": "Shōgun",
+        "overview": "In Japan in the year 1600, Lord Yoshii Toranaga fights for survival.",
+        "poster_path": "/z99t2367fd317079MCH3f36t26b.jpg",
+        "release_date": "2024-02-27",
+        "vote_average": 8.7,
+        "vote_count": 850,
+        "genre_ids": [
+          10766
+        ],
+        "popularity": 1400,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/z99t2367fd317079MCH3f36t26b.jpg",
+        "backdropUrl": "",
+        "genres": []
+      }
+    ],
+    "topRated": [
+      {
+        "id": 126298,
+        "title": "Fallout",
+        "overview": "A peaceful dweller from a cozy fallout shelter returns to the surface.",
+        "poster_path": "/v9B62m48DndJWwwZ67g20aaL1vU.jpg",
+        "release_date": "2024-04-10",
+        "vote_average": 8.4,
+        "vote_count": 1200,
+        "genre_ids": [
+          10766
+        ],
+        "popularity": 1600,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/v9B62m48DndJWwwZ67g20aaL1vU.jpg",
+        "backdropUrl": "",
+        "genres": []
+      }
+    ]
+  },
+  "10767-movie": {
+    "mustSee": [
+      {
+        "id": 27205,
+        "title": "Inception",
+        "overview": "A skilled thief steals secrets from within dreams.",
+        "poster_path": "/oYu24ueLSgzFSxD13wpe5Vm2XcV.jpg",
+        "release_date": "2010-07-15",
+        "vote_average": 8.4,
+        "vote_count": 34000,
+        "genre_ids": [
+          10767
+        ],
+        "popularity": 100,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/oYu24ueLSgzFSxD13wpe5Vm2XcV.jpg",
+        "backdropUrl": "",
+        "genres": []
+      },
+      {
+        "id": 157336,
+        "title": "Interstellar",
+        "overview": "Explorers travel through a wormhole in space.",
+        "poster_path": "/gEU2Qv6e6Fc3vPjCf4j37iwZ7ta.jpg",
+        "release_date": "2014-11-05",
+        "vote_average": 8.4,
+        "vote_count": 32000,
+        "genre_ids": [
+          10767
+        ],
+        "popularity": 140,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/gEU2Qv6e6Fc3vPjCf4j37iwZ7ta.jpg",
+        "backdropUrl": "",
+        "genres": []
+      }
+    ],
+    "topRated": [
+      {
+        "id": 507089,
+        "title": "Dune: Part Two",
+        "overview": "Mythic journey of Paul Atreides continues.",
+        "poster_path": "/czembDcB205qiQDiiWn24e9585s.jpg",
+        "release_date": "2024-02-27",
+        "vote_average": 8.2,
+        "vote_count": 4500,
+        "genre_ids": [
+          10767
+        ],
+        "popularity": 1500,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/czembDcB205qiQDiiWn24e9585s.jpg",
+        "backdropUrl": "",
+        "genres": []
+      }
+    ]
+  },
+  "10767-tv": {
+    "mustSee": [
+      {
+        "id": 111110,
+        "title": "Shōgun",
+        "overview": "In Japan in the year 1600, Lord Yoshii Toranaga fights for survival.",
+        "poster_path": "/z99t2367fd317079MCH3f36t26b.jpg",
+        "release_date": "2024-02-27",
+        "vote_average": 8.7,
+        "vote_count": 850,
+        "genre_ids": [
+          10767
+        ],
+        "popularity": 1400,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/z99t2367fd317079MCH3f36t26b.jpg",
+        "backdropUrl": "",
+        "genres": []
+      }
+    ],
+    "topRated": [
+      {
+        "id": 126298,
+        "title": "Fallout",
+        "overview": "A peaceful dweller from a cozy fallout shelter returns to the surface.",
+        "poster_path": "/v9B62m48DndJWwwZ67g20aaL1vU.jpg",
+        "release_date": "2024-04-10",
+        "vote_average": 8.4,
+        "vote_count": 1200,
+        "genre_ids": [
+          10767
+        ],
+        "popularity": 1600,
+        "posterUrl": "https://image.tmdb.org/t/p/w500/v9B62m48DndJWwwZ67g20aaL1vU.jpg",
+        "backdropUrl": "",
+        "genres": []
+      }
+    ]
+  }
+}

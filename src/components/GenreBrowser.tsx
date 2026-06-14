@@ -409,9 +409,9 @@ function GenreCard({
           )}
         </div>
 
-        <p className="text-xs font-medium text-foreground leading-tight line-clamp-2 px-0.5">{movie.title}</p>
+        <p className="text-sm font-semibold text-foreground leading-tight line-clamp-2 px-0.5">{movie.title}</p>
         {movie.release_date && (
-          <p className="text-[10px] text-muted-foreground mt-0.5 px-0.5">{movie.release_date.slice(0, 4)}</p>
+          <p className="text-xs text-muted-foreground mt-1 px-0.5">{movie.release_date.slice(0, 4)}</p>
         )}
       </div>
 
@@ -647,28 +647,37 @@ export default function GenreBrowser() {
             exit={{ opacity: 0, y: -8 }}
             transition={{ duration: 0.2 }}
           >
-            <HorizontalCarousel
-              title="Must See"
-              icon={Trophy}
-              iconColor="text-yellow-500"
-              movies={genreData.mustSee}
-              watchlist={watchlist}
-              libraryTitles={libraryTitles}
-              onAddToWatchlist={addToWatchlist}
-              onRemoveFromWatchlist={removeFromWatchlist}
-              onDownload={handleDownload}
-            />
-            <HorizontalCarousel
-              title={mediaType === 'tv' ? 'Trending Right Now' : 'Top Rated Right Now'}
-              icon={Flame}
-              iconColor="text-orange-500"
-              movies={genreData.topRated}
-              watchlist={watchlist}
-              libraryTitles={libraryTitles}
-              onAddToWatchlist={addToWatchlist}
-              onRemoveFromWatchlist={removeFromWatchlist}
-              onDownload={handleDownload}
-            />
+            {genreData.mustSee.length === 0 && genreData.topRated.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16 text-center">
+                <p className="text-muted-foreground text-sm">No titles found for this genre yet.</p>
+                <p className="text-xs text-muted-foreground/60 mt-1">Add your TMDB API Key in Settings to pull live data.</p>
+              </div>
+            ) : (
+              <>
+                <HorizontalCarousel
+                  title="Must See"
+                  icon={Trophy}
+                  iconColor="text-yellow-500"
+                  movies={genreData.mustSee}
+                  watchlist={watchlist}
+                  libraryTitles={libraryTitles}
+                  onAddToWatchlist={addToWatchlist}
+                  onRemoveFromWatchlist={removeFromWatchlist}
+                  onDownload={handleDownload}
+                />
+                <HorizontalCarousel
+                  title={mediaType === 'tv' ? 'Trending Right Now' : 'Top Rated Right Now'}
+                  icon={Flame}
+                  iconColor="text-orange-500"
+                  movies={genreData.topRated}
+                  watchlist={watchlist}
+                  libraryTitles={libraryTitles}
+                  onAddToWatchlist={addToWatchlist}
+                  onRemoveFromWatchlist={removeFromWatchlist}
+                  onDownload={handleDownload}
+                />
+              </>
+            )}
           </motion.div>
         )}
       </AnimatePresence>

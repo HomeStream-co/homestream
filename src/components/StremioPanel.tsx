@@ -347,17 +347,18 @@ export default function StremioPanel() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
-      const data = await res.json() as { queued?: number; jobs?: TorrentJob[]; error?: string; message?: string };
+      const data = await res.json() as { queued?: number; jobs?: TorrentJob[]; error?: string; message?: string; vpnUsed?: boolean };
 
       if (data.error) {
         // Show the detailed message when available (e.g. qBit offline / WebTorrent unavailable)
         toast.error(data.message ?? data.error);
       } else {
         const count = data.queued ?? 1;
+        const vpnText = data.vpnUsed ? ' (Protected by VPN)' : '';
         if (meta.type === 'series' && opts?.allEpisodes) {
-          toast.success(`Queued ${count} episode${count !== 1 ? 's' : ''} of "${meta.name}" for download`);
+          toast.success(`Queued ${count} episode${count !== 1 ? 's' : ''} of "${meta.name}" for download${vpnText}`);
         } else {
-          toast.success(`"${meta.name}" queued for download — check the Downloads tab`);
+          toast.success(`"${meta.name}" queued for download${vpnText} — check the Downloads tab`);
         }
         await fetchJobs();
         setView('downloads');
@@ -801,6 +802,7 @@ export default function StremioPanel() {
                                   title="Schedule for later"
                                 >
                                   <CalendarClock className="w-3.5 h-3.5" />
+                                  Later
                                 </button>
                               </motion.div>
                             ))}

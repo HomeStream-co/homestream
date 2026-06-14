@@ -50,7 +50,34 @@ export default function handler(req: Request, res: Response) {
     try {
       const cfg = readConfig();
       const inputFilename  = req.file.filename;
-      const inputPath      = path.join(UPLOADS_DIR, inputFilename);
+      const tempInputPath  = path.join(UPLOADS_DIR, inputFilename);
+
+      // Resolve final target directory: use libraryDir if configured, fallback to UPLOADS_DIR
+      const targetDir = cfg.libraryDir || UPLOADS_DIR;
+      if (!fs.existsSync(targetDir)) {
+        fs.mkdirSync(targetDir, { recursive: true });
+      }
+      
+      const inputPath = path.join(targetDir, inputFilename);
+      
+      // Move helper with cross-device copy/unlink fallback
+      const moveFile = (src: string, dest: string) => {
+        try {
+          fs.renameSync(src, dest);
+        } catch (renameErr) {
+          if ((renameErr as any).code === 'EXDEV') {
+            fs.copyFileSync(src, dest);
+            fs.unlinkSync(src);
+          } else {
+            throw renameErr;
+          }
+        }
+      };
+
+      // Move the file from temp/uploads to the user's library directory
+      if (tempInputPath !== inputPath) {
+        moveFile(tempInputPath, inputPath);
+      }
 
       // ── 1. Parse title — prefer manual override from form body ──
       const { title: extractedTitle, year: extractedYear } = extractTitle(req.file.originalname);
@@ -89,7 +116,7 @@ export default function handler(req: Request, res: Response) {
       }
 
       const outputFilename = inputFilename.replace(/\.[^.]+$/, '') + '_tc.mp4';
-      const outputPath     = path.join(UPLOADS_DIR, outputFilename);
+      const outputPath     = path.join(targetDir, outputFilename);
 
       // ── 3. Register transcode job ──
       const mediaItem = buildMediaItem({

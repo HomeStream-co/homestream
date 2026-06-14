@@ -46,6 +46,7 @@ function resolveClientPath(...segments: string[]): string {
 }
 
 const BAKED_CACHE_PATH = resolveClientPath('tmdb-cache-baked.json');
+const BAKED_GENRE_CACHE_PATH = resolveClientPath('tmdb-genre-baked.json');
 const LOCAL_IMG_DIR   = resolveClientPath('tmdb-images');
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 const TMDB_BASE = 'https://api.themoviedb.org/3';
@@ -289,6 +290,49 @@ export async function getRecommendations(
   }
 }
 
+// ── Genre-specific caching & fallbacks ────────────────────────────────────────
+
+function readGenreDiskCache(genreId: number, mediaType: 'movie' | 'tv', type: 'mustSee' | 'topRated'): TMDBMovie[] | null {
+  const file = cacheFile(`genre-${mediaType}-${genreId}-${type}`);
+  if (fs.existsSync(file)) {
+    try {
+      return JSON.parse(fs.readFileSync(file, 'utf-8')) as TMDBMovie[];
+    } catch { /* ignore */ }
+  }
+  return null;
+}
+
+function writeGenreDiskCache(genreId: number, mediaType: 'movie' | 'tv', type: 'mustSee' | 'topRated', data: TMDBMovie[]): void {
+  try {
+    const dest = cacheFile(`genre-${mediaType}-${genreId}-${type}`);
+    const tmp = dest + '.tmp';
+    fs.writeFileSync(tmp, JSON.stringify(data, null, 2));
+    fs.renameSync(tmp, dest);
+  } catch (err) {
+    console.error(`[tmdbCache] Failed to write genre ${type} cache:`, err);
+  }
+}
+
+function getGenreBakedFallback(genreId: number, mediaType: 'movie' | 'tv', type: 'mustSee' | 'topRated'): TMDBMovie[] {
+  let fileToRead = BAKED_GENRE_CACHE_PATH;
+  if (!fs.existsSync(fileToRead)) {
+    // In dev, the file might still be in the src folder if it wasn't copied to dist
+    fileToRead = path.join(__dirname, 'tmdb-genre-baked.json');
+  }
+  if (fs.existsSync(fileToRead)) {
+    try {
+      const allBakes = JSON.parse(fs.readFileSync(fileToRead, 'utf-8'));
+      const key = `${genreId}-${mediaType}`;
+      if (allBakes[key] && allBakes[key][type]) {
+        return allBakes[key][type];
+      }
+    } catch (err) {
+      console.warn('[tmdbCache] Failed to read baked genre cache:', err);
+    }
+  }
+  return [];
+}
+
 // ── Genre-specific fetches ────────────────────────────────────────────────────
 
 /**
@@ -306,8 +350,15 @@ export async function getGenreMustSee(genreId: number): Promise<TMDBMovie[]> {
     const results = ((raw as { results: Record<string, unknown>[] }).results ?? [])
       .map(normaliseMovie)
       .slice(0, 20);
-    return attachGenres(results);
-  } catch { return []; }
+    const data = attachGenres(results);
+    writeGenreDiskCache(genreId, 'movie', 'mustSee', data);
+    return data;
+  } catch (err) {
+    console.warn(`[tmdbCache] Live getGenreMustSee failed for genre ${genreId}:`, err);
+    const cached = readGenreDiskCache(genreId, 'movie', 'mustSee');
+    if (cached) return cached;
+    return getGenreBakedFallback(genreId, 'movie', 'mustSee');
+  }
 }
 
 /**
@@ -324,8 +375,15 @@ export async function getGenreTopRated(genreId: number): Promise<TMDBMovie[]> {
     const results = ((raw as { results: Record<string, unknown>[] }).results ?? [])
       .map(normaliseMovie)
       .slice(0, 20);
-    return attachGenres(results);
-  } catch { return []; }
+    const data = attachGenres(results);
+    writeGenreDiskCache(genreId, 'movie', 'topRated', data);
+    return data;
+  } catch (err) {
+    console.warn(`[tmdbCache] Live getGenreTopRated failed for genre ${genreId}:`, err);
+    const cached = readGenreDiskCache(genreId, 'movie', 'topRated');
+    if (cached) return cached;
+    return getGenreBakedFallback(genreId, 'movie', 'topRated');
+  }
 }
 
 /**
@@ -342,8 +400,14 @@ export async function getGenreMustSeeTv(genreId: number): Promise<TMDBMovie[]> {
     const results = ((raw as { results: Record<string, unknown>[] }).results ?? [])
       .map(r => normaliseMovie({ ...r, _mediaType: 'tv' }))
       .slice(0, 20);
+    writeGenreDiskCache(genreId, 'tv', 'mustSee', results);
     return results;
-  } catch { return []; }
+  } catch (err) {
+    console.warn(`[tmdbCache] Live getGenreMustSeeTv failed for genre ${genreId}:`, err);
+    const cached = readGenreDiskCache(genreId, 'tv', 'mustSee');
+    if (cached) return cached;
+    return getGenreBakedFallback(genreId, 'tv', 'mustSee');
+  }
 }
 
 /**
@@ -359,8 +423,14 @@ export async function getGenreTopRatedTv(genreId: number): Promise<TMDBMovie[]> 
     const results = ((raw as { results: Record<string, unknown>[] }).results ?? [])
       .map(r => normaliseMovie({ ...r, _mediaType: 'tv' }))
       .slice(0, 20);
+    writeGenreDiskCache(genreId, 'tv', 'topRated', results);
     return results;
-  } catch { return []; }
+  } catch (err) {
+    console.warn(`[tmdbCache] Live getGenreTopRatedTv failed for genre ${genreId}:`, err);
+    const cached = readGenreDiskCache(genreId, 'tv', 'topRated');
+    if (cached) return cached;
+    return getGenreBakedFallback(genreId, 'tv', 'topRated');
+  }
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────

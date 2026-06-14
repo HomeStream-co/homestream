@@ -461,12 +461,49 @@ export default function PlayerPage() {
 
   // ── CC ::cue styling ──────────────────────────────────────────────────────
   useEffect(() => {
-    const fontSize = ps.ccFontSize === 'small' ? '0.8em' : ps.ccFontSize === 'large' ? '1.4em' : '1em';
-    const bg = ps.ccBgOpacity === 'none' ? 'transparent' : ps.ccBgOpacity === 'high' ? 'rgba(0,0,0,0.85)' : 'rgba(0,0,0,0.5)';
+    const fontSize = ps.ccFontSize === 'small' ? '0.8em' : ps.ccFontSize === 'large' ? '1.4em' : '1.0em';
+    
+    // Map text colors
+    const textColors: Record<string, string> = {
+      white: '#ffffff',
+      yellow: '#ffff00',
+      cyan: '#00ffff',
+      green: '#00ff00',
+      magenta: '#ff00ff',
+      red: '#ff0000',
+      blue: '#3b82f6',
+    };
+    const textColor = textColors[ps.ccTextColor] || '#ffffff';
+
+    // Map background colors to RGB
+    const bgColors: Record<string, string> = {
+      black: '0, 0, 0',
+      white: '255, 255, 255',
+      red: '255, 0, 0',
+      green: '0, 255, 0',
+      blue: '59, 130, 246',
+      yellow: '255, 255, 0',
+      magenta: '255, 0, 255',
+      cyan: '0, 255, 255',
+    };
+    const bgRgb = bgColors[ps.ccBgColor] || '0, 0, 0';
+
+    // Map opacity
+    const opacities: Record<string, number> = {
+      none: 0,
+      low: 0.35,
+      medium: 0.60,
+      high: 0.85,
+      full: 1.0,
+    };
+    const opacity = opacities[ps.ccBgOpacity] !== undefined ? opacities[ps.ccBgOpacity] : 0.60;
+    
+    const bg = `rgba(${bgRgb}, ${opacity})`;
+    
     let el = document.getElementById('homestream-cc-style') as HTMLStyleElement | null;
     if (!el) { el = document.createElement('style'); el.id = 'homestream-cc-style'; document.head.appendChild(el); }
-    el.textContent = `::cue { font-size: ${fontSize}; background-color: ${bg}; color: white; }`;
-  }, [ps.ccFontSize, ps.ccBgOpacity]);
+    el.textContent = `::cue { font-size: ${fontSize} !important; background-color: ${bg} !important; color: ${textColor} !important; }`;
+  }, [ps.ccFontSize, ps.ccBgOpacity, ps.ccTextColor, ps.ccBgColor]);
 
   // ── Cleanup thumb video ───────────────────────────────────────────────────
   useEffect(() => {
@@ -910,6 +947,8 @@ export default function PlayerPage() {
               ccLang={ps.ccLang}
               ccFontSize={ps.ccFontSize}
               ccBgOpacity={ps.ccBgOpacity}
+              ccTextColor={ps.ccTextColor}
+              ccBgColor={ps.ccBgColor}
               audioTracks={ps.audioTracks}
               activeAudioTrack={ps.activeAudioTrack}
               tvFocus={ps.tvFocus}
@@ -935,6 +974,8 @@ export default function PlayerPage() {
               setCcLang={ps.setCcLang}
               setCcFontSize={ps.setCcFontSize}
               setCcBgOpacity={ps.setCcBgOpacity}
+              setCcTextColor={ps.setCcTextColor}
+              setCcBgColor={ps.setCcBgColor}
               setActiveAudioTrack={ps.setActiveAudioTrack}
               setShowInfo={ps.setShowInfo}
               setShowSpeedMenu={ps.setShowSpeedMenu}

@@ -72,7 +72,9 @@ interface Props {
   showAudioMenu: boolean;
   ccLang: CcLang;
   ccFontSize: 'small' | 'medium' | 'large';
-  ccBgOpacity: 'none' | 'low' | 'high';
+  ccBgOpacity: 'none' | 'low' | 'medium' | 'high' | 'full';
+  ccTextColor: 'white' | 'yellow' | 'cyan' | 'green' | 'magenta' | 'red' | 'blue';
+  ccBgColor: 'black' | 'white' | 'red' | 'green' | 'blue' | 'yellow' | 'magenta' | 'cyan';
   audioTracks: AudioTrack[];
   activeAudioTrack: number;
   tvFocus: TvControl | null;
@@ -107,7 +109,9 @@ interface Props {
   changeSpeed: (rate: number) => void;
   setCcLang: (v: CcLang) => void;
   setCcFontSize: (v: 'small' | 'medium' | 'large') => void;
-  setCcBgOpacity: (v: 'none' | 'low' | 'high') => void;
+  setCcBgOpacity: (v: 'none' | 'low' | 'medium' | 'high' | 'full') => void;
+  setCcTextColor: (v: 'white' | 'yellow' | 'cyan' | 'green' | 'magenta' | 'red' | 'blue') => void;
+  setCcBgColor: (v: 'black' | 'white' | 'red' | 'green' | 'blue' | 'yellow' | 'magenta' | 'cyan') => void;
   setActiveAudioTrack: (i: number) => void;
   setShowInfo: React.Dispatch<React.SetStateAction<boolean>>;
   setShowSpeedMenu: React.Dispatch<React.SetStateAction<boolean>>;
@@ -128,13 +132,13 @@ interface Props {
 function PlayerControlsOverlayInner({
   item, playing, duration, volume, muted, fullscreen,
   playbackRate, isPiP, showInfo, showSpeedMenu, showCcMenu,
-  showAudioMenu, ccLang, ccFontSize, ccBgOpacity, audioTracks,
+  showAudioMenu, ccLang, ccFontSize, ccBgOpacity, ccTextColor, ccBgColor, audioTracks,
   activeAudioTrack, tvFocus, playerAccent, seekHover, seekBarRef,
   thumbCanvasRef, currentTimeRef, bufferedRef: _bufferedRef, timeDisplayRef, bufferedBarRef,
   castButtonRef, castControlRef, videoRef,
   togglePlay, toggleMute, toggleFullscreen, togglePiP,
   handleSeek, handleVolumeChange, handleSeekHover, changeSpeed,
-  setCcLang, setCcFontSize, setCcBgOpacity, setActiveAudioTrack,
+  setCcLang, setCcFontSize, setCcBgOpacity, setCcTextColor, setCcBgColor, setActiveAudioTrack,
   setShowInfo, setShowSpeedMenu, setShowCcMenu, setShowAudioMenu,
   setShowShortcuts, setSeekHover, setSeekFlash, setSeekFlashCount,
   setShowResumeBanner, resumeBannerTimer, showActionToast, fadeAndNavigate,
@@ -381,7 +385,7 @@ function PlayerControlsOverlayInner({
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: 6, scale: 0.95 }}
                     transition={{ duration: 0.12 }}
-                    className="absolute bottom-full right-0 mb-2 bg-black/90 border border-white/20 rounded-lg overflow-hidden shadow-xl backdrop-blur-sm z-20 min-w-[130px]"
+                    className="absolute bottom-full right-0 mb-2 bg-black/95 border border-white/20 rounded-lg overflow-hidden shadow-xl backdrop-blur-sm z-20 min-w-[200px]"
                     onClick={e => e.stopPropagation()}
                   >
                     <div className="px-3 py-1.5 border-b border-white/10">
@@ -398,9 +402,11 @@ function PlayerControlsOverlayInner({
                       </button>
                     ))}
                     {/* CC Styling */}
-                    <div className="border-t border-white/10 px-3 py-2">
-                      <p className="text-[10px] text-white/30 uppercase tracking-wider mb-2">Style</p>
-                      <div className="flex items-center justify-between mb-1.5">
+                    <div className="border-t border-white/10 px-3 py-2 space-y-2.5">
+                      <p className="text-[10px] text-white/30 uppercase tracking-wider">Style Settings</p>
+                      
+                      {/* Font Size */}
+                      <div className="flex items-center justify-between">
                         <span className="text-[11px] text-white/50">Size</span>
                         <div className="flex gap-1">
                           {(['small', 'medium', 'large'] as const).map(s => (
@@ -411,13 +417,57 @@ function PlayerControlsOverlayInner({
                           ))}
                         </div>
                       </div>
+
+                      {/* Text Color */}
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-[11px] text-white/50">Text Color</span>
+                          <span className="text-[9px] text-primary/80 font-bold capitalize">{ccTextColor}</span>
+                        </div>
+                        <div className="flex gap-1.5 flex-wrap">
+                          {(['white', 'yellow', 'cyan', 'green', 'magenta', 'red', 'blue'] as const).map(color => (
+                            <button
+                              key={color}
+                              onClick={() => setCcTextColor(color)}
+                              className={`w-4 h-4 rounded-full border transition-all ${
+                                ccTextColor === color ? 'border-primary scale-110 ring-1 ring-primary/40' : 'border-white/20 hover:border-white/50'
+                              }`}
+                              style={{ backgroundColor: color === 'blue' ? '#3b82f6' : color }}
+                              title={color}
+                            />
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Background Color */}
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-[11px] text-white/50">BG Color</span>
+                          <span className="text-[9px] text-primary/80 font-bold capitalize">{ccBgColor}</span>
+                        </div>
+                        <div className="flex gap-1.5 flex-wrap">
+                          {(['black', 'white', 'red', 'green', 'blue', 'yellow', 'magenta', 'cyan'] as const).map(color => (
+                            <button
+                              key={color}
+                              onClick={() => setCcBgColor(color)}
+                              className={`w-4 h-4 rounded-full border transition-all ${
+                                ccBgColor === color ? 'border-primary scale-110 ring-1 ring-primary/40' : 'border-white/20 hover:border-white/50'
+                              }`}
+                              style={{ backgroundColor: color === 'blue' ? '#3b82f6' : color }}
+                              title={color}
+                            />
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Background Opacity */}
                       <div className="flex items-center justify-between">
-                        <span className="text-[11px] text-white/50">Background</span>
+                        <span className="text-[11px] text-white/50">BG Opacity</span>
                         <div className="flex gap-1">
-                          {(['none', 'low', 'high'] as const).map(b => (
+                          {(['none', 'low', 'medium', 'high', 'full'] as const).map(b => (
                             <button key={b} onClick={() => setCcBgOpacity(b)}
-                              className={`px-2 py-0.5 rounded text-[10px] font-bold transition-colors ${ccBgOpacity === b ? 'bg-primary text-black' : 'text-white/40 hover:text-white/70'}`}>
-                              {b === 'none' ? 'Off' : b === 'low' ? '50%' : '85%'}
+                              className={`px-1.5 py-0.5 rounded text-[9px] font-bold transition-colors ${ccBgOpacity === b ? 'bg-primary text-black' : 'text-white/40 hover:text-white/70'}`}>
+                              {b === 'none' ? '0%' : b === 'low' ? '35%' : b === 'medium' ? '60%' : b === 'high' ? '85%' : '100%'}
                             </button>
                           ))}
                         </div>
@@ -530,6 +580,8 @@ function arePropsEqual(prev: Props, next: Props): boolean {
   if (prev.ccLang      !== next.ccLang)      return false;
   if (prev.ccFontSize  !== next.ccFontSize)  return false;
   if (prev.ccBgOpacity !== next.ccBgOpacity) return false;
+  if (prev.ccTextColor !== next.ccTextColor) return false;
+  if (prev.ccBgColor   !== next.ccBgColor)   return false;
 
   // Audio tracks — reference equality (array only replaced on fetch)
   if (prev.audioTracks      !== next.audioTracks)      return false;

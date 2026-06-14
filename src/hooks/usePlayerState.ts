@@ -131,7 +131,9 @@ export function usePlayerState() {
   // ── Closed captions ───────────────────────────────────────────────────────
   const [ccLang, setCcLang] = useState<CcLang>('off');
   const [ccFontSize, setCcFontSize] = useState<'small' | 'medium' | 'large'>('medium');
-  const [ccBgOpacity, setCcBgOpacity] = useState<'none' | 'low' | 'high'>('low');
+  const [ccBgOpacity, setCcBgOpacity] = useState<'none' | 'low' | 'medium' | 'high' | 'full'>('medium');
+  const [ccTextColor, setCcTextColor] = useState<'white' | 'yellow' | 'cyan' | 'green' | 'magenta' | 'red' | 'blue'>('white');
+  const [ccBgColor, setCcBgColor] = useState<'black' | 'white' | 'red' | 'green' | 'blue' | 'yellow' | 'magenta' | 'cyan'>('black');
 
   // ── TV D-pad ──────────────────────────────────────────────────────────────
   const [tvFocus, setTvFocus] = useState<TvControl | null>(null);
@@ -219,6 +221,8 @@ export function usePlayerState() {
     ccLang, setCcLang,
     ccFontSize, setCcFontSize,
     ccBgOpacity, setCcBgOpacity,
+    ccTextColor, setCcTextColor,
+    ccBgColor, setCcBgColor,
     // TV D-pad
     tvFocus, setTvFocus,
     actionToast, setActionToast,

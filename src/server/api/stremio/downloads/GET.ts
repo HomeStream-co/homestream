@@ -29,7 +29,7 @@ export default async function handler(req: Request, res: Response) {
   if (!qbitReachable) {
     // qBit offline — return persisted jobs + RD jobs
     return res.json({
-      jobs: wtJobs,
+      jobs: [...wtJobs, ...rdJobs],
       qbitTorrents: [],
       transferInfo: null,
       backend: 'none',
@@ -78,7 +78,7 @@ export default async function handler(req: Request, res: Response) {
     });
 
     res.json({
-      jobs: wtJobs,
+      jobs: [...wtJobs, ...rdJobs, ...enrichedTorrents],
       qbitTorrents: enrichedTorrents,
       transferInfo,
       backend: 'qbittorrent',
@@ -88,7 +88,7 @@ export default async function handler(req: Request, res: Response) {
   } catch (err) {
     // qBit reachable but API call failed — return what we have
     res.json({
-      jobs: wtJobs,
+      jobs: [...wtJobs, ...rdJobs],
       qbitTorrents: [],
       transferInfo: null,
       backend: 'qbittorrent',
