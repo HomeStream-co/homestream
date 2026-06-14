@@ -830,6 +830,21 @@ function StreamingTab({ onDownload, libraryTitles, watchlist, onAddToWatchlist, 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  // Logo source resolution with local server proxy fallback
+  const [logoSrcs, setLogoSrcs] = useState<Record<number, string>>(() =>
+    Object.fromEntries(STREAMING_SERVICES.map(s => [s.id, s.logo]))
+  );
+  const [failedLogos, setFailedLogos] = useState<Record<number, boolean>>({});
+
+  const handleLogoError = (id: number, currentSrc: string) => {
+    if (currentSrc.startsWith('https://image.tmdb.org')) {
+      const proxy = `/api/tmdb-proxy?url=${encodeURIComponent(currentSrc)}`;
+      setLogoSrcs(prev => ({ ...prev, [id]: proxy }));
+    } else {
+      setFailedLogos(prev => ({ ...prev, [id]: true }));
+    }
+  };
+
   const service = STREAMING_SERVICES.find(s => s.id === selectedService);
 
   const fetchCatalog = useCallback(async (providerId: ServiceId, type: 'movie' | 'tv', pg: number, sort: string) => {
@@ -867,19 +882,39 @@ function StreamingTab({ onDownload, libraryTitles, watchlist, onAddToWatchlist, 
           Browse what's currently streaming — click a service to see their full catalog, then download any title directly to your server.
         </p>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
-          {STREAMING_SERVICES.map(svc => (
-            <motion.button
-              key={svc.id}
-              onClick={() => handleServiceSelect(svc.id)}
-              whileHover={{ scale: 1.04 }}
-              whileTap={{ scale: 0.97 }}
-              className="relative flex flex-col items-center justify-center gap-3 p-6 rounded-2xl border border-border hover:border-primary/40 bg-card transition-all group overflow-hidden"
-            >
-              <div className="absolute inset-0 opacity-0 group-hover:opacity-10 transition-opacity" style={{ background: svc.color }} />
-              <img src={svc.logo} alt={svc.name} className="w-14 h-14 rounded-xl object-cover shadow-md" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-              <span className="text-sm font-semibold text-foreground">{svc.name}</span>
-            </motion.button>
-          ))}
+          {STREAMING_SERVICES.map(svc => {
+            const logoSrc = logoSrcs[svc.id] ?? svc.logo;
+            const logoFailed = failedLogos[svc.id];
+            return (
+              <motion.button
+                key={svc.id}
+                onClick={() => handleServiceSelect(svc.id)}
+                whileHover={{ scale: 1.04 }}
+                whileTap={{ scale: 0.97 }}
+                className="relative flex flex-col items-center justify-center gap-3 p-6 rounded-2xl border border-border hover:border-primary/40 bg-card transition-all group overflow-hidden"
+              >
+                <div className="absolute inset-0 opacity-0 group-hover:opacity-10 transition-opacity" style={{ background: svc.color }} />
+                
+                {logoFailed ? (
+                  <div
+                    className="w-14 h-14 rounded-xl flex items-center justify-center font-heading font-black text-2xl text-white shadow-lg uppercase select-none transition-transform group-hover:scale-105"
+                    style={{ backgroundColor: svc.color }}
+                  >
+                    {svc.name[0]}
+                  </div>
+                ) : (
+                  <img
+                    src={logoSrc}
+                    alt={svc.name}
+                    className="w-14 h-14 rounded-xl object-cover shadow-md transition-transform group-hover:scale-105"
+                    onError={() => handleLogoError(svc.id, logoSrc)}
+                  />
+                )}
+                
+                <span className="text-sm font-semibold text-foreground">{svc.name}</span>
+              </motion.button>
+            );
+          })}
         </div>
       </div>
     );
@@ -892,7 +927,21 @@ function StreamingTab({ onDownload, libraryTitles, watchlist, onAddToWatchlist, 
           <ChevronLeft className="w-4 h-4" />All Services
         </button>
         <div className="flex items-center gap-2 ml-2">
-          <img src={service?.logo} alt={service?.name} className="w-7 h-7 rounded-lg object-cover" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+          {service && failedLogos[service.id] ? (
+            <div
+              className="w-7 h-7 rounded-lg flex items-center justify-center font-heading font-black text-xs text-white shadow-sm uppercase select-none"
+              style={{ backgroundColor: service.color }}
+            >
+              {service.name[0]}
+            </div>
+          ) : (
+            <img
+              src={service ? (logoSrcs[service.id] ?? service.logo) : ''}
+              alt={service?.name}
+              className="w-7 h-7 rounded-lg object-cover"
+              onError={() => service && handleLogoError(service.id, logoSrcs[service.id] ?? service.logo)}
+            />
+          )}
           <span className="text-base font-bold text-foreground">{service?.name}</span>
         </div>
         <div className="flex items-center gap-2 ml-auto flex-wrap">
