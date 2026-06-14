@@ -370,9 +370,7 @@ async function queueViaQbit(params: {
   poster?: string;
 }): Promise<QbitJob> {
   const config = readConfig();
-  const savePath = config.mediaDir
-    ? `${config.mediaDir}/downloads`
-    : '/downloads';
+  const savePath = config.downloadsDir || (config.mediaDir ? `${config.mediaDir}/downloads` : '/downloads');
 
   const hash = await addMagnet(params.magnet, {
     savepath: savePath,

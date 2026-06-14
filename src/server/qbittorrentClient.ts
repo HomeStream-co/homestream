@@ -52,9 +52,23 @@ export interface QbitAddOptions {
 /** Ensure a URL has a protocol prefix. Defaults to http:// if missing. */
 function normalizeUrl(url: string, defaultPort = '8080'): string {
   if (!url) return `http://localhost:${defaultPort}`;
-  const trimmed = url.trim();
-  if (/^https?:\/\//i.test(trimmed)) return trimmed.replace(/\/$/, '');
-  return `http://${trimmed}`.replace(/\/$/, '');
+  let trimmed = url.trim();
+  const hasProtocol = /^https?:\/\//i.test(trimmed);
+  if (!hasProtocol) {
+    trimmed = `http://${trimmed}`;
+  }
+  trimmed = trimmed.replace(/\/$/, '');
+  try {
+    const parsed = new URL(trimmed);
+    if (!parsed.port) {
+      if (!hasProtocol || parsed.protocol === 'http:') {
+        parsed.port = defaultPort;
+      }
+    }
+    return parsed.toString().replace(/\/$/, '');
+  } catch {
+    return trimmed;
+  }
 }
 
 function getQbitUrl(): string {

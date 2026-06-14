@@ -222,6 +222,28 @@ export function readConfig(): AppConfig {
     _configCacheAt = Date.now();
   }
 
+  // Populate process.env keys so files reading from process.env directly
+  // get the user's configured values (e.g. qbittorrentClient, mediaUtils, enrich).
+  const isElectron = !!process.env.ELECTRON;
+  const setEnvIfConfigured = (envKey: string, configValue: string | undefined) => {
+    if (configValue) {
+      if (isElectron || !process.env[envKey]) {
+        process.env[envKey] = configValue;
+      }
+    }
+  };
+
+  setEnvIfConfigured('QBIT_URL', parsed.qbitUrl);
+  setEnvIfConfigured('QBIT_USERNAME', parsed.qbitUsername);
+  setEnvIfConfigured('QBIT_PASSWORD', parsed.qbitPassword);
+  setEnvIfConfigured('GOOGLE_AI_API_KEY', parsed.googleAiApiKey || parsed.aiApiKey);
+  setEnvIfConfigured('AI_API_KEY', parsed.aiApiKey);
+  setEnvIfConfigured('OMDB_API_KEY', parsed.omdbApiKey);
+  setEnvIfConfigured('TMDB_API_KEY', parsed.tmdbApiKey);
+  setEnvIfConfigured('PROWLARR_URL', parsed.prowlarrUrl);
+  setEnvIfConfigured('PROWLARR_API_KEY', parsed.prowlarrApiKey);
+  setEnvIfConfigured('REAL_DEBRID_API_KEY', parsed.realDebridApiKey);
+
   return parsed;
 }
 

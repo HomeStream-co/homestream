@@ -62,6 +62,12 @@ function resolveFfprobe(): string {
   if (process.env.FFMPEG_PATH) {
     const dir = path.dirname(process.env.FFMPEG_PATH);
     const ext = process.platform === 'win32' ? '.exe' : '';
+    const platform = process.platform;
+    const arch = process.arch;
+    // Check local package directory layout first
+    const candidate2 = path.join(dir, '..', 'ffprobe-bin', platform, arch, `ffprobe${ext}`);
+    if (fs.existsSync(candidate2)) return candidate2;
+    // Fallback to same folder
     const candidate = path.join(dir, `ffprobe${ext}`);
     if (fs.existsSync(candidate)) return candidate;
   }
@@ -123,7 +129,7 @@ type EncodeStrategy = 'remux' | 'encode_h264' | 'skip_remux_only';
  * Single ffprobe call that returns everything we need to make a strategy decision.
  */
 async function probeFile(filePath: string): Promise<VideoInfo> {
-  return new Promise(resolve => {
+  const ffprobeResult = await new Promise<VideoInfo | null>(resolve => {
     const probe = spawn(FFPROBE, [
       '-v', 'quiet',
       '-print_format', 'json',
@@ -135,7 +141,8 @@ async function probeFile(filePath: string): Promise<VideoInfo> {
     let out = '';
     probe.stdout.on('data', (d: Buffer) => { out += d.toString(); });
 
-    probe.on('close', () => {
+    probe.on('close', (code) => {
+      if (code !== 0) { resolve(null); return; }
       try {
         const json = JSON.parse(out) as {
           format?: { duration?: string; bit_rate?: string; size?: string };
@@ -161,11 +168,64 @@ async function probeFile(filePath: string): Promise<VideoInfo> {
           fileSizeBytes: parseInt(json.format?.size ?? '0', 10) || 0,
         });
       } catch {
-        resolve({ codec: 'unknown', width: 0, height: 0, bitrateBps: 0, audioStreams: 0, durationSecs: 0, fileSizeBytes: 0 });
+        resolve(null);
       }
     });
 
     probe.on('error', () => {
+      resolve(null);
+    });
+  });
+
+  if (ffprobeResult && ffprobeResult.codec !== 'unknown') {
+    return ffprobeResult;
+  }
+
+  // Fallback to ffmpeg -i parsing if ffprobe is missing or fails
+  console.log(`[transcode] ffprobe failed for ${path.basename(filePath)} — trying ffmpeg fallback`);
+  return new Promise(resolve => {
+    const proc = spawn(FFMPEG, ['-i', filePath]);
+    let stderr = '';
+    proc.stderr.on('data', (d: Buffer) => { stderr += d.toString(); });
+
+    proc.on('close', () => {
+      const durationMatch = stderr.match(/Duration:\s*(\d{2}):(\d{2}):(\d{2})\.(\d{2})/);
+      let durationSecs = 0;
+      if (durationMatch) {
+        durationSecs = parseInt(durationMatch[1], 10) * 3600
+          + parseInt(durationMatch[2], 10) * 60
+          + parseInt(durationMatch[3], 10)
+          + parseFloat(`0.${durationMatch[4]}`);
+      }
+
+      const videoStreamMatch = stderr.match(/Stream #\d+:\d+.*Video:\s*([a-zA-Z0-9_-]+)/);
+      const codec = videoStreamMatch ? videoStreamMatch[1].toLowerCase() : 'unknown';
+
+      let width = 0, height = 0;
+      const resMatch = stderr.match(/Stream #\d+:\d+.*Video:.*?\s*(\d{3,5})x(\d{3,5})/);
+      if (resMatch) {
+        width = parseInt(resMatch[1], 10);
+        height = parseInt(resMatch[2], 10);
+      }
+
+      const audioMatches = stderr.match(/Stream #\d+:\d+.*Audio:/g);
+      const audioStreams = audioMatches ? audioMatches.length : 0;
+
+      let fileSizeBytes = 0;
+      try { fileSizeBytes = fs.statSync(filePath).size; } catch { /* ignore */ }
+
+      resolve({
+        codec,
+        width,
+        height,
+        bitrateBps: 0,
+        audioStreams,
+        durationSecs,
+        fileSizeBytes,
+      });
+    });
+
+    proc.on('error', () => {
       resolve({ codec: 'unknown', width: 0, height: 0, bitrateBps: 0, audioStreams: 0, durationSecs: 0, fileSizeBytes: 0 });
     });
   });

@@ -15,13 +15,29 @@ import fs from 'fs';
 import path from 'path';
 import { createRequire } from 'module';
 
-// Resolve ffprobe binary: prefer FFMPEG_PATH env var (Electron sets this),
-// then look for ffprobe alongside the bundled ffmpeg-static binary,
-// then fall back to system 'ffprobe' on PATH.
+// Resolve ffmpeg and ffprobe binaries
+function resolveFfmpeg(): string {
+  if (process.env.FFMPEG_PATH) return process.env.FFMPEG_PATH;
+  try {
+    const req = createRequire(import.meta.url);
+    const p = req('ffmpeg-static') as string | null;
+    if (p) return p;
+  } catch { /* not installed */ }
+  return 'ffmpeg';
+}
+
+const FFMPEG = resolveFfmpeg();
+
 function resolveFfprobe(): string {
   if (process.env.FFMPEG_PATH) {
     const dir = path.dirname(process.env.FFMPEG_PATH);
     const ext = process.platform === 'win32' ? '.exe' : '';
+    const platform = process.platform;
+    const arch = process.arch;
+    // Check local package directory layout first
+    const candidate2 = path.join(dir, '..', 'ffprobe-bin', platform, arch, `ffprobe${ext}`);
+    if (fs.existsSync(candidate2)) return candidate2;
+    // Fallback to same folder
     const candidate = path.join(dir, `ffprobe${ext}`);
     if (fs.existsSync(candidate)) return candidate;
   }
@@ -131,8 +147,8 @@ function langLabel(code?: string): string {
   return LANG_NAMES[code.toLowerCase().slice(0, 3)] ?? code.toUpperCase();
 }
 
-function runProbe(filePath: string): Promise<ProbeResult> {
-  return new Promise(resolve => {
+async function runProbe(filePath: string): Promise<ProbeResult> {
+  const ffprobeResult = await new Promise<ProbeResult | null>(resolve => {
     const proc = spawn(FFPROBE, [
       '-v', 'quiet',
       '-print_format', 'json',
@@ -144,7 +160,8 @@ function runProbe(filePath: string): Promise<ProbeResult> {
     let out = '';
     proc.stdout.on('data', (d: Buffer) => { out += d.toString(); });
 
-    proc.on('close', () => {
+    proc.on('close', (code) => {
+      if (code !== 0) { resolve(null); return; }
       try {
         const json = JSON.parse(out) as {
           format?: { duration?: string; bit_rate?: string; size?: string };
@@ -213,12 +230,76 @@ function runProbe(filePath: string): Promise<ProbeResult> {
           subtitleTracks,
         });
       } catch {
-        resolve({
-          codec: 'unknown', width: 0, height: 0, bitrateBps: 0,
-          audioStreams: 0, durationSecs: 0, fileSizeBytes: 0,
-          audioTracks: [], subtitleTracks: [],
+        resolve(null);
+      }
+    });
+
+    proc.on('error', () => {
+      resolve(null);
+    });
+  });
+
+  if (ffprobeResult && ffprobeResult.codec !== 'unknown') {
+    return ffprobeResult;
+  }
+
+  // Fallback to ffmpeg -i parsing
+  console.log(`[probeCache] ffprobe failed for ${path.basename(filePath)} — trying ffmpeg fallback`);
+  return new Promise(resolve => {
+    const proc = spawn(FFMPEG, ['-i', filePath]);
+    let stderr = '';
+    proc.stderr.on('data', (d: Buffer) => { stderr += d.toString(); });
+
+    proc.on('close', () => {
+      const durationMatch = stderr.match(/Duration:\s*(\d{2}):(\d{2}):(\d{2})\.(\d{2})/);
+      let durationSecs = 0;
+      if (durationMatch) {
+        durationSecs = parseInt(durationMatch[1], 10) * 3600
+          + parseInt(durationMatch[2], 10) * 60
+          + parseInt(durationMatch[3], 10)
+          + parseFloat(`0.${durationMatch[4]}`);
+      }
+
+      const videoStreamMatch = stderr.match(/Stream #\d+:\d+.*Video:\s*([a-zA-Z0-9_-]+)/);
+      const codec = videoStreamMatch ? videoStreamMatch[1].toLowerCase() : 'unknown';
+
+      let width = 0, height = 0;
+      const resMatch = stderr.match(/Stream #\d+:\d+.*Video:.*?\s*(\d{3,5})x(\d{3,5})/);
+      if (resMatch) {
+        width = parseInt(resMatch[1], 10);
+        height = parseInt(resMatch[2], 10);
+      }
+
+      const audioMatches = stderr.match(/Stream #\d+:\d+.*Audio:/g);
+      const audioStreams = audioMatches ? audioMatches.length : 0;
+
+      let fileSizeBytes = 0;
+      try { fileSizeBytes = fs.statSync(filePath).size; } catch { /* ignore */ }
+
+      const audioTracks = [];
+      for (let i = 0; i < audioStreams; i++) {
+        audioTracks.push({
+          index: i,
+          streamIndex: i + 1,
+          language: 'und',
+          label: `Audio Track ${i + 1}`,
+          codec: 'aac',
+          channels: 2,
+          isDefault: i === 0,
         });
       }
+
+      resolve({
+        codec,
+        width,
+        height,
+        bitrateBps: 0,
+        audioStreams,
+        durationSecs,
+        fileSizeBytes,
+        audioTracks,
+        subtitleTracks: [],
+      });
     });
 
     proc.on('error', () => {

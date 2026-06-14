@@ -56,6 +56,12 @@ function resolveFfprobe(): string {
   if (process.env.FFMPEG_PATH) {
     const dir = path.dirname(process.env.FFMPEG_PATH);
     const ext = process.platform === 'win32' ? '.exe' : '';
+    const platform = process.platform;
+    const arch = process.arch;
+    // Check local package directory layout first
+    const candidate2 = path.join(dir, '..', 'ffprobe-bin', platform, arch, `ffprobe${ext}`);
+    if (fs.existsSync(candidate2)) { _ffprobe = candidate2; return _ffprobe; }
+    // Fallback to same folder
     const candidate = path.join(dir, `ffprobe${ext}`);
     if (fs.existsSync(candidate)) { _ffprobe = candidate; return _ffprobe; }
   }
@@ -147,13 +153,11 @@ export interface CodecInfo {
 const BROWSER_SAFE_CODECS = new Set(['h264', 'avc1', 'vp8', 'vp9', 'av1', 'theora']);
 
 export async function probeCodec(filePath: string): Promise<CodecInfo> {
-  // 15-second timeout — ffprobe can hang indefinitely on corrupt or network-
-  // mounted files. Without this guard the player page never finishes loading.
-  return new Promise(resolve => {
+  const ffprobeResult = await new Promise<CodecInfo | null>(resolve => {
     const timer = setTimeout(() => {
       probe.kill('SIGTERM');
-      console.warn(`[hls] ffprobe timed out for ${path.basename(filePath)} — assuming safe codec`);
-      resolve({ codec: 'unknown', needsTranscode: false });
+      console.warn(`[hls] ffprobe timed out for ${path.basename(filePath)}`);
+      resolve(null);
     }, 15_000);
 
     const probe = spawn(FFPROBE(), [
@@ -166,20 +170,45 @@ export async function probeCodec(filePath: string): Promise<CodecInfo> {
 
     let out = '';
     probe.stdout.on('data', (d: Buffer) => { out += d.toString(); });
-    probe.on('close', () => {
+    probe.on('close', (code) => {
       clearTimeout(timer);
+      if (code !== 0) { resolve(null); return; }
       try {
         const json = JSON.parse(out) as { streams?: Array<{ codec_name?: string }> };
         const codec = json.streams?.[0]?.codec_name ?? 'unknown';
-        // hevc/H.265 and any unrecognised codec need transcoding.
-        // BROWSER_SAFE_CODECS intentionally excludes hevc — no contradiction.
         const needsTranscode = !BROWSER_SAFE_CODECS.has(codec);
         resolve({ codec, needsTranscode });
       } catch {
-        resolve({ codec: 'unknown', needsTranscode: false });
+        resolve(null);
       }
     });
-    probe.on('error', () => { clearTimeout(timer); resolve({ codec: 'unknown', needsTranscode: false }); });
+    probe.on('error', () => {
+      clearTimeout(timer);
+      resolve(null);
+    });
+  });
+
+  if (ffprobeResult && ffprobeResult.codec !== 'unknown') {
+    return ffprobeResult;
+  }
+
+  // Fallback to ffmpeg -i parsing
+  console.log(`[hls] ffprobe failed for ${path.basename(filePath)} — trying ffmpeg fallback`);
+  return new Promise(resolve => {
+    const proc = spawn(FFMPEG(), ['-i', filePath]);
+    let stderr = '';
+    proc.stderr.on('data', (d: Buffer) => { stderr += d.toString(); });
+
+    proc.on('close', () => {
+      const videoStreamMatch = stderr.match(/Stream #\d+:\d+.*Video:\s*([a-zA-Z0-9_-]+)/);
+      const codec = videoStreamMatch ? videoStreamMatch[1].toLowerCase() : 'unknown';
+      const needsTranscode = !BROWSER_SAFE_CODECS.has(codec);
+      resolve({ codec, needsTranscode });
+    });
+
+    proc.on('error', () => {
+      resolve({ codec: 'unknown', needsTranscode: true });
+    });
   });
 }
 
