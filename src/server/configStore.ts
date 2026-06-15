@@ -398,10 +398,29 @@ export function detectAndSyncProwlarrApiKey(): void {
 
     const detectedKey = detectLocalProwlarrApiKey();
     let apiKey = config.prowlarrApiKey;
+    let didChange = false;
+    const updates: Partial<AppConfig> = {};
+
     if (detectedKey && detectedKey !== config.prowlarrApiKey) {
       console.log(`[prowlarr] Auto-detected local Prowlarr API key: ${detectedKey.slice(0, 4)}...`);
-      writeConfig({ prowlarrApiKey: detectedKey });
+      updates.prowlarrApiKey = detectedKey;
       apiKey = detectedKey;
+      didChange = true;
+    }
+
+    // Ensure the prowlarr torrent source is enabled if credentials exist
+    const prowlarrSource = config.torrentSources?.find(s => s.type === 'prowlarr');
+    const hasCreds = !!(config.prowlarrUrl && apiKey);
+    if (hasCreds && (!prowlarrSource || !prowlarrSource.enabled)) {
+      console.log('[prowlarr] Credentials present but source disabled. Enabling Prowlarr source...');
+      updates.torrentSources = (config.torrentSources ?? DEFAULT_TORRENT_SOURCES).map(s =>
+        s.type === 'prowlarr' ? { ...s, enabled: true } : s
+      );
+      didChange = true;
+    }
+
+    if (didChange) {
+      writeConfig(updates);
     }
 
     if (config.prowlarrUrl && apiKey) {
