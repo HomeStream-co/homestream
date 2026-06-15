@@ -36,9 +36,13 @@ async function poll(): Promise<void> {
     return; // qBit reachable but API call failed — try again next cycle
   }
 
-  // Load all qBit jobs that are still in 'queued' or 'downloading' state
+  // Load all qBit jobs that are in 'queued', 'downloading', or 'error' state (max 3 retries)
   const pendingJobs = getAllPersistedJobs().filter(
-    j => j.backend === 'qbittorrent' && (j.status === 'queued' || j.status === 'downloading'),
+    j => j.backend === 'qbittorrent' && (
+      j.status === 'queued' ||
+      j.status === 'downloading' ||
+      (j.status === 'error' && (j.errorCount ?? 0) < 3)
+    ),
   );
 
   for (const job of pendingJobs) {
@@ -89,7 +93,12 @@ async function poll(): Promise<void> {
     })
       .catch(err => {
         console.error(`[qbit-watcher] Pipeline failed for "${job.title}":`, err);
-        updateJobStatus(job.jobId, 'error');
+        const errorCount = (job.errorCount ?? 0) + 1;
+        upsertJob({
+          ...job,
+          status: 'error',
+          errorCount,
+        });
       })
       .finally(() => {
         processing.delete(job.infoHash);

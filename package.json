@@ -1,6 +1,6 @@
 {
   "name": "v8-app-template",
-  "version": "2.2.25",
+  "version": "2.2.26",
   "type": "module",
   "imports": {
     "#airo/secrets": "./airo-secrets/src/index.ts"

@@ -32,7 +32,7 @@ import { fetchOMDB } from './mediaUtils.js';
 import { runEnrichmentInBackground, runCaptionFetchInBackground } from './mediaUtils.js';
 import { upsertJob, getPersistedJob } from './downloadJobStore.js';
 import { readConfig } from './configStore.js';
-import { deleteTorrent } from './qbittorrentClient.js';
+import { deleteTorrent, pauseTorrent } from './qbittorrentClient.js';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -63,20 +63,37 @@ export interface PostDownloadParams {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function moveFile(src: string, dest: string): void {
+async function moveFile(src: string, dest: string, retries = 5): Promise<void> {
   if (src === dest) return;
   if (!fs.existsSync(src)) return;
   const destDir = path.dirname(dest);
   if (!fs.existsSync(destDir)) {
     fs.mkdirSync(destDir, { recursive: true });
   }
-  try {
-    fs.renameSync(src, dest);
-  } catch (err: any) {
-    if (err.code === 'EXDEV') {
-      fs.copyFileSync(src, dest);
-      fs.unlinkSync(src);
-    } else {
+
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      fs.renameSync(src, dest);
+      console.log(`[pipeline] ✓ Moved: ${src} → ${dest}`);
+      return;
+    } catch (err: any) {
+      const code = err.code;
+      if ((code === 'EBUSY' || code === 'EPERM' || code === 'EACCES') && attempt < retries) {
+        console.warn(`[pipeline] ⚠️ File locked (attempt ${attempt + 1}/${retries + 1}), waiting...`);
+        await new Promise(resolve => setTimeout(resolve, 2000 * Math.pow(1.5, attempt)));
+        continue;
+      }
+      if (code === 'EXDEV' || (code === 'EBUSY' && attempt === retries)) {
+        console.log(`[pipeline] 🔄 Falling back to copy+delete for ${src}`);
+        fs.copyFileSync(src, dest);
+        try {
+          fs.unlinkSync(src);
+        } catch (e) {
+          console.warn('[pipeline] Could not delete original after copy:', e);
+        }
+        console.log(`[pipeline] ✓ Copied: ${src} → ${dest}`);
+        return;
+      }
       throw err;
     }
   }
@@ -192,6 +209,18 @@ export async function runPostDownloadPipeline(params: PostDownloadParams): Promi
   const existingJob = getPersistedJob(jobId);
   if (existingJob) upsertJob({ ...existingJob, status: 'transcoding' });
 
+  // ── Pause qBit torrent immediately to release file lock ──
+  if (backend === 'qbittorrent' && existingJob?.infoHash) {
+    try {
+      console.log(`[pipeline] Pausing torrent ${existingJob.infoHash} to release file lock...`);
+      await pauseTorrent(existingJob.infoHash);
+      // Brief settle to let qBit release locks
+      await new Promise(resolve => setTimeout(resolve, 3000));
+    } catch (pauseErr) {
+      console.warn(`[pipeline] Failed to pause torrent ${existingJob.infoHash}:`, pauseErr);
+    }
+  }
+
   // ── 2. Fetch OMDB metadata ──
   const lookupTitle = type === 'series'
     ? title.replace(/\s+S\d{2}E\d{2}$/i, '').trim()
@@ -280,7 +309,7 @@ export async function runPostDownloadPipeline(params: PostDownloadParams): Promi
     const destFilename = cleanFilename(omdb?.Title, omdb?.Year, srcFilename, srcExt);
     const destPath     = path.join(targetDir, destFilename);
     try {
-      moveFile(filePath, destPath);
+      await moveFile(filePath, destPath);
     } catch (moveErr) {
       console.error(`[pipeline] Failed to move file to ${targetDir}:`, moveErr);
     }
@@ -338,7 +367,7 @@ export async function runPostDownloadPipeline(params: PostDownloadParams): Promi
       finalFilename = cleanFilename(omdb?.Title, omdb?.Year, srcFilename, srcExt);
       finalPath     = path.join(targetDir, finalFilename);
       console.log(`[pipeline] Reverted to original, moving: ${filePath} → ${finalPath}`);
-      moveFile(filePath, finalPath);
+      await moveFile(filePath, finalPath);
     }
     // The _tc.mp4 is already at outputPath — no move needed
     console.log(`[pipeline] ✓ Transcode complete for "${resolvedTitle}" — saved ${Math.round((result.savedBytes ?? 0) / 1e6)} MB`);
@@ -348,7 +377,7 @@ export async function runPostDownloadPipeline(params: PostDownloadParams): Promi
     finalFilename = cleanFilename(omdb?.Title, omdb?.Year, srcFilename, srcExt);
     finalPath     = path.join(targetDir, finalFilename);
     try {
-      moveFile(filePath, finalPath);
+      await moveFile(filePath, finalPath);
     } catch (moveErr) {
       console.error(`[pipeline] Also failed to move original:`, moveErr);
     }
