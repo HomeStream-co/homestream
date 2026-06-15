@@ -864,9 +864,6 @@ function StreamingTab({ onDownload, libraryTitles, watchlist, onAddToWatchlist, 
   if (!selectedService) {
     return (
       <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-8 rounded-2xl overflow-hidden border border-border/40 shadow-xl bg-black/50 flex items-center justify-center max-w-4xl mx-auto aspect-[16/5]">
-          <img src="/discover-logos.png" alt="Streaming Services" className="w-full h-full object-cover object-center opacity-85 hover:opacity-100 transition-opacity duration-300" />
-        </div>
         <p className="text-muted-foreground text-sm mb-6">
           Browse what's currently streaming — click a service to see their full catalog, then download any title directly to your server.
         </p>

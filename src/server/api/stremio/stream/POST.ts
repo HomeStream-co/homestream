@@ -36,7 +36,7 @@ interface ProwlarrResult {
   size?: number;
   publishDate?: string;
 }
-interface ProwlarrResponse { results?: ProwlarrResult[] }
+type ProwlarrResponse = ProwlarrResult[] | { results?: ProwlarrResult[] };
 
 interface NyaaItem {
   id: number;
@@ -145,11 +145,12 @@ async function fetchProwlarr(
     clearTimeout(t);
     if (!res.ok) return [];
     const data = await res.json() as ProwlarrResponse;
-    const mapped: (StreamResult | null)[] = (data.results ?? [])
+    const results = Array.isArray(data) ? data : (data.results ?? []);
+    const mapped: (StreamResult | null)[] = results
       .filter(r => r.magnetUrl || r.infoHash)
       .map(r => {
         const infoHash = r.infoHash ?? r.magnetUrl?.match(/btih:([a-fA-F0-9]{40})/i)?.[1] ?? '';
-        const magnet = r.magnetUrl ?? (infoHash ? `magnet:?xt=urn:btih:${infoHash}` : '');
+        const magnet = infoHash ? `magnet:?xt=urn:btih:${infoHash}` : (r.magnetUrl ?? '');
         if (!infoHash && !magnet) return null;
         return {
           name: r.title,
