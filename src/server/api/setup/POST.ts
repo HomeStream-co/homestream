@@ -128,7 +128,13 @@ export default async function handler(req: Request, res: Response) {
         ];
         const updates: Record<string, unknown> = {};
         for (const key of allowed) {
-          if (fields[key] !== undefined) updates[key] = fields[key];
+          if (fields[key] !== undefined) {
+            const val = fields[key];
+            if (typeof val === 'string' && val.includes('•')) {
+              continue;
+            }
+            updates[key] = val;
+          }
         }
         // Normalise URL fields — add http:// if user typed bare host:port
         if (updates.qbitUrl)     updates.qbitUrl     = normalizeUrl(updates.qbitUrl as string);
