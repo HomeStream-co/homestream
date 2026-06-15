@@ -314,6 +314,11 @@ app.get("/api/jellyfin/Videos", jellyfinVideosGet);
 app.get("/api/jellyfin/Videos/:id/stream", jellyfinVideoStreamGet);
 // library
 app.post("/api/library/scan", libraryScanPost);
+app.post("/api/library/rescan", async (req, res) => {
+  const { scanLibrary } = await import("./libraryScanner.js");
+  const result = await scanLibrary();
+  res.json(result);
+});
 app.get("/api/library/storage", libraryStorageGet);
 app.patch("/api/library/storage", libraryStoragePatch);
 app.patch("/api/library/storage/drive", libraryStorageDrivePatch);
