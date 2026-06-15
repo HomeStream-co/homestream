@@ -177,6 +177,15 @@ import watchlistDeleteById from "./api/watchlist/[id]/DELETE";
 import { seoRoutes } from "../lib/seo-routes";
 import { startQbitCompletionWatcher } from "./qbitCompletionWatcher";
 import { runStartupMediaSync } from "./startupMediaSync";
+import { runStartupCleanup } from "./startupCleanup";
+import { runOwnershipSeed } from "./ownershipSeed";
+import { detectAndSyncProwlarrApiKey, readConfig } from "./configStore";
+import { startJellyfinDiscovery } from "./jellyfinDiscovery";
+import { scheduleAllSubscriptions } from "./episodeScheduler";
+import { startScheduler as startScheduledDownloads } from "./scheduledDownloads";
+import { startVpnKillSwitch } from "./vpnKillSwitch";
+import { startMDNS } from "./mdnsService";
+import { dataDir } from "./dataDir";
 
 function normalizeCommerceApiBaseUrlEnv() {
 	if (process.env.GODADDY_API_BASE_URL) return;
@@ -211,6 +220,7 @@ app.use((req, res, next) => {
   }
 });
 app.use(cookieParser());
+app.use('/tmdb-images', express.static(join(dataDir(), 'tmdb-images')));
 
 
 
@@ -665,6 +675,78 @@ if (import.meta.env.PROD) {
 	const host = process.env.HOST || "0.0.0.0";
 	const server = app.listen(port, host, () => {
 		console.log(`Ready at http://${host}:${port}`);
+		
+		// Run startup cleanup (clear stuck transcoding flags in database)
+		try {
+			runStartupCleanup();
+		} catch (err: any) {
+			console.error("[startup] Cleanup failed:", err.message);
+		}
+
+		// Run ownership seed
+		runOwnershipSeed().catch((err: Error) => {
+			console.warn('[ownership] Seed failed (non-fatal):', err.message);
+		});
+
+		// Prowlarr key sync
+		try {
+			detectAndSyncProwlarrApiKey();
+		} catch (err: any) {
+			console.warn('[startup] Prowlarr key sync failed:', err.message);
+		}
+
+		// Start folder watcher if enabled
+		const cfg = readConfig();
+		if (cfg.watchFolderEnabled && cfg.downloadsDir) {
+			import('./folderWatcher.js').then(({ startWatcher }) => {
+				startWatcher(cfg.downloadsDir!);
+				console.log(`[startup] Folder watcher resumed → ${cfg.downloadsDir}`);
+			}).catch((err: Error) => console.warn('[startup] Folder watcher failed to resume:', err.message));
+		}
+
+		// Start Jellyfin discovery
+		try {
+			startJellyfinDiscovery(port);
+		} catch (err: any) {
+			console.warn('[jellyfin-discovery] Failed to start:', err.message);
+		}
+
+		// Episode subscriptions scheduler
+		try {
+			scheduleAllSubscriptions();
+		} catch (err: any) {
+			console.warn('[scheduler] Failed to start:', err.message);
+		}
+
+		// Scheduled downloads
+		try {
+			startScheduledDownloads();
+		} catch (err: any) {
+			console.warn('[scheduled-downloads] Failed to start:', err.message);
+		}
+
+		// VPN kill switch
+		try {
+			startVpnKillSwitch();
+		} catch (err: any) {
+			console.warn('[vpn-killswitch] Failed to start:', err.message);
+		}
+
+		// mDNS service
+		try {
+			startMDNS(port);
+		} catch (err: any) {
+			console.warn('[mdns] Failed to start:', err.message);
+		}
+
+		// Periodic segment cleanup (6 hours)
+		const SIX_HOURS_MS = 6 * 60 * 60 * 1000;
+		setInterval(() => {
+			import('./startupCleanup.js').then(({ runHlsPeriodicCleanup }) => {
+				runHlsPeriodicCleanup();
+			}).catch(() => {});
+		}, SIX_HOURS_MS);
+
 		// Attach WebSocket remote control (/ws/remote).
 		// Dynamic import keeps 'ws' (a CJS package) out of the top-level module
 		// graph so Vite's ESM runner doesn't choke on `module is not defined`.

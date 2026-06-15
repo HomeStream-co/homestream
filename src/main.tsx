@@ -6,6 +6,37 @@ import App from './App';
 import './styles/globals.css';
 import { connectNotificationStream } from './lib/notificationStore';
 
+// Auto-reload on stale chunk loading errors (occurs after rebuilds / updates)
+if (typeof window !== 'undefined') {
+  const handleChunkError = (error: any) => {
+    const msg = String(error?.message || error || '');
+    if (
+      msg.includes('Failed to fetch dynamically imported module') ||
+      msg.includes('Importing a module script failed') ||
+      msg.includes('error loading dynamically imported module') ||
+      msg.includes('Unable to preload CSS for')
+    ) {
+      const CHUNK_RELOAD_KEY = 'hs_global_chunk_reload_at';
+      const CHUNK_RELOAD_COOLDOWN_MS = 10_000;
+      const now = Date.now();
+      const lastReload = parseInt(sessionStorage.getItem(CHUNK_RELOAD_KEY) ?? '0', 10);
+      if (now - lastReload >= CHUNK_RELOAD_COOLDOWN_MS) {
+        console.warn('[HomeStream] Global: stale chunk detected — reloading page…');
+        sessionStorage.setItem(CHUNK_RELOAD_KEY, String(now));
+        window.location.reload();
+      }
+    }
+  };
+
+  window.addEventListener('unhandledrejection', (event) => {
+    handleChunkError(event.reason);
+  });
+
+  window.addEventListener('error', (event) => {
+    handleChunkError(event.error || event.message);
+  }, true);
+}
+
 if (import.meta.env.MODE === 'development') {
   const meta = document.createElement('meta');
   meta.name = 'robots';
