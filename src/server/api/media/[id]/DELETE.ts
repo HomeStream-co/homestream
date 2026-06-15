@@ -6,6 +6,8 @@ import { removeFromAllWatchlists } from '../../../watchlistStore.js';
 import { requireAuth } from '../../../authMiddleware.js';
 import { dataDir } from '../../../dataDir.js';
 import { killTranscode } from '../../../transcodeWorker.js';
+import { getAllTorrents, deleteTorrent } from '../../../qbittorrentClient.js';
+import { deleteJob, getAllPersistedJobs } from '../../../downloadJobStore.js';
 
 const UPLOADS_DIR = path.join(dataDir(), 'uploads');
 
@@ -13,7 +15,7 @@ const UPLOADS_DIR = path.join(dataDir(), 'uploads');
  * Safely delete a file that belongs to this media item.
  *
  * Accepts either:
- *   - A bare filename (basename only) → resolved inside uploads/
+ *   - A bare filename (basename only) → resolved inside uploads/ (or fallbackDir)
  *   - An absolute path → used directly if it exists
  *
  * In both cases we verify the resolved path exists before unlinking.
@@ -22,7 +24,7 @@ const UPLOADS_DIR = path.join(dataDir(), 'uploads');
  * We DO prevent path traversal by rejecting any path that contains '..'
  * after normalisation.
  */
-function safeDelete(fileRef: string): void {
+function safeDelete(fileRef: string, fallbackDir = UPLOADS_DIR): void {
   if (!fileRef) return;
 
   // Reject path traversal attempts BEFORE normalisation.
@@ -34,7 +36,7 @@ function safeDelete(fileRef: string): void {
   // Normalise to an absolute path
   const resolved = path.isAbsolute(fileRef)
     ? path.normalize(fileRef)
-    : path.resolve(UPLOADS_DIR, path.basename(fileRef));
+    : path.resolve(fallbackDir, path.basename(fileRef));
 
   try {
     if (fs.existsSync(resolved)) fs.unlinkSync(resolved);
@@ -58,14 +60,70 @@ export default async function handler(req: Request, res: Response) {
     // Prefer the absolute filePath stored by the upload/watcher pipeline;
     // fall back to the bare filename for legacy library entries.
     const primaryPath = (item.filePath ?? item.filepath ?? item.filename) as string | undefined;
-    if (primaryPath) safeDelete(primaryPath);
+    const fallbackDir = primaryPath && path.isAbsolute(primaryPath)
+      ? path.dirname(primaryPath)
+      : UPLOADS_DIR;
+
+    if (primaryPath) safeDelete(primaryPath, fallbackDir);
 
     // Also delete the original file if it differs (e.g. transcode was reverted
     // and the original was kept alongside a failed _tc.mp4, or the original
     // was a different extension before remux).
     const originalRef = item.originalFilename as string | undefined;
     if (originalRef && originalRef !== path.basename(primaryPath ?? '')) {
-      safeDelete(originalRef);
+      safeDelete(originalRef, fallbackDir);
+    }
+
+    // ── Clean up associated torrents and jobs ──
+    const originalFilename = item.originalFilename as string | undefined;
+    if (originalFilename) {
+      try {
+        const torrents = await getAllTorrents();
+        const lowerOriginal = originalFilename.toLowerCase();
+        for (const t of torrents) {
+          const matchName = t.name && t.name.toLowerCase().includes(lowerOriginal);
+          const matchContent = t.content_path && t.content_path.toLowerCase().includes(lowerOriginal);
+          const matchSave = t.save_path && t.save_path.toLowerCase().includes(lowerOriginal);
+
+          if (matchName || matchContent || matchSave) {
+            console.log(`[delete] Found matching torrent in qBittorrent: ${t.name} (${t.hash}). Deleting...`);
+            await deleteTorrent(t.hash, true);
+
+            // Delete corresponding job by infoHash
+            const jobs = getAllPersistedJobs();
+            const job = jobs.find(j => j.infoHash?.toLowerCase() === t.hash.toLowerCase());
+            if (job) {
+              console.log(`[delete] Deleting corresponding download job: ${job.jobId}`);
+              deleteJob(job.jobId);
+            }
+          }
+        }
+      } catch (err) {
+        console.error(`[delete] Failed to clean up matching torrents in qBittorrent:`, err);
+      }
+    }
+
+    // Also clean up any job whose title matches
+    try {
+      const jobs = getAllPersistedJobs();
+      const mediaTitle = item.title as string | undefined;
+      const mediaSeason = item.season as number | undefined;
+      const mediaEpisode = item.episode as number | undefined;
+
+      const matchedJob = jobs.find(j => {
+        const titleMatch = mediaTitle && j.title && j.title.toLowerCase() === mediaTitle.toLowerCase();
+        const typeMatch = j.type === item.type;
+        const seasonMatch = j.season === mediaSeason;
+        const episodeMatch = j.episode === mediaEpisode;
+        return titleMatch && typeMatch && seasonMatch && episodeMatch;
+      });
+
+      if (matchedJob) {
+        console.log(`[delete] Deleting matched download job: ${matchedJob.jobId}`);
+        deleteJob(matchedJob.jobId);
+      }
+    } catch (err) {
+      console.error(`[delete] Failed to clean up job by title match:`, err);
     }
 
     // Remove from library (serialised through write queue)

@@ -33,6 +33,7 @@ import { fetchOMDB } from './mediaUtils.js';
 import { runEnrichmentInBackground, runCaptionFetchInBackground } from './mediaUtils.js';
 import { upsertJob, getPersistedJob } from './downloadJobStore.js';
 import { readConfig } from './configStore.js';
+import { deleteTorrent } from './qbittorrentClient.js';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -59,6 +60,27 @@ export interface PostDownloadParams {
   jobId: string;
   /** Which backend produced this file */
   backend: 'real-debrid' | 'qbittorrent';
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function moveFile(src: string, dest: string): void {
+  if (src === dest) return;
+  if (!fs.existsSync(src)) return;
+  const destDir = path.dirname(dest);
+  if (!fs.existsSync(destDir)) {
+    fs.mkdirSync(destDir, { recursive: true });
+  }
+  try {
+    fs.renameSync(src, dest);
+  } catch (err: any) {
+    if (err.code === 'EXDEV') {
+      fs.copyFileSync(src, dest);
+      fs.unlinkSync(src);
+    } else {
+      throw err;
+    }
+  }
 }
 
 // ── Category resolver ─────────────────────────────────────────────────────────
@@ -125,14 +147,23 @@ export async function runPostDownloadPipeline(params: PostDownloadParams): Promi
   const fileSize = fs.statSync(filePath).size;
 
   const cfg = readConfig();
+  const targetDir = cfg.libraryDir || path.dirname(filePath);
+
   if (cfg.autoTranscode === false) {
-    // Skip transcoding — add file directly to the library in-place
+    // Skip transcoding — move file to targetDir and add to library
+    const finalPath = path.join(targetDir, filename);
+    try {
+      moveFile(filePath, finalPath);
+    } catch (moveErr) {
+      console.error(`[pipeline] Failed to move file to targetDir:`, moveErr);
+    }
+
     const mediaItem: Record<string, unknown> = {
       id: mediaId,
       filename,
       originalFilename: filename,
-      filepath: filePath,
-      filePath,
+      filepath: finalPath,
+      filePath: finalPath,
       title: omdb?.Title || title,
       year: omdb?.Year || year || 'Unknown',
       genre: genres,
@@ -172,13 +203,23 @@ export async function runPostDownloadPipeline(params: PostDownloadParams): Promi
     const doneJob = getPersistedJob(jobId);
     if (doneJob) upsertJob({ ...doneJob, status: 'done', progress: 100, completedAt: new Date().toISOString() });
 
+    // Clean up torrent from qBittorrent
+    if (backend === 'qbittorrent' && doneJob?.infoHash) {
+      try {
+        console.log(`[pipeline] Auto-removing torrent ${doneJob.infoHash} from qBittorrent`);
+        await deleteTorrent(doneJob.infoHash, true);
+      } catch (err) {
+        console.error(`[pipeline] Failed to auto-remove torrent ${doneJob.infoHash} from qBittorrent:`, err);
+      }
+    }
+
     runEnrichmentInBackground(mediaId).catch(() => {});
     runCaptionFetchInBackground(mediaId).catch(() => {});
     return;
   }
 
   const outputFilename = filename.replace(/\.[^.]+$/, '') + '_tc.mp4';
-  const outputPath = path.join(path.dirname(filePath), outputFilename);
+  const outputPath = path.join(targetDir, outputFilename);
 
   // ── 3. Build initial library item (transcoding: true) ──
   const mediaItem: Record<string, unknown> = {
@@ -229,7 +270,13 @@ export async function runPostDownloadPipeline(params: PostDownloadParams): Promi
   // ── 5. Transcode ──
   try {
     const result = await transcodeFile(mediaId, filePath, outputPath);
-    const finalPath = path.join(path.dirname(filePath), result.outputFilename);
+    const finalPath = path.join(targetDir, result.outputFilename);
+
+    if (result.outputFilename === filename) {
+      // Reverted to original — move original to targetDir
+      console.log(`[pipeline] Reverted to original, moving file to targetDir: ${filePath} -> ${finalPath}`);
+      moveFile(filePath, finalPath);
+    }
 
     await writeLibrary(lib => {
       const idx = lib.findIndex(m => (m as { id: string }).id === mediaId);
@@ -251,10 +298,21 @@ export async function runPostDownloadPipeline(params: PostDownloadParams): Promi
   } catch (transcodeErr) {
     console.error(`[pipeline] Transcode failed for "${title}":`, transcodeErr);
     // Keep the item in the library with the original file — still playable
+    const finalPath = path.join(targetDir, filename);
+    try {
+      console.log(`[pipeline] Transcode failed, moving original to targetDir: ${filePath} -> ${finalPath}`);
+      moveFile(filePath, finalPath);
+    } catch (moveErr) {
+      console.error(`[pipeline] Failed to move original file to targetDir after transcode failure:`, moveErr);
+    }
+
     await writeLibrary(lib => {
       const idx = lib.findIndex(m => (m as { id: string }).id === mediaId);
       if (idx !== -1) {
-        (lib[idx] as Record<string, unknown>).transcoding = false;
+        const item = lib[idx] as Record<string, unknown>;
+        item.transcoding = false;
+        item.filepath = finalPath;
+        item.filePath = finalPath;
       }
       return lib;
     });
@@ -264,7 +322,17 @@ export async function runPostDownloadPipeline(params: PostDownloadParams): Promi
   const doneJob = getPersistedJob(jobId);
   if (doneJob) upsertJob({ ...doneJob, status: 'done', progress: 100, completedAt: new Date().toISOString() });
 
-  // ── 7. Background enrichment + captions ──
+  // ── 7. Clean up torrent from qBittorrent ──
+  if (backend === 'qbittorrent' && doneJob?.infoHash) {
+    try {
+      console.log(`[pipeline] Auto-removing torrent ${doneJob.infoHash} from qBittorrent`);
+      await deleteTorrent(doneJob.infoHash, true);
+    } catch (err) {
+      console.error(`[pipeline] Failed to auto-remove torrent ${doneJob.infoHash} from qBittorrent:`, err);
+    }
+  }
+
+  // ── 8. Background enrichment + captions ──
   runEnrichmentInBackground(mediaId).catch(() => {});
   runCaptionFetchInBackground(mediaId).catch(() => {});
 }
