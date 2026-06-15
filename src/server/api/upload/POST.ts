@@ -4,7 +4,7 @@ import path from 'path';
 import multer from 'multer';
 import { createJob } from '../../transcodeStore.js';
 import { transcodeFile } from '../../transcodeWorker.js';
-import { writeLibrary } from '../../libraryStore.js';
+import { readLibrary, writeLibrary } from '../../libraryStore.js';
 import { requireAuth } from '../../authMiddleware.js';
 import {
   extractTitle,
@@ -85,6 +85,19 @@ export default function handler(req: Request, res: Response) {
       const manualYear  = (req.body as Record<string, string>).year;
       const searchTitle = manualTitle || extractedTitle;
       const searchYear  = manualYear  || extractedYear;
+
+      // ── DEDUP CHECK: if same originalFilename already in library, skip re-upload ──
+      const existingLib = readLibrary<{ id: string; originalFilename?: string; filePath?: string; filepath?: string; transcoding?: boolean }>();
+      const duplicate = existingLib.find(
+        m => m.originalFilename === req.file!.originalname && !m.transcoding
+      );
+      if (duplicate) {
+        console.log(`[upload] Duplicate detected — "${req.file.originalname}" already in library as id=${duplicate.id}. Discarding re-upload.`);
+        // Remove the redundant uploaded file from disk
+        try { if (fs.existsSync(inputPath)) fs.unlinkSync(inputPath); } catch {}
+        try { if (fs.existsSync(tempInputPath)) fs.unlinkSync(tempInputPath); } catch {}
+        return res.status(200).json({ ...duplicate, transcodeId: duplicate.id, _deduplicated: true });
+      }
 
       // ── 2. Fetch OMDB metadata (graceful — works offline) ──
       const omdb = await fetchOMDB(searchTitle, searchYear);

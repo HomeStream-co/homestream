@@ -31,7 +31,7 @@ const VIDEO_EXTENSIONS = new Set([
 
 // Folders to skip — system/managed dirs that should never be scanned
 const SKIP_DIRS = new Set([
-  'downloads', 'uploads', '.trash', '@eaDir', '#recycle',
+  'downloads', 'uploads', 'library', '.trash', '@eaDir', '#recycle',
   '.ds_store', 'system volume information', '$recycle.bin',
   'lost+found', '.thumbnails', '.cache',
 ]);
@@ -57,7 +57,7 @@ export interface ImportResult {
 
 // ─── Walk directory recursively ───────────────────────────────────────────────
 
-function walkDir(dir: string, results: ScannedFile[] = []): ScannedFile[] {
+function walkDir(dir: string, results: ScannedFile[] = [], excludeAbsolute: Set<string> = new Set()): ScannedFile[] {
   if (!fs.existsSync(dir)) return results;
 
   let entries: fs.Dirent[];
@@ -72,7 +72,9 @@ function walkDir(dir: string, results: ScannedFile[] = []): ScannedFile[] {
 
     if (entry.isDirectory()) {
       if (SKIP_DIRS.has(entry.name.toLowerCase())) continue;
-      walkDir(fullPath, results);
+      // Skip directories that are explicitly excluded (e.g. the configured libraryDir)
+      if (excludeAbsolute.has(path.normalize(fullPath))) continue;
+      walkDir(fullPath, results, excludeAbsolute);
     } else if (entry.isFile()) {
       const ext = path.extname(entry.name).toLowerCase();
       if (!VIDEO_EXTENSIONS.has(ext)) continue;
@@ -94,20 +96,18 @@ function walkDir(dir: string, results: ScannedFile[] = []): ScannedFile[] {
 /**
  * Scan mediaDir for existing video files not yet in the library.
  * Returns a list of found files — does NOT import them yet.
+ * @param excludeDirs - absolute paths of managed dirs to skip (e.g. libraryDir, downloadsDir)
  */
-export function scanExistingMedia(mediaDir: string): ScanResult {
+export function scanExistingMedia(mediaDir: string, excludeDirs: string[] = []): ScanResult {
   const library = readLibrary<{ filePath?: string; filepath?: string; originalFilename?: string; filename?: string }>();
   const knownPaths = new Set([
     ...library.map(m => m.filePath ?? ''),
     ...library.map(m => m.filepath ?? ''),
   ]);
-  // FIX (🟡): Previously also deduplicated by bare filename (knownNames), which
-  // caused false-positive skips when two different directories contained files
-  // with the same name (e.g. /movies/movie.mkv and /shows/movie.mkv). The
-  // absolute-path check (knownPaths) is sufficient and correct — bare-name
-  // deduplication is removed.
 
-  const allFiles = walkDir(mediaDir);
+  const excludeAbsolute = new Set(excludeDirs.map(d => path.normalize(d)));
+
+  const allFiles = walkDir(mediaDir, [], excludeAbsolute);
   const newFiles: ScannedFile[] = [];
   let skipped = 0;
 

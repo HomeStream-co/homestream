@@ -36,6 +36,10 @@ build/
 .next/
 out/
 
+# Electron build output — contains large binaries (.exe, .zip, .asar) that
+# exceed GitHub's 100 MB file size limit. Never commit these.
+dist-electron/
+
 # Testing
 coverage/
 

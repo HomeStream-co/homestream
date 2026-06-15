@@ -42,7 +42,14 @@ async function scanPredownloadedMedia(): Promise<void> {
       return;
     }
 
-    const scanResult = scanExistingMedia(cfg.mediaDir);
+    // Build list of managed directories to EXCLUDE from the scan.
+    // These are directories that HomeStream actively manages — scanning them
+    // would cause duplicate library entries every time the server restarts.
+    const excludeDirs: string[] = [];
+    if (cfg.libraryDir)   excludeDirs.push(cfg.libraryDir);
+    if (cfg.downloadsDir) excludeDirs.push(cfg.downloadsDir);
+
+    const scanResult = scanExistingMedia(cfg.mediaDir, excludeDirs);
 
     if (scanResult.files.length === 0) {
       console.log(`[startup-sync] Pre-download scan: 0 new files (${scanResult.skipped} already in library)`);

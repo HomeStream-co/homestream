@@ -26,7 +26,7 @@
 import path from 'path';
 import fs from 'fs';
 import { randomUUID } from 'crypto';
-import { writeLibrary } from './libraryStore.js';
+import { readLibrary, writeLibrary } from './libraryStore.js';
 import { createJob } from './transcodeStore.js';
 import { transcodeFile } from './transcodeWorker.js';
 import { fetchOMDB } from './mediaUtils.js';
@@ -148,6 +148,26 @@ export async function runPostDownloadPipeline(params: PostDownloadParams): Promi
 
   const cfg = readConfig();
   const targetDir = cfg.libraryDir || path.dirname(filePath);
+
+  // ── DEDUP CHECK: prevent double-entry if pipeline fires twice for same content ──
+  const currentLib = readLibrary<{ id: string; imdbId?: string; title?: string; year?: string; transcoding?: boolean }>();
+  const resolvedTitle = omdb?.Title || title;
+  const resolvedYear = omdb?.Year || year;
+  const dup = currentLib.find(m => {
+    if (m.transcoding) return false; // never match an in-progress item
+    if (imdbId && m.imdbId && m.imdbId === imdbId) return true;
+    // fallback: same title + year
+    return m.title === resolvedTitle && m.year === resolvedYear;
+  });
+  if (dup) {
+    console.log(`[pipeline] Dedup — "${resolvedTitle}" already in library (id=${dup.id}). Skipping re-add.`);
+    const doneJob = getPersistedJob(jobId);
+    if (doneJob) upsertJob({ ...doneJob, status: 'done', progress: 100, completedAt: new Date().toISOString() });
+    if (backend === 'qbittorrent' && doneJob?.infoHash) {
+      deleteTorrent(doneJob.infoHash, true).catch(() => {});
+    }
+    return;
+  }
 
   if (cfg.autoTranscode === false) {
     // Skip transcoding — move file to targetDir and add to library
