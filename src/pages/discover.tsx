@@ -810,6 +810,70 @@ const STREAMING_SERVICES = [
 
 type ServiceId = typeof STREAMING_SERVICES[number]['id'];
 
+const renderLogo = (id: number) => {
+  switch (id) {
+    case 8: // Netflix
+      return (
+        <svg viewBox="0 0 24 32" xmlns="http://www.w3.org/2000/svg" className="h-full object-contain transition-transform group-hover:scale-105 duration-300">
+          <path d="M20.1 0h3.9v32h-3.9z" fill="#E50914"/>
+          <path d="M0 0h3.9v32H0z" fill="#E50914"/>
+          <path d="M0 0l20.1 32h3.9L3.9 0H0z" fill="#B81D24"/>
+        </svg>
+      );
+    case 9: // Prime Video
+      return (
+        <svg viewBox="0 0 80 32" xmlns="http://www.w3.org/2000/svg" className="h-full object-contain transition-transform group-hover:scale-105 duration-300">
+          <path d="M12 12h3c2.5 0 4 1 4 3s-1.5 3-4 3h-1.5v4H12v-10zm1.5 4H15c1 0 1.8-.3 1.8-1s-.8-1-1.8-1h-1.5V16zM22 14.5h2.5v1.5h.1c.4-1.2 1.3-2 2.5-2 .7 0 1.3.2 1.7.6l-.7 2c-.4-.3-.9-.5-1.5-.5-1.5 0-2.5 1-2.5 2.5v4.4H22v-8.5zM31 11h2.5v13.5H31V11zM36.5 14.5H39v1.5h.1c.4-1.2 1.3-2 2.5-2 .7 0 1.3.2 1.7.6l-.7 2c-.4-.3-.9-.5-1.5-.5-1.5 0-2.5 1-2.5 2.5v4.4H36.5v-8.5z" fill="#FFFFFF"/>
+          <path d="M48 16.5c0-2.5-2-4.5-4.5-4.5s-4.5 2-4.5 4.5 2 4.5 4.5 4.5 4.5-2 4.5-4.5zm-2.5 0c0 1.2-1 2-2 2s-2-.8-2-2 1-2 2-2 2 .8 2 2z" fill="#FFFFFF"/>
+          <path d="M8 22c15 6 35 6 48 0" stroke="#00A8E1" stroke-width="3" stroke-linecap="round" fill="none"/>
+          <path d="M56 22l-1.5-4.5 4.5 1.5-3 3z" fill="#00A8E1"/>
+        </svg>
+      );
+    case 1899: // Max
+      return (
+        <svg viewBox="0 0 64 24" xmlns="http://www.w3.org/2000/svg" className="h-full object-contain transition-transform group-hover:scale-105 duration-300">
+          <path d="M2 4h4.5l4.5 8 4.5-8H20v16h-4V9l-4 7-4-7v11H2V4z" fill="#002BE7"/>
+          <path d="M28 8c-3.3 0-6 2.7-6 6s2.7 6 6 6 6-2.7 6-6-2.7-6-6-6zm0 8.5c-1.4 0-2.5-1.1-2.5-2.5s1.1-2.5 2.5-2.5 2.5 1.1 2.5 2.5-1.1 2.5-2.5 2.5z" fill="#FFFFFF"/>
+          <path d="M42 4h4.5l3.5 6 3.5-6H58l-5.5 9L58 20h-4.5l-3.5-6-3.5 6H42l5.5-9-5.5-9z" fill="#002BE7"/>
+        </svg>
+      );
+    case 337: // Disney+
+      return (
+        <svg viewBox="0 0 72 32" xmlns="http://www.w3.org/2000/svg" className="h-full object-contain transition-transform group-hover:scale-105 duration-300">
+          <path d="M18 6c-4.4 0-8 3.6-8 8s3.6 8 8 8c3.5 0 6.4-2.2 7.5-5.3h-3.8c-.8 1.4-2.3 2.3-4.1 2.3-2.5 0-4.5-2-4.5-4.5s2-4.5 4.5-4.5c1.8 0 3.3.9 4.1 2.3h3.8C24.4 8.2 21.5 6 18 6z" fill="#FFFFFF"/>
+          <path d="M34 11h-2v3h-3v2h3v3h2v-3h3v-2h-3v-3z" fill="#00E5FF"/>
+          <path d="M6 22C18 6 34 6 42 15" stroke="url(#disney-grad)" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+          <defs>
+            <linearGradient id="disney-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#00E5FF"/>
+              <stop offset="100%" stop-color="#9C27B0"/>
+            </linearGradient>
+          </defs>
+        </svg>
+      );
+    case 15: // Hulu
+      return (
+        <svg viewBox="0 0 64 24" fill="#1CE783" xmlns="http://www.w3.org/2000/svg" className="h-full object-contain transition-transform group-hover:scale-105 duration-300">
+          <path d="M14 4v7h-5V4H5v16h4v-6h5v6h4V4h-4zm11.2 5.1c-1.8 0-2.8.8-3.2 2.2h-.1V4.2h-3.9v15.3h3.9V12.7c0-1 .6-1.5 1.5-1.5s1.2.5 1.2 1.5v6.8h3.9v-7.2c0-2.3-1.4-3.2-3.3-3.2zm12.3.2h-3.9V16c0 1-.5 1.5-1.5 1.5s-1.2-.5-1.2-1.5v-6.8h-3.9V15c0 2.3 1.4 3.2 3.3 3.2 1.8 0 2.8-.8 3.2-2.2h.1v1.7h3.9V9.3zm12 .2h-3.9V16c0 1-.5 1.5-1.5 1.5s-1.2-.5-1.2-1.5v-6.8h-3.9V15c0 2.3 1.4 3.2 3.3 3.2 1.8 0 2.8-.8 3.2-2.2h.1V19.5h3.9V9.5z"/>
+        </svg>
+      );
+    case 386: // Peacock
+      return (
+        <svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" className="h-full object-contain transition-transform group-hover:scale-105 duration-300">
+          <path d="M24 28c-1.5 0-3-1.5-3-3s1.5-3 3-3 3 1.5 3 3-1.5 3-3 3z" fill="#FFFFFF"/>
+          <path d="M17 18.5c.3-2.5 2-4.5 4.5-4.5s3.5 1.5 3.5 3.5S22 23 20 23.5l-3-5z" fill="#FFC107"/>
+          <path d="M21 13.5c1-2.2 3.2-3.5 5.5-2.5s3 3 2.5 5-2.5 4-4.5 4l-3.5-6.5z" fill="#FF9800"/>
+          <path d="M27 12.5c2-1 4.5 0 5 2.5s-1 4-3 5.5l-2-8z" fill="#E91E63"/>
+          <path d="M31.5 16.5c2.2.5 3.5 2.8 2.5 5s-3 3-5.5 2.5l3-7.5z" fill="#9C27B0"/>
+          <path d="M30.5 22.5c2 1.5 2 4 0 5.5s-4 .5-4.5-2l4.5-3.5z" fill="#03A9F4"/>
+          <path d="M25.5 26.5c1 2.2-.5 4.5-2.5 5s-4-1.5-3.5-4l6-1z" fill="#4CAF50"/>
+        </svg>
+      );
+    default:
+      return null;
+  }
+};
+
 interface CatalogMovie extends TMDBMovie {
   mediaType: 'movie' | 'tv';
 }
@@ -830,15 +894,6 @@ function StreamingTab({ onDownload, libraryTitles, watchlist, onAddToWatchlist, 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // Logo source resolution with local server proxy fallback
-  const [logoSrcs] = useState<Record<number, string>>(() =>
-    Object.fromEntries(STREAMING_SERVICES.map(s => [s.id, `/api/tmdb-proxy?url=${encodeURIComponent(s.logo)}`]))
-  );
-  const [failedLogos, setFailedLogos] = useState<Record<number, boolean>>({});
-
-  const handleLogoError = (id: number, currentSrc: string) => {
-    setFailedLogos(prev => ({ ...prev, [id]: true }));
-  };
 
   const service = STREAMING_SERVICES.find(s => s.id === selectedService);
 
@@ -878,35 +933,22 @@ function StreamingTab({ onDownload, libraryTitles, watchlist, onAddToWatchlist, 
         </p>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
           {STREAMING_SERVICES.map(svc => {
-            const logoSrc = logoSrcs[svc.id] ?? svc.logo;
-            const logoFailed = failedLogos[svc.id];
             return (
               <motion.button
                 key={svc.id}
                 onClick={() => handleServiceSelect(svc.id)}
                 whileHover={{ scale: 1.04 }}
                 whileTap={{ scale: 0.97 }}
-                className="relative flex flex-col items-center justify-center gap-3 p-6 rounded-2xl border border-border hover:border-primary/40 bg-card transition-all group overflow-hidden"
+                style={{ '--glow-color': svc.color } as React.CSSProperties}
+                className="relative flex flex-col items-center justify-center gap-4 p-8 rounded-2xl border border-white/10 bg-black/40 backdrop-blur-md transition-all duration-300 group overflow-hidden hover:bg-black/60 hover:border-white/20 hover:shadow-[0_0_25px_var(--glow-color)] shadow-lg"
               >
-                <div className="absolute inset-0 opacity-0 group-hover:opacity-10 transition-opacity" style={{ background: svc.color }} />
+                <div className="absolute inset-0 opacity-0 group-hover:opacity-[0.03] transition-opacity duration-300" style={{ background: svc.color }} />
                 
-                {logoFailed ? (
-                  <div
-                    className="w-14 h-14 rounded-xl flex items-center justify-center font-heading font-black text-2xl text-white shadow-lg uppercase select-none transition-transform group-hover:scale-105"
-                    style={{ backgroundColor: svc.color }}
-                  >
-                    {svc.name[0]}
-                  </div>
-                ) : (
-                  <img
-                    src={logoSrc}
-                    alt={svc.name}
-                    className="w-14 h-14 rounded-xl object-cover shadow-md transition-transform group-hover:scale-105"
-                    onError={() => handleLogoError(svc.id, logoSrc)}
-                  />
-                )}
+                <div className="h-14 flex items-center justify-center select-none">
+                  {renderLogo(svc.id)}
+                </div>
                 
-                <span className="text-sm font-semibold text-foreground">{svc.name}</span>
+                <span className="text-xs font-semibold text-muted-foreground group-hover:text-foreground transition-colors duration-300">{svc.name}</span>
               </motion.button>
             );
           })}
@@ -922,20 +964,10 @@ function StreamingTab({ onDownload, libraryTitles, watchlist, onAddToWatchlist, 
           <ChevronLeft className="w-4 h-4" />All Services
         </button>
         <div className="flex items-center gap-2 ml-2">
-          {service && failedLogos[service.id] ? (
-            <div
-              className="w-7 h-7 rounded-lg flex items-center justify-center font-heading font-black text-xs text-white shadow-sm uppercase select-none"
-              style={{ backgroundColor: service.color }}
-            >
-              {service.name[0]}
+          {service && (
+            <div className="h-6 w-12 flex items-center justify-center select-none mr-1">
+              {renderLogo(service.id)}
             </div>
-          ) : (
-            <img
-              src={service ? (logoSrcs[service.id] ?? service.logo) : ''}
-              alt={service?.name}
-              className="w-7 h-7 rounded-lg object-cover"
-              onError={() => service && handleLogoError(service.id, logoSrcs[service.id] ?? service.logo)}
-            />
           )}
           <span className="text-base font-bold text-foreground">{service?.name}</span>
         </div>
