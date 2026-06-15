@@ -20,20 +20,10 @@ import { readConfig } from '../../../configStore.js';
 import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
-import { fileURLToPath } from 'url';
+import { dataDir } from '../../../dataDir.js';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const TMDB_BASE = 'https://api.themoviedb.org/3';
-
-function resolveClientPath(...segments: string[]): string {
-  const resourcesPath = (process as NodeJS.Process & { resourcesPath?: string }).resourcesPath;
-  if (process.env.ELECTRON === '1' && resourcesPath) {
-    return path.join(resourcesPath, 'client', ...segments);
-  }
-  return path.join(__dirname, '..', '..', '..', '..', ...segments);
-}
-
-const LOCAL_IMG_DIR = resolveClientPath('tmdb-images');
+const LOCAL_IMG_DIR = path.join(dataDir(), 'tmdb-images');
 
 function toLocalImgUrl(tmdbPath: string | null, size: 'w500' | 'original'): string {
   if (!tmdbPath) return '';
@@ -41,7 +31,8 @@ function toLocalImgUrl(tmdbPath: string | null, size: 'w500' | 'original'): stri
   const localFile = path.join(LOCAL_IMG_DIR, `${hash}.jpg`);
   if (fs.existsSync(localFile)) return `/tmdb-images/${hash}.jpg`;
   const base = size === 'original' ? 'https://image.tmdb.org/t/p/original' : 'https://image.tmdb.org/t/p/w500';
-  return `${base}${tmdbPath}`;
+  const remoteUrl = `${base}${tmdbPath}`;
+  return `/api/tmdb-proxy?url=${encodeURIComponent(remoteUrl)}`;
 }
 
 const GENRE_MAP: Record<number, string> = {

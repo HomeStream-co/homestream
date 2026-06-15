@@ -335,6 +335,61 @@ export function detectLocalProwlarrApiKey(): string | null {
   return null;
 }
 
+export async function autoConfigureProwlarrIndexers(prowlarrUrl: string, prowlarrApiKey: string): Promise<void> {
+  if (!prowlarrUrl || !prowlarrApiKey) return;
+  try {
+    const listUrl = `${prowlarrUrl.replace(/\/$/, '')}/api/v1/indexer`;
+    const getRes = await fetch(listUrl, {
+      headers: { 'X-Api-Key': prowlarrApiKey }
+    });
+    if (!getRes.ok) return;
+    const indexers = await getRes.json() as any[];
+    if (indexers.length > 0) {
+      console.log(`[prowlarr] Indexers already configured: ${indexers.length}`);
+      return;
+    }
+
+    console.log('[prowlarr] No indexers configured. Seeding YTS, LimeTorrents, and The Pirate Bay...');
+    const indexersToSeed = [
+      { name: 'YTS', definitionFile: 'yts' },
+      { name: 'LimeTorrents', definitionFile: 'limetorrents' },
+      { name: 'The Pirate Bay', definitionFile: 'thepiratebay' }
+    ];
+
+    for (const item of indexersToSeed) {
+      const body = {
+        name: item.name,
+        enable: true,
+        protocol: 'torrent',
+        implementation: 'Cardigann',
+        configContract: 'CardigannSettings',
+        appProfileId: 1,
+        priority: 25,
+        fields: [
+          { name: 'definitionFile', value: item.definitionFile }
+        ],
+        tags: []
+      };
+
+      try {
+        const postRes = await fetch(listUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Api-Key': prowlarrApiKey
+          },
+          body: JSON.stringify(body)
+        });
+        console.log(`[prowlarr] Seeded indexer ${item.name}: status ${postRes.status}`);
+      } catch (err: any) {
+        console.error(`[prowlarr] Failed to seed indexer ${item.name}:`, err.message);
+      }
+    }
+  } catch (err: any) {
+    console.error('[prowlarr] Auto-configuration failed:', err.message);
+  }
+}
+
 export function detectAndSyncProwlarrApiKey(): void {
   try {
     const config = readConfig();
@@ -342,9 +397,17 @@ export function detectAndSyncProwlarrApiKey(): void {
     if (!isLocal) return;
 
     const detectedKey = detectLocalProwlarrApiKey();
+    let apiKey = config.prowlarrApiKey;
     if (detectedKey && detectedKey !== config.prowlarrApiKey) {
       console.log(`[prowlarr] Auto-detected local Prowlarr API key: ${detectedKey.slice(0, 4)}...`);
       writeConfig({ prowlarrApiKey: detectedKey });
+      apiKey = detectedKey;
+    }
+
+    if (config.prowlarrUrl && apiKey) {
+      autoConfigureProwlarrIndexers(config.prowlarrUrl, apiKey).catch(err => {
+        console.warn('[prowlarr] Background indexer auto-config failed:', err);
+      });
     }
   } catch (err) {
     console.warn('[prowlarr] Auto-detection failed:', err);

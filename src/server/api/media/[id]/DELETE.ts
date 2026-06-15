@@ -5,6 +5,7 @@ import { readLibrary, writeLibrary } from '../../../libraryStore.js';
 import { removeFromAllWatchlists } from '../../../watchlistStore.js';
 import { requireAuth } from '../../../authMiddleware.js';
 import { dataDir } from '../../../dataDir.js';
+import { killTranscode } from '../../../transcodeWorker.js';
 
 const UPLOADS_DIR = path.join(dataDir(), 'uploads');
 
@@ -49,6 +50,9 @@ export default async function handler(req: Request, res: Response) {
     if (!item) {
       return res.status(404).json({ error: 'Media item not found' });
     }
+
+    // Kill any active transcode process for this media item
+    killTranscode(id);
 
     // Delete the current (possibly transcoded) file.
     // Prefer the absolute filePath stored by the upload/watcher pipeline;

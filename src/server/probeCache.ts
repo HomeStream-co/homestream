@@ -157,10 +157,19 @@ async function runProbe(filePath: string): Promise<ProbeResult> {
       filePath,
     ]);
 
+    const timer = setTimeout(() => {
+      console.log(`[probeCache] ffprobe timed out for ${filePath}`);
+      try {
+        proc.kill('SIGKILL');
+      } catch {}
+      resolve(null);
+    }, 15000);
+
     let out = '';
     proc.stdout.on('data', (d: Buffer) => { out += d.toString(); });
 
     proc.on('close', (code) => {
+      clearTimeout(timer);
       if (code !== 0) { resolve(null); return; }
       try {
         const json = JSON.parse(out) as {
@@ -235,6 +244,7 @@ async function runProbe(filePath: string): Promise<ProbeResult> {
     });
 
     proc.on('error', () => {
+      clearTimeout(timer);
       resolve(null);
     });
   });
@@ -246,11 +256,25 @@ async function runProbe(filePath: string): Promise<ProbeResult> {
   // Fallback to ffmpeg -i parsing
   console.log(`[probeCache] ffprobe failed for ${path.basename(filePath)} — trying ffmpeg fallback`);
   return new Promise(resolve => {
-    const proc = spawn(FFMPEG, ['-i', filePath]);
+    const proc = spawn(FFMPEG, ['-nostdin', '-i', filePath]);
+
+    const timer = setTimeout(() => {
+      console.log(`[probeCache] fallback ffmpeg timed out for ${filePath}`);
+      try {
+        proc.kill('SIGKILL');
+      } catch {}
+      resolve({
+        codec: 'unknown', width: 0, height: 0, bitrateBps: 0,
+        audioStreams: 0, durationSecs: 0, fileSizeBytes: 0,
+        audioTracks: [], subtitleTracks: [],
+      });
+    }, 15000);
+
     let stderr = '';
     proc.stderr.on('data', (d: Buffer) => { stderr += d.toString(); });
 
     proc.on('close', () => {
+      clearTimeout(timer);
       const durationMatch = stderr.match(/Duration:\s*(\d{2}):(\d{2}):(\d{2})\.(\d{2})/);
       let durationSecs = 0;
       if (durationMatch) {
@@ -303,6 +327,7 @@ async function runProbe(filePath: string): Promise<ProbeResult> {
     });
 
     proc.on('error', () => {
+      clearTimeout(timer);
       resolve({
         codec: 'unknown', width: 0, height: 0, bitrateBps: 0,
         audioStreams: 0, durationSecs: 0, fileSizeBytes: 0,

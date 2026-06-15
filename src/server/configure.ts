@@ -3,6 +3,7 @@ import cookieParser from "cookie-parser";
 import { fileURLToPath } from "node:url";
 import { dirname, join, extname } from "node:path";
 import { existsSync } from "node:fs";
+import { dataDir } from "./dataDir.js";
 import zlib from "node:zlib";
 import type { Server } from "node:http";
 import type { ViteDevServer } from "vite";
@@ -63,6 +64,8 @@ function gzipMiddleware(req: express.Request, res: express.Response, next: expre
 
 export const viteServerBefore = (server: express.Express, _viteServer: ViteDevServer) => {
   console.log('[HomeStream] Dev server starting...');
+  server.use('/tmdb-images', express.static(join(dataDir(), 'tmdb-images')));
+
   import('./configStore.js').then(({ detectAndSyncProwlarrApiKey }) => {
     detectAndSyncProwlarrApiKey();
   }).catch((err: Error) => console.warn('[startup] Prowlarr key sync failed in dev:', err.message));
@@ -164,6 +167,7 @@ export const serverBefore = (server: express.Express) => {
   server.use(express.json({ limit: '50mb' }));
   server.use(express.urlencoded({ extended: true, limit: '50mb' }));
   server.use(gzipMiddleware);
+  server.use('/tmdb-images', express.static(join(dataDir(), 'tmdb-images')));
 
   server.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
     const isApi = req.path.startsWith('/api');

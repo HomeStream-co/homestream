@@ -47,7 +47,7 @@ function resolveClientPath(...segments: string[]): string {
 
 const BAKED_CACHE_PATH = resolveClientPath('tmdb-cache-baked.json');
 const BAKED_GENRE_CACHE_PATH = resolveClientPath('tmdb-genre-baked.json');
-const LOCAL_IMG_DIR   = resolveClientPath('tmdb-images');
+const LOCAL_IMG_DIR   = path.join(dataDir(), 'tmdb-images');
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 const TMDB_BASE = 'https://api.themoviedb.org/3';
 const TMDB_IMG = 'https://image.tmdb.org/t/p/w500';
@@ -65,9 +65,10 @@ function toLocalImgUrl(tmdbPath: string | null, size: 'w500' | 'original'): stri
   const hash = crypto.createHash('md5').update(tmdbPath + size).digest('hex').slice(0, 12);
   const localFile = path.join(LOCAL_IMG_DIR, `${hash}.jpg`);
   if (fs.existsSync(localFile)) return `/tmdb-images/${hash}.jpg`;
-  // File not cached yet — return live URL as fallback (will work when online)
+  // File not cached yet — route through server-side proxy which will download and cache it
   const base = size === 'w500' ? TMDB_IMG : TMDB_IMG_ORIGINAL;
-  return `${base}${tmdbPath}`;
+  const remoteUrl = `${base}${tmdbPath}`;
+  return `/api/tmdb-proxy?url=${encodeURIComponent(remoteUrl)}`;
 }
 
 /**

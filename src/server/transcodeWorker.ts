@@ -40,6 +40,23 @@ import { dataDir } from './dataDir.js';
 import { detectHwEncoder } from './hwEncoderDetect.js';
 import { readConfig } from './configStore.js';
 
+const activeTranscodes = new Map<string, any>();
+
+export function killTranscode(mediaId: string): boolean {
+  const proc = activeTranscodes.get(mediaId);
+  if (proc) {
+    console.log(`[transcode] Killing transcode process for mediaId=${mediaId}`);
+    try {
+      proc.kill('SIGKILL');
+    } catch (err) {
+      console.error(`[transcode] Failed to kill transcode process:`, err);
+    }
+    activeTranscodes.delete(mediaId);
+    return true;
+  }
+  return false;
+}
+
 // Uploads live inside the data directory so they are writable in packaged
 // Electron on Linux (AppImage mounts read-only; process.cwd() is not writable).
 const UPLOADS_DIR = path.join(dataDir(), 'uploads');
@@ -138,10 +155,19 @@ async function probeFile(filePath: string): Promise<VideoInfo> {
       filePath,
     ]);
 
+    const timer = setTimeout(() => {
+      console.log(`[transcode] ffprobe timed out for ${filePath}`);
+      try {
+        probe.kill('SIGKILL');
+      } catch {}
+      resolve(null);
+    }, 15000);
+
     let out = '';
     probe.stdout.on('data', (d: Buffer) => { out += d.toString(); });
 
     probe.on('close', (code) => {
+      clearTimeout(timer);
       if (code !== 0) { resolve(null); return; }
       try {
         const json = JSON.parse(out) as {
@@ -173,6 +199,7 @@ async function probeFile(filePath: string): Promise<VideoInfo> {
     });
 
     probe.on('error', () => {
+      clearTimeout(timer);
       resolve(null);
     });
   });
@@ -184,11 +211,21 @@ async function probeFile(filePath: string): Promise<VideoInfo> {
   // Fallback to ffmpeg -i parsing if ffprobe is missing or fails
   console.log(`[transcode] ffprobe failed for ${path.basename(filePath)} — trying ffmpeg fallback`);
   return new Promise(resolve => {
-    const proc = spawn(FFMPEG, ['-i', filePath]);
+    const proc = spawn(FFMPEG, ['-nostdin', '-i', filePath]);
+
+    const timer = setTimeout(() => {
+      console.log(`[transcode] fallback ffmpeg timed out for ${filePath}`);
+      try {
+        proc.kill('SIGKILL');
+      } catch {}
+      resolve({ codec: 'unknown', width: 0, height: 0, bitrateBps: 0, audioStreams: 0, durationSecs: 0, fileSizeBytes: 0 });
+    }, 15000);
+
     let stderr = '';
     proc.stderr.on('data', (d: Buffer) => { stderr += d.toString(); });
 
     proc.on('close', () => {
+      clearTimeout(timer);
       const durationMatch = stderr.match(/Duration:\s*(\d{2}):(\d{2}):(\d{2})\.(\d{2})/);
       let durationSecs = 0;
       if (durationMatch) {
@@ -226,6 +263,7 @@ async function probeFile(filePath: string): Promise<VideoInfo> {
     });
 
     proc.on('error', () => {
+      clearTimeout(timer);
       resolve({ codec: 'unknown', width: 0, height: 0, bitrateBps: 0, audioStreams: 0, durationSecs: 0, fileSizeBytes: 0 });
     });
   });
@@ -313,7 +351,9 @@ function parseProgress(line: string, durationSecs: number): {
 
 function runFFmpeg(args: string[], mediaId: string, durationSecs: number): Promise<void> {
   return new Promise((resolve, reject) => {
-    const ff = spawn(FFMPEG, args);
+    const finalArgs = args.includes('-nostdin') ? args : ['-nostdin', ...args];
+    const ff = spawn(FFMPEG, finalArgs);
+    activeTranscodes.set(mediaId, ff);
     let stderrBuf = '';
 
     ff.stderr.on('data', (data: Buffer) => {
@@ -336,11 +376,13 @@ function runFFmpeg(args: string[], mediaId: string, durationSecs: number): Promi
     });
 
     ff.on('close', code => {
+      activeTranscodes.delete(mediaId);
       if (code === 0) { resolve(); }
       else { reject(new Error(`FFmpeg exited with code ${code}`)); }
     });
 
     ff.on('error', err => {
+      activeTranscodes.delete(mediaId);
       const msg = err.message.includes('ENOENT')
         ? `FFmpeg not found at "${FFMPEG}". The bundled ffmpeg-static binary may be missing — try reinstalling HomeStream.`
         : err.message;

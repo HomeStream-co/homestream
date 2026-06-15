@@ -831,18 +831,13 @@ function StreamingTab({ onDownload, libraryTitles, watchlist, onAddToWatchlist, 
   const [error, setError] = useState('');
 
   // Logo source resolution with local server proxy fallback
-  const [logoSrcs, setLogoSrcs] = useState<Record<number, string>>(() =>
-    Object.fromEntries(STREAMING_SERVICES.map(s => [s.id, s.logo]))
+  const [logoSrcs] = useState<Record<number, string>>(() =>
+    Object.fromEntries(STREAMING_SERVICES.map(s => [s.id, `/api/tmdb-proxy?url=${encodeURIComponent(s.logo)}`]))
   );
   const [failedLogos, setFailedLogos] = useState<Record<number, boolean>>({});
 
   const handleLogoError = (id: number, currentSrc: string) => {
-    if (currentSrc.startsWith('https://image.tmdb.org')) {
-      const proxy = `/api/tmdb-proxy?url=${encodeURIComponent(currentSrc)}`;
-      setLogoSrcs(prev => ({ ...prev, [id]: proxy }));
-    } else {
-      setFailedLogos(prev => ({ ...prev, [id]: true }));
-    }
+    setFailedLogos(prev => ({ ...prev, [id]: true }));
   };
 
   const service = STREAMING_SERVICES.find(s => s.id === selectedService);
