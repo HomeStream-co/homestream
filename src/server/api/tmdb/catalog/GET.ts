@@ -45,12 +45,12 @@ const GENRE_MAP: Record<number, string> = {
 export default async function handler(req: Request, res: Response) {
   if (!requireAuth(req, res)) return;
 
-  const providerId = parseInt(req.query.provider as string, 10);
+  const provider = req.query.provider as string;
   const type = (req.query.type as string) === 'tv' ? 'tv' : 'movie';
   const page = Math.max(1, parseInt((req.query.page as string) ?? '1', 10));
   const sortBy = (req.query.sort as string) || 'popularity.desc';
 
-  if (!providerId || isNaN(providerId)) {
+  if (!provider) {
     res.status(400).json({ error: 'provider query param required (e.g. ?provider=8)' });
     return;
   }
@@ -68,7 +68,7 @@ export default async function handler(req: Request, res: Response) {
     url.searchParams.set('language', 'en-US');
     url.searchParams.set('sort_by', sortBy);
     url.searchParams.set('watch_region', 'US');
-    url.searchParams.set('with_watch_providers', String(providerId));
+    url.searchParams.set('with_watch_providers', provider);
     url.searchParams.set('page', String(page));
     // Only include titles with a reasonable vote count so junk doesn't surface
     url.searchParams.set('vote_count.gte', '20');
