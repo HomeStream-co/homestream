@@ -42,6 +42,49 @@ const upload = multer({
   limits: { fileSize: 200 * 1024 * 1024 * 1024 }, // 200 GB max
 });
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function cleanFilename(omdbTitle: string | undefined, omdbYear: string | undefined, originalBasename: string, ext: string): string {
+  if (omdbTitle) {
+    const safeName = omdbTitle
+      .replace(/[<>:"/\\|?*]+/g, '')   // strip illegal chars
+      .replace(/\s+/g, '_')             // spaces → underscores
+      .replace(/_+/g, '_')              // collapse multiple underscores
+      .trim();
+    const yearPart = omdbYear ? `_${omdbYear}` : '';
+    return `${safeName}${yearPart}${ext}`;
+  }
+  return originalBasename.replace(/^\d{13}-/, '');
+}
+
+function resolveSubfolder(type: string | undefined, genresStr: string | undefined, title: string): string {
+  if (type === 'series') return 'tv';
+  const genres = genresStr ? genresStr.split(',').map(g => g.trim().toLowerCase()).filter(Boolean) : [];
+  const isAnime = genres.includes('animation') &&
+    (title.toLowerCase().match(/\b(anime|manga|shonen|shojo|seinen|isekai|mecha|naruto|bleach|one piece|dragon ball|attack on titan|demon slayer|jujutsu|chainsaw|spy x|my hero)\b/) != null ||
+     genres.includes('japan'));
+  return 'movies';
+}
+
+const moveFile = (src: string, dest: string) => {
+  if (src === dest) return;
+  if (!fs.existsSync(src)) return;
+  const destDir = path.dirname(dest);
+  if (!fs.existsSync(destDir)) {
+    fs.mkdirSync(destDir, { recursive: true });
+  }
+  try {
+    fs.renameSync(src, dest);
+  } catch (renameErr) {
+    if ((renameErr as any).code === 'EXDEV') {
+      fs.copyFileSync(src, dest);
+      fs.unlinkSync(src);
+    } else {
+      throw renameErr;
+    }
+  }
+};
+
 export default function handler(req: Request, res: Response) {
   if (!requireAuth(req, res)) return;
   upload.single('video')(req, res, async (err) => {
@@ -52,39 +95,26 @@ export default function handler(req: Request, res: Response) {
       const inputFilename  = req.file.filename;
       const tempInputPath  = path.join(UPLOADS_DIR, inputFilename);
 
-      // Resolve final target directory: use libraryDir if configured, fallback to UPLOADS_DIR
-      const targetDir = cfg.libraryDir || UPLOADS_DIR;
-      if (!fs.existsSync(targetDir)) {
-        fs.mkdirSync(targetDir, { recursive: true });
-      }
-      
-      const inputPath = path.join(targetDir, inputFilename);
-      
-      // Move helper with cross-device copy/unlink fallback
-      const moveFile = (src: string, dest: string) => {
-        try {
-          fs.renameSync(src, dest);
-        } catch (renameErr) {
-          if ((renameErr as any).code === 'EXDEV') {
-            fs.copyFileSync(src, dest);
-            fs.unlinkSync(src);
-          } else {
-            throw renameErr;
-          }
-        }
-      };
-
-      // Move the file from temp/uploads to the user's library directory
-      if (tempInputPath !== inputPath) {
-        moveFile(tempInputPath, inputPath);
-      }
-
       // ── 1. Parse title — prefer manual override from form body ──
       const { title: extractedTitle, year: extractedYear } = extractTitle(req.file.originalname);
       const manualTitle = (req.body as Record<string, string>).title;
       const manualYear  = (req.body as Record<string, string>).year;
       const searchTitle = manualTitle || extractedTitle;
       const searchYear  = manualYear  || extractedYear;
+
+      // ── 2. Fetch OMDB metadata (graceful — works offline) ──
+      const omdb = await fetchOMDB(searchTitle, searchYear);
+
+      const subfolder = resolveSubfolder(omdb?.Type, omdb?.Genre, searchTitle);
+      const libraryDir = cfg.libraryDir || UPLOADS_DIR;
+      const targetDir = path.join(libraryDir, subfolder);
+      if (!fs.existsSync(targetDir)) {
+        fs.mkdirSync(targetDir, { recursive: true });
+      }
+
+      const inputExt = path.extname(req.file.originalname).toLowerCase();
+      const finalFilename = cleanFilename(omdb?.Title, omdb?.Year, req.file.originalname, inputExt);
+      const finalPath = path.join(targetDir, finalFilename);
 
       // ── DEDUP CHECK: if same originalFilename already in library, skip re-upload ──
       const existingLib = readLibrary<{ id: string; originalFilename?: string; filePath?: string; filepath?: string; transcoding?: boolean }>();
@@ -94,20 +124,18 @@ export default function handler(req: Request, res: Response) {
       if (duplicate) {
         console.log(`[upload] Duplicate detected — "${req.file.originalname}" already in library as id=${duplicate.id}. Discarding re-upload.`);
         // Remove the redundant uploaded file from disk
-        try { if (fs.existsSync(inputPath)) fs.unlinkSync(inputPath); } catch {}
         try { if (fs.existsSync(tempInputPath)) fs.unlinkSync(tempInputPath); } catch {}
         return res.status(200).json({ ...duplicate, transcodeId: duplicate.id, _deduplicated: true });
       }
 
-      // ── 2. Fetch OMDB metadata (graceful — works offline) ──
-      const omdb = await fetchOMDB(searchTitle, searchYear);
-
       if (cfg.autoTranscode === false) {
-        // Skip transcoding — add file directly to the library in-place
+        // Skip transcoding — move file directly to targetDir with clean name
+        moveFile(tempInputPath, finalPath);
+
         const mediaItem = buildMediaItem({
-          filename: inputFilename,
+          filename: finalFilename,
           originalFilename: req.file.originalname,
-          filePath: inputPath,   // absolute path — stream endpoint uses this directly
+          filePath: finalPath,   // absolute path — stream endpoint uses this directly
           fileSize: req.file.size,
           omdb,
           extractedTitle: searchTitle,
@@ -128,12 +156,12 @@ export default function handler(req: Request, res: Response) {
         return;
       }
 
-      const outputFilename = inputFilename.replace(/\.[^.]+$/, '') + '_tc.mp4';
-      const outputPath     = path.join(targetDir, outputFilename);
+      const tcFilename = finalFilename.replace(/\.[^.]+$/, '') + '_tc.mp4';
+      const outputPath = path.join(targetDir, tcFilename);
 
       // ── 3. Register transcode job ──
       const mediaItem = buildMediaItem({
-        filename: outputFilename,
+        filename: tcFilename,
         originalFilename: req.file.originalname,
         filePath: outputPath,   // absolute path — stream endpoint uses this directly
         fileSize: req.file.size,
@@ -144,7 +172,7 @@ export default function handler(req: Request, res: Response) {
         importedFrom: 'upload',
       });
 
-      createJob(mediaItem.id, inputFilename, outputFilename);
+      createJob(mediaItem.id, inputFilename, tcFilename);
 
       // ── 4. Write to library immediately (via queue — concurrent-safe) ──
       await writeLibrary(lib => {
@@ -160,18 +188,31 @@ export default function handler(req: Request, res: Response) {
       runCaptionFetchInBackground(mediaItem.id).catch(() => {});
 
       // ── 7. Transcode in background ──
-      transcodeFile(mediaItem.id, inputPath, outputPath)
+      transcodeFile(mediaItem.id, tempInputPath, outputPath)
         .then(result => {
-          // Determine the final absolute path (may revert to input if output was larger)
-          const finalPath = result.outputFilename === outputFilename ? outputPath : inputPath;
+          let resolvedPath = outputPath;
+          let resolvedFilename = tcFilename;
+          if (result.outputFilename !== tcFilename) {
+            // Reverted to original
+            resolvedFilename = finalFilename;
+            resolvedPath = finalPath;
+            console.log(`[upload] Reverted to original, moving: ${tempInputPath} → ${resolvedPath}`);
+            moveFile(tempInputPath, resolvedPath);
+          }
+
+          // Clean up temp file
+          if (fs.existsSync(tempInputPath) && tempInputPath !== resolvedPath) {
+            try { fs.unlinkSync(tempInputPath); } catch {}
+          }
+
           writeLibrary(lib => {
             const idx = lib.findIndex(m => (m as { id: string }).id === mediaItem.id);
             if (idx !== -1) {
               const item = lib[idx] as Record<string, unknown>;
               item.transcoding      = false;
-              item.filename         = result.outputFilename;
-              item.filepath         = finalPath;
-              item.filePath         = finalPath;
+              item.filename         = resolvedFilename;
+              item.filepath         = resolvedPath;
+              item.filePath         = resolvedPath;
               item.fileSize         = result.finalSize;
               item.originalSize     = result.originalSize;
               item.savedBytes       = result.savedBytes;
@@ -182,13 +223,21 @@ export default function handler(req: Request, res: Response) {
         })
         .catch((transcodeErr: Error) => {
           console.error(`[transcode] Error for ${mediaItem.id}:`, transcodeErr.message);
+          // Transcode failed — move original to finalPath
+          try {
+            console.log(`[upload] Transcode failed, moving original: ${tempInputPath} → ${finalPath}`);
+            moveFile(tempInputPath, finalPath);
+          } catch (moveErr) {
+            console.error(`[upload] Failed to move original after transcode failure:`, moveErr);
+          }
+
           writeLibrary(lib => {
             const idx = lib.findIndex(m => (m as { id: string }).id === mediaItem.id);
             if (idx !== -1) {
               const item = lib[idx] as Record<string, unknown>;
-              item.filename         = inputFilename;
-              item.filepath         = inputPath;   // absolute path
-              item.filePath         = inputPath;   // absolute path
+              item.filename         = finalFilename;
+              item.filepath         = finalPath;   // absolute path
+              item.filePath         = finalPath;   // absolute path
               item.transcoding      = false;
               item.transcodeError   = transcodeErr.message;
             }

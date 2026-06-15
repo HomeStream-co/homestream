@@ -2,32 +2,31 @@
  * postDownloadPipeline — shared post-download processing
  *
  * Called by EVERY download backend (Real-Debrid, qBittorrent) once a file
- * lands on disk.  Runs the same pipeline that WebTorrent used to run inline:
+ * lands on disk. Runs the full pipeline:
  *
- *   1. Determine the best category for the content (movies / tv / anime / other)
- *   2. Fetch OMDB metadata
- *   3. Register a transcode job
- *   4. Write the item to the library (transcoding: true)
- *   5. Run FFmpeg transcode
- *   6. Update the library item with final path + size
- *   7. Kick off background enrichment + caption fetch
+ *   1. Fetch OMDB metadata
+ *   2. Determine category (Movies / TV Shows / Anime / Animation / Documentaries)
+ *   3. Transcode the file (or copy as-is if autoTranscode === false)
+ *   4. Move final file to library/<category-subfolder>/
+ *   5. Add item to library with correct path (only AFTER file is in place)
+ *   6. Delete source file from downloads folder
+ *   7. Mark job done + remove torrent from qBittorrent
+ *   8. Kick off background enrichment + caption fetch
  *
- * Category logic:
- *   - type === 'series'                       → "TV Shows"
- *   - genre includes "Animation" + "Japan"    → "Anime"  (Nyaa downloads)
- *   - genre includes "Animation"              → "Animation"
- *   - genre includes "Documentary"            → "Documentaries"
- *   - otherwise                               → "Movies"
+ * File organisation:
+ *   library/
+ *     movies/       ← Movies, Animation, Documentaries, Anime
+ *     tv/           ← TV Shows
  *
- * This module has NO knowledge of how the file was obtained — it only cares
- * about what to do with it once it exists on disk.
+ * NOTE: Items are NOT added to the library while transcoding — they only
+ * appear once the file is fully ready to play. This prevents "stuck"
+ * Optimizing… cards and "Media not found" errors.
  */
 
 import path from 'path';
 import fs from 'fs';
 import { randomUUID } from 'crypto';
 import { readLibrary, writeLibrary } from './libraryStore.js';
-import { createJob } from './transcodeStore.js';
 import { transcodeFile } from './transcodeWorker.js';
 import { fetchOMDB } from './mediaUtils.js';
 import { runEnrichmentInBackground, runCaptionFetchInBackground } from './mediaUtils.js';
@@ -83,6 +82,25 @@ function moveFile(src: string, dest: string): void {
   }
 }
 
+/**
+ * Produce a clean, filesystem-safe filename from an OMDB title + year.
+ * Falls back to the original basename if no OMDB data.
+ * Strips timestamp prefixes like "1781549335871-".
+ */
+function cleanFilename(omdbTitle: string | undefined, omdbYear: string | undefined, originalBasename: string, ext: string): string {
+  if (omdbTitle) {
+    const safeName = omdbTitle
+      .replace(/[<>:"/\\|?*]+/g, '')   // strip illegal chars
+      .replace(/\s+/g, '_')             // spaces → underscores
+      .replace(/_+/g, '_')              // collapse multiple underscores
+      .trim();
+    const yearPart = omdbYear ? `_${omdbYear}` : '';
+    return `${safeName}${yearPart}${ext}`;
+  }
+  // Strip leading timestamp prefix (e.g. "1781549335871-")
+  return originalBasename.replace(/^\d{13}-/, '');
+}
+
 // ── Category resolver ─────────────────────────────────────────────────────────
 
 function resolveCategory(
@@ -106,23 +124,69 @@ function resolveCategory(
   return 'Movies';
 }
 
+/** Map a category string to the correct library subfolder name */
+function categorySubfolder(category: string): string {
+  return category === 'TV Shows' ? 'tv' : 'movies';
+}
+
+function resolveVideoFile(filePath: string): string {
+  try {
+    const stat = fs.statSync(filePath);
+    if (stat.isDirectory()) {
+      const videoExtensions = new Set(['.mp4', '.mkv', '.avi', '.mov', '.wmv', '.m4v', '.ts', '.webm', '.flv']);
+      let largestFile = '';
+      let largestSize = 0;
+
+      const scan = (dir: string) => {
+        const entries = fs.readdirSync(dir, { withFileTypes: true });
+        for (const entry of entries) {
+          const fullPath = path.join(dir, entry.name);
+          if (entry.isDirectory()) {
+            scan(fullPath);
+          } else if (entry.isFile()) {
+            const ext = path.extname(entry.name).toLowerCase();
+            if (videoExtensions.has(ext)) {
+              const fsize = fs.statSync(fullPath).size;
+              if (fsize > largestSize) {
+                largestSize = fsize;
+                largestFile = fullPath;
+              }
+            }
+          }
+        }
+      };
+
+      scan(filePath);
+      if (largestFile) {
+        console.log(`[pipeline] Resolved directory ${filePath} to video file: ${largestFile}`);
+        return largestFile;
+      }
+    }
+  } catch (err) {
+    console.error(`[pipeline] Error resolving video file:`, err);
+  }
+  return filePath;
+}
+
 // ── Main pipeline ─────────────────────────────────────────────────────────────
 
 export async function runPostDownloadPipeline(params: PostDownloadParams): Promise<void> {
   const {
-    filePath, title, quality, type, season, episode,
+    filePath: initialFilePath, title, quality, type, season, episode,
     imdbId, poster, year, jobId, backend,
   } = params;
 
-  if (!fs.existsSync(filePath)) {
-    console.error(`[pipeline] File not found: ${filePath}`);
+  if (!fs.existsSync(initialFilePath)) {
+    console.error(`[pipeline] File not found: ${initialFilePath}`);
     const existing = getPersistedJob(jobId);
     if (existing) upsertJob({ ...existing, status: 'error' });
     return;
   }
 
+  const filePath = resolveVideoFile(initialFilePath);
   const mediaId = randomUUID();
-  const filename = path.basename(filePath);
+  const srcFilename = path.basename(filePath);
+  const srcExt      = path.extname(srcFilename).toLowerCase();
 
   // ── 1. Mark job as transcoding ──
   const existingJob = getPersistedJob(jobId);
@@ -138,7 +202,8 @@ export async function runPostDownloadPipeline(params: PostDownloadParams): Promi
     ? omdb.Genre.split(',').map((g: string) => g.trim()).filter(Boolean)
     : ['Unknown'];
 
-  const category = resolveCategory(type, genres, title);
+  const category   = resolveCategory(type, genres, title);
+  const subfolder  = categorySubfolder(category);
 
   const episodeLabel = type === 'series' && season != null && episode != null
     ? ` S${String(season).padStart(2, '0')}E${String(episode).padStart(2, '0')}`
@@ -146,17 +211,21 @@ export async function runPostDownloadPipeline(params: PostDownloadParams): Promi
 
   const fileSize = fs.statSync(filePath).size;
 
-  const cfg = readConfig();
-  const targetDir = cfg.libraryDir || path.dirname(filePath);
+  const cfg        = readConfig();
+  const libraryDir = cfg.libraryDir || path.dirname(filePath);
+  const targetDir  = path.join(libraryDir, subfolder);
 
-  // ── DEDUP CHECK: prevent double-entry if pipeline fires twice for same content ──
-  const currentLib = readLibrary<{ id: string; imdbId?: string; title?: string; year?: string; transcoding?: boolean }>();
+  if (!fs.existsSync(targetDir)) {
+    fs.mkdirSync(targetDir, { recursive: true });
+  }
+
+  // ── DEDUP CHECK: prevent double-entry if pipeline fires twice ──
   const resolvedTitle = omdb?.Title || title;
-  const resolvedYear = omdb?.Year || year;
+  const resolvedYear  = omdb?.Year  || year;
+  const currentLib = readLibrary<{ id: string; imdbId?: string; title?: string; year?: string; transcoding?: boolean }>();
   const dup = currentLib.find(m => {
-    if (m.transcoding) return false; // never match an in-progress item
+    if (m.transcoding) return false;
     if (imdbId && m.imdbId && m.imdbId === imdbId) return true;
-    // fallback: same title + year
     return m.title === resolvedTitle && m.year === resolvedYear;
   });
   if (dup) {
@@ -169,87 +238,15 @@ export async function runPostDownloadPipeline(params: PostDownloadParams): Promi
     return;
   }
 
-  if (cfg.autoTranscode === false) {
-    // Skip transcoding — move file to targetDir and add to library
-    const finalPath = path.join(targetDir, filename);
-    try {
-      moveFile(filePath, finalPath);
-    } catch (moveErr) {
-      console.error(`[pipeline] Failed to move file to targetDir:`, moveErr);
-    }
-
-    const mediaItem: Record<string, unknown> = {
-      id: mediaId,
-      filename,
-      originalFilename: filename,
-      filepath: finalPath,
-      filePath: finalPath,
-      title: omdb?.Title || title,
-      year: omdb?.Year || year || 'Unknown',
-      genre: genres,
-      plot: omdb?.Plot || '',
-      director: omdb?.Director || '',
-      actors: omdb?.Actors || '',
-      imdbRating: omdb?.imdbRating || 'N/A',
-      poster: (omdb?.Poster && omdb.Poster !== 'N/A') ? omdb.Poster : (poster || ''),
-      type,
-      runtime: omdb?.Runtime || 'Unknown',
-      rated: omdb?.Rated && omdb.Rated !== 'N/A' ? omdb.Rated.trim() : 'NR',
-      addedAt: new Date().toISOString(),
-      watchProgress: 0,
-      fileSize,
-      originalSize: fileSize,
-      transcoding: false,
-      needsMetadata: !omdb,
-      metadataAvailable: !!omdb,
-      imdbId: imdbId || '',
-      season,
-      episode,
-      episodeLabel,
-      category,
-      downloadedVia: backend,
-      quality,
-      ccStatus: 'none',
-      enriching: false,
-    };
-
-    await writeLibrary(lib => {
-      lib.unshift(mediaItem);
-      return lib;
-    });
-
-    console.log(`[pipeline] Added "${title}" to library (no transcode, category: ${category})`);
-
-    const doneJob = getPersistedJob(jobId);
-    if (doneJob) upsertJob({ ...doneJob, status: 'done', progress: 100, completedAt: new Date().toISOString() });
-
-    // Clean up torrent from qBittorrent
-    if (backend === 'qbittorrent' && doneJob?.infoHash) {
-      try {
-        console.log(`[pipeline] Auto-removing torrent ${doneJob.infoHash} from qBittorrent`);
-        await deleteTorrent(doneJob.infoHash, true);
-      } catch (err) {
-        console.error(`[pipeline] Failed to auto-remove torrent ${doneJob.infoHash} from qBittorrent:`, err);
-      }
-    }
-
-    runEnrichmentInBackground(mediaId).catch(() => {});
-    runCaptionFetchInBackground(mediaId).catch(() => {});
-    return;
-  }
-
-  const outputFilename = filename.replace(/\.[^.]+$/, '') + '_tc.mp4';
-  const outputPath = path.join(targetDir, outputFilename);
-
-  // ── 3. Build initial library item (transcoding: true) ──
-  const mediaItem: Record<string, unknown> = {
+  // ── 3. Helper to build the library media item ──
+  const buildItem = (finalPath: string, finalFilename: string, finalSize: number, extra: Record<string, unknown> = {}): Record<string, unknown> => ({
     id: mediaId,
-    filename,
-    originalFilename: filename,
-    filepath: filePath,
-    filePath,
-    title: omdb?.Title || title,
-    year: omdb?.Year || year || 'Unknown',
+    filename: finalFilename,
+    originalFilename: srcFilename,
+    filepath: finalPath,
+    filePath: finalPath,
+    title: resolvedTitle,
+    year: resolvedYear || 'Unknown',
     genre: genres,
     plot: omdb?.Plot || '',
     director: omdb?.Director || '',
@@ -261,9 +258,9 @@ export async function runPostDownloadPipeline(params: PostDownloadParams): Promi
     rated: omdb?.Rated && omdb.Rated !== 'N/A' ? omdb.Rated.trim() : 'NR',
     addedAt: new Date().toISOString(),
     watchProgress: 0,
-    fileSize,
+    fileSize: finalSize,
     originalSize: fileSize,
-    transcoding: true,
+    transcoding: false,
     needsMetadata: !omdb,
     metadataAvailable: !!omdb,
     imdbId: imdbId || '',
@@ -275,84 +272,125 @@ export async function runPostDownloadPipeline(params: PostDownloadParams): Promi
     quality,
     ccStatus: 'none',
     enriching: false,
-  };
-
-  // ── 4. Register transcode job + write to library ──
-  createJob(mediaId, filename, outputFilename);
-
-  await writeLibrary(lib => {
-    lib.unshift(mediaItem);
-    return lib;
+    ...extra,
   });
 
-  console.log(`[pipeline] Added "${title}" to library (category: ${category}, transcoding…)`);
-
-  // ── 5. Transcode ──
-  try {
-    const result = await transcodeFile(mediaId, filePath, outputPath);
-    const finalPath = path.join(targetDir, result.outputFilename);
-
-    if (result.outputFilename === filename) {
-      // Reverted to original — move original to targetDir
-      console.log(`[pipeline] Reverted to original, moving file to targetDir: ${filePath} -> ${finalPath}`);
-      moveFile(filePath, finalPath);
-    }
-
-    await writeLibrary(lib => {
-      const idx = lib.findIndex(m => (m as { id: string }).id === mediaId);
-      if (idx !== -1) {
-        const item = lib[idx] as Record<string, unknown>;
-        item.transcoding = false;
-        item.filename = result.outputFilename;
-        item.filepath = finalPath;
-        item.filePath = finalPath;
-        item.fileSize = result.finalSize;
-        item.originalSize = result.originalSize;
-        item.savedBytes = result.savedBytes;
-        item.transcodeStrategy = result.strategy;
-      }
-      return lib;
-    });
-
-    console.log(`[pipeline] ✓ Transcode complete for "${title}" — saved ${Math.round((result.savedBytes ?? 0) / 1e6)} MB`);
-  } catch (transcodeErr) {
-    console.error(`[pipeline] Transcode failed for "${title}":`, transcodeErr);
-    // Keep the item in the library with the original file — still playable
-    const finalPath = path.join(targetDir, filename);
+  // ── 4. No-transcode path ──
+  if (cfg.autoTranscode === false) {
+    const destFilename = cleanFilename(omdb?.Title, omdb?.Year, srcFilename, srcExt);
+    const destPath     = path.join(targetDir, destFilename);
     try {
-      console.log(`[pipeline] Transcode failed, moving original to targetDir: ${filePath} -> ${finalPath}`);
-      moveFile(filePath, finalPath);
+      moveFile(filePath, destPath);
     } catch (moveErr) {
-      console.error(`[pipeline] Failed to move original file to targetDir after transcode failure:`, moveErr);
+      console.error(`[pipeline] Failed to move file to ${targetDir}:`, moveErr);
     }
 
-    await writeLibrary(lib => {
-      const idx = lib.findIndex(m => (m as { id: string }).id === mediaId);
-      if (idx !== -1) {
-        const item = lib[idx] as Record<string, unknown>;
-        item.transcoding = false;
-        item.filepath = finalPath;
-        item.filePath = finalPath;
-      }
-      return lib;
-    });
+    if (!fs.existsSync(destPath)) {
+      console.error(`[pipeline] File missing after move attempt: ${destPath}`);
+      const doneJob = getPersistedJob(jobId);
+      if (doneJob) upsertJob({ ...doneJob, status: 'error' });
+      return;
+    }
+
+    const finalSize = fs.statSync(destPath).size;
+    const mediaItem = buildItem(destPath, destFilename, finalSize);
+
+    await writeLibrary(lib => { lib.unshift(mediaItem); return lib; });
+    console.log(`[pipeline] ✓ Added "${resolvedTitle}" → ${destPath}`);
+
+    const doneJob = getPersistedJob(jobId);
+    if (doneJob) upsertJob({ ...doneJob, status: 'done', progress: 100, completedAt: new Date().toISOString() });
+
+    if (backend === 'qbittorrent' && doneJob?.infoHash) {
+      await deleteTorrent(doneJob.infoHash, true).catch(err =>
+        console.error(`[pipeline] Failed to remove torrent ${doneJob.infoHash}:`, err));
+    }
+
+    runEnrichmentInBackground(mediaId).catch(() => {});
+    runCaptionFetchInBackground(mediaId).catch(() => {});
+    return;
   }
 
-  // ── 6. Mark job done ──
+  // ── 5. Transcode path ──
+  // Output goes to targetDir with a clean filename
+  const tcBasename   = cleanFilename(omdb?.Title, omdb?.Year, srcFilename, '').replace(/\.[^.]*$/, '');
+  const tcFilename   = `${tcBasename}_tc.mp4`;
+  const outputPath   = path.join(targetDir, tcFilename);
+
+  console.log(`[pipeline] Transcoding "${resolvedTitle}" → ${outputPath}`);
+
+  let finalPath     = outputPath;
+  let finalFilename = tcFilename;
+  let finalSize     = fileSize;
+  let tcExtra: Record<string, unknown> = {};
+
+  try {
+    const result = await transcodeFile(mediaId, filePath, outputPath);
+    finalSize = result.finalSize;
+    tcExtra = {
+      savedBytes: result.savedBytes,
+      transcodeStrategy: result.strategy,
+      originalSize: result.originalSize,
+    };
+
+    if (result.outputFilename !== path.basename(outputPath)) {
+      // Transcode reverted to original (output was larger) — move original to targetDir
+      finalFilename = cleanFilename(omdb?.Title, omdb?.Year, srcFilename, srcExt);
+      finalPath     = path.join(targetDir, finalFilename);
+      console.log(`[pipeline] Reverted to original, moving: ${filePath} → ${finalPath}`);
+      moveFile(filePath, finalPath);
+    }
+    // The _tc.mp4 is already at outputPath — no move needed
+    console.log(`[pipeline] ✓ Transcode complete for "${resolvedTitle}" — saved ${Math.round((result.savedBytes ?? 0) / 1e6)} MB`);
+  } catch (transcodeErr) {
+    console.error(`[pipeline] Transcode failed for "${resolvedTitle}":`, transcodeErr);
+    // Move original to targetDir so it's still playable
+    finalFilename = cleanFilename(omdb?.Title, omdb?.Year, srcFilename, srcExt);
+    finalPath     = path.join(targetDir, finalFilename);
+    try {
+      moveFile(filePath, finalPath);
+    } catch (moveErr) {
+      console.error(`[pipeline] Also failed to move original:`, moveErr);
+    }
+    tcExtra = { transcodeError: String(transcodeErr) };
+  }
+
+  // ── 6. Delete source file from downloads (if it still exists and isn't the final file) ──
+  if (fs.existsSync(filePath) && filePath !== finalPath) {
+    try {
+      fs.unlinkSync(filePath);
+      console.log(`[pipeline] Deleted source from downloads: ${filePath}`);
+    } catch (delErr) {
+      console.warn(`[pipeline] Could not delete source file: ${filePath}`, delErr);
+    }
+  }
+
+  // ── 7. Verify final file exists before adding to library ──
+  if (!fs.existsSync(finalPath)) {
+    console.error(`[pipeline] Final file missing after processing: ${finalPath}. NOT adding to library.`);
+    const errJob = getPersistedJob(jobId);
+    if (errJob) upsertJob({ ...errJob, status: 'error' });
+    return;
+  }
+
+  finalSize = fs.statSync(finalPath).size;
+
+  // ── 8. Add to library (only now — file is confirmed in place) ──
+  const mediaItem = buildItem(finalPath, finalFilename, finalSize, tcExtra);
+  await writeLibrary(lib => { lib.unshift(mediaItem); return lib; });
+  console.log(`[pipeline] ✓ Added "${resolvedTitle}" to library → ${finalPath}`);
+
+  // ── 9. Mark job done ──
   const doneJob = getPersistedJob(jobId);
   if (doneJob) upsertJob({ ...doneJob, status: 'done', progress: 100, completedAt: new Date().toISOString() });
 
-  // ── 7. Clean up torrent from qBittorrent ──
+  // ── 10. Remove torrent from qBittorrent ──
   if (backend === 'qbittorrent' && doneJob?.infoHash) {
-    try {
-      console.log(`[pipeline] Auto-removing torrent ${doneJob.infoHash} from qBittorrent`);
-      await deleteTorrent(doneJob.infoHash, true);
-    } catch (err) {
-      console.error(`[pipeline] Failed to auto-remove torrent ${doneJob.infoHash} from qBittorrent:`, err);
-    }
+    await deleteTorrent(doneJob.infoHash, true).catch(err =>
+      console.error(`[pipeline] Failed to remove torrent ${doneJob.infoHash}:`, err));
   }
 
-  // ── 8. Background enrichment + captions ──
+  // ── 11. Background enrichment + captions ──
   runEnrichmentInBackground(mediaId).catch(() => {});
   runCaptionFetchInBackground(mediaId).catch(() => {});
 }

@@ -61,14 +61,58 @@ let activeWatchDir = '';
 
 // ─── Import pipeline ──────────────────────────────────────────────────────────
 
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function moveFile(src: string, dest: string): void {
+  if (src === dest) return;
+  if (!fs.existsSync(src)) return;
+  const dir = path.dirname(dest);
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  try {
+    fs.renameSync(src, dest);
+  } catch (err: any) {
+    if (err.code === 'EXDEV') {
+      fs.copyFileSync(src, dest);
+      fs.unlinkSync(src);
+    } else throw err;
+  }
+}
+
+function cleanFilename(omdbTitle: string | undefined, omdbYear: string | undefined, originalBasename: string, ext: string): string {
+  if (omdbTitle) {
+    const safeName = omdbTitle
+      .replace(/[<>:"/\\|?*]+/g, '')
+      .replace(/\s+/g, '_')
+      .replace(/_+/g, '_')
+      .trim();
+    const yearPart = omdbYear ? `_${omdbYear}` : '';
+    return `${safeName}${yearPart}${ext}`;
+  }
+  return originalBasename.replace(/^\d{13}-/, '');
+}
+
+function resolveTargetDir(libraryDir: string, type: string, genres: string[], title: string): string {
+  if (type === 'series') return path.join(libraryDir, 'tv');
+  const g = genres.map(x => x.toLowerCase());
+  // Anime heuristic
+  const isAnime = g.includes('animation') &&
+    (title.toLowerCase().match(/\b(anime|manga|shonen|shojo|seinen|isekai|mecha|naruto|bleach|one piece|dragon ball|attack on titan|demon slayer|jujutsu|chainsaw|spy x|my hero)\b/) != null ||
+     g.includes('japan'));
+  if (isAnime) return path.join(libraryDir, 'movies');
+  return path.join(libraryDir, 'movies'); // all non-TV goes to movies/
+}
+
+// ─── Import pipeline ──────────────────────────────────────────────────────────
+
 async function importFile(filePath: string): Promise<void> {
   if (importedPaths.has(filePath)) return;
   importedPaths.add(filePath);
 
   const filename = path.basename(filePath);
+  const ext      = path.extname(filename).toLowerCase();
   console.log(`[watcher] Importing: ${filename}`);
 
-  // Check if already in library
+  // Check if already in library by path or original filename
   const library = readLibrary<{ originalFilename?: string; filePath?: string; filepath?: string }>();
   if (library.some(item =>
     item.originalFilename === filename ||
@@ -84,18 +128,38 @@ async function importFile(filePath: string): Promise<void> {
   // Fetch OMDB metadata
   const omdb = await fetchOMDB(extractedTitle, extractedYear);
 
+  const genres: string[] = omdb?.Genre
+    ? omdb.Genre.split(',').map((g: string) => g.trim()).filter(Boolean)
+    : ['Unknown'];
+
   const fileSize = (() => {
     try { return fs.statSync(filePath).size; } catch { return 0; }
   })();
 
   const cfg = readConfig();
+  const libraryDir = cfg.libraryDir || path.dirname(filePath);
+  const targetDir  = resolveTargetDir(libraryDir, 'movie', genres, extractedTitle);
+  if (!fs.existsSync(targetDir)) fs.mkdirSync(targetDir, { recursive: true });
+
   if (cfg.autoTranscode === false) {
-    // Skip transcoding — register source file directly in library
+    // No transcode — move directly to library/movies/ with clean name
+    const destFilename = cleanFilename(omdb?.Title, omdb?.Year, filename, ext);
+    const destPath     = path.join(targetDir, destFilename);
+    try { moveFile(filePath, destPath); } catch (e) {
+      console.error(`[watcher] Failed to move file to library:`, e);
+    }
+
+    if (!fs.existsSync(destPath)) {
+      console.error(`[watcher] File missing after move: ${destPath}`);
+      return;
+    }
+
+    const finalSize = fs.statSync(destPath).size;
     const mediaItem = buildMediaItem({
-      filename,
+      filename: destFilename,
       originalFilename: filename,
-      filePath,
-      fileSize,
+      filePath: destPath,
+      fileSize: finalSize,
       omdb,
       extractedTitle,
       extractedYear,
@@ -108,86 +172,106 @@ async function importFile(filePath: string): Promise<void> {
       return lib;
     });
 
-    console.log(`[watcher] Added to library (no transcode): "${mediaItem.title}" (${mediaItem.id})`);
+    console.log(`[watcher] ✓ Added to library (no transcode): "${mediaItem.title}" → ${destPath}`);
     runEnrichmentInBackground(mediaItem.id).catch(() => {});
     runCaptionFetchInBackground(mediaItem.id).catch(() => {});
     return;
   }
 
-  // Determine output path for transcoded file
-  // Transcoded file lives alongside the source in the downloads folder
-  const outputFilename = filename.replace(/\.[^.]+$/, '') + '_tc.mp4';
-  const outputPath = path.join(path.dirname(filePath), outputFilename);
+  // Transcode path — output goes directly to targetDir with clean name
+  const tcBase     = cleanFilename(omdb?.Title, omdb?.Year, filename, '').replace(/\.mp4$/, '');
+  const tcFilename = `${tcBase}_tc.mp4`;
+  const outputPath = path.join(targetDir, tcFilename);
 
-  // Build library record — initially points at source file.
-  // Always mark transcoding:true so the UI shows "Optimizing…" while the
-  // transcoder runs. The transcoder itself decides whether to skip, remux,
-  // or re-encode based on codec analysis — it may finish instantly for
-  // already-efficient H.264 MP4 files.
+  console.log(`[watcher] Transcoding → ${outputPath}`);
+
+  let finalPath     = outputPath;
+  let finalFilename = tcFilename;
+  let finalSize     = fileSize;
+  const extraFields: Record<string, unknown> = {};
+
+  try {
+    const mediaItemId = buildMediaItem({
+      filename,
+      originalFilename: filename,
+      filePath,
+      fileSize,
+      omdb,
+      extractedTitle,
+      extractedYear,
+      transcoding: false,
+      importedFrom: 'folder_watcher',
+    }).id; // generate stable ID to pass to transcoder
+
+    const result = await transcodeFile(mediaItemId, filePath, outputPath);
+    finalSize = result.finalSize;
+    extraFields.savedBytes = result.savedBytes;
+    extraFields.transcodeStrategy = result.strategy;
+    extraFields.originalSize = result.originalSize;
+
+    if (result.outputFilename !== path.basename(outputPath)) {
+      // Reverted — move original to library/movies/ with clean name
+      finalFilename = cleanFilename(omdb?.Title, omdb?.Year, filename, ext);
+      finalPath     = path.join(targetDir, finalFilename);
+      console.log(`[watcher] Reverted to original, moving: ${filePath} → ${finalPath}`);
+      moveFile(filePath, finalPath);
+    }
+    // _tc.mp4 is already written directly to targetDir — nothing to move
+    console.log(`[watcher] ✓ Transcode complete: saved ${Math.round((result.savedBytes ?? 0) / 1024 / 1024)}MB`);
+  } catch (err) {
+    console.error(`[watcher] Transcode failed:`, err);
+    // Move original to library/movies/ so it's still playable
+    finalFilename = cleanFilename(omdb?.Title, omdb?.Year, filename, ext);
+    finalPath     = path.join(targetDir, finalFilename);
+    try { moveFile(filePath, finalPath); } catch (e) {
+      console.error(`[watcher] Also failed to move original:`, e);
+    }
+    extraFields.transcodeError = String(err);
+  }
+
+  // Delete source from downloads if it still exists and isn't the final file
+  if (fs.existsSync(filePath) && filePath !== finalPath) {
+    try {
+      fs.unlinkSync(filePath);
+      console.log(`[watcher] Deleted source from downloads: ${filePath}`);
+    } catch (e) {
+      console.warn(`[watcher] Could not delete source:`, e);
+    }
+  }
+
+  // Only add to library once file is confirmed in place
+  if (!fs.existsSync(finalPath)) {
+    console.error(`[watcher] Final file missing: ${finalPath}. NOT adding to library.`);
+    return;
+  }
+
+  finalSize = fs.statSync(finalPath).size;
+
   const mediaItem = buildMediaItem({
-    filename,
+    filename: finalFilename,
     originalFilename: filename,
-    filePath,                    // stream from source until transcode completes
-    fileSize,
+    filePath: finalPath,
+    fileSize: finalSize,
     omdb,
     extractedTitle,
     extractedYear,
-    transcoding: true,
+    transcoding: false,
     importedFrom: 'folder_watcher',
   });
 
-  // Register transcode job
-  createJob(mediaItem.id, filename, outputFilename);
+  // Merge extra transcode fields
+  Object.assign(mediaItem, extraFields);
 
-  // Write to library immediately — item visible in UI right away
   await writeLibrary(lib => {
     lib.unshift(mediaItem as unknown as Record<string, unknown>);
     return lib;
   });
 
-  console.log(`[watcher] Added to library: "${mediaItem.title}" (${mediaItem.id})`);
+  console.log(`[watcher] ✓ Added to library: "${mediaItem.title}" → ${finalPath}`);
 
-  // Trigger AI enrichment + CC in background immediately
+  // Trigger AI enrichment + CC in background
   runEnrichmentInBackground(mediaItem.id).catch(() => {});
   runCaptionFetchInBackground(mediaItem.id).catch(() => {});
-
-  // Transcode in background
-  try {
-    const result = await transcodeFile(mediaItem.id, filePath, outputPath);
-    // result.outputFilename is the basename of whichever file won (output or original)
-    const finalPath = result.outputFilename === path.basename(outputPath)
-      ? outputPath
-      : filePath; // reverted to original
-
-    await writeLibrary(lib => {
-      const idx = lib.findIndex(m => (m as { id: string }).id === mediaItem.id);
-      if (idx !== -1) {
-        const item = lib[idx] as Record<string, unknown>;
-        item.transcoding = false;
-        item.filename = result.outputFilename;
-        item.filepath = finalPath;
-        item.filePath = finalPath;
-        item.fileSize = result.finalSize;
-        item.originalSize = result.originalSize;
-        item.savedBytes = result.savedBytes;
-        item.transcodeStrategy = result.strategy;
-      }
-      return lib;
-    });
-    console.log(`[watcher] Transcode complete: "${mediaItem.title}" — saved ${Math.round((result.savedBytes ?? 0) / 1024 / 1024)}MB`);
-  } catch (err) {
-    console.error(`[watcher] Transcode failed for ${mediaItem.id}:`, err);
-    // Keep original file — mark transcoding done so UI doesn't spin forever
-    await writeLibrary(lib => {
-      const idx = lib.findIndex(m => (m as { id: string }).id === mediaItem.id);
-      if (idx !== -1) {
-        const item = lib[idx] as Record<string, unknown>;
-        item.transcoding = false;
-        item.transcodeError = String(err);
-      }
-      return lib;
-    });
-  }
 }
 
 // ─── Stability check ──────────────────────────────────────────────────────────
