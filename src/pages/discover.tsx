@@ -22,6 +22,7 @@ import {
   Loader2, WifiOff, RefreshCw, Film, TrendingUp, Sparkles,
   ChevronDown, Search, X, Tv2, Clapperboard, Play, Volume2, VolumeX, Layers,
   AlertCircle, MonitorPlay, ChevronLeft, ChevronRight, SlidersHorizontal,
+  HardDrive,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useMedia } from '@/context/MediaContext';
@@ -498,6 +499,56 @@ function DownloadModal({ target, onClose }: { target: DownloadTarget; onClose: (
   const [error, setError] = useState('');
   const [downloading, setDownloading] = useState<string | null>(null);
 
+  const [selectedSeason, setSelectedSeason] = useState<string>('all');
+  const [episodesPerSeason, setEpisodesPerSeason] = useState(12);
+  const [bulkDownloading, setBulkDownloading] = useState(false);
+
+  const handleBulkSeriesDownload = async () => {
+    setBulkDownloading(true);
+    try {
+      const body: Record<string, any> = {
+        imdbId: target.imdbId || null,
+        type: 'series',
+        title: target.title,
+        poster: target.posterUrl,
+        allEpisodes: true,
+        totalEpisodes: episodesPerSeason,
+        totalSeasons: 10,
+      };
+      if (selectedSeason !== 'all') {
+        body.season = parseInt(selectedSeason);
+      }
+      
+      const res = await fetch('/api/stremio/download', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+
+      if (res.status === 503) {
+        toast.error('Configure qBittorrent or Real-Debrid first.');
+        setBulkDownloading(false);
+        return;
+      }
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({})) as { error?: string; message?: string };
+        throw new Error(errData.message ?? errData.error ?? `Server error ${res.status}`);
+      }
+
+      const data = await res.json() as { queued?: number; message?: string; vpnUsed?: boolean };
+      const count = data.queued ?? 1;
+      const vpnText = data.vpnUsed ? ' (Protected by VPN)' : '';
+      toast.success(`Queued ${count} episode${count !== 1 ? 's' : ''} of "${target.title}"${vpnText}`);
+      onClose();
+    } catch (err) {
+      toast.error(`Bulk download failed: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setBulkDownloading(false);
+    }
+  };
+
   const search = async () => {
     setSearching(true);
     setError('');
@@ -664,7 +715,65 @@ function DownloadModal({ target, onClose }: { target: DownloadTarget; onClose: (
           </button>
         </div>
 
-        <div className="p-5">
+        <div className="p-5 max-h-[75vh] overflow-y-auto space-y-4">
+          {/* Bulk download options for series */}
+          {target.type === 'series' && (
+            <div className="bg-zinc-900 border border-zinc-700 rounded-xl p-4 mb-2 space-y-3">
+              <div className="flex items-center gap-2">
+                <HardDrive className="w-4 h-4 text-primary" />
+                <span className="text-sm font-semibold text-foreground">Download Series / Season</span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Downloads the best quality ≥720p stream for each episode. Already downloaded episodes are skipped.
+              </p>
+              
+              <div className="flex items-center gap-3 flex-wrap">
+                <div className="flex items-center gap-1.5">
+                  <label className="text-xs text-zinc-400">Season</label>
+                  <select
+                    value={selectedSeason}
+                    onChange={e => setSelectedSeason(e.target.value)}
+                    className="bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-primary"
+                  >
+                    <option value="all">All seasons</option>
+                    {Array.from({ length: 15 }, (_, i) => i + 1).map(s => (
+                      <option key={s} value={s.toString()}>Season {s}</option>
+                    ))}
+                  </select>
+                </div>
+                
+                <div className="flex items-center gap-1.5">
+                  <label className="text-xs text-zinc-400">Episodes/season</label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={50}
+                    value={episodesPerSeason}
+                    onChange={e => setEpisodesPerSeason(Math.max(1, Math.min(50, parseInt(e.target.value) || 12)))}
+                    className="w-14 bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-primary text-center"
+                  />
+                </div>
+              </div>
+
+              <button
+                disabled={bulkDownloading}
+                onClick={handleBulkSeriesDownload}
+                className="w-full flex items-center justify-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground py-2 rounded-lg text-sm font-semibold transition-colors disabled:opacity-50"
+              >
+                {bulkDownloading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Queueing episodes…
+                  </>
+                ) : (
+                  <>
+                    <Download className="w-4 h-4" />
+                    Download {selectedSeason === 'all' ? 'All Seasons' : `Season ${selectedSeason}`}
+                  </>
+                )}
+              </button>
+            </div>
+          )}
           {streams.length === 0 && !searching && !error && (
             <div className="text-center py-4">
               <p className="text-sm text-muted-foreground mb-4">

@@ -51,7 +51,7 @@ export default function PlayerPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const fromParam = searchParams.get('from');  const { library, updateProgress, triggerPostWatchRecommendation, continueWatching } = useMedia();
+  const fromParam = searchParams.get('from');  const { library, loading, updateProgress, triggerPostWatchRecommendation, continueWatching } = useMedia();
   const { activeProfile } = useProfile();
   const profileId = activeProfile?.id ?? 'adult';
   const { settings: appSettings } = useTheme();
@@ -685,6 +685,15 @@ export default function PlayerPage() {
     sendRemoteStateNow();
   };
   const changeSpeed = (rate: number) => { if (ps.videoRef.current) ps.videoRef.current.playbackRate = rate; ps.setPlaybackRate(rate); ps.setShowSpeedMenu(false); };
+
+  // ── Loading guard ─────────────────────────────────────────────────────────
+  if (loading && library.length === 0) {
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        <div className="w-14 h-14 rounded-full border-4 border-white/20 border-t-white animate-spin" />
+      </div>
+    );
+  }
 
   // ── Not found ─────────────────────────────────────────────────────────────
   if (!item) {

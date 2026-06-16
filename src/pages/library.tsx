@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Film, Trash2, Edit2, Check, X, Star, AlertCircle,
   Upload, Clapperboard, Cpu, CheckCircle2, Clock, Zap, WifiOff, PenLine, Captions, Play,
@@ -352,6 +353,7 @@ function totalProgress(u: UploadingFile): number {
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function LibraryPage() {
+  const navigate = useNavigate();
   const { library, loading, isDemoMode, refreshLibrary, deleteMedia, updateMedia } = useMedia();
   const { isAllowed } = useProfile();
   const { settings: appSettings } = useTheme();
@@ -1204,7 +1206,7 @@ export default function LibraryPage() {
                               <motion.button
                                 whileHover={{ scale: 1.1 }}
                                 whileTap={{ scale: 0.95 }}
-                                onClick={e => { e.stopPropagation(); window.location.href = `/player/${item.id}`; }}
+                                onClick={e => { e.stopPropagation(); navigate(`/player/${item.id}`); }}
                                 className="w-11 h-11 rounded-full bg-primary flex items-center justify-center shadow-[0_0_20px_hsl(var(--primary)/0.5)] hover:bg-primary/90 transition-colors"
                                 title="Play"
                               >
