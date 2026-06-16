@@ -3,11 +3,8 @@ import path from 'path';
 import { execSync } from 'child_process';
 import { dataPath } from './dataDir.js';
 import { readLibrary, writeLibrary } from './libraryStore.js';
+import { readConfig } from './configStore.js';
 import { randomUUID } from 'crypto';
-
-const LIBRARY_ROOT = dataPath('library'); // Should point to your D:\HomeStream\library or equivalent
-
-
 
 function getFfprobeInfo(filePath: string) {
   try {
@@ -32,8 +29,17 @@ function parseBasicTitle(filename: string) {
 
 export async function scanLibrary() {
   console.log('[scanner] Starting safe rescan...');
+  const config = readConfig();
+  const libraryRoot = config.libraryDir || dataPath('library');
+  console.log(`[scanner] Using library root: ${libraryRoot}`);
+
   const currentLibrary = readLibrary();
-  const existingPaths = new Set(currentLibrary.map((m: any) => m.filePath || m.filepath || m.filePath));
+  const existingPaths = new Set(
+    currentLibrary.flatMap((m: any) => [
+      (m.filePath || '').replace(/\\/g, '/'),
+      (m.filepath || '').replace(/\\/g, '/'),
+    ].filter(Boolean))
+  );
 
   let addedCount = 0;
 
@@ -50,8 +56,8 @@ export async function scanLibrary() {
 
       if (!/\.(mp4|mkv|avi|mov|wmv|m4v)$/i.test(entry.name)) continue;
 
-      const relativePath = path.relative(LIBRARY_ROOT, fullPath).replace(/\\/g, '/');
-      const absPath = fullPath; // your buildItem uses absolute paths
+      const relativePath = path.relative(libraryRoot, fullPath).replace(/\\/g, '/');
+      const absPath = fullPath.replace(/\\/g, '/');
 
       if (existingPaths.has(absPath) || existingPaths.has(relativePath)) continue;
 
@@ -110,8 +116,8 @@ export async function scanLibrary() {
   };
 
   try {
-    await scanDir(path.join(LIBRARY_ROOT, 'movies'), 'movies');
-    await scanDir(path.join(LIBRARY_ROOT, 'tv'), 'tv');
+    await scanDir(path.join(libraryRoot, 'movies'), 'movies');
+    await scanDir(path.join(libraryRoot, 'tv'), 'tv');
 
     console.log(`[scanner] Rescan complete. Added ${addedCount} new items.`);
     return { success: true, added: addedCount };

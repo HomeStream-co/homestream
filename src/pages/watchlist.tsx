@@ -304,9 +304,9 @@ function WatchlistCard({
       }`}
       onClick={onNavigateToDetail}
       draggable={draggable}
-      onDragStart={onDragStart}
+      onDragStart={onDragStart as any}
       onDragOver={onDragOver}
-      onDragEnd={onDragEnd}
+      onDragEnd={onDragEnd as any}
     >
       {/* Poster */}
       <div className="relative aspect-[2/3] rounded-xl overflow-hidden bg-card shadow-lg">

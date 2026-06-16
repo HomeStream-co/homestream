@@ -71,6 +71,18 @@ async function moveFile(src: string, dest: string, retries = 5): Promise<void> {
     fs.mkdirSync(destDir, { recursive: true });
   }
 
+  // Linux hardlink optimization
+  if (process.platform === 'linux' && path.parse(src).root === path.parse(dest).root) {
+    try {
+      fs.linkSync(src, dest);
+      fs.unlinkSync(src);
+      console.log(`[pipeline] ✓ Hardlinked: ${src} → ${dest}`);
+      return;
+    } catch (e) {
+      console.warn('[pipeline] Hardlink failed, falling back to rename/copy');
+    }
+  }
+
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
       fs.renameSync(src, dest);
@@ -268,41 +280,44 @@ export async function runPostDownloadPipeline(params: PostDownloadParams): Promi
   }
 
   // ── 3. Helper to build the library media item ──
-  const buildItem = (finalPath: string, finalFilename: string, finalSize: number, extra: Record<string, unknown> = {}): Record<string, unknown> => ({
-    id: mediaId,
-    filename: finalFilename,
-    originalFilename: srcFilename,
-    filepath: finalPath,
-    filePath: finalPath,
-    title: resolvedTitle,
-    year: resolvedYear || 'Unknown',
-    genre: genres,
-    plot: omdb?.Plot || '',
-    director: omdb?.Director || '',
-    actors: omdb?.Actors || '',
-    imdbRating: omdb?.imdbRating || 'N/A',
-    poster: (omdb?.Poster && omdb.Poster !== 'N/A') ? omdb.Poster : (poster || ''),
-    type,
-    runtime: omdb?.Runtime || 'Unknown',
-    rated: omdb?.Rated && omdb.Rated !== 'N/A' ? omdb.Rated.trim() : 'NR',
-    addedAt: new Date().toISOString(),
-    watchProgress: 0,
-    fileSize: finalSize,
-    originalSize: fileSize,
-    transcoding: false,
-    needsMetadata: !omdb,
-    metadataAvailable: !!omdb,
-    imdbId: imdbId || '',
-    season,
-    episode,
-    episodeLabel,
-    category,
-    downloadedVia: backend,
-    quality,
-    ccStatus: 'none',
-    enriching: false,
-    ...extra,
-  });
+  const buildItem = (finalPath: string, finalFilename: string, finalSize: number, extra: Record<string, unknown> = {}): Record<string, unknown> => {
+    const normalized = finalPath.replace(/\\/g, '/');
+    return {
+      id: mediaId,
+      filename: finalFilename,
+      originalFilename: srcFilename,
+      filepath: normalized,
+      filePath: normalized,
+      title: resolvedTitle,
+      year: resolvedYear || 'Unknown',
+      genre: genres,
+      plot: omdb?.Plot || '',
+      director: omdb?.Director || '',
+      actors: omdb?.Actors || '',
+      imdbRating: omdb?.imdbRating || 'N/A',
+      poster: (omdb?.Poster && omdb.Poster !== 'N/A') ? omdb.Poster : (poster || ''),
+      type,
+      runtime: omdb?.Runtime || 'Unknown',
+      rated: omdb?.Rated && omdb.Rated !== 'N/A' ? omdb.Rated.trim() : 'NR',
+      addedAt: new Date().toISOString(),
+      watchProgress: 0,
+      fileSize: finalSize,
+      originalSize: fileSize,
+      transcoding: false,
+      needsMetadata: !omdb,
+      metadataAvailable: !!omdb,
+      imdbId: imdbId || '',
+      season,
+      episode,
+      episodeLabel,
+      category,
+      downloadedVia: backend,
+      quality,
+      ccStatus: 'none',
+      enriching: false,
+      ...extra,
+    };
+  };
 
   // ── 4. No-transcode path ──
   if (cfg.autoTranscode === false) {

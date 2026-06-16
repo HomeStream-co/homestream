@@ -47,4 +47,4 @@ ENV HOMESTREAM_DATA=/app/homestream-data
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
   CMD curl -sf http://localhost:3000/api/health || exit 1
 
-CMD ["node", "dist/server.bundle.mjs"]
+CMD ["node", "dist/server/server.bundle.cjs"]

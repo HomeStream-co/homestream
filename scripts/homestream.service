@@ -1,0 +1,24 @@
+[Unit]
+Description=HomeStream Offline Media Server
+After=network.target qbittorrent-nox.service
+
+[Service]
+Type=simple
+User=homestream
+Group=homestream
+WorkingDirectory=/opt/homestream
+ExecStart=/usr/bin/node /opt/homestream/dist/server/server.bundle.cjs
+Restart=always
+RestartSec=3
+Environment=NODE_ENV=production
+Environment=PORT=3000
+# Recommended limits
+LimitNOFILE=4096
+Nice=10
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

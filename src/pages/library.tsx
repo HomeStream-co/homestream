@@ -668,7 +668,7 @@ export default function LibraryPage() {
       plot: item.plot,
       runtime: item.runtime || '',
       director: item.director || '',
-      actors: item.actors || '',
+      actors: Array.isArray(item.actors) ? item.actors.join(', ') : (item.actors || ''),
       imdbId: item.imdbId || '',
       rated: item.rated || 'NR',
       imdbRating: item.imdbRating || 'N/A',

@@ -137,6 +137,10 @@ export interface MediaItem {
   enriching?: boolean;
 }
 
+export function normalizePath(p: string): string {
+  return p.replace(/\\/g, '/');
+}
+
 /**
  * Build a standardised MediaItem record from raw inputs.
  * Used by upload, folderWatcher, and existingMediaScanner so the
@@ -154,12 +158,14 @@ export function buildMediaItem(input: MediaItemInput): MediaItem {
       ? omdb.Rated.trim()
       : 'NR';
 
+  const normalizedPath = normalizePath(input.filePath);
+
   return {
     id: input.id ?? randomUUID(),
     filename: input.filename,
     originalFilename: input.originalFilename,
-    filepath: input.filePath,
-    filePath: input.filePath,
+    filepath: normalizedPath,
+    filePath: normalizedPath,
     title: omdb?.Title || input.extractedTitle,
     year: omdb?.Year || input.extractedYear || 'Unknown',
     genre,

@@ -68,6 +68,18 @@ function moveFile(src: string, dest: string): void {
   if (!fs.existsSync(src)) return;
   const dir = path.dirname(dest);
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+
+  // Linux hardlink optimization
+  if (process.platform === 'linux' && path.parse(src).root === path.parse(dest).root) {
+    try {
+      fs.linkSync(src, dest);
+      fs.unlinkSync(src);
+      return;
+    } catch {
+      // Fall through to rename/copy
+    }
+  }
+
   try {
     fs.renameSync(src, dest);
   } catch (err: any) {
