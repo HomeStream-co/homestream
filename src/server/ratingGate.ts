@@ -50,7 +50,7 @@ const DEFAULT_RESTRICTED_RATINGS = new Set([
  * Returns true if `rating` is allowed for a restricted profile with the given
  * `maxRating` ceiling (or the default restricted set if maxRating is absent).
  */
-function isRatingAllowed(rating: string, maxRating?: string): boolean {
+export function isRatingAllowed(rating: string, maxRating?: string): boolean {
   const r = rating.trim().toUpperCase();
   if (!r || r === 'N/A' || r === 'NR' || r === 'UNKNOWN' || r === 'NOT RATED') {
     // Unrated content: block for restricted profiles (conservative default)

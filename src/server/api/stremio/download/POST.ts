@@ -10,6 +10,9 @@ import { requireAuth } from '../../../authMiddleware.js';
 import { resolvemagnet, downloadUrl } from '../../../realDebridClient.js';
 import { runPostDownloadPipeline } from '../../../postDownloadPipeline.js';
 import { fetchAllCustomSources } from '../../../customSourceFetcher.js';
+import { getProfile } from '../../../profilesStore.js';
+import { getActiveProfileId, isRatingAllowed } from '../../../ratingGate.js';
+import { fetchOMDB } from '../../../mediaUtils.js';
 
 const CINEMETA   = 'https://v3-cinemeta.strem.io';
 const TIMEOUT_MS = 15_000;
@@ -328,6 +331,7 @@ interface QbitJob {
   poster?: string;
   imdbId: string;
   backend: 'qbittorrent';
+  profileId?: string;
 }
 
 const qbitJobs = new Map<string, QbitJob>();
@@ -348,6 +352,7 @@ export function getQbitJobs(): QbitJob[] {
       poster: j.poster,
       imdbId: j.imdbId,
       backend: 'qbittorrent' as const,
+      profileId: j.profileId,
     }));
 
   const inMemoryIds = new Set(qbitJobs.keys());
@@ -368,6 +373,7 @@ async function queueViaQbit(params: {
   episode?: number;
   imdbId: string;
   poster?: string;
+  profileId?: string;
 }): Promise<QbitJob> {
   const config = readConfig();
   const savePath = config.downloadsDir || (config.mediaDir ? `${config.mediaDir}/downloads` : '/downloads');
@@ -391,6 +397,7 @@ async function queueViaQbit(params: {
     poster: params.poster,
     imdbId: params.imdbId,
     backend: 'qbittorrent',
+    profileId: params.profileId,
   };
 
   qbitJobs.set(job.jobId, job);
@@ -408,6 +415,7 @@ async function queueViaQbit(params: {
     poster: job.poster,
     imdbId: job.imdbId,
     backend: 'qbittorrent',
+    profileId: job.profileId,
   });
 
   return job;
@@ -455,6 +463,39 @@ export default async function handler(req: Request, res: Response) {
     }
   }
   const finalImdbId = resolvedImdbId;
+
+  // ── Parental controls & limits check ──
+  const profileId = getActiveProfileId(req);
+  const profile = getProfile(profileId);
+
+  if (profile && profile.restricted) {
+    // 1. Download limit check (kids limited to 5 downloads per 24h)
+    const dailyLimit = 5;
+    const recentJobs = getAllPersistedJobs().filter(j => 
+      j.profileId === profileId && 
+      new Date(j.addedAt).getTime() > Date.now() - 24 * 60 * 60 * 1000
+    );
+    if (recentJobs.length >= dailyLimit) {
+      res.status(429).json({
+        error: 'Download limit exceeded',
+        message: `Kids profiles are limited to ${dailyLimit} downloads per 24 hours. You have already downloaded ${recentJobs.length} titles.`,
+      });
+      return;
+    }
+
+    // 2. Rating restriction check
+    console.log(`[parental-gate] Verifying rating for "${title}" (${finalImdbId})…`);
+    const omdb = await fetchOMDB(title, year, finalImdbId);
+    const rating = omdb?.Rated?.trim() || 'NR';
+    
+    if (!isRatingAllowed(rating, profile.maxRating)) {
+      res.status(403).json({
+        error: 'Content restricted',
+        message: `This content (rated ${rating}) is PG-13 or above and cannot be downloaded on the "${profile.name}" profile.`,
+      });
+      return;
+    }
+  }
 
   // ── Backend selection: RD > qBit ──────────────────────────────────────────
   const cfg = readConfig();
@@ -531,6 +572,7 @@ export default async function handler(req: Request, res: Response) {
       type: 'movie' | 'series'; season?: number; episode?: number;
       status: 'downloading'; addedAt: string; poster?: string;
       imdbId: string; backend: 'real-debrid';
+      profileId?: string;
     };
     magnet: string;
   }) {
@@ -607,6 +649,7 @@ export default async function handler(req: Request, res: Response) {
           jobId, infoHash: best.infoHash, title, quality: best.quality,
           type: 'movie' as const, status: 'downloading' as const,
           addedAt: new Date().toISOString(), poster, imdbId: finalImdbId, backend: 'real-debrid' as const,
+          profileId,
         };
         upsertJob(jobEntry);
         res.json({ queued: 1, jobs: [jobEntry], backend: 'real-debrid', securityScan: scan, vpnUsed: vpnConnected });
@@ -621,7 +664,7 @@ export default async function handler(req: Request, res: Response) {
           res.status(403).json({ error: 'Download blocked by security scan', reason: scan.reason, layer: scan.layer, details: scan.details, threatLevel: scan.threatLevel });
           return;
         }
-        const job = await queueViaQbit({ infoHash: best.infoHash, magnet: best.magnet, quality: best.quality, type: 'movie', title, imdbId: finalImdbId, poster });
+        const job = await queueViaQbit({ infoHash: best.infoHash, magnet: best.magnet, quality: best.quality, type: 'movie', title, imdbId: finalImdbId, poster, profileId });
         await releaseVPN();
         res.json({ queued: 1, jobs: [job], backend: 'qbittorrent', securityScan: scan, vpnUsed: vpnConnected });
       }
@@ -651,6 +694,7 @@ export default async function handler(req: Request, res: Response) {
             jobId, infoHash: best.infoHash, title: epTitle, quality: best.quality,
             type: 'series' as const, season, episode, status: 'downloading' as const,
             addedAt: new Date().toISOString(), poster, imdbId: finalImdbId, backend: 'real-debrid' as const,
+            profileId,
           };
           upsertJob(jobEntry);
           res.json({ queued: 1, jobs: [jobEntry], backend: 'real-debrid', vpnUsed: vpnConnected });
@@ -658,7 +702,7 @@ export default async function handler(req: Request, res: Response) {
           fireRdDownload({ jobEntry, magnet: best.magnet });
         } else {
           if (checkDuplicate(best.infoHash, epTitle)) { await releaseVPN(); return; }
-          const job = await queueViaQbit({ infoHash: best.infoHash, magnet: best.magnet, quality: best.quality, title: epTitle, type: 'series', season, episode, imdbId: finalImdbId, poster });
+          const job = await queueViaQbit({ infoHash: best.infoHash, magnet: best.magnet, quality: best.quality, title: epTitle, type: 'series', season, episode, imdbId: finalImdbId, poster, profileId });
           await releaseVPN();
           res.json({ queued: 1, jobs: [job], backend: 'qbittorrent', vpnUsed: vpnConnected });
         }
@@ -716,12 +760,13 @@ export default async function handler(req: Request, res: Response) {
               jobId, infoHash: best.infoHash, title: epTitle, quality: best.quality,
               type: 'series' as const, season: s, episode: ep, status: 'downloading' as const,
               addedAt: new Date().toISOString(), poster, imdbId: finalImdbId, backend: 'real-debrid' as const,
+              profileId,
             };
             upsertJob(jobEntry);
             queuedJobs.push(jobEntry);
             fireRdDownload({ jobEntry, magnet: best.magnet });
           } else {
-            const job = await queueViaQbit({ infoHash: best.infoHash, magnet: best.magnet, quality: best.quality, title: epTitle, type: 'series', season: s, episode: ep, imdbId: finalImdbId, poster });
+            const job = await queueViaQbit({ infoHash: best.infoHash, magnet: best.magnet, quality: best.quality, title: epTitle, type: 'series', season: s, episode: ep, imdbId: finalImdbId, poster, profileId });
             queuedJobs.push(job);
           }
         }

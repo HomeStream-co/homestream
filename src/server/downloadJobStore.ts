@@ -41,6 +41,7 @@ export interface PersistedJob {
   poster?: string;
   imdbId: string;
   backend: 'qbittorrent' | 'webtorrent' | 'real-debrid';
+  profileId?: string;
   errorCount?: number;
   /** 0–100 download progress (Real-Debrid only — qBit/WT use live API data) */
   progress?: number;

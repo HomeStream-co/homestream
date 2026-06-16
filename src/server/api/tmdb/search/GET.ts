@@ -9,6 +9,8 @@
 import type { Request, Response } from 'express';
 import { readConfig } from '../../../configStore.js';
 import { requireAuth } from '../../../authMiddleware.js';
+import { getProfile } from '../../../profilesStore.js';
+import { getActiveProfileId } from '../../../ratingGate.js';
 
 export default async function handler(req: Request, res: Response) {
   if (!requireAuth(req, res)) return;
@@ -24,15 +26,31 @@ export default async function handler(req: Request, res: Response) {
     return res.status(503).json({ error: 'TMDB API key not configured', results: [] });
   }
 
+  // Check if profile is restricted (kids)
+  const profileId = getActiveProfileId(req);
+  const profile = getProfile(profileId);
+  const isRestricted = profile && profile.restricted;
+
   try {
     const url = `https://api.themoviedb.org/3/search/multi?api_key=${apiKey}&query=${encodeURIComponent(q)}&page=${page}&include_adult=false`;
     const r = await fetch(url);
     if (!r.ok) throw new Error(`TMDB responded ${r.status}`);
-    const data = await r.json() as { results?: unknown[]; total_results?: number; total_pages?: number };
+    const data = await r.json() as { results?: any[]; total_results?: number; total_pages?: number };
+    
+    let results = data.results ?? [];
+    if (isRestricted) {
+      const allowedGenres = [10762, 10751, 16]; // Kids, Family, Animation
+      results = results.filter(item => {
+        if (item.media_type === 'person') return false;
+        const ids = (item.genre_ids as number[]) ?? [];
+        return ids.some(id => allowedGenres.includes(id));
+      });
+    }
+
     res.json({
-      results: data.results ?? [],
-      total_results: data.total_results ?? 0,
-      total_pages: data.total_pages ?? 0,
+      results,
+      total_results: isRestricted ? results.length : (data.total_results ?? 0),
+      total_pages: isRestricted ? 1 : (data.total_pages ?? 0),
     });
   } catch (err) {
     res.status(500).json({ error: 'TMDB search failed', message: String(err), results: [] });

@@ -76,14 +76,15 @@ export interface OMDBData {
  * Returns null if: no API key, network error, or title not found.
  * Never throws — always returns null on failure.
  */
-export async function fetchOMDB(title: string, year?: string): Promise<OMDBData | null> {
+export async function fetchOMDB(title: string, year?: string, imdbId?: string): Promise<OMDBData | null> {
   // Check env first, then secrets store
   const apiKey = process.env.OMDB_API_KEY;
   if (!apiKey || typeof apiKey !== 'string') return null;
 
   try {
     const yearParam = year ? `&y=${year}` : '';
-    const url = `http://www.omdbapi.com/?t=${encodeURIComponent(title)}${yearParam}&apikey=${apiKey}`;
+    const query = imdbId ? `i=${imdbId}` : `t=${encodeURIComponent(title)}${yearParam}`;
+    const url = `http://www.omdbapi.com/?${query}&apikey=${apiKey}`;
     const res = await fetch(url, { signal: AbortSignal.timeout(8_000) });
     const data = await res.json() as OMDBData;
     return data.Response === 'True' ? data : null;

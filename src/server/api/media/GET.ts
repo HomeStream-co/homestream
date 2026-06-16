@@ -23,6 +23,8 @@ import type { Request, Response } from 'express';
 import crypto from 'crypto';
 import { readLibrary } from '../../libraryStore.js';
 import { requireAuth } from '../../authMiddleware.js';
+import { getProfile } from '../../profilesStore.js';
+import { isRatingAllowed } from '../../ratingGate.js';
 
 interface ProfileProgressEntry {
   progress: number;
@@ -58,9 +60,20 @@ function buildETag(library: Record<string, unknown>[], profileId: string): strin
 export default function handler(req: Request, res: Response) {
   try {
     if (!requireAuth(req, res)) return;
-    const library = readLibrary<Record<string, unknown>>();
+    let library = readLibrary<Record<string, unknown>>();
 
     const profileId = (req.query.profile as string | undefined)?.trim() ?? '';
+
+    // Server-side library separation for restricted profiles
+    if (profileId) {
+      const profile = getProfile(profileId);
+      if (profile && profile.restricted) {
+        library = library.filter(item => {
+          const r = (item.rated ?? '') as string;
+          return isRatingAllowed(r, profile.maxRating);
+        });
+      }
+    }
 
     // ── ETag / 304 handling ───────────────────────────────────────────────────
     // Skip ETag caching for empty libraries so the client always gets a fresh

@@ -21,6 +21,8 @@ import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import { dataDir } from '../../../dataDir.js';
+import { getProfile } from '../../../profilesStore.js';
+import { getActiveProfileId } from '../../../ratingGate.js';
 
 const TMDB_BASE = 'https://api.themoviedb.org/3';
 const LOCAL_IMG_DIR = path.join(dataDir(), 'tmdb-images');
@@ -82,7 +84,20 @@ export default async function handler(req: Request, res: Response) {
       page: number;
     };
 
-    const results = (data.results ?? []).map(m => {
+    const profileId = getActiveProfileId(req);
+    const profile = getProfile(profileId);
+    const isRestricted = profile && profile.restricted;
+
+    let rawResults = data.results ?? [];
+    if (isRestricted) {
+      const allowedGenres = [10762, 10751, 16]; // Kids, Family, Animation
+      rawResults = rawResults.filter(item => {
+        const ids = (item.genre_ids as number[]) ?? [];
+        return ids.some(id => allowedGenres.includes(id));
+      });
+    }
+
+    const results = rawResults.map(m => {
       const posterPath = (m.poster_path as string | null) ?? null;
       const backdropPath = (m.backdrop_path as string | null) ?? null;
       const genreIds = (m.genre_ids as number[]) ?? [];
