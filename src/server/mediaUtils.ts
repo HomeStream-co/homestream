@@ -15,6 +15,21 @@ import path from 'path';
 import { randomUUID } from 'crypto';
 // No #airo/secrets — reads from process.env directly for full portability
 
+export function findExistingMediaIndex(library: any[], newItem: any): number {
+  return library.findIndex(item => {
+    // Strong multi-key deduplication
+    return (
+      (item.filePath && item.filePath === newItem.filePath) ||
+      (item.filepath && item.filepath === newItem.filepath) ||
+      (item.id && item.id === newItem.id) ||
+      (item.imdbId && item.imdbId === newItem.imdbId) ||
+      (item.title && 
+       item.title.toLowerCase().trim() === newItem.title?.toLowerCase().trim() &&
+       Math.abs((item.year || 0) - (newItem.year || 0)) < 2)
+    );
+  });
+}
+
 // ─── Title extraction ─────────────────────────────────────────────────────────
 
 /**
@@ -91,6 +106,74 @@ export async function fetchOMDB(title: string, year?: string, imdbId?: string): 
   } catch {
     return null;
   }
+}
+
+// ── Improved Metadata Helpers ─────────────────────────────────────
+export async function fetchMetadata(title: string, year?: string | number, imdbId?: string, type: 'movie' | 'series' = 'movie'): Promise<OMDBData | null> {
+  console.log(`[metadata] Fetching for "${title}" (${year || 'unknown'})`);
+
+  let metadata = null;
+
+  // 1. Try OMDB first (your existing source)
+  try {
+    metadata = await fetchOMDB(title, year ? String(year) : undefined, imdbId);
+    if (metadata && metadata.Response !== 'False') {
+      console.log(`[metadata] ✅ OMDB success for ${title}`);
+      return metadata;
+    }
+  } catch (e) {
+    console.warn(`[metadata] OMDB failed for ${title}`);
+  }
+
+  // 2. Fallback to TMDB
+  try {
+    const tmdbData = await fallbackTMDB(title, type, year);
+    if (tmdbData) {
+      console.log(`[metadata] ✅ TMDB fallback success for ${title}`);
+      return mapTMDBToOMDB(tmdbData, type);
+    }
+  } catch (e) {
+    console.warn(`[metadata] TMDB fallback failed`);
+  }
+
+  console.warn(`[metadata] ❌ No metadata found for "${title}"`);
+  return null;
+}
+
+async function fallbackTMDB(title: string, type: 'movie' | 'series', year?: string | number) {
+  const { readConfig } = await import('./configStore.js');
+  const config = readConfig();
+  const apiKey = config.tmdbApiKey;
+  if (!apiKey) return null;
+
+  const searchType = type === 'series' ? 'tv' : 'movie';
+  let url = `https://api.themoviedb.org/3/search/${searchType}?api_key=${apiKey}&query=${encodeURIComponent(title)}`;
+
+  if (year) url += `&year=${year}`;
+
+  const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+  if (!res.ok) throw new Error('TMDB search failed');
+
+  const data = await res.json();
+  return data.results?.[0] || null;
+}
+
+function mapTMDBToOMDB(tmdb: any, type: string): OMDBData {
+  return {
+    Title: tmdb.title || tmdb.name,
+    Year: tmdb.release_date ? tmdb.release_date.slice(0,4) : tmdb.first_air_date?.slice(0,4),
+    Genre: tmdb.genre_ids ? '' : '',
+    Plot: tmdb.overview,
+    Poster: tmdb.poster_path ? `https://image.tmdb.org/t/p/w500${tmdb.poster_path}` : 'N/A',
+    imdbID: `tmdb-${tmdb.id}`,
+    imdbRating: tmdb.vote_average ? String(tmdb.vote_average) : 'N/A',
+    Type: type,
+    Runtime: 'Unknown',
+    Rated: 'NR',
+    Director: '',
+    Actors: '',
+    Response: 'True'
+  };
 }
 
 // ─── Media item builder ───────────────────────────────────────────────────────

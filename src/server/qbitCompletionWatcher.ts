@@ -14,7 +14,7 @@
  * downloadJobStore it is skipped on all future poll cycles.
  */
 
-import { getAllTorrents, isReachable } from './qbittorrentClient.js';
+import { getAllTorrents, isReachable, pauseTorrent } from './qbittorrentClient.js';
 import { getAllPersistedJobs, upsertJob } from './downloadJobStore.js';
 import { runPostDownloadPipeline } from './postDownloadPipeline.js';
 
@@ -77,32 +77,55 @@ async function poll(): Promise<void> {
     processing.add(job.infoHash);
     console.log(`[qbit-watcher] "${job.title}" complete — starting pipeline`);
 
-    // Fire pipeline in background — don't await so the poll loop continues
-    runPostDownloadPipeline({
-      filePath,
-      title: job.title,
-      quality: job.quality,
-      type: job.type as 'movie' | 'series',
-      season: job.season,
-      episode: job.episode,
-      imdbId: job.imdbId,
-      poster: job.poster,
-      year: undefined,
-      jobId: job.jobId,
-      backend: 'qbittorrent',
-    })
-      .catch(err => {
-        console.error(`[qbit-watcher] Pipeline failed for "${job.title}":`, err);
-        const errorCount = (job.errorCount ?? 0) + 1;
-        upsertJob({
-          ...job,
-          status: 'error',
-          errorCount,
-        });
-      })
-      .finally(() => {
-        processing.delete(job.infoHash);
+    // Fire processCompletedJob in background — don't await so the poll loop continues
+    processCompletedJob(job, filePath).finally(() => {
+      processing.delete(job.infoHash);
+    });
+  }
+}
+
+async function processCompletedJob(job: any, filePath: string) {
+  let attempts = job.errorCount || 0;
+  const maxRetries = 4;
+
+  while (attempts <= maxRetries) {
+    try {
+      console.log(`[qbit-watcher] Processing ${job.title} (attempt ${attempts + 1}/${maxRetries + 1})`);
+
+      // Pause torrent first so it doesn't conflict during transcode
+      if (job.infoHash) await pauseTorrent(job.infoHash).catch(() => {});
+
+      await runPostDownloadPipeline({
+        filePath,
+        title: job.title,
+        quality: job.quality,
+        type: job.type as 'movie' | 'series',
+        season: job.season,
+        episode: job.episode,
+        imdbId: job.imdbId,
+        poster: job.poster,
+        year: undefined,
+        jobId: job.jobId,
+        backend: 'qbittorrent',
       });
+      // runPostDownloadPipeline handles setting job to 'done' internally, 
+      // but we can break out of the retry loop if it succeeds without throwing.
+      return;
+    } catch (err) {
+      attempts++;
+      job.errorCount = attempts;
+      
+      if (attempts > maxRetries) {
+        job.status = 'error';
+        console.error(`[watcher] ❌ Job failed permanently: ${job.title}`, err);
+      } else {
+        job.status = 'error';
+        console.warn(`[watcher] ⚠️ Job failed, retrying in 30s: ${job.title}`);
+        await new Promise(r => setTimeout(r, 30000)); // 30 second backoff
+      }
+      
+      upsertJob(job);
+    }
   }
 }
 

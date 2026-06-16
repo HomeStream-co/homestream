@@ -27,6 +27,7 @@ import { useTranscodeProgress } from '@/hooks/useTranscodeProgress';
 import TranscodeProgressOverlay from '@/components/TranscodeProgressOverlay';
 import PlayerControlsOverlay from '@/components/player/PlayerControlsOverlay';
 import PlayerEndOverlay from '@/components/player/PlayerEndOverlay';
+import PlayerPauseRecommendations from '@/components/player/PlayerPauseRecommendations';
 import PlayerInfoPanel from '@/components/player/PlayerInfoPanel';
 import PlayerShortcutsOverlay from '@/components/player/PlayerShortcutsOverlay';
 import PlayerBelowFold from '@/components/player/PlayerBelowFold';
@@ -1031,6 +1032,17 @@ export default function PlayerPage() {
               fadeAndNavigate={fadeAndNavigate}
               setCastInfo={ps.setCastInfo}
               isScrubbingRef={isScrubbingRef}
+            />
+          )}
+        </AnimatePresence>
+
+        {/* Pause recommendations overlay */}
+        <AnimatePresence>
+          {!ps.isPlaying && !ps.showEndOverlay && item && (
+            <PlayerPauseRecommendations
+              mediaId={item.id}
+              isPaused={!ps.isPlaying}
+              playerAccent={playerAccent}
             />
           )}
         </AnimatePresence>

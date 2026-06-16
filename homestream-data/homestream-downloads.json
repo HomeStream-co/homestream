@@ -1,1 +1,30 @@
-[]
+[
+  {
+    "jobId": "759ca07141be32f7bad81eccb3a2e914066c680f",
+    "infoHash": "759ca07141be32f7bad81eccb3a2e914066c680f",
+    "title": "The Dark Knight",
+    "quality": "The.Dark.Knight.2008.IMAX.2160p.10bit.HDR.DV.BluRay.6CH.x265.HEVC-PSA",
+    "type": "movie",
+    "status": "done",
+    "addedAt": "2026-06-14T18:00:48.436Z",
+    "poster": "https://m.media-amazon.com/images/M/MV5BMTMxNTMwODM0NF5BMl5BanBnXkFtZTcwODAyMTk2Mw@@._V1_SX250.jpg",
+    "imdbId": "tt0468569",
+    "backend": "qbittorrent",
+    "progress": 100,
+    "completedAt": "2026-06-16T03:59:20.309Z"
+  },
+  {
+    "jobId": "8c5a4004a6f67bfd373b179fcb7633d9a2e9de26",
+    "infoHash": "8c5a4004a6f67bfd373b179fcb7633d9a2e9de26",
+    "title": "Harry Potter and the Philosopher's Stone",
+    "quality": "1080p",
+    "type": "movie",
+    "status": "done",
+    "addedAt": "2026-06-15T22:25:41.092Z",
+    "poster": "/tmdb-images/d128bfcb0ad7.jpg",
+    "imdbId": "tt0241527",
+    "backend": "qbittorrent",
+    "progress": 100,
+    "completedAt": "2026-06-15T22:45:05.198Z"
+  }
+]

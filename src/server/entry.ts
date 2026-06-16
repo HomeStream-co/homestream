@@ -222,6 +222,7 @@ app.use((req, res, next) => {
 });
 app.use(cookieParser());
 app.use('/tmdb-images', express.static(join(dataDir(), 'tmdb-images')));
+app.use('/posters', express.static(join(dataDir(), 'posters')));
 
 
 

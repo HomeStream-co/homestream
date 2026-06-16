@@ -5,6 +5,7 @@ import { dataPath } from './dataDir.js';
 import { readLibrary, writeLibrary } from './libraryStore.js';
 import { readConfig } from './configStore.js';
 import { randomUUID } from 'crypto';
+import { findExistingMediaIndex } from './mediaUtils.js';
 
 function getFfprobeInfo(filePath: string) {
   try {
@@ -104,11 +105,22 @@ export async function scanLibrary() {
 
       try {
         await writeLibrary((lib: any[]) => {
-          lib.unshift(mediaItem);
+          const existingIndex = findExistingMediaIndex(lib, mediaItem);
+          
+          if (existingIndex >= 0) {
+            console.log(`[scanner] 🔄 Updating existing: ${title}`);
+            lib[existingIndex] = {
+              ...lib[existingIndex],
+              ...mediaItem,
+              addedAt: lib[existingIndex].addedAt || new Date().toISOString()
+            };
+          } else {
+            console.log(`[scanner] ✓ Added: ${title}`);
+            lib.unshift(mediaItem);
+            addedCount++;
+          }
           return lib;
         });
-        console.log(`[scanner] ✓ Added: ${title}`);
-        addedCount++;
       } catch (err) {
         console.error(`[scanner] Failed to add ${entry.name}:`, err);
       }

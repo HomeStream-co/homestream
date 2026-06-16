@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Film, Trash2, Edit2, Check, X, Star, AlertCircle,
   Upload, Clapperboard, Cpu, CheckCircle2, Clock, Zap, WifiOff, PenLine, Captions, Play,
-  Search, SlidersHorizontal, RefreshCw,
+  Search, SlidersHorizontal, RefreshCw, Wand2,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'sonner';
@@ -393,6 +393,7 @@ export default function LibraryPage() {
   const [libSearch, setLibSearch] = useState(searchParams.get('search') || '');
   const [libSort, setLibSort] = useState<'added' | 'title' | 'rating' | 'year'>('added');
   const [rescanning, setRescanning] = useState(false);
+  const [optimizing, setOptimizing] = useState(false);
 
   useEffect(() => {
     const s = searchParams.get('search');
@@ -409,12 +410,29 @@ export default function LibraryPage() {
         toast.success(`Library rescanned — ${data.added ?? 0} new items found`);
         refreshLibrary();
       } else {
-        toast.error(data.error || 'Rescan failed');
+        toast.error(`Rescan failed: ${data.error || 'Unknown error'}`);
       }
-    } catch {
-      toast.error('Could not reach server');
+    } catch (err) {
+      toast.error('Rescan request failed');
     } finally {
       setRescanning(false);
+    }
+  }
+
+  async function handleOptimize() {
+    setOptimizing(true);
+    try {
+      const res = await fetch('/api/library/optimize', { method: 'POST', credentials: 'include' });
+      if (res.ok) {
+        toast.success('Optimization started in background. AI tagging and poster downloads will proceed automatically.');
+      } else {
+        toast.error('Failed to start optimization');
+      }
+    } catch (err) {
+      toast.error('Optimization request failed');
+    } finally {
+      // The button can re-enable soon after starting, since it's a background process
+      setTimeout(() => setOptimizing(false), 2000);
     }
   }
 
@@ -775,14 +793,25 @@ export default function LibraryPage() {
                 <div className="w-1 h-8 rounded-full bg-primary shadow-[0_0_12px_hsl(var(--primary)/0.6)]" />
                 <h1 className="text-4xl sm:text-5xl font-heading font-bold text-foreground tracking-tight">My Library</h1>
               </div>
-              <button
-                onClick={handleRescan}
-                disabled={rescanning}
-                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl glass border border-border hover:border-primary/40 text-muted-foreground hover:text-foreground text-sm font-medium transition-all disabled:opacity-50"
-              >
-                <RefreshCw className={`w-3.5 h-3.5 ${rescanning ? 'animate-spin' : ''}`} />
-                {rescanning ? 'Scanning...' : 'Rescan Library'}
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleOptimize}
+                  disabled={optimizing}
+                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl glass border border-primary/20 bg-primary/5 hover:bg-primary/10 hover:border-primary/40 text-primary text-sm font-medium transition-all disabled:opacity-50"
+                  title="Run AI enrichment on all items and download posters to local storage"
+                >
+                  <Wand2 className={`w-3.5 h-3.5 ${optimizing ? 'animate-pulse' : ''}`} />
+                  {optimizing ? 'Starting...' : 'Optimize & Enrich'}
+                </button>
+                <button
+                  onClick={handleRescan}
+                  disabled={rescanning}
+                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl glass border border-border hover:border-primary/40 text-muted-foreground hover:text-foreground text-sm font-medium transition-all disabled:opacity-50"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${rescanning ? 'animate-spin' : ''}`} />
+                  {rescanning ? 'Scanning...' : 'Rescan Library'}
+                </button>
+              </div>
             </div>
             <p className="text-muted-foreground text-sm ml-4 pl-3 border-l border-border">
               Drop any video format — HomeStream auto-transcodes to browser-ready MP4 with zero-latency seeking.

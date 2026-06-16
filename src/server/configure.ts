@@ -168,6 +168,7 @@ export const serverBefore = (server: express.Express) => {
   server.use(express.urlencoded({ extended: true, limit: '50mb' }));
   server.use(gzipMiddleware);
   server.use('/tmdb-images', express.static(join(dataDir(), 'tmdb-images')));
+  server.use('/posters', express.static(join(dataDir(), 'posters')));
 
   server.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
     const isApi = req.path.startsWith('/api');

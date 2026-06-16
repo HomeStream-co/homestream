@@ -124,7 +124,10 @@ export default defineConfig(({ mode, isSsrBuild }) => ({
     // Node's native require() handles them — Vite's CJS interop wraps them
     // correctly. noExternal still applies for the prod Rollup build.
     ...(process.env.NODE_ENV === 'production'
-      ? { noExternal: /^(?!node:).+/ }
+      ? { 
+          noExternal: /^(?!node:).+/,
+          external: ['bufferutil', 'utf-8-validate']
+        }
       : {
           // Keep CJS-only packages external in dev so Vite doesn't try to
           // inline them through its ESM runner.

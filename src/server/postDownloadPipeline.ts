@@ -28,7 +28,7 @@ import fs from 'fs';
 import { randomUUID } from 'crypto';
 import { readLibrary, writeLibrary } from './libraryStore.js';
 import { transcodeFile } from './transcodeWorker.js';
-import { fetchOMDB } from './mediaUtils.js';
+import { fetchOMDB, findExistingMediaIndex } from './mediaUtils.js';
 import { runEnrichmentInBackground, runCaptionFetchInBackground } from './mediaUtils.js';
 import { upsertJob, getPersistedJob } from './downloadJobStore.js';
 import { readConfig } from './configStore.js';
@@ -363,6 +363,17 @@ export async function runPostDownloadPipeline(params: PostDownloadParams): Promi
 
   console.log(`[pipeline] Transcoding "${resolvedTitle}" → ${outputPath}`);
 
+  const activeJob = getPersistedJob(jobId);
+  if (activeJob) {
+    upsertJob({
+      ...activeJob,
+      status: 'transcoding',
+      progress: 45,
+      progressMessage: 'Transcoding to browser-ready MP4...',
+      updatedAt: new Date().toISOString()
+    });
+  }
+
   let finalPath     = outputPath;
   let finalFilename = tcFilename;
   let finalSize     = fileSize;
@@ -419,10 +430,30 @@ export async function runPostDownloadPipeline(params: PostDownloadParams): Promi
 
   finalSize = fs.statSync(finalPath).size;
 
-  // ── 8. Add to library (only now — file is confirmed in place) ──
+  // ── 8. Add to library with strong deduplication ──
   const mediaItem = buildItem(finalPath, finalFilename, finalSize, tcExtra);
-  await writeLibrary(lib => { lib.unshift(mediaItem); return lib; });
-  console.log(`[pipeline] ✓ Added "${resolvedTitle}" to library → ${finalPath}`);
+
+  try {
+    await writeLibrary((lib: any[]) => {
+      const existingIndex = findExistingMediaIndex(lib, mediaItem);
+      
+      if (existingIndex >= 0) {
+        console.log(`[pipeline] 🔄 Updating existing item: ${resolvedTitle}`);
+        lib[existingIndex] = { 
+          ...lib[existingIndex], 
+          ...mediaItem,
+          addedAt: lib[existingIndex].addedAt || new Date().toISOString() // keep original date
+        };
+      } else {
+        console.log(`[pipeline] ✅ Adding new item: ${resolvedTitle}`);
+        lib.unshift(mediaItem);
+      }
+      return lib;
+    });
+  } catch (err) {
+    console.error('[pipeline] Failed to write to library:', err);
+    throw err;
+  }
 
   // ── 9. Mark job done ──
   const doneJob = getPersistedJob(jobId);
