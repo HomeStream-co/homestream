@@ -11,7 +11,7 @@
 import os from 'os';
 import { readConfig } from './configStore.js';
 
-const POLL_INTERVAL_MS = 10_000;
+const POLL_INTERVAL_MS = 1_000;
 
 let timer: ReturnType<typeof setInterval> | null = null;
 let wasUp = true; // assume up on first start to avoid false pause on boot

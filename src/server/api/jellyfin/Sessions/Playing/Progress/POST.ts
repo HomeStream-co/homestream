@@ -6,7 +6,7 @@
  * HomeStream's "Continue Watching" rail stays in sync.
  */
 import type { Request, Response } from 'express';
-import { readLibrary, writeLibraryDirect } from '../../../../../libraryStore.js';
+import { writeLibrary } from '../../../../../libraryStore.js';
 import { requireJellyfinAuth } from '../../../../../jellyfinAuth.js';
 
 interface LibraryItem {
@@ -27,7 +27,7 @@ interface ProgressBody {
   MediaSourceId?: string;
 }
 
-export default function handler(req: Request, res: Response) {
+export default async function handler(req: Request, res: Response) {
   if (!requireJellyfinAuth(req, res)) return;
   try {
     const body = req.body as ProgressBody;
@@ -39,22 +39,22 @@ export default function handler(req: Request, res: Response) {
     // Convert ticks → seconds (1 tick = 100ns → 10,000,000 ticks/sec)
     const watchedSeconds = Math.floor(ticks / 10_000_000);
 
-    const library = readLibrary<LibraryItem>();
-    const idx = library.findIndex(i => i.id === itemId);
-    if (idx === -1) return res.status(204).send();
+    await writeLibrary<LibraryItem>(lib => {
+      const idx = lib.findIndex(i => i.id === itemId);
+      if (idx === -1) return lib;
 
-    const item = library[idx];
-    const runtime = item.runtime ?? 0; // minutes
-    const totalSeconds = runtime * 60;
-    const progress = totalSeconds > 0 ? Math.min(100, Math.round((watchedSeconds / totalSeconds) * 100)) : 0;
+      const item = lib[idx];
+      const runtime = item.runtime ?? 0; // minutes
+      const totalSeconds = runtime * 60;
+      const progress = totalSeconds > 0 ? Math.min(100, Math.round((watchedSeconds / totalSeconds) * 100)) : 0;
 
-    library[idx] = {
-      ...item,
-      watchedSeconds,
-      watchProgress: progress,
-    };
-
-    writeLibraryDirect(library);
+      lib[idx] = {
+        ...item,
+        watchedSeconds,
+        watchProgress: progress,
+      };
+      return lib;
+    });
     res.status(204).send();
   } catch (err) {
     console.error('[Jellyfin] Progress error:', err);

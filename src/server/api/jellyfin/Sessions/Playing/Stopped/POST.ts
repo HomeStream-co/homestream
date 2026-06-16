@@ -6,7 +6,7 @@
  * if ≥ 90% complete.
  */
 import type { Request, Response } from 'express';
-import { readLibrary, writeLibraryDirect } from '../../../../../libraryStore.js';
+import { writeLibrary } from '../../../../../libraryStore.js';
 import { requireJellyfinAuth } from '../../../../../jellyfinAuth.js';
 
 interface LibraryItem {
@@ -22,7 +22,7 @@ interface StoppedBody {
   PlayedToCompletion?: boolean;
 }
 
-export default function handler(req: Request, res: Response) {
+export default async function handler(req: Request, res: Response) {
   if (!requireJellyfinAuth(req, res)) return;
   try {
     const body = req.body as StoppedBody;
@@ -33,21 +33,22 @@ export default function handler(req: Request, res: Response) {
 
     const watchedSeconds = Math.floor(ticks / 10_000_000);
 
-    const library = readLibrary<LibraryItem>();
-    const idx = library.findIndex(i => i.id === itemId);
-    if (idx === -1) return res.status(204).send();
+    await writeLibrary<LibraryItem>(lib => {
+      const idx = lib.findIndex(i => i.id === itemId);
+      if (idx === -1) return lib;
 
-    const item = library[idx];
-    const runtime = item.runtime ?? 0;
-    const totalSeconds = runtime * 60;
-    const progress = body.PlayedToCompletion
-      ? 100
-      : totalSeconds > 0
-        ? Math.min(100, Math.round((watchedSeconds / totalSeconds) * 100))
-        : 0;
+      const item = lib[idx];
+      const runtime = item.runtime ?? 0;
+      const totalSeconds = runtime * 60;
+      const progress = body.PlayedToCompletion
+        ? 100
+        : totalSeconds > 0
+          ? Math.min(100, Math.round((watchedSeconds / totalSeconds) * 100))
+          : 0;
 
-    library[idx] = { ...item, watchedSeconds, watchProgress: progress };
-    writeLibraryDirect(library);
+      lib[idx] = { ...item, watchedSeconds, watchProgress: progress };
+      return lib;
+    });
 
     res.status(204).send();
   } catch (err) {
