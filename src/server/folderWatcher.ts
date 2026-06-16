@@ -29,7 +29,7 @@
 import fs from 'fs';
 import path from 'path';
 import { readLibrary, writeLibrary } from './libraryStore.js';
-import { createJob } from './transcodeStore.js';
+
 import { transcodeFile } from './transcodeWorker.js';
 import {
   extractTitle,

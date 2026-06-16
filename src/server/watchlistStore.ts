@@ -91,3 +91,8 @@ export function removeFromAllWatchlists(id: string): Promise<void> {
   }
   return writeStore(updated);
 }
+
+export function reorderWatchlist(ids: string[], profileId = 'adult'): Promise<string[]> {
+  const store = readStore();
+  return writeStore({ ...store, [profileId]: ids }).then(() => ids);
+}

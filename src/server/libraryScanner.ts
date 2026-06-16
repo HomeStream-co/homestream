@@ -1,95 +1,113 @@
 import fs from 'fs';
 import path from 'path';
-import { randomUUID } from 'crypto';
+import { execSync } from 'child_process';
+import { dataPath } from './dataDir.js';
 import { readLibrary, writeLibrary } from './libraryStore.js';
-import { readConfig } from './configStore.js';
-import { buildMediaItem } from './mediaUtils.js';
-import { probeFile } from './probeCache.js';
+import { randomUUID } from 'crypto';
+
+const LIBRARY_ROOT = dataPath('library'); // Should point to your D:\HomeStream\library or equivalent
+
+
+
+function getFfprobeInfo(filePath: string) {
+  try {
+    const output = execSync(
+      `ffprobe -v quiet -print_format json -show_format -show_streams "${filePath}"`,
+      { timeout: 15000 }
+    ).toString();
+    return JSON.parse(output);
+  } catch (e) {
+    console.warn(`[scanner] ffprobe failed for ${path.basename(filePath)}`);
+    return {};
+  }
+}
+
+function parseBasicTitle(filename: string) {
+  return filename
+    .replace(/\.\w+$/, '')
+    .replace(/[\._]/g, ' ')
+    .replace(/\b(19|20)\d{2}\b/g, '')
+    .trim();
+}
 
 export async function scanLibrary() {
-  console.log('[scanner] Starting safe rescan of library...');
-  const cfg = readConfig();
-  const LIBRARY_ROOT = cfg.libraryDir || path.resolve(process.cwd(), 'library');
-
-  if (!fs.existsSync(LIBRARY_ROOT)) {
-    console.warn(`[scanner] Library directory does not exist: ${LIBRARY_ROOT}`);
-    return { success: false, error: 'Library directory does not exist' };
-  }
-
-  const currentLibrary = readLibrary<any>();
-  const existingPaths = new Set(currentLibrary.map(m => m.filePath || m.filepath));
+  console.log('[scanner] Starting safe rescan...');
+  const currentLibrary = readLibrary();
+  const existingPaths = new Set(currentLibrary.map((m: any) => m.filePath || m.filepath || m.filePath));
 
   let addedCount = 0;
 
-  async function scanDir(dir: string, category: 'movies' | 'tv') {
+  const scanDir = async (dir: string, category: 'movies' | 'tv') => {
     if (!fs.existsSync(dir)) return;
 
     const entries = fs.readdirSync(dir, { withFileTypes: true });
     for (const entry of entries) {
       const fullPath = path.join(dir, entry.name);
-
       if (entry.isDirectory()) {
         await scanDir(fullPath, category);
         continue;
       }
 
-      const ext = path.extname(entry.name).toLowerCase();
-      const allowed = ['.mp4', '.mkv', '.avi', '.mov', '.wmv', '.m4v', '.ts', '.webm', '.flv'];
-      if (!allowed.includes(ext)) continue;
+      if (!/\.(mp4|mkv|avi|mov|wmv|m4v)$/i.test(entry.name)) continue;
 
-      if (existingPaths.has(fullPath)) {
-        continue;
-      }
+      const relativePath = path.relative(LIBRARY_ROOT, fullPath).replace(/\\/g, '/');
+      const absPath = fullPath; // your buildItem uses absolute paths
 
-      console.log(`[scanner] Found new file: ${entry.name}. Probing...`);
-      const probe = await probeFile(fullPath);
+      if (existingPaths.has(absPath) || existingPaths.has(relativePath)) continue;
 
-      // Extract basic title: strip extension, convert underscores/dots to spaces
-      const cleanTitle = entry.name
-        .replace(/\.[^.]+$/, '')
-        .replace(/[\._]/g, ' ')
-        .replace(/\b(19|20)\d{2}\b/g, '')
-        .trim();
+      const probe = getFfprobeInfo(fullPath);
+      const videoStream = probe.streams?.find((s: any) => s.codec_type === 'video') || {};
+      const format = probe.format || {};
 
+      const title = parseBasicTitle(entry.name);
       const finalSize = fs.statSync(fullPath).size;
 
-      // Construct media item using buildMediaItem (same as upload / watcher)
       const mediaItem = {
-        ...buildMediaItem({
-          id: randomUUID(),
-          filename: entry.name,
-          originalFilename: entry.name,
-          filePath: fullPath,
-          fileSize: finalSize,
-          omdb: null, // Scanner is fast, background enrichment will pick it up
-          extractedTitle: cleanTitle,
-          extractedYear: 'Unknown',
-          transcoding: false,
-          importedFrom: 'existing_scan',
-        }),
-        type: category === 'movies' ? ('movie' as const) : ('series' as const),
+        id: randomUUID(),
+        filename: entry.name,
+        originalFilename: entry.name,
+        filepath: absPath,
+        filePath: absPath,
+        title,
+        type: category === 'movies' ? 'movie' : 'series',
         category: category === 'movies' ? 'Movies' : 'TV Shows',
+        year: 'Unknown',
+        genre: [],                  // will be enriched later
+        plot: '',
+        director: '',
+        actors: '',
+        imdbRating: 'N/A',
+        poster: '',
+        runtime: 'Unknown',
+        rated: 'NR',                // safe default for parental gate
+        quality: videoStream.height ? `${Math.round(videoStream.height / 100) * 100}p` : 'Unknown',
+        resolution: videoStream.height ? `${videoStream.width}x${videoStream.height}` : undefined,
+        duration: parseFloat(format.duration) || undefined,
+        codec: videoStream.codec_name,
+        fileSize: finalSize,
+        originalSize: finalSize,
+        addedAt: new Date().toISOString(),
+        watchProgress: 0,
+        transcoding: false,
+        needsMetadata: true,
+        metadataAvailable: false,
+        ccStatus: 'none',
+        enriching: false,
+        downloadedVia: 'manual-scan',
       };
 
-      // Add extra details from probe
-      if (probe.codec !== 'unknown') {
-        (mediaItem as any).quality = probe.height ? `${probe.height}p` : 'Unknown';
-        (mediaItem as any).resolution = probe.height ? `${probe.width}x${probe.height}` : undefined;
-        (mediaItem as any).duration = probe.durationSecs || undefined;
-      }
-
       try {
-        await writeLibrary(lib => {
+        await writeLibrary((lib: any[]) => {
           lib.unshift(mediaItem);
           return lib;
         });
-        console.log(`[scanner] ✓ Added to library: ${cleanTitle}`);
+        console.log(`[scanner] ✓ Added: ${title}`);
         addedCount++;
       } catch (err) {
-        console.error(`[scanner] Failed to save ${entry.name} to library:`, err);
+        console.error(`[scanner] Failed to add ${entry.name}:`, err);
       }
     }
-  }
+  };
 
   try {
     await scanDir(path.join(LIBRARY_ROOT, 'movies'), 'movies');
@@ -97,8 +115,8 @@ export async function scanLibrary() {
 
     console.log(`[scanner] Rescan complete. Added ${addedCount} new items.`);
     return { success: true, added: addedCount };
-  } catch (err) {
-    console.error('[scanner] Fatal scanner error:', err);
-    return { success: false, error: (err as Error).message };
+  } catch (err: any) {
+    console.error('[scanner] Fatal error:', err);
+    return { success: false, error: err.message };
   }
 }

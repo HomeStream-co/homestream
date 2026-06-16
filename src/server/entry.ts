@@ -173,6 +173,7 @@ import vpnInterfacesStatusGet from "./api/vpn/interfaces/status/GET";
 import watchlistGet from "./api/watchlist/GET";
 import watchlistPutById from "./api/watchlist/[id]/PUT";
 import watchlistDeleteById from "./api/watchlist/[id]/DELETE";
+import watchlistReorderPost from "./api/watchlist/reorder/POST";
 // </api-imports>
 import { seoRoutes } from "../lib/seo-routes";
 import { startQbitCompletionWatcher } from "./qbitCompletionWatcher";
@@ -315,6 +316,8 @@ app.get("/api/jellyfin/Videos/:id/stream", jellyfinVideoStreamGet);
 // library
 app.post("/api/library/scan", libraryScanPost);
 app.post("/api/library/rescan", async (req, res) => {
+  const { requireAuth } = await import("./authMiddleware.js");
+  if (!requireAuth(req as import('express').Request, res as import('express').Response)) return;
   const { scanLibrary } = await import("./libraryScanner.js");
   const result = await scanLibrary();
   res.json(result);
@@ -416,6 +419,7 @@ app.get("/api/vpn/interfaces/status", vpnInterfacesStatusGet);
 app.get("/api/watchlist", watchlistGet);
 app.put("/api/watchlist/:id", watchlistPutById);
 app.delete("/api/watchlist/:id", watchlistDeleteById);
+app.post("/api/watchlist/reorder", watchlistReorderPost);
 // </api-registrations>
 
 // Error middleware must be registered AFTER the routes it protects; Express

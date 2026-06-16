@@ -20,7 +20,7 @@
 
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Play, Plus, Check, Star, Upload, Clock, Search, X, SlidersHorizontal, Bookmark, Tv2 } from 'lucide-react';
+import { Play, Plus, Check, Star, Upload, Clock, Search, X, SlidersHorizontal, Bookmark, Tv2, Activity, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useMedia } from '@/context/MediaContext';
 import { useProfile } from '@/context/ProfileContext';
@@ -32,6 +32,8 @@ import { toActorsString } from '@/lib/utils';
 import OfflineBanner from '@/components/OfflineBanner';
 import LazySection from '@/components/LazySection';
 import HomePageSkeleton from '@/components/HomePageSkeleton';
+import TrailerHover from '@/components/TrailerHover';
+import type { MediaItem } from '@/types/media';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -59,9 +61,37 @@ export default function HomePage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
+  // ── Mood/vibe filter state ──
+  const [selectedMood, setSelectedMood] = useState<string | null>(null);
+
+  // ── Health panel states ──
+  const [healthData, setHealthData] = useState<{ overall: string; checks: any[] } | null>(null);
+  const [healthExpanded, setHealthExpanded] = useState(false);
+  const [healthLoading, setHealthLoading] = useState(false);
+
+  const fetchHealth = async () => {
+    setHealthLoading(true);
+    try {
+      const res = await fetch('/api/health/full', { credentials: 'include' });
+      if (res.ok) {
+        const data = await res.json() as { overall: string; checks: any[] };
+        setHealthData(data);
+      }
+    } catch {}
+    setHealthLoading(false);
+  };
+
+  useEffect(() => {
+    if (activeProfile?.isAdmin) {
+      fetchHealth();
+    } else {
+      setHealthData(null);
+    }
+  }, [activeProfile]);
+
   // ── Search / filter state ──
   const [query, setQuery] = useState(searchParams.get('q') || '');
-  const [genre, setGenre] = useState('All');
+  const [genre, setGenre] = useState(searchParams.get('genre') || 'All');
   const [typeFilter, setTypeFilter] = useState<'all' | 'movie' | 'series'>('all');
   const [sortBy, setSortBy] = useState('added');
   const [showFilters, setShowFilters] = useState(false);
@@ -71,12 +101,14 @@ export default function HomePage() {
 
   const isSearching = query.trim().length > 0 || genre !== 'All' || typeFilter !== 'all';
 
-  // Sync ?q= param → local state (for links from other pages like genre pills)
+  // Sync ?q= and ?genre= params → local state (for links from other pages)
   useEffect(() => {
     const q = searchParams.get('q');
-    if (q && q !== query) setQuery(q);
+    if (q !== null && q !== query) setQuery(q);
+    const g = searchParams.get('genre');
+    if (g !== null && g !== genre) setGenre(g);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [searchParams]);
 
   // ── Visible library (kids filter applied once) ──
   const visibleLibrary = useMemo(
@@ -84,38 +116,81 @@ export default function HomePage() {
     [library, isAllowed],
   );
 
+  const visibleLibraryFiltered = useMemo(() => {
+    if (!selectedMood) return visibleLibrary;
+    return visibleLibrary.filter(m =>
+      (m.enrichment?.mood ?? []).some((mood: string) => mood.toLowerCase() === selectedMood.toLowerCase())
+    );
+  }, [visibleLibrary, selectedMood]);
+
+  // Aggregate popular mood tags from library
+  const popularMoods = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const item of visibleLibrary) {
+      const moods = item.enrichment?.mood || [];
+      for (const m of moods) {
+        if (!m || m.trim() === '') continue;
+        const normalized = m.trim();
+        counts[normalized] = (counts[normalized] || 0) + 1;
+      }
+    }
+    return Object.entries(counts)
+      .sort((a, b) => b[1] - a[1])
+      .map(entry => entry[0])
+      .slice(0, 8);
+  }, [visibleLibrary]);
+
+  // TV "Up Next" episodes derivation
+  const upNextItems = useMemo(() => {
+    const list: Array<{ show: MediaItem; nextEpisode: any }> = [];
+    const seriesItems = visibleLibrary.filter(m => m.type === 'series' && m.episodes && m.episodes.length > 0);
+    
+    for (const show of seriesItems) {
+      const eps = show.episodes || [];
+      const watchedCount = eps.filter(e => e.watched).length;
+      if (watchedCount > 0 && watchedCount < eps.length) {
+        const sortedEps = [...eps].sort((a, b) => a.season !== b.season ? a.season - b.season : a.episode - b.episode);
+        const nextEp = sortedEps.find(e => !e.watched);
+        if (nextEp) {
+          list.push({ show, nextEpisode: nextEp });
+        }
+      }
+    }
+    return list;
+  }, [visibleLibrary]);
+
   // ── Carousel derivations — all memoized ──
-  const featured = useMemo(() => visibleLibrary[0], [visibleLibrary]);
+  const featured = useMemo(() => visibleLibraryFiltered[0], [visibleLibraryFiltered]);
   const inWatchlist = useMemo(() => featured ? watchlist.includes(featured.id) : false, [featured, watchlist]);
 
   const continueWatchingItems = useMemo(() =>
-    visibleLibrary
+    visibleLibraryFiltered
       .filter(m => continueWatching.some(c => c.id === m.id && c.progress > 0))
       .sort((a, b) => {
         const ta = a.lastWatchedAt ? new Date(a.lastWatchedAt).getTime() : 0;
         const tb = b.lastWatchedAt ? new Date(b.lastWatchedAt).getTime() : 0;
         return tb - ta;
       }),
-    [visibleLibrary, continueWatching],
+    [visibleLibraryFiltered, continueWatching],
   );
 
   const myList = useMemo(
-    () => visibleLibrary.filter(m => watchlist.includes(m.id)),
-    [visibleLibrary, watchlist],
+    () => visibleLibraryFiltered.filter(m => watchlist.includes(m.id)),
+    [visibleLibraryFiltered, watchlist],
   );
 
-  const recentlyAdded = useMemo(() => [...visibleLibrary].slice(0, 20), [visibleLibrary]);
+  const recentlyAdded = useMemo(() => [...visibleLibraryFiltered].slice(0, 20), [visibleLibraryFiltered]);
 
   const movies = useMemo(
-    () => visibleLibrary.filter(m => m.type === 'movie'),
-    [visibleLibrary],
+    () => visibleLibraryFiltered.filter(m => m.type === 'movie'),
+    [visibleLibraryFiltered],
   );
 
   // Deduplicated series — one card per show title (first episode found), matching Library ShowCard logic
   const series = useMemo(() => {
     const seen = new Set<string>();
-    const deduped: typeof visibleLibrary = [];
-    for (const m of visibleLibrary) {
+    const deduped: typeof visibleLibraryFiltered = [];
+    for (const m of visibleLibraryFiltered) {
       if (m.type !== 'series') continue;
       const key = m.title.trim().toLowerCase();
       if (!seen.has(key)) {
@@ -124,23 +199,23 @@ export default function HomePage() {
       }
     }
     return deduped;
-  }, [visibleLibrary]);
+  }, [visibleLibraryFiltered]);
 
   // Count matches the carousel — both are deduped by title
   const uniqueShowCount = series.length;
 
   const topRated = useMemo(() =>
-    [...visibleLibrary]
+    [...visibleLibraryFiltered]
       .filter(m => m.imdbRating !== 'N/A' && parseFloat(m.imdbRating) > 0)
       .sort((a, b) => parseFloat(b.imdbRating) - parseFloat(a.imdbRating))
       .slice(0, 20),
-    [visibleLibrary],
+    [visibleLibraryFiltered],
   );
 
   // ── Search results ──
   const searchResults = useMemo(() => {
     if (!isSearching) return [];
-    let items = [...visibleLibrary];
+    let items = [...visibleLibraryFiltered];
 
     if (query.trim()) {
       const q = query.toLowerCase();
@@ -529,7 +604,9 @@ export default function HomePage() {
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: Math.min(i * 0.03, 0.4), duration: 0.25 }}
                   >
-                    <MediaCard item={item} size="md" />
+                    <TrailerHover item={item}>
+                      <MediaCard item={item} size="md" />
+                    </TrailerHover>
                   </motion.div>
                 ))}
               </div>
@@ -545,6 +622,99 @@ export default function HomePage() {
             transition={{ duration: 0.2 }}
             className="pt-8 pb-20"
           >
+            {/* ── System Diagnostics Dashboard Banner ── */}
+            {activeProfile?.isAdmin && (
+              <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 mb-6">
+                <div className="bg-card border border-border/80 rounded-2xl overflow-hidden shadow-lg">
+                  {/* Collapsed Header */}
+                  <div
+                    onClick={() => setHealthExpanded(prev => !prev)}
+                    className="flex items-center justify-between px-5 py-4 cursor-pointer hover:bg-white/5 transition-colors select-none"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center">
+                        <Activity className="w-4 h-4 text-primary" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-foreground flex items-center gap-2">
+                          System Diagnostics Dashboard
+                          {healthLoading && <span className="w-1.5 h-1.5 rounded-full bg-primary animate-ping" />}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {healthData ? `Overall Status: ${healthData.overall.toUpperCase()}` : 'Loading diagnostics...'}
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-3">
+                      {healthData && (
+                        <span className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase leading-none border ${
+                          healthData.overall === 'ok' ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' :
+                          healthData.overall === 'warn' ? 'bg-yellow-500/10 border-yellow-500/30 text-yellow-400' :
+                          'bg-destructive/10 border-destructive/30 text-destructive'
+                        }`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${
+                            healthData.overall === 'ok' ? 'bg-emerald-500 animate-pulse' :
+                            healthData.overall === 'warn' ? 'bg-yellow-500 animate-pulse' :
+                            'bg-destructive animate-pulse'
+                          }`} />
+                          {healthData.overall}
+                        </span>
+                      )}
+                      
+                      <button
+                        onClick={e => { e.stopPropagation(); fetchHealth(); }}
+                        disabled={healthLoading}
+                        className="p-1.5 text-muted-foreground hover:text-foreground rounded-lg hover:bg-white/5 transition-colors"
+                        title="Refresh health checks"
+                      >
+                        <RefreshCw className={`w-3.5 h-3.5 ${healthLoading ? 'animate-spin' : ''}`} />
+                      </button>
+
+                      {healthExpanded ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+                    </div>
+                  </div>
+
+                  {/* Expanded checks list */}
+                  <AnimatePresence>
+                    {healthExpanded && healthData && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        className="border-t border-border/40 bg-muted/30 px-5 py-4 overflow-hidden"
+                      >
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                          {healthData.checks.map(check => {
+                            const statusColor =
+                              check.status === 'ok' ? 'border-emerald-500/20 bg-emerald-500/5 text-emerald-400' :
+                              check.status === 'warn' ? 'border-yellow-500/20 bg-yellow-500/5 text-yellow-400' :
+                              check.status === 'error' ? 'border-destructive/20 bg-destructive/5 text-destructive' :
+                              'border-border bg-card text-muted-foreground';
+                            return (
+                              <div
+                                key={check.name}
+                                className={`border rounded-xl p-3 flex flex-col gap-1 transition-all ${statusColor}`}
+                                title={check.detail || check.message}
+                              >
+                                <div className="flex items-center justify-between">
+                                  <span className="text-xs font-semibold text-foreground">{check.name}</span>
+                                  <span className="text-[9px] font-bold uppercase tracking-wider">{check.status}</span>
+                                </div>
+                                <p className="text-[11px] text-muted-foreground line-clamp-2 leading-snug mt-0.5">{check.message}</p>
+                                {check.detail && (
+                                  <p className="text-[9px] opacity-75 font-mono truncate mt-1">{check.detail}</p>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              </div>
+            )}
             {/* ── Watch on TV banner ── */}
             <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 mb-6 flex flex-col sm:flex-row gap-3">
               {/* TV Interface — primary action, shown first */}
@@ -597,6 +767,105 @@ export default function HomePage() {
               </div>
             ) : (
               <>
+                {/* Mood/Vibe Pills Filter Strip */}
+                {popularMoods.length > 0 && (
+                  <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 mb-8">
+                    <div className="flex items-center gap-2 mb-2.5">
+                      <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">Filter by vibe</span>
+                      {selectedMood && (
+                        <button
+                          onClick={() => setSelectedMood(null)}
+                          className="text-[10px] text-primary hover:underline font-semibold"
+                        >
+                          Clear
+                        </button>
+                      )}
+                    </div>
+                    <div className="flex gap-2 overflow-x-auto scrollbar-hide py-1">
+                      {popularMoods.map(mood => {
+                        const active = selectedMood?.toLowerCase() === mood.toLowerCase();
+                        return (
+                          <button
+                            key={mood}
+                            onClick={() => setSelectedMood(active ? null : mood)}
+                            className={`px-4 py-2 rounded-full text-xs font-semibold transition-all duration-300 whitespace-nowrap shadow-sm ${
+                              active
+                                ? 'bg-primary text-primary-foreground shadow-primary/30 ring-2 ring-primary ring-offset-2 ring-offset-background'
+                                : 'glass border border-border/80 text-muted-foreground hover:text-foreground hover:border-primary/30'
+                            }`}
+                          >
+                            ✨ {mood}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* "Up Next" Episode Strip */}
+                {upNextItems.length > 0 && (
+                  <section className="mb-10">
+                    <div className="flex items-center gap-3 mb-4 px-4 sm:px-6 lg:px-8">
+                      <div className="w-1 h-5 rounded-full bg-purple-500 flex-shrink-0" />
+                      <h2 className="text-base font-heading tracking-widest text-foreground uppercase flex items-center gap-2">
+                        <Tv2 className="w-3.5 h-3.5" />
+                        Up Next
+                      </h2>
+                      <span className="text-xs text-muted-foreground font-medium ml-1 tabular-nums">
+                        {upNextItems.length}
+                      </span>
+                      <div className="flex-1 h-px bg-border/40 ml-2" />
+                    </div>
+
+                    <div className="relative overflow-x-auto scrollbar-hide px-4 sm:px-6 lg:px-8 flex gap-4 pb-3">
+                      {upNextItems.map(({ show, nextEpisode }) => {
+                        const syntheticItem = {
+                          ...show,
+                          id: nextEpisode.id,
+                          title: `${show.title} - S${nextEpisode.season}E${nextEpisode.episode}: ${nextEpisode.title}`,
+                        };
+                        return (
+                          <TrailerHover key={nextEpisode.id} item={syntheticItem}>
+                            <div
+                              onClick={() => navigate(`/player/${nextEpisode.id}`)}
+                              className="relative cursor-pointer group w-36 sm:w-44 flex-shrink-0 select-none"
+                            >
+                              <div className="relative aspect-poster rounded-xl overflow-hidden bg-card shadow-md shadow-black/40 group-hover:scale-105 transition-transform duration-200">
+                                {show.poster ? (
+                                  <img src={show.poster} alt={show.title} className="w-full h-full object-cover" />
+                                ) : (
+                                  <div className="w-full h-full flex flex-col items-center justify-center bg-card p-2 text-center">
+                                    <Tv2 className="w-8 h-8 text-muted-foreground/30 mb-2" />
+                                    <p className="text-[10px] text-muted-foreground line-clamp-3">{show.title}</p>
+                                  </div>
+                                )}
+                                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center">
+                                  <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center shadow-lg shadow-primary/40">
+                                    <Play className="w-4 h-4 text-white fill-white ml-0.5" />
+                                  </div>
+                                </div>
+                                <div className="absolute top-2 left-2 bg-primary/95 text-primary-foreground text-[10px] font-bold px-1.5 py-0.5 rounded shadow-md">
+                                  S{nextEpisode.season}E{nextEpisode.episode}
+                                </div>
+                              </div>
+                              
+                              <div className="mt-2 px-0.5">
+                                <p className="text-xs font-semibold text-foreground truncate group-hover:text-primary transition-colors leading-tight">
+                                  {show.title}
+                                </p>
+                                <p className="text-[10px] text-muted-foreground truncate mt-0.5">
+                                  {nextEpisode.title || `Episode ${nextEpisode.episode}`}
+                                </p>
+                              </div>
+                            </div>
+                          </TrailerHover>
+                        );
+                      })}
+                      <div className="w-4 flex-shrink-0" />
+                    </div>
+                  </section>
+                )}
+
             {!isDemoMode && continueWatchingItems.length > 0 && (
               <MediaCarousel
                 title="Continue Watching"

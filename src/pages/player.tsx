@@ -42,7 +42,7 @@ function formatTime(seconds: number): string {
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 
-const AUTOPLAY_SECONDS = 60;
+const AUTOPLAY_SECONDS = 15;
 const SKIP_INTRO_END = 240;
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -313,6 +313,37 @@ export default function PlayerPage() {
     if (ps.videoRef.current) ps.videoRef.current.playbackRate = 1;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
+
+  // ── "Now Playing" heartbeat ───────────────────────────────────────────────
+  useEffect(() => {
+    if (!id || !item) return;
+
+    const updateHeartbeat = () => {
+      const video = ps.videoRef.current;
+      const paused = video ? video.paused : true;
+      localStorage.setItem('homestream-now-playing', JSON.stringify({
+        id,
+        title: item.title,
+        paused,
+        updatedAt: Date.now(),
+      }));
+    };
+
+    updateHeartbeat();
+    const interval = setInterval(updateHeartbeat, 2000);
+
+    return () => {
+      clearInterval(interval);
+      try {
+        localStorage.setItem('homestream-now-playing', JSON.stringify({
+          id,
+          title: item.title,
+          paused: true,
+          updatedAt: Date.now(),
+        }));
+      } catch {}
+    };
+  }, [id, item, ps.videoRef]);
 
   // ── Fetch audio tracks ────────────────────────────────────────────────────
   useEffect(() => {

@@ -15,7 +15,7 @@
  */
 
 import { getAllTorrents, isReachable } from './qbittorrentClient.js';
-import { getAllPersistedJobs, upsertJob, updateJobStatus } from './downloadJobStore.js';
+import { getAllPersistedJobs, upsertJob } from './downloadJobStore.js';
 import { runPostDownloadPipeline } from './postDownloadPipeline.js';
 
 // ── State ─────────────────────────────────────────────────────────────────────

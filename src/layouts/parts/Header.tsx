@@ -243,6 +243,27 @@ export default function Header({ onChatOpen: _onChatOpen }: HeaderProps) {
   const { watchlist } = useMedia();
   const { activeProfile, profiles, switchProfile, verifyPin } = useProfile();
   const activeDownloads = useActiveDownloadCount();
+  const [nowPlaying, setNowPlaying] = useState<{ id: string; title: string } | null>(null);
+
+  useEffect(() => {
+    const checkNowPlaying = () => {
+      try {
+        const stored = localStorage.getItem('homestream-now-playing');
+        if (stored) {
+          const data = JSON.parse(stored) as { id: string; title: string; paused: boolean; updatedAt: number };
+          if (data && !data.paused && Date.now() - data.updatedAt < 5000) {
+            setNowPlaying({ id: data.id, title: data.title });
+            return;
+          }
+        }
+      } catch {}
+      setNowPlaying(null);
+    };
+
+    checkNowPlaying();
+    const interval = setInterval(checkNowPlaying, 2000);
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 40);
@@ -337,6 +358,18 @@ export default function Header({ onChatOpen: _onChatOpen }: HeaderProps) {
                   )}
                 </Link>
               ))}
+              {nowPlaying && (
+                <Link
+                  to={`/player/${nowPlaying.id}`}
+                  className="ml-3 flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/35 hover:bg-emerald-500/20 text-emerald-400 hover:text-emerald-300 text-xs font-semibold transition-all duration-300 select-none shadow-[0_0_15px_rgba(16,185,129,0.1)]"
+                >
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                  </span>
+                  <span className="truncate max-w-[140px] md:max-w-[200px]">Now Playing: {nowPlaying.title}</span>
+                </Link>
+              )}
             </nav>
 
             {/* ── Right Actions ── */}
@@ -594,6 +627,19 @@ export default function Header({ onChatOpen: _onChatOpen }: HeaderProps) {
               className="md:hidden overflow-hidden glass border-t border-border/50"
             >
               <div className="px-4 py-4 flex flex-col gap-1">
+                {nowPlaying && (
+                  <Link
+                    to={`/player/${nowPlaying.id}`}
+                    onClick={() => setMobileOpen(false)}
+                    className="flex items-center gap-3 px-3 py-3 rounded-xl bg-emerald-500/10 border border-emerald-500/35 text-emerald-400 font-semibold mb-2 animate-pulse"
+                  >
+                    <span className="relative flex h-2.5 w-2.5">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                    </span>
+                    <span className="text-sm truncate">Now Playing: {nowPlaying.title}</span>
+                  </Link>
+                )}
                 {[
                   { to: '/',          label: 'Home',       Icon: Home },
                   { to: '/discover',  label: 'Discover',   Icon: Compass },

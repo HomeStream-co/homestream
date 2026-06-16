@@ -57,12 +57,8 @@ function cleanFilename(omdbTitle: string | undefined, omdbYear: string | undefin
   return originalBasename.replace(/^\d{13}-/, '');
 }
 
-function resolveSubfolder(type: string | undefined, genresStr: string | undefined, title: string): string {
+function resolveSubfolder(type: string | undefined): string {
   if (type === 'series') return 'tv';
-  const genres = genresStr ? genresStr.split(',').map(g => g.trim().toLowerCase()).filter(Boolean) : [];
-  const isAnime = genres.includes('animation') &&
-    (title.toLowerCase().match(/\b(anime|manga|shonen|shojo|seinen|isekai|mecha|naruto|bleach|one piece|dragon ball|attack on titan|demon slayer|jujutsu|chainsaw|spy x|my hero)\b/) != null ||
-     genres.includes('japan'));
   return 'movies';
 }
 
@@ -105,7 +101,7 @@ export default function handler(req: Request, res: Response) {
       // ── 2. Fetch OMDB metadata (graceful — works offline) ──
       const omdb = await fetchOMDB(searchTitle, searchYear);
 
-      const subfolder = resolveSubfolder(omdb?.Type, omdb?.Genre, searchTitle);
+      const subfolder = resolveSubfolder(omdb?.Type);
       const libraryDir = cfg.libraryDir || UPLOADS_DIR;
       const targetDir = path.join(libraryDir, subfolder);
       if (!fs.existsSync(targetDir)) {

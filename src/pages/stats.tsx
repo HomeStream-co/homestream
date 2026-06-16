@@ -9,7 +9,7 @@
  */
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
 import {
   HardDrive, Film, Tv2, Clock, TrendingUp, BarChart3,
@@ -132,9 +132,9 @@ function SpeedIndicator({ speed }: { speed: DownloadSpeed | null }) {
 // ── Mini bar chart ────────────────────────────────────────────────────────────
 
 function BarRow({
-  label, count, total, bytes, color, delay = 0,
+  label, count, total, bytes, color, delay = 0, onClick,
 }: {
-  label: string; count: number; total: number; bytes: number; color: string; delay?: number;
+  label: string; count: number; total: number; bytes: number; color: string; delay?: number; onClick?: () => void;
 }) {
   const pct = total > 0 ? Math.round((count / total) * 100) : 0;
   return (
@@ -142,7 +142,8 @@ function BarRow({
       initial={{ opacity: 0, x: -10 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ duration: 0.3, delay }}
-      className="flex items-center gap-3"
+      className={`flex items-center gap-3 ${onClick ? 'cursor-pointer hover:bg-muted/30 p-1.5 -m-1.5 rounded-lg transition-colors' : ''}`}
+      onClick={onClick}
     >
       <span className="w-16 text-xs text-muted-foreground text-right font-mono shrink-0 uppercase tracking-wide">
         {label}
@@ -194,6 +195,7 @@ function StatCard({
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function StatsPage() {
+  const navigate = useNavigate();
   const [data, setData] = useState<StatsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -432,6 +434,7 @@ export default function StatsPage() {
                       bytes={c.bytes}
                       color={codecColor(c.name)}
                       delay={0.35 + i * 0.05}
+                      onClick={() => navigate('/library?search=' + encodeURIComponent(c.name))}
                     />
                   ))
                 )}
@@ -598,7 +601,8 @@ export default function StatsPage() {
                         initial={{ opacity: 0, x: -8 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ duration: 0.25, delay: 0.6 + i * 0.04 }}
-                        className="flex items-center gap-3"
+                        className="flex items-center gap-3 cursor-pointer hover:bg-muted/30 p-1.5 -m-1.5 rounded-lg transition-colors"
+                        onClick={() => navigate('/?genre=' + encodeURIComponent(g.name))}
                       >
                         <span className="w-24 text-xs text-muted-foreground truncate shrink-0">{g.name}</span>
                         <div className="flex-1 h-4 bg-muted rounded-full overflow-hidden">

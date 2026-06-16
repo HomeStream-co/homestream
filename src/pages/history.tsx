@@ -6,7 +6,7 @@
  * Users can remove individual items or clear all history.
  */
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { Clock, Trash2, X, Play, CheckCircle2, Film, Tv, Loader2, User } from 'lucide-react';
 import { toast } from 'sonner';
@@ -55,6 +55,7 @@ function formatDuration(seconds: number): string {
 
 export default function HistoryPage() {
   const { activeProfile, isAllowed } = useProfile();
+  const navigate = useNavigate();
   const profileId = activeProfile?.id ?? 'adult';
 
   const [items, setItems] = useState<HistoryItem[]>([]);
@@ -267,6 +268,15 @@ export default function HistoryPage() {
 
                       {/* Actions */}
                       <div className="flex items-center gap-2 flex-shrink-0">
+                        {item.watchProgress > 0 && item.watchProgress < 100 && (
+                          <button
+                            onClick={() => navigate(`/player/${item.id}`)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary/15 hover:bg-primary/25 text-primary text-xs font-semibold transition-colors"
+                          >
+                            <Play className="w-3 h-3 fill-primary" />
+                            Resume
+                          </button>
+                        )}
                         <Link
                           to={`/player/${item.id}`}
                           className="opacity-0 group-hover:opacity-100 transition-opacity w-8 h-8 rounded-full bg-primary/10 hover:bg-primary/20 flex items-center justify-center"

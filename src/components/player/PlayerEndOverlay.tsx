@@ -13,7 +13,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { Play, RotateCcw, Star, Sparkles } from 'lucide-react';
 
-const AUTOPLAY_SECONDS = 60;
+const AUTOPLAY_SECONDS = 15;
 
 function CountdownRing({ seconds, total }: { seconds: number; total: number }) {
   const r = 28;

@@ -1,8 +1,9 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Film, Trash2, Edit2, Check, X, Star, AlertCircle,
   Upload, Clapperboard, Cpu, CheckCircle2, Clock, Zap, WifiOff, PenLine, Captions, Play,
+  Search, SlidersHorizontal, RefreshCw,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'sonner';
@@ -17,6 +18,7 @@ import CaptionManager from '@/components/CaptionManager';
 import TrailerButton from '@/components/TrailerButton';
 import MediaContextMenu from '@/components/MediaContextMenu';
 import ShowCard from '@/components/ShowCard';
+import TrailerHover from '@/components/TrailerHover';
 import type { MediaEnrichment } from '@/types/media';
 import {
   AlertDialog,
@@ -299,6 +301,12 @@ interface EditState {
   genre: string;
   poster: string;
   plot: string;
+  runtime: string;
+  director: string;
+  actors: string;
+  imdbId: string;
+  rated: string;
+  imdbRating: string;
 }
 
 // ─── Phase label helpers ──────────────────────────────────────────────────────
@@ -376,6 +384,39 @@ export default function LibraryPage() {
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
   const [bulkEnriching, setBulkEnriching] = useState(false);
+  const [bulkEnrichCurrentIndex, setBulkEnrichCurrentIndex] = useState(0);
+  const [bulkEnrichTotal, setBulkEnrichTotal] = useState(0);
+  const [bulkEnrichCurrentName, setBulkEnrichCurrentName] = useState('');
+
+  // ── Search + Sort + Rescan ──
+  const [searchParams] = useSearchParams();
+  const [libSearch, setLibSearch] = useState(searchParams.get('search') || '');
+  const [libSort, setLibSort] = useState<'added' | 'title' | 'rating' | 'year'>('added');
+  const [rescanning, setRescanning] = useState(false);
+
+  useEffect(() => {
+    const s = searchParams.get('search');
+    if (s !== null && s !== libSearch) setLibSearch(s);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
+  async function handleRescan() {
+    setRescanning(true);
+    try {
+      const res = await fetch('/api/library/rescan', { method: 'POST', credentials: 'include' });
+      const data = await res.json() as { success: boolean; added?: number; error?: string };
+      if (data.success) {
+        toast.success(`Library rescanned — ${data.added ?? 0} new items found`);
+        refreshLibrary();
+      } else {
+        toast.error(data.error || 'Rescan failed');
+      }
+    } catch {
+      toast.error('Could not reach server');
+    } finally {
+      setRescanning(false);
+    }
+  }
 
   const genId = () => Math.random().toString(36).slice(2);
 
@@ -625,6 +666,12 @@ export default function LibraryPage() {
       genre: item.genre.join(', '),
       poster: item.poster,
       plot: item.plot,
+      runtime: item.runtime || '',
+      director: item.director || '',
+      actors: item.actors || '',
+      imdbId: item.imdbId || '',
+      rated: item.rated || 'NR',
+      imdbRating: item.imdbRating || 'N/A',
     });
   };
 
@@ -633,9 +680,15 @@ export default function LibraryPage() {
     await updateMedia(editState.id, {
       title: editState.title,
       year: editState.year,
-      genre: editState.genre.split(',').map(g => g.trim()),
+      genre: editState.genre.split(',').map(g => g.trim()).filter(Boolean),
       poster: editState.poster,
       plot: editState.plot,
+      runtime: editState.runtime,
+      director: editState.director,
+      actors: editState.actors,
+      imdbId: editState.imdbId,
+      rated: editState.rated,
+      imdbRating: editState.imdbRating,
     });
     setEditState(null);
     toast.success('Updated successfully');
@@ -668,17 +721,29 @@ export default function LibraryPage() {
   const handleBulkEnrich = async () => {
     const ids = Array.from(selectedIds);
     if (ids.length === 0) return;
+    
+    setBulkEnrichTotal(ids.length);
+    setBulkEnrichCurrentIndex(0);
     setBulkEnriching(true);
+    
     let enriched = 0;
-    for (const id of ids) {
+    for (let i = 0; i < ids.length; i++) {
+      const id = ids[i];
+      const item = library.find(m => m.id === id);
+      setBulkEnrichCurrentName(item?.title || 'Unknown item');
+      setBulkEnrichCurrentIndex(i + 1);
+      
       try {
         const res = await fetch(`/api/enrich/${id}`, { method: 'POST', credentials: 'include' });
         if (res.ok) enriched++;
       } catch { /* non-fatal — individual enrich failure, continue bulk loop */ }
     }
+    
     setSelectMode(false);
     setSelectedIds(new Set());
-    toast.success(`Enrichment started for ${enriched} item${enriched !== 1 ? 's' : ''}`);
+    setBulkEnriching(false);
+    toast.success(`Enrichment complete for ${enriched} of ${ids.length} item${ids.length !== 1 ? 's' : ''}`);
+    refreshLibrary();
   };
 
   const toggleSelect = (id: string) => {
@@ -705,9 +770,19 @@ export default function LibraryPage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.45, ease: 'easeOut' as const }}
           >
-            <div className="flex items-center gap-3 mb-2">
-              <div className="w-1 h-8 rounded-full bg-primary shadow-[0_0_12px_hsl(var(--primary)/0.6)]" />
-              <h1 className="text-4xl sm:text-5xl font-heading font-bold text-foreground tracking-tight">My Library</h1>
+            <div className="flex items-center justify-between mb-2 gap-4 flex-wrap">
+              <div className="flex items-center gap-3">
+                <div className="w-1 h-8 rounded-full bg-primary shadow-[0_0_12px_hsl(var(--primary)/0.6)]" />
+                <h1 className="text-4xl sm:text-5xl font-heading font-bold text-foreground tracking-tight">My Library</h1>
+              </div>
+              <button
+                onClick={handleRescan}
+                disabled={rescanning}
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl glass border border-border hover:border-primary/40 text-muted-foreground hover:text-foreground text-sm font-medium transition-all disabled:opacity-50"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${rescanning ? 'animate-spin' : ''}`} />
+                {rescanning ? 'Scanning...' : 'Rescan Library'}
+              </button>
             </div>
             <p className="text-muted-foreground text-sm ml-4 pl-3 border-l border-border">
               Drop any video format — HomeStream auto-transcodes to browser-ready MP4 with zero-latency seeking.
@@ -977,6 +1052,38 @@ export default function LibraryPage() {
           )}
         </AnimatePresence>
 
+        {/* ── Search + Sort bar ── */}
+        <div className="flex items-center gap-2 mb-5 flex-wrap">
+          <div className="relative flex-1 max-w-xs">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
+            <input
+              type="text"
+              value={libSearch}
+              onChange={e => setLibSearch(e.target.value)}
+              placeholder="Search library..."
+              className="w-full glass rounded-xl pl-9 pr-8 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary/50"
+            />
+            {libSearch && (
+              <button onClick={() => setLibSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+          <div className="flex items-center gap-1.5 ml-auto">
+            <SlidersHorizontal className="w-3.5 h-3.5 text-muted-foreground" />
+            <select
+              value={libSort}
+              onChange={e => setLibSort(e.target.value as typeof libSort)}
+              className="glass rounded-xl px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary/50 cursor-pointer"
+            >
+              <option value="added">Date Added</option>
+              <option value="title">Title A–Z</option>
+              <option value="rating">Top Rated</option>
+              <option value="year">Year</option>
+            </select>
+          </div>
+        </div>
+
         {/* ── Library Grid header ── */}
         <div className="flex items-center justify-between mb-5 gap-3 flex-wrap">
           <div className="flex items-center gap-3">
@@ -1082,11 +1189,26 @@ export default function LibraryPage() {
           </motion.div>
         ) : (
           (() => {
-            // Filter items by profile + active tab
-            const filtered = library.filter(m =>
-              isAllowed(m.rated) &&
-              (activeTab === 'all' || (activeTab === 'series' ? m.type === 'series' : m.type !== 'series'))
-            );
+            // Filter items by profile + active tab + search
+            const filtered = library
+              .filter(m =>
+                isAllowed(m.rated) &&
+                (activeTab === 'all' || (activeTab === 'series' ? m.type === 'series' : m.type !== 'series')) &&
+                (!libSearch ||
+                  m.title.toLowerCase().includes(libSearch.toLowerCase()) ||
+                  ((m as any).codec && (m as any).codec.toLowerCase().includes(libSearch.toLowerCase())) ||
+                  (m.genre ?? []).some(g => g.toLowerCase().includes(libSearch.toLowerCase())) ||
+                  (m.director && m.director.toLowerCase().includes(libSearch.toLowerCase())) ||
+                  (m.actors && (Array.isArray(m.actors) ? m.actors.join(', ') : m.actors).toLowerCase().includes(libSearch.toLowerCase()))
+                )
+              )
+              .sort((a, b) => {
+                if (libSort === 'title') return a.title.localeCompare(b.title);
+                if (libSort === 'rating') return (parseFloat(b.imdbRating) || 0) - (parseFloat(a.imdbRating) || 0);
+                if (libSort === 'year') return (parseInt(b.year) || 0) - (parseInt(a.year) || 0);
+                // 'added' (default) - sorted by date added desc (newest first)
+                return new Date(b.addedAt).getTime() - new Date(a.addedAt).getTime();
+              });
 
             // Group series by title — all episodes of the same show share one card
             const showGroups = new Map<string, MediaItem[]>();
@@ -1143,8 +1265,8 @@ export default function LibraryPage() {
                   }
 
                   const item = entry.item as MediaItem & { transcoding?: boolean; transcodeWarning?: string; transcodeError?: string };
-                  return (
-                    <MediaContextMenu key={item.id} item={item} disabled={selectMode}>
+                  const cardContent = (
+                    <MediaContextMenu item={item} disabled={selectMode}>
                     <motion.div
                       initial={{ opacity: 0, y: 12 }}
                       animate={{ opacity: 1, y: 0 }}
@@ -1305,6 +1427,14 @@ export default function LibraryPage() {
                     </motion.div>
                     </MediaContextMenu>
                   );
+
+                  return selectMode ? (
+                    <div key={item.id}>{cardContent}</div>
+                  ) : (
+                    <TrailerHover key={item.id} item={item}>
+                      {cardContent}
+                    </TrailerHover>
+                  );
                 })}
               </div>
             );
@@ -1369,7 +1499,7 @@ export default function LibraryPage() {
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
               onClick={e => e.stopPropagation()}
-              className="bg-card border border-border rounded-2xl p-6 w-full max-w-md"
+              className="bg-card border border-border rounded-2xl p-6 w-full max-w-lg"
             >
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-heading text-foreground">Edit Metadata</h3>
@@ -1377,47 +1507,187 @@ export default function LibraryPage() {
                   <X className="w-5 h-5" />
                 </button>
               </div>
-              <div className="flex flex-col gap-3">
-                {[
-                  { label: 'Title', key: 'title' as const },
-                  { label: 'Year', key: 'year' as const },
-                  { label: 'Genre (comma separated)', key: 'genre' as const },
-                  { label: 'Poster URL', key: 'poster' as const },
-                ].map(field => (
-                  <div key={field.key}>
-                    <label className="text-xs text-muted-foreground mb-1 block">{field.label}</label>
+              <div className="flex flex-col gap-3 max-h-[65vh] overflow-y-auto pr-1">
+                {/* Title */}
+                <div>
+                  <label className="text-xs text-muted-foreground mb-1 block">Title</label>
+                  <input
+                    type="text"
+                    value={editState.title}
+                    onChange={e => setEditState(prev => prev ? { ...prev, title: e.target.value } : null)}
+                    className="w-full bg-secondary border border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary"
+                  />
+                </div>
+
+                {/* 2-column: Year & Runtime */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-muted-foreground mb-1 block">Year</label>
                     <input
                       type="text"
-                      value={editState[field.key]}
-                      onChange={e => setEditState(prev => prev ? { ...prev, [field.key]: e.target.value } : null)}
-                      className="w-full bg-secondary border border-border rounded px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary"
+                      value={editState.year}
+                      onChange={e => setEditState(prev => prev ? { ...prev, year: e.target.value } : null)}
+                      className="w-full bg-secondary border border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary"
                     />
                   </div>
-                ))}
+                  <div>
+                    <label className="text-xs text-muted-foreground mb-1 block">Runtime (e.g. 120 min)</label>
+                    <input
+                      type="text"
+                      value={editState.runtime}
+                      onChange={e => setEditState(prev => prev ? { ...prev, runtime: e.target.value } : null)}
+                      className="w-full bg-secondary border border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary"
+                    />
+                  </div>
+                </div>
+
+                {/* 2-column: Content Rating & IMDb Rating */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-muted-foreground mb-1 block">Content Rating</label>
+                    <select
+                      value={editState.rated}
+                      onChange={e => setEditState(prev => prev ? { ...prev, rated: e.target.value } : null)}
+                      className="w-full bg-secondary border border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary"
+                    >
+                      {RATING_OPTIONS.map(r => (
+                        <option key={r} value={r} className="bg-card text-foreground">{r}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground mb-1 block">IMDb Rating</label>
+                    <input
+                      type="text"
+                      value={editState.imdbRating}
+                      onChange={e => setEditState(prev => prev ? { ...prev, imdbRating: e.target.value } : null)}
+                      className="w-full bg-secondary border border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary"
+                    />
+                  </div>
+                </div>
+
+                {/* 2-column: IMDb ID & Genres */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-muted-foreground mb-1 block">IMDb ID</label>
+                    <input
+                      type="text"
+                      value={editState.imdbId}
+                      onChange={e => setEditState(prev => prev ? { ...prev, imdbId: e.target.value } : null)}
+                      className="w-full bg-secondary border border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground mb-1 block">Genres (comma separated)</label>
+                    <input
+                      type="text"
+                      value={editState.genre}
+                      onChange={e => setEditState(prev => prev ? { ...prev, genre: e.target.value } : null)}
+                      className="w-full bg-secondary border border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary"
+                    />
+                  </div>
+                </div>
+
+                {/* Director */}
+                <div>
+                  <label className="text-xs text-muted-foreground mb-1 block">Director</label>
+                  <input
+                    type="text"
+                    value={editState.director}
+                    onChange={e => setEditState(prev => prev ? { ...prev, director: e.target.value } : null)}
+                    className="w-full bg-secondary border border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary"
+                  />
+                </div>
+
+                {/* Actors */}
+                <div>
+                  <label className="text-xs text-muted-foreground mb-1 block">Actors</label>
+                  <input
+                    type="text"
+                    value={editState.actors}
+                    onChange={e => setEditState(prev => prev ? { ...prev, actors: e.target.value } : null)}
+                    className="w-full bg-secondary border border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary"
+                  />
+                </div>
+
+                {/* Poster URL */}
+                <div>
+                  <label className="text-xs text-muted-foreground mb-1 block">Poster URL</label>
+                  <input
+                    type="text"
+                    value={editState.poster}
+                    onChange={e => setEditState(prev => prev ? { ...prev, poster: e.target.value } : null)}
+                    className="w-full bg-secondary border border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary"
+                  />
+                </div>
+
+                {/* Plot */}
                 <div>
                   <label className="text-xs text-muted-foreground mb-1 block">Plot</label>
                   <textarea
                     value={editState.plot}
                     onChange={e => setEditState(prev => prev ? { ...prev, plot: e.target.value } : null)}
                     rows={3}
-                    className="w-full bg-secondary border border-border rounded px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary resize-none"
+                    className="w-full bg-secondary border border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary resize-none"
                   />
                 </div>
               </div>
               <div className="flex gap-2 mt-4">
                 <button
                   onClick={saveEdit}
-                  className="flex-1 flex items-center justify-center gap-2 bg-primary hover:bg-primary/80 text-white py-2 rounded font-medium text-sm transition-colors"
+                  className="flex-1 flex items-center justify-center gap-2 bg-primary hover:bg-primary/80 text-white py-2 rounded-xl font-medium text-sm transition-colors"
                 >
                   <Check className="w-4 h-4" /> Save Changes
                 </button>
                 <button
                   onClick={() => setEditState(null)}
-                  className="px-4 bg-secondary hover:bg-secondary/70 text-foreground py-2 rounded text-sm transition-colors"
+                  className="px-4 bg-secondary hover:bg-secondary/70 text-foreground py-2 rounded-xl text-sm transition-colors"
                 >
                   Cancel
                 </button>
               </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+ 
+      {/* ── Bulk Enrichment Progress Modal ── */}
+      <AnimatePresence>
+        {bulkEnriching && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 backdrop-blur-sm"
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-card border border-border rounded-2xl p-6 w-full max-w-sm text-center shadow-2xl"
+            >
+              <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4 animate-bounce">
+                <Cpu className="w-6 h-6 text-primary animate-pulse" />
+              </div>
+              <h3 className="text-base font-bold text-foreground mb-2">AI Metadata Enrichment</h3>
+              <p className="text-xs text-muted-foreground mb-4">
+                Enriching item <span className="text-foreground font-semibold">{bulkEnrichCurrentIndex}</span> of <span className="text-foreground font-semibold">{bulkEnrichTotal}</span>
+              </p>
+              
+              {/* Progress bar */}
+              <div className="h-1.5 bg-muted rounded-full overflow-hidden mb-3">
+                <div
+                  className="h-full bg-primary transition-all duration-300"
+                  style={{ width: `${(bulkEnrichCurrentIndex / bulkEnrichTotal) * 100}%` }}
+                />
+              </div>
+              
+              <p className="text-xs font-medium text-foreground truncate px-2">
+                {bulkEnrichCurrentName}
+              </p>
+              <p className="text-[10px] text-muted-foreground mt-2 animate-pulse">
+                Fetching genres, tags, and summary...
+              </p>
             </motion.div>
           </motion.div>
         )}

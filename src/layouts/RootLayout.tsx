@@ -1,6 +1,7 @@
 import { type ReactElement, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Toaster } from 'sonner';
+import { motion, AnimatePresence } from 'motion/react';
 
 import Footer from '@/layouts/parts/Footer';
 import Header from '@/layouts/parts/Header';
@@ -56,7 +57,17 @@ function AppShell({ children }: { children: ReactElement }) {
       <>
         <FirstRunGuard />
         {!hideChrome && <Header />}
-        {children}
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={location.pathname}
+            initial={{ opacity: 0.3 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0.3 }}
+            transition={{ duration: 0.18, ease: 'easeInOut' }}
+          >
+            {children}
+          </motion.div>
+        </AnimatePresence>
         {!hideChrome && <Footer />}
         <Toaster
           theme="dark"
