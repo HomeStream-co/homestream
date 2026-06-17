@@ -13,7 +13,6 @@ import { useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import MediaCard from '@/components/MediaCard';
-import TrailerHover from '@/components/TrailerHover';
 import type { MediaItem } from '@/types/media';
 
 interface MediaCarouselProps {
@@ -99,13 +98,7 @@ export default function MediaCarousel({
           className="flex gap-3 overflow-x-auto scrollbar-hide px-4 sm:px-6 lg:px-8 pb-3"
         >
           {items.map(item => (
-            trailerPreview ? (
-              <TrailerHover key={item.id} item={item}>
-                <MediaCard item={item} showProgress={showProgress} />
-              </TrailerHover>
-            ) : (
               <MediaCard key={item.id} item={item} showProgress={showProgress} />
-            )
           ))}
           {/* Trailing spacer so last card isn't flush against edge */}
           <div className="w-4 flex-shrink-0" />

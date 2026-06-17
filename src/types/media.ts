@@ -58,6 +58,7 @@ export interface MediaItem {
   transcodeStrategy?: 'remux' | 'encode_h264' | 'skipped';
   // AI enrichment (populated after upload wizard runs)
   enrichment?: MediaEnrichment;
+  ccStatus?: 'none' | 'fetching' | 'available' | 'failed';
   enriching?: boolean;          // true while wizard is running
   // Closed caption availability (populated after caption fetch)
   captions?: {

@@ -211,12 +211,9 @@ function PlayerControlsOverlayInner({
       <div className="flex items-center justify-center">
         <button
           onClick={togglePlay}
-          className="w-16 h-16 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors"
+          className={`w-16 h-16 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-all duration-200 ${playing ? 'opacity-0 scale-90 pointer-events-none' : 'opacity-100 scale-100 pointer-events-auto'}`}
         >
-          {playing
-            ? <Pause className="w-7 h-7 text-white fill-white" />
-            : <Play className="w-7 h-7 text-white fill-white ml-1" />
-          }
+          <Play className="w-7 h-7 text-white fill-white ml-1" />
         </button>
       </div>
 

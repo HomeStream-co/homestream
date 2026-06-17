@@ -32,7 +32,6 @@ import { toActorsString } from '@/lib/utils';
 import OfflineBanner from '@/components/OfflineBanner';
 import LazySection from '@/components/LazySection';
 import HomePageSkeleton from '@/components/HomePageSkeleton';
-import TrailerHover from '@/components/TrailerHover';
 import type { MediaItem } from '@/types/media';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -602,11 +601,8 @@ export default function HomePage() {
                     key={item.id}
                     initial={{ opacity: 0, y: 12 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: Math.min(i * 0.03, 0.4), duration: 0.25 }}
                   >
-                    <TrailerHover item={item}>
-                      <MediaCard item={item} size="md" />
-                    </TrailerHover>
+                    <MediaCard item={item} size="md" />
                   </motion.div>
                 ))}
               </div>
@@ -825,7 +821,6 @@ export default function HomePage() {
                           title: `${show.title} - S${nextEpisode.season}E${nextEpisode.episode}: ${nextEpisode.title}`,
                         };
                         return (
-                          <TrailerHover key={nextEpisode.id} item={syntheticItem}>
                             <div
                               onClick={() => navigate(`/player/${nextEpisode.id}`)}
                               className="relative cursor-pointer group w-36 sm:w-44 flex-shrink-0 select-none"
@@ -858,7 +853,6 @@ export default function HomePage() {
                                 </p>
                               </div>
                             </div>
-                          </TrailerHover>
                         );
                       })}
                       <div className="w-4 flex-shrink-0" />

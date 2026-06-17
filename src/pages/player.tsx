@@ -346,6 +346,17 @@ export default function PlayerPage() {
     };
   }, [id, item, ps.videoRef]);
 
+  // ── Auto-fetch Subtitles ──────────────────────────────────────────────────
+  useEffect(() => {
+    if (id && item && item.ccStatus === 'none') {
+      console.log('[player] Auto-fetching subtitles for', id);
+      ps.showActionToast('Downloading Subtitles...');
+      fetch(`/api/captions/${id}/fetch`, { method: 'POST' })
+        .catch(err => console.error('[player] Failed to auto-fetch subtitles:', err));
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, item?.ccStatus]);
+
   // ── Fetch audio tracks ────────────────────────────────────────────────────
   useEffect(() => {
     if (!id) return;

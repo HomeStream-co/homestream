@@ -16,7 +16,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import EnrichmentWizard from '@/components/EnrichmentWizard';
 import EnrichmentRevealModal from '@/components/EnrichmentRevealModal';
 import CaptionManager from '@/components/CaptionManager';
-import TrailerHover from '@/components/TrailerHover';
 import MediaContextMenu from '@/components/MediaContextMenu';
 import ShowCard from '@/components/ShowCard';
 import type { MediaEnrichment } from '@/types/media';
@@ -1455,9 +1454,7 @@ export default function LibraryPage() {
                     <div key={item.id} className="h-full flex flex-col">{cardContent}</div>
                   ) : (
                     <div key={item.id} className="h-full flex flex-col">
-                      <TrailerHover item={item}>
-                        {cardContent}
-                      </TrailerHover>
+                      {cardContent}
                     </div>
                   );
                 }}
