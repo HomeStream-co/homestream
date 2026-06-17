@@ -6,6 +6,7 @@ import {
   Search, SlidersHorizontal, RefreshCw, Wand2,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { VirtuosoGrid } from 'react-virtuoso';
 import { toast } from 'sonner';
 import { useMedia } from '@/context/MediaContext';
 import { useProfile } from '@/context/ProfileContext';
@@ -1276,8 +1277,11 @@ export default function LibraryPage() {
             }
 
             return (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-                {entries.map(entry => {
+              <VirtuosoGrid
+                useWindowScroll
+                data={entries}
+                listClassName="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 pb-12"
+                itemContent={(index, entry) => {
                   if (entry.kind === 'show') {
                     return (
                       <ShowCard
@@ -1288,7 +1292,7 @@ export default function LibraryPage() {
                         onToggleSelect={toggleSelect}
                         onDelete={setDeleteId}
                         onEdit={startEdit}
-                        animDelay={entry.idx * 0.025}
+                        animDelay={0} // Virtualized items don't need stagger delay
                       />
                     );
                   }
@@ -1299,8 +1303,8 @@ export default function LibraryPage() {
                     <motion.div
                       initial={{ opacity: 0, y: 12 }}
                       animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.3, delay: Math.min(entry.idx * 0.025, 0.4), ease: 'easeOut' as const }}
-                      className={`group relative ${selectMode ? 'cursor-pointer' : ''}`}
+                      transition={{ duration: 0.3, delay: 0, ease: 'easeOut' as const }}
+                      className={`group relative ${selectMode ? 'cursor-pointer' : ''} h-full flex flex-col`}
                       onClick={selectMode ? () => toggleSelect(item.id) : undefined}
                     >
                       <div className={`aspect-[2/3] rounded-xl overflow-hidden bg-card relative transition-all duration-200 ${
@@ -1313,8 +1317,8 @@ export default function LibraryPage() {
                           <PosterImage poster={item.poster} title={item.title} />
                         ) : (
                           <div className="w-full h-full flex flex-col items-center justify-center gap-2 bg-card p-2">
-                            <Film className="w-8 h-8 text-muted-foreground/30" />
-                            <p className="text-[10px] text-muted-foreground text-center line-clamp-3">{item.title}</p>
+                            <Film className="w-8 h-8 text-muted-foreground/30 flex-shrink-0" />
+                            <p className="text-[10px] text-muted-foreground text-center line-clamp-3 leading-snug">{item.title}</p>
                           </div>
                         )}
 
@@ -1403,7 +1407,7 @@ export default function LibraryPage() {
                         )}
                       </div>
 
-                      <div className="mt-2 px-0.5">
+                      <div className="mt-2 px-0.5 flex-1 flex flex-col">
                         <p className="text-xs font-semibold text-foreground truncate leading-snug">{item.title}</p>
                         <div className="flex items-center justify-between mt-0.5">
                           <p className="text-[10px] text-muted-foreground">{item.year}</p>
@@ -1431,7 +1435,7 @@ export default function LibraryPage() {
                                 {m}
                               </span>
                             ))}
-                            {item.enrichment?.tags?.slice(0, 2).map((t: string) => (
+                            {item.enrichment?.tags?.slice(0, 1).map((t: string) => (
                               <span key={t} className="text-[9px] px-1 py-0.5 rounded-full bg-muted text-muted-foreground font-medium leading-none truncate max-w-[64px]">
                                 {t}
                               </span>
@@ -1458,14 +1462,16 @@ export default function LibraryPage() {
                   );
 
                   return selectMode ? (
-                    <div key={item.id}>{cardContent}</div>
+                    <div key={item.id} className="h-full flex flex-col">{cardContent}</div>
                   ) : (
-                    <TrailerHover key={item.id} item={item}>
-                      {cardContent}
-                    </TrailerHover>
+                    <div key={item.id} className="h-full flex flex-col">
+                      <TrailerHover item={item}>
+                        {cardContent}
+                      </TrailerHover>
+                    </div>
                   );
-                })}
-              </div>
+                }}
+              />
             );
           })()
         )}

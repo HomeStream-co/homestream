@@ -1,0 +1,70 @@
+{
+  "setupComplete": true,
+  "mediaDir": "D:\\HomeStream",
+  "downloadsDir": "D:\\HomeStream\\downloads",
+  "libraryDir": "D:\\HomeStream\\library",
+  "qbitUrl": "127.0.0.1",
+  "qbitUsername": "admin",
+  "qbitPassword": "homestream",
+  "jellyfinUrl": "http://localhost:8096",
+  "jellyfinApiKey": "",
+  "adminPassword": "",
+  "omdbApiKey": "",
+  "googleAiApiKey": "",
+  "tmdbApiKey": "1fc76698ee09cbcfe927abb03da9fe5a",
+  "aiApiKey": "",
+  "aiProvider": "gemini",
+  "ollamaUrl": "http://localhost:11434",
+  "ollamaModel": "llama3",
+  "openaiApiKey": "",
+  "openaiModel": "gpt-4.1",
+  "anthropicApiKey": "",
+  "anthropicModel": "claude-sonnet-4-6",
+  "watchFolderEnabled": true,
+  "autoTranscode": true,
+  "preferredQuality": "1080p",
+  "transcodePreset": "balanced",
+  "virusTotalApiKey": "",
+  "storageMoviesPct": 60,
+  "storageTvPct": 30,
+  "prowlarrUrl": "http://localhost:9696",
+  "prowlarrApiKey": "28a71a94a8ad4a5e939ce63e037732fe",
+  "realDebridApiKey": "",
+  "torrentSources": [
+    {
+      "id": "builtin-torrentio",
+      "name": "Torrentio",
+      "type": "torrentio",
+      "enabled": true,
+      "builtIn": true
+    },
+    {
+      "id": "builtin-nyaa",
+      "name": "Nyaa.si",
+      "type": "nyaa",
+      "enabled": true,
+      "builtIn": true
+    },
+    {
+      "id": "builtin-prowlarr",
+      "name": "Prowlarr",
+      "type": "prowlarr",
+      "enabled": true,
+      "builtIn": true
+    }
+  ],
+  "tmdbApiKeySavedAt": "2026-06-07T21:34:57.738Z",
+  "setupCompletedAt": "2026-06-07T21:34:57.748Z",
+  "vpnInterface": "Norton VPN WireGuard",
+  "vpnKillSwitch": true,
+  "vpn": {
+    "enabled": true,
+    "downloadOnly": true,
+    "protocol": "wireguard",
+    "provider": "custom",
+    "configContent": "",
+    "autoConnect": false,
+    "autoFastest": true,
+    "serverType": "p2p"
+  }
+}

@@ -1,11 +1,10 @@
 import type { Request, Response } from 'express';
 import fs from 'fs';
 import path from 'path';
-import { pipeline } from 'stream/promises';
-import { readLibrary, writeLibrary } from '../../../../libraryStore.js';
-import { dataDir } from '../../../../dataDir.js';
-import { runEnrichmentInBackground } from '../../../../mediaUtils.js';
-import { requireAuth } from '../../../../authMiddleware.js';
+import { readLibrary, writeLibrary } from '../../../libraryStore.js';
+import { dataPath } from '../../../dataDir.js';
+import { runEnrichmentInBackground } from '../../../mediaUtils.js';
+import { requireAuth } from '../../../authMiddleware.js';
 
 export default async function handler(req: Request, res: Response) {
   if (!requireAuth(req, res)) return;
@@ -21,7 +20,7 @@ export default async function handler(req: Request, res: Response) {
 
 // Separate function for the background task
 async function queueOptimizationJob() {
-  const postersDir = path.join(dataDir(), 'posters');
+  const postersDir = path.join(dataPath(), 'posters');
   if (!fs.existsSync(postersDir)) {
     fs.mkdirSync(postersDir, { recursive: true });
   }

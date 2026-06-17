@@ -20,6 +20,7 @@
  */
 
 import fs from 'fs';
+import { readLibrary } from './libraryStore.js';
 
 import { dataPath } from './dataDir.js';
 const WATCHLIST_PATH = dataPath('homestream-watchlist.json');
@@ -32,11 +33,43 @@ function readStore(): WatchlistStore {
   if (!fs.existsSync(WATCHLIST_PATH)) return {};
   try {
     const raw = JSON.parse(fs.readFileSync(WATCHLIST_PATH, 'utf-8'));
+    let store: WatchlistStore;
+    
     // Migrate legacy plain-array format → adult profile
     if (Array.isArray(raw)) {
-      return { adult: raw as string[] };
+      store = { adult: raw as string[] };
+      // Save it immediately so we don't have to do this again
+      writeStore(store);
+    } else {
+      store = raw as WatchlistStore;
     }
-    return raw as WatchlistStore;
+
+    // Auto-migrate old IDs (e.g. imdb tt123) to current library IDs (tmdb-xxx)
+    let migrated = false;
+    const library = readLibrary();
+    const idMap = new Map<string, string>();
+    for (const item of library) {
+      if (typeof item.imdbId === 'string' && item.id !== item.imdbId) {
+        idMap.set(item.imdbId, item.id);
+      }
+    }
+
+    for (const [profileId, ids] of Object.entries(store)) {
+      const newIds = ids.map(id => {
+        if (idMap.has(id)) {
+          migrated = true;
+          return idMap.get(id)!;
+        }
+        return id;
+      });
+      store[profileId] = newIds;
+    }
+
+    if (migrated) {
+      writeStore(store);
+    }
+
+    return store;
   } catch {
     return {};
   }

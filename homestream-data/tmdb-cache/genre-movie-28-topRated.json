@@ -1,0 +1,458 @@
+[
+  {
+    "id": 931285,
+    "title": "Mortal Kombat II",
+    "overview": "The fan favorite champions—now joined by Johnny Cage himself—are pitted against one another in the ultimate, no-holds barred, gory battle to defeat the dark rule of Shao Kahn that threatens the very existence of the Earthrealm and its defenders.",
+    "poster_path": "/hwRdDFIhaEmpRgoki805YvyyjZf.jpg",
+    "backdrop_path": "/laR2dpcNpbv83jdlRUNAYPPjH90.jpg",
+    "release_date": "2026-05-06",
+    "vote_average": 8.015,
+    "vote_count": 1337,
+    "genre_ids": [
+      28,
+      14,
+      12
+    ],
+    "popularity": 611.0283,
+    "posterUrl": "/tmdb-images/f2a401b53228.jpg",
+    "backdropUrl": "/api/tmdb-proxy?url=https%3A%2F%2Fimage.tmdb.org%2Ft%2Fp%2Foriginal%2FlaR2dpcNpbv83jdlRUNAYPPjH90.jpg",
+    "genres": [
+      "Action",
+      "Fantasy",
+      "Adventure"
+    ]
+  },
+  {
+    "id": 1275779,
+    "title": "Disclosure Day",
+    "overview": "If you found out we weren’t alone, if someone showed you, proved it to you, would that frighten you?",
+    "poster_path": "/3o5YPjDGDTcTDL5ftDA9NwN9dLd.jpg",
+    "backdrop_path": "/s6ly8laenkHWlIBRkLSfIuEMLC6.jpg",
+    "release_date": "2026-06-10",
+    "vote_average": 6.9,
+    "vote_count": 369,
+    "genre_ids": [
+      28,
+      878,
+      53
+    ],
+    "popularity": 339.0969,
+    "posterUrl": "/tmdb-images/7c34f18b4b9c.jpg",
+    "backdropUrl": "/api/tmdb-proxy?url=https%3A%2F%2Fimage.tmdb.org%2Ft%2Fp%2Foriginal%2Fs6ly8laenkHWlIBRkLSfIuEMLC6.jpg",
+    "genres": [
+      "Action",
+      "Sci-Fi",
+      "Thriller"
+    ]
+  },
+  {
+    "id": 1228710,
+    "title": "The Mandalorian and Grogu",
+    "overview": "The evil Empire has fallen, and Imperial warlords remain scattered throughout the galaxy. As the fledgling New Republic works to protect everything the Rebellion fought for, they have enlisted the help of legendary Mandalorian bounty hunter Din Djarin and his young apprentice Grogu.",
+    "poster_path": "/5Vi8dSauVwH1HOsiZceDMbRr1Ca.jpg",
+    "backdrop_path": "/6zg7A9ICOthNR2TSXlT51KvXrsA.jpg",
+    "release_date": "2026-05-20",
+    "vote_average": 6.782,
+    "vote_count": 471,
+    "genre_ids": [
+      28,
+      12,
+      878
+    ],
+    "popularity": 282.4184,
+    "posterUrl": "/tmdb-images/f2e1e70d0fc6.jpg",
+    "backdropUrl": "/api/tmdb-proxy?url=https%3A%2F%2Fimage.tmdb.org%2Ft%2Fp%2Foriginal%2F6zg7A9ICOthNR2TSXlT51KvXrsA.jpg",
+    "genres": [
+      "Action",
+      "Adventure",
+      "Sci-Fi"
+    ]
+  },
+  {
+    "id": 454639,
+    "title": "Masters of the Universe",
+    "overview": "After being separated for 15 years, the Sword of Power leads Prince Adam back to Eternia, where he discovers his home shattered under the fiendish rule of Skeletor. To save his family and his world, Adam must join forces with his closest allies, Teela and Duncan/Man-At-Arms, and embrace his true destiny as He-Man — the most powerful man in the universe.",
+    "poster_path": "/3YMd9Ogae4rDKLWuAZFuse9xhc5.jpg",
+    "backdrop_path": "/eQySd26OW7UmCuaeBOL7qy6foMn.jpg",
+    "release_date": "2026-06-03",
+    "vote_average": 7.296,
+    "vote_count": 213,
+    "genre_ids": [
+      28,
+      14,
+      878
+    ],
+    "popularity": 203.9842,
+    "posterUrl": "/tmdb-images/ddc0c1699c71.jpg",
+    "backdropUrl": "/tmdb-images/25cdd21455c4.jpg",
+    "genres": [
+      "Action",
+      "Fantasy",
+      "Sci-Fi"
+    ]
+  },
+  {
+    "id": 1122573,
+    "title": "In the Grey",
+    "overview": "A covert team of elite operatives are living in the shadows. When a ruthless despot steals a billion-dollar fortune, they're sent to take it back—an impossible heist that erupts into a deadly game of strategy, deception and survival.",
+    "poster_path": "/dQgIcW6Th08kMRf2HBoYWoFE6OD.jpg",
+    "backdrop_path": "/qcIKxhqGMIj8uujsSoSMZWr8QqU.jpg",
+    "release_date": "2026-05-13",
+    "vote_average": 6.637,
+    "vote_count": 230,
+    "genre_ids": [
+      28,
+      53
+    ],
+    "popularity": 171.4177,
+    "posterUrl": "/tmdb-images/e4250d5ef1a2.jpg",
+    "backdropUrl": "/api/tmdb-proxy?url=https%3A%2F%2Fimage.tmdb.org%2Ft%2Fp%2Foriginal%2FqcIKxhqGMIj8uujsSoSMZWr8QqU.jpg",
+    "genres": [
+      "Action",
+      "Thriller"
+    ]
+  },
+  {
+    "id": 1439930,
+    "title": "The Punisher: One Last Kill",
+    "overview": "As Frank Castle searches for meaning beyond revenge, an unexpected force pulls him back into the fight.",
+    "poster_path": "/qQclTgLMDvGBuUBFGHRipxkEwWR.jpg",
+    "backdrop_path": "/qO55CD8tgVL1T4WKn6zYFFiD6lL.jpg",
+    "release_date": "2026-05-12",
+    "vote_average": 8.351,
+    "vote_count": 1603,
+    "genre_ids": [
+      28,
+      18,
+      80
+    ],
+    "popularity": 156.5747,
+    "posterUrl": "/tmdb-images/e3ed5b3fcfba.jpg",
+    "backdropUrl": "/api/tmdb-proxy?url=https%3A%2F%2Fimage.tmdb.org%2Ft%2Fp%2Foriginal%2FqO55CD8tgVL1T4WKn6zYFFiD6lL.jpg",
+    "genres": [
+      "Action",
+      "Drama",
+      "Crime"
+    ]
+  },
+  {
+    "id": 1582770,
+    "title": "Dhurandhar: The Revenge",
+    "overview": "As rival gangs, corrupt officials and a ruthless Major Iqbal close in, Hamza's mission for his country spirals into a bloody personal war where the line between patriot and monster disappears in the streets of Lyari.",
+    "poster_path": "/ptTwQES14pr5c3aZvJg56YlYgb1.jpg",
+    "backdrop_path": "/gRoZG3Z0zJxgElmTsVHOl2dNYXe.jpg",
+    "release_date": "2026-03-18",
+    "vote_average": 7.3,
+    "vote_count": 118,
+    "genre_ids": [
+      28,
+      80,
+      53
+    ],
+    "popularity": 141.8881,
+    "posterUrl": "/tmdb-images/9ab93decd802.jpg",
+    "backdropUrl": "/api/tmdb-proxy?url=https%3A%2F%2Fimage.tmdb.org%2Ft%2Fp%2Foriginal%2FgRoZG3Z0zJxgElmTsVHOl2dNYXe.jpg",
+    "genres": [
+      "Action",
+      "Crime",
+      "Thriller"
+    ]
+  },
+  {
+    "id": 1419406,
+    "title": "The Shadow's Edge",
+    "overview": "Macau Police brings the tracking expert police officer out of retirement to help catch a dangerous group of professional thieves.",
+    "poster_path": "/cHKo3m8N1fwvEy2ZEr0xGmmMODV.jpg",
+    "backdrop_path": "/4BtL2vvEufDXDP4u6xQjjQ1Y2aT.jpg",
+    "release_date": "2025-08-16",
+    "vote_average": 7.765,
+    "vote_count": 857,
+    "genre_ids": [
+      28,
+      80,
+      18,
+      53
+    ],
+    "popularity": 131.0239,
+    "posterUrl": "/tmdb-images/d2b5169df9c7.jpg",
+    "backdropUrl": "/api/tmdb-proxy?url=https%3A%2F%2Fimage.tmdb.org%2Ft%2Fp%2Foriginal%2F4BtL2vvEufDXDP4u6xQjjQ1Y2aT.jpg",
+    "genres": [
+      "Action",
+      "Crime",
+      "Drama",
+      "Thriller"
+    ]
+  },
+  {
+    "id": 1380291,
+    "title": "Tom Clancy's Jack Ryan: Ghost War",
+    "overview": "Jack Ryan is reluctantly pulled back into espionage when an international covert mission unravels a deadly conspiracy. Racing against time, he joins CIA allies Mike November & James Greer and sharp MI6 officer Emma Marlowe to battle a rogue black-ops unit in a high-stakes, deeply personal fight.",
+    "poster_path": "/8ehYxUh5MWE41AeE9gkHE8DKzvB.jpg",
+    "backdrop_path": "/dd31qJxOarrHyGZwYsCzOjobQzP.jpg",
+    "release_date": "2026-05-20",
+    "vote_average": 7.089,
+    "vote_count": 559,
+    "genre_ids": [
+      28,
+      53
+    ],
+    "popularity": 133.8238,
+    "posterUrl": "/tmdb-images/9210c70984ce.jpg",
+    "backdropUrl": "/api/tmdb-proxy?url=https%3A%2F%2Fimage.tmdb.org%2Ft%2Fp%2Foriginal%2Fdd31qJxOarrHyGZwYsCzOjobQzP.jpg",
+    "genres": [
+      "Action",
+      "Thriller"
+    ]
+  },
+  {
+    "id": 1290821,
+    "title": "Shelter",
+    "overview": "A man living in self-imposed exile on a remote island rescues a young girl from a violent storm, setting off a chain of events that forces him out of seclusion to protect her from enemies tied to his past.",
+    "poster_path": "/buPFnHZ3xQy6vZEHxbHgL1Pc6CR.jpg",
+    "backdrop_path": "/nHxWyy18SvAZ8jJeemtS8k1UNjM.jpg",
+    "release_date": "2026-01-28",
+    "vote_average": 7.661,
+    "vote_count": 1233,
+    "genre_ids": [
+      28,
+      80,
+      53
+    ],
+    "popularity": 95.2513,
+    "posterUrl": "/tmdb-images/eed1735f4cd2.jpg",
+    "backdropUrl": "/api/tmdb-proxy?url=https%3A%2F%2Fimage.tmdb.org%2Ft%2Fp%2Foriginal%2FnHxWyy18SvAZ8jJeemtS8k1UNjM.jpg",
+    "genres": [
+      "Action",
+      "Crime",
+      "Thriller"
+    ]
+  },
+  {
+    "id": 1311031,
+    "title": "Demon Slayer: Kimetsu no Yaiba Infinity Castle",
+    "overview": "The Demon Slayer Corps are drawn into the Infinity Castle, where Tanjiro, Nezuko, and the Hashira face terrifying Upper Rank demons in a desperate fight as the final battle against Muzan Kibutsuji begins.",
+    "poster_path": "/fWVSwgjpT2D78VUh6X8UBd2rorW.jpg",
+    "backdrop_path": "/1RgPyOhN4DRs225BGTlHJqCudII.jpg",
+    "release_date": "2025-07-18",
+    "vote_average": 7.7,
+    "vote_count": 862,
+    "genre_ids": [
+      16,
+      28,
+      14
+    ],
+    "popularity": 100.6421,
+    "posterUrl": "/tmdb-images/3d17624ff8a1.jpg",
+    "backdropUrl": "/api/tmdb-proxy?url=https%3A%2F%2Fimage.tmdb.org%2Ft%2Fp%2Foriginal%2F1RgPyOhN4DRs225BGTlHJqCudII.jpg",
+    "genres": [
+      "Animation",
+      "Action",
+      "Fantasy"
+    ]
+  },
+  {
+    "id": 1390300,
+    "title": "Over Your Dead Body",
+    "overview": "A dysfunctional couple head to a remote cabin to \"reconnect\", but each has secret intentions to kill the other.",
+    "poster_path": "/kZCauMzAt9eMAhLMopCqnFw1Q5k.jpg",
+    "backdrop_path": "/sb76azrAXr9U13uEQxNP5e3fujY.jpg",
+    "release_date": "2026-03-14",
+    "vote_average": 6.6,
+    "vote_count": 218,
+    "genre_ids": [
+      28,
+      35,
+      53
+    ],
+    "popularity": 102.5037,
+    "posterUrl": "/tmdb-images/f652269f3a36.jpg",
+    "backdropUrl": "/api/tmdb-proxy?url=https%3A%2F%2Fimage.tmdb.org%2Ft%2Fp%2Foriginal%2Fsb76azrAXr9U13uEQxNP5e3fujY.jpg",
+    "genres": [
+      "Action",
+      "Comedy",
+      "Thriller"
+    ]
+  },
+  {
+    "id": 1318447,
+    "title": "Apex",
+    "overview": "A grieving woman pushing her limits on a solo adventure in the Australian wild is ensnared in a twisted game with a cunning killer who thinks she's prey.",
+    "poster_path": "/eTp7gSPkSF3Aw79mNx1NkBP1PZT.jpg",
+    "backdrop_path": "/9nzfyiYbmTUXWC4B2kwjl4NAlqO.jpg",
+    "release_date": "2026-04-24",
+    "vote_average": 6.805,
+    "vote_count": 1462,
+    "genre_ids": [
+      28,
+      53
+    ],
+    "popularity": 80.8799,
+    "posterUrl": "/tmdb-images/443903b9cd83.jpg",
+    "backdropUrl": "/api/tmdb-proxy?url=https%3A%2F%2Fimage.tmdb.org%2Ft%2Fp%2Foriginal%2F9nzfyiYbmTUXWC4B2kwjl4NAlqO.jpg",
+    "genres": [
+      "Action",
+      "Thriller"
+    ]
+  },
+  {
+    "id": 39254,
+    "title": "Real Steel",
+    "overview": "Charlie Kenton is a washed-up fighter who retired from the ring when robots took over the sport. After his robot is trashed, he reluctantly teams up with his estranged son to rebuild and train an unlikely contender.",
+    "poster_path": "/4GIeI5K5YdDUkR3mNQBoScpSFEf.jpg",
+    "backdrop_path": "/pjlxrd646cBYznHoPBWTzz6FujX.jpg",
+    "release_date": "2011-09-28",
+    "vote_average": 7.105,
+    "vote_count": 9216,
+    "genre_ids": [
+      28,
+      878,
+      18
+    ],
+    "popularity": 69.7955,
+    "posterUrl": "/api/tmdb-proxy?url=https%3A%2F%2Fimage.tmdb.org%2Ft%2Fp%2Fw500%2F4GIeI5K5YdDUkR3mNQBoScpSFEf.jpg",
+    "backdropUrl": "/api/tmdb-proxy?url=https%3A%2F%2Fimage.tmdb.org%2Ft%2Fp%2Foriginal%2Fpjlxrd646cBYznHoPBWTzz6FujX.jpg",
+    "genres": [
+      "Action",
+      "Sci-Fi",
+      "Drama"
+    ]
+  },
+  {
+    "id": 1291608,
+    "title": "Dhurandhar",
+    "overview": "A mysterious traveler slips into the heart of Karachi's underbelly and rises through its ranks with lethal precision, only to tear the notorious ISI-Underworld nexus apart from within.",
+    "poster_path": "/snBOuXDdhmTvlzMUvP9Em3Pp1u1.jpg",
+    "backdrop_path": "/4DfxcN4w0FuYZHQ3JAHzpHWia1U.jpg",
+    "release_date": "2025-12-05",
+    "vote_average": 7.242,
+    "vote_count": 306,
+    "genre_ids": [
+      28,
+      80,
+      53
+    ],
+    "popularity": 68.2553,
+    "posterUrl": "/tmdb-images/238e09e22d4f.jpg",
+    "backdropUrl": "/api/tmdb-proxy?url=https%3A%2F%2Fimage.tmdb.org%2Ft%2Fp%2Foriginal%2F4DfxcN4w0FuYZHQ3JAHzpHWia1U.jpg",
+    "genres": [
+      "Action",
+      "Crime",
+      "Thriller"
+    ]
+  },
+  {
+    "id": 460465,
+    "title": "Mortal Kombat",
+    "overview": "Washed-up MMA fighter Cole Young, unaware of his heritage, and hunted by Emperor Shang Tsung's best warrior, Sub-Zero, seeks out and trains with Earth's greatest champions as he prepares to stand against the enemies of Outworld in a high stakes battle for the universe.",
+    "poster_path": "/ybrX94xQm8lXYpZAPRmwD9iIbWP.jpg",
+    "backdrop_path": "/6ELCZlTA5lGUops70hKdB83WJxH.jpg",
+    "release_date": "2021-04-07",
+    "vote_average": 7.045,
+    "vote_count": 6774,
+    "genre_ids": [
+      28,
+      14,
+      12
+    ],
+    "popularity": 60.2624,
+    "posterUrl": "/tmdb-images/9cad99084218.jpg",
+    "backdropUrl": "/api/tmdb-proxy?url=https%3A%2F%2Fimage.tmdb.org%2Ft%2Fp%2Foriginal%2F6ELCZlTA5lGUops70hKdB83WJxH.jpg",
+    "genres": [
+      "Action",
+      "Fantasy",
+      "Adventure"
+    ]
+  },
+  {
+    "id": 980477,
+    "title": "Ne Zha 2",
+    "overview": "After a catastrophic event leaves their bodies destroyed, Ne Zha and Ao Bing are granted a fragile second chance at life. As tensions rise between the dragon clans and celestial forces, the two must undergo a series of perilous trials that will test their bond, challenge their identities, and decide the fate of both mortals and immortals.",
+    "poster_path": "/cb5NyNrqiCNNoDkA8FfxHAtypdG.jpg",
+    "backdrop_path": "/zxi6WQPVc0uQAG5TtLsKvxYHApC.jpg",
+    "release_date": "2025-01-29",
+    "vote_average": 8.134,
+    "vote_count": 714,
+    "genre_ids": [
+      16,
+      28,
+      14,
+      12
+    ],
+    "popularity": 57.2717,
+    "posterUrl": "/tmdb-images/83a897065992.jpg",
+    "backdropUrl": "/api/tmdb-proxy?url=https%3A%2F%2Fimage.tmdb.org%2Ft%2Fp%2Foriginal%2Fzxi6WQPVc0uQAG5TtLsKvxYHApC.jpg",
+    "genres": [
+      "Animation",
+      "Action",
+      "Fantasy",
+      "Adventure"
+    ]
+  },
+  {
+    "id": 1242898,
+    "title": "Predator: Badlands",
+    "overview": "Cast out from his clan, a young Predator finds an unlikely ally in a damaged android and embarks on a treacherous journey in search of the ultimate adversary.",
+    "poster_path": "/pHpq9yNUIo6aDoCXEBzjSolywgz.jpg",
+    "backdrop_path": "/82lM4GJ9uuNvNDOEpxFy77uv4Ak.jpg",
+    "release_date": "2025-11-05",
+    "vote_average": 7.791,
+    "vote_count": 3090,
+    "genre_ids": [
+      28,
+      878,
+      12
+    ],
+    "popularity": 56.0283,
+    "posterUrl": "/api/tmdb-proxy?url=https%3A%2F%2Fimage.tmdb.org%2Ft%2Fp%2Fw500%2FpHpq9yNUIo6aDoCXEBzjSolywgz.jpg",
+    "backdropUrl": "/api/tmdb-proxy?url=https%3A%2F%2Fimage.tmdb.org%2Ft%2Fp%2Foriginal%2F82lM4GJ9uuNvNDOEpxFy77uv4Ak.jpg",
+    "genres": [
+      "Action",
+      "Sci-Fi",
+      "Adventure"
+    ]
+  },
+  {
+    "id": 1613798,
+    "title": "Vengeance",
+    "overview": "The brutal murder of the wife of “Toro,” a military hero in the special forces, turns him into a man with a single purpose: revenge. After a stroke of fate makes him a millionaire, Carlos transforms his fortune into an arsenal and, together with his closest soldiers, sets out to hunt down those responsible.",
+    "poster_path": "/ygWXPL0RS91JyJPNOfK34eV3bRE.jpg",
+    "backdrop_path": "/xyW8rJO3rwG2EGcTO6eaUEa8b9d.jpg",
+    "release_date": "2026-02-26",
+    "vote_average": 7.5,
+    "vote_count": 255,
+    "genre_ids": [
+      28,
+      53
+    ],
+    "popularity": 60.403,
+    "posterUrl": "/tmdb-images/e18b99d3b03d.jpg",
+    "backdropUrl": "/api/tmdb-proxy?url=https%3A%2F%2Fimage.tmdb.org%2Ft%2Fp%2Foriginal%2FxyW8rJO3rwG2EGcTO6eaUEa8b9d.jpg",
+    "genres": [
+      "Action",
+      "Thriller"
+    ]
+  },
+  {
+    "id": 299536,
+    "title": "Avengers: Infinity War",
+    "overview": "As the Avengers and their allies have continued to protect the world from threats too large for any one hero to handle, a new danger has emerged from the cosmic shadows: Thanos. A despot of intergalactic infamy, his goal is to collect all six Infinity Stones, artifacts of unimaginable power, and use them to inflict his twisted will on all of reality. Everything the Avengers have fought for has led up to this moment - the fate of Earth and existence itself has never been more uncertain.",
+    "poster_path": "/7WsyChQLEftFiDOVTGkv3hFpyyt.jpg",
+    "backdrop_path": "/mDfJG3LC3Dqb67AZ52x3Z0jU0uB.jpg",
+    "release_date": "2018-04-25",
+    "vote_average": 8.2,
+    "vote_count": 32106,
+    "genre_ids": [
+      12,
+      28,
+      878
+    ],
+    "popularity": 52.7119,
+    "posterUrl": "/tmdb-images/d93af56cb6bc.jpg",
+    "backdropUrl": "/api/tmdb-proxy?url=https%3A%2F%2Fimage.tmdb.org%2Ft%2Fp%2Foriginal%2FmDfJG3LC3Dqb67AZ52x3Z0jU0uB.jpg",
+    "genres": [
+      "Adventure",
+      "Action",
+      "Sci-Fi"
+    ]
+  }
+]

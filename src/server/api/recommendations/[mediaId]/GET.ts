@@ -1,7 +1,14 @@
 import type { Request, Response } from 'express';
-import { readConfig } from '../../../../configStore.js';
-import { readLibrary } from '../../../../libraryStore.js';
-import { requireAuth } from '../../../../authMiddleware.js';
+import { readConfig } from '../../../configStore.js';
+import { readLibrary } from '../../../libraryStore.js';
+import { requireAuth } from '../../../authMiddleware.js';
+
+interface CacheEntry {
+  data: any;
+  timestamp: number;
+}
+const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
+const recommendationsCache = new Map<string, CacheEntry>();
 
 export default async function handler(req: Request, res: Response) {
   if (!requireAuth(req, res)) return;
@@ -18,6 +25,12 @@ export default async function handler(req: Request, res: Response) {
   
   if (!currentItem) return res.status(404).json({ error: 'Media not found in library' });
   if (!apiKey) return res.status(503).json({ error: 'TMDB API key not configured' });
+
+  const cacheKey = `rec_${mediaId}`;
+  const cached = recommendationsCache.get(cacheKey);
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+    return res.json(cached.data);
+  }
 
   try {
     let tmdbId = currentItem.tmdbId;
@@ -54,7 +67,7 @@ export default async function handler(req: Request, res: Response) {
 
     for (const item of similarResults) {
       // Find in local library by tmdbId
-      const localMatch = library.find(l => l.tmdbId === item.id.toString());
+      const localMatch = library.find((l: any) => l.tmdbId === item.id.toString());
       if (localMatch) {
         if (inLibrary.length < 3) inLibrary.push(localMatch);
       } else {
@@ -73,8 +86,19 @@ export default async function handler(req: Request, res: Response) {
       if (inLibrary.length === 3 && online.length === 3) break;
     }
 
-    res.json({ inLibrary, online });
-  } catch (err) {
-    res.status(500).json({ error: 'TMDB fetch failed', message: String(err) });
+    const resultData = {
+      inLibrary,
+      online
+    };
+
+    recommendationsCache.set(cacheKey, {
+      data: resultData,
+      timestamp: Date.now()
+    });
+
+    res.json(resultData);
+  } catch (error) {
+    console.error('[recommendations] Error fetching similar:', error);
+    res.status(500).json({ error: 'Failed to fetch recommendations' });
   }
 }

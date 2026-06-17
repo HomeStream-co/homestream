@@ -93,13 +93,12 @@ export default function PlayerPauseRecommendations({ mediaId, isPaused, playerAc
             </h3>
             <div className="grid grid-cols-3 gap-3">
               {online.map((item) => (
-                <div 
+                <a 
                   key={item.id} 
-                  className="relative group cursor-pointer rounded-lg overflow-hidden aspect-[2/3] bg-white/5"
-                  onClick={() => {
-                    // Navigate to discover page or trigger download modal
-                    navigate(`/discover?search=${encodeURIComponent(item.title)}`);
-                  }}
+                  className="relative group cursor-pointer rounded-lg overflow-hidden aspect-[2/3] bg-white/5 block"
+                  href={`/discover?q=${encodeURIComponent(item.title)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
                 >
                   {item.posterPath ? (
                     <img src={item.posterPath} alt={item.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
@@ -111,7 +110,7 @@ export default function PlayerPauseRecommendations({ mediaId, isPaused, playerAc
                   <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                     <Download className="w-8 h-8 text-white" />
                   </div>
-                </div>
+                </a>
               ))}
             </div>
           </div>
