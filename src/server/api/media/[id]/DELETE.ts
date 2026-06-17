@@ -40,7 +40,12 @@ function safeDelete(fileRef: string, fallbackDir = UPLOADS_DIR): void {
 
   try {
     if (fs.existsSync(resolved)) fs.unlinkSync(resolved);
-  } catch { /* ignore — file may already be gone */ }
+  } catch (err: any) { 
+    if (err.code !== 'ENOENT') {
+      console.error(`[delete] Failed to delete file ${resolved}:`, err);
+      throw new Error(`Could not delete file ${resolved}: ${err.message}`);
+    }
+  }
 }
 
 export default async function handler(req: Request, res: Response) {
@@ -56,25 +61,12 @@ export default async function handler(req: Request, res: Response) {
     // Kill any active transcode process for this media item
     killTranscode(id);
 
-    // Delete the current (possibly transcoded) file.
-    // Prefer the absolute filePath stored by the upload/watcher pipeline;
-    // fall back to the bare filename for legacy library entries.
+    // ── Clean up associated torrents and jobs ──
     const primaryPath = (item.filePath ?? item.filepath ?? item.filename) as string | undefined;
     const fallbackDir = primaryPath && path.isAbsolute(primaryPath)
       ? path.dirname(primaryPath)
       : UPLOADS_DIR;
 
-    if (primaryPath) safeDelete(primaryPath, fallbackDir);
-
-    // Also delete the original file if it differs (e.g. transcode was reverted
-    // and the original was kept alongside a failed _tc.mp4, or the original
-    // was a different extension before remux).
-    const originalRef = item.originalFilename as string | undefined;
-    if (originalRef && originalRef !== path.basename(primaryPath ?? '')) {
-      safeDelete(originalRef, fallbackDir);
-    }
-
-    // ── Clean up associated torrents and jobs ──
     const originalFilename = item.originalFilename as string | undefined;
     if (originalFilename) {
       try {
@@ -101,6 +93,13 @@ export default async function handler(req: Request, res: Response) {
       } catch (err) {
         console.error(`[delete] Failed to clean up matching torrents in qBittorrent:`, err);
       }
+    }
+
+    // Now safely delete files (qBittorrent should have released its lock)
+    if (primaryPath) safeDelete(primaryPath, fallbackDir);
+    const originalRef = item.originalFilename as string | undefined;
+    if (originalRef && originalRef !== path.basename(primaryPath ?? '')) {
+      safeDelete(originalRef, fallbackDir);
     }
 
     // Also clean up any job whose title matches

@@ -195,6 +195,12 @@ export default defineConfig(({ mode, isSsrBuild }) => ({
     emptyOutDir: false,
     copyPublicDir: false,
     ssr: "src/server/entry.ts",
+    resolve: {
+      alias: {
+        'bufferutil': path.resolve(__dirname, 'src/server/dummy-ws-native.js'),
+        'utf-8-validate': path.resolve(__dirname, 'src/server/dummy-ws-native.js')
+      }
+    },
     rollupOptions: {
       output: {
         // CJS format + .cjs extension — electron-builder and the smoke-test
