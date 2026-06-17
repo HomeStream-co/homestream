@@ -50,7 +50,7 @@ function readStore(): WatchlistStore {
     const idMap = new Map<string, string>();
     for (const item of library) {
       if (typeof item.imdbId === 'string' && item.id !== item.imdbId) {
-        idMap.set(item.imdbId, item.id);
+        idMap.set(item.imdbId as string, item.id as string);
       }
     }
 

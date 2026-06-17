@@ -16,10 +16,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 import EnrichmentWizard from '@/components/EnrichmentWizard';
 import EnrichmentRevealModal from '@/components/EnrichmentRevealModal';
 import CaptionManager from '@/components/CaptionManager';
-import TrailerButton from '@/components/TrailerButton';
+import TrailerHover from '@/components/TrailerHover';
 import MediaContextMenu from '@/components/MediaContextMenu';
 import ShowCard from '@/components/ShowCard';
-import TrailerHover from '@/components/TrailerHover';
 import type { MediaEnrichment } from '@/types/media';
 import {
   DropdownMenu,
@@ -1305,12 +1304,14 @@ export default function LibraryPage() {
                   }
 
                   const item = entry.item as MediaItem & { transcoding?: boolean; transcodeWarning?: string; transcodeError?: string };
-                  const isSelected = selectedIds.has(item.id);
                   const cardContent = (
                     <MediaContextMenu item={item} disabled={selectMode}>
+                    <motion.div
+                      initial={{ opacity: 0, y: 12 }}
+                      animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: 0.3, delay: 0, ease: 'easeOut' as const }}
-                      className={`group relative ${selectMode ? 'cursor-pointer' : ''} h-full flex flex-col`}
-                      onClick={selectMode ? () => toggleSelect(item.id) : undefined}
+                      className={`group relative cursor-pointer h-full flex flex-col`}
+                      onClick={selectMode ? () => toggleSelect(item.id) : () => navigate(`/player/${item.id}`)}
                     >
                       <div className={`aspect-[2/3] rounded-xl overflow-hidden bg-card relative transition-all duration-200 ${
                         selectMode && selectedIds.has(item.id)
@@ -1365,7 +1366,7 @@ export default function LibraryPage() {
                         {item.transcodeError && !item.transcoding && (
                           <div className="absolute top-1.5 right-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
                             <button
-                              onClick={() => setDeleteId(item.id)}
+                              onClick={(e) => { e.stopPropagation(); setDeleteId(item.id); }}
                               className="p-1.5 bg-destructive/80 hover:bg-destructive rounded-full transition-colors"
                               title="Remove and re-upload"
                             >
@@ -1373,7 +1374,7 @@ export default function LibraryPage() {
                             </button>
                           </div>
                         )}
-                      </button>
+                      </div>
 
                       <div className="mt-2 px-0.5 flex-1 flex flex-col">
                         <div className="flex items-start justify-between gap-1">

@@ -69,8 +69,8 @@ export default function PlayerPauseRecommendations({ mediaId, isPaused, playerAc
                   className="relative group cursor-pointer rounded-lg overflow-hidden aspect-[2/3] bg-white/5"
                   onClick={() => navigate(`/player/${item.id}`)}
                 >
-                  {item.posterPath ? (
-                    <img src={item.posterPath} alt={item.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                  {item.poster ? (
+                    <img src={item.poster} alt={item.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
                   ) : (
                     <div className="w-full h-full flex flex-col items-center justify-center p-2 text-center text-xs">
                       {item.title}

@@ -368,9 +368,7 @@ export async function runPostDownloadPipeline(params: PostDownloadParams): Promi
     upsertJob({
       ...activeJob,
       status: 'transcoding',
-      progress: 45,
-      progressMessage: 'Transcoding to browser-ready MP4...',
-      updatedAt: new Date().toISOString()
+      progress: 45
     });
   }
 
