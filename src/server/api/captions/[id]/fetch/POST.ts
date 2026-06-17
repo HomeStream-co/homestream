@@ -2,6 +2,7 @@ import type { Request, Response } from 'express';
 import fs from 'fs';
 import path from 'path';
 import { createRequire } from 'module';
+import zlib from 'zlib';
 import { readLibrary } from '../../../../libraryStore.js';
 import { requireAuth } from '../../../../authMiddleware.js';
 import { captionsDir } from '../../../../dataDir.js';
@@ -55,7 +56,15 @@ async function downloadSrt(downloadUrl: string): Promise<string | null> {
     });
     clearTimeout(timeout);
     if (!res.ok) return null;
-    return await res.text();
+    const arrayBuffer = await res.arrayBuffer();
+    
+    // OpenSubtitles download links typically point to .gz files
+    try {
+      return zlib.gunzipSync(Buffer.from(arrayBuffer)).toString('utf-8');
+    } catch {
+      // If it fails to gunzip, it might not be compressed
+      return Buffer.from(arrayBuffer).toString('utf-8');
+    }
   } catch {
     clearTimeout(timeout);
     return null; // non-fatal — network timeout or parse error, ignore
