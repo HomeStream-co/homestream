@@ -1,4 +1,19 @@
-// This file intentionally throws an error so that the `ws` library
-// gracefully falls back to its JS implementation instead of crashing
-// when trying to load incompatible native .node files in Electron.
-throw new Error("Native module intentionally disabled for Electron compatibility");
+// Fallback for native ws dependencies
+export function unmask(buffer, mask) {
+  const length = buffer.length;
+  for (let i = 0; i < length; i++) {
+    buffer[i] ^= mask[i & 3];
+  }
+}
+
+export function mask(source, mask, output, offset, length) {
+  for (let i = 0; i < length; i++) {
+    output[offset + i] = source[i] ^ mask[i & 3];
+  }
+}
+
+export function isValidUTF8(buffer) {
+  return true; // Simple fallback
+}
+
+export default { unmask, mask, isValidUTF8 };

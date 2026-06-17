@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Film, Trash2, Edit2, Check, X, Star, AlertCircle,
   Upload, Clapperboard, Cpu, CheckCircle2, Clock, Zap, WifiOff, PenLine, Captions, Play,
-  Search, SlidersHorizontal, RefreshCw, Wand2,
+  Search, SlidersHorizontal, RefreshCw, Wand2, MoreVertical
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { VirtuosoGrid } from 'react-virtuoso';
@@ -21,6 +21,13 @@ import MediaContextMenu from '@/components/MediaContextMenu';
 import ShowCard from '@/components/ShowCard';
 import TrailerHover from '@/components/TrailerHover';
 import type { MediaEnrichment } from '@/types/media';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from '@/components/ui/dropdown-menu';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -1292,17 +1299,15 @@ export default function LibraryPage() {
                         onToggleSelect={toggleSelect}
                         onDelete={setDeleteId}
                         onEdit={startEdit}
-                        animDelay={0} // Virtualized items don't need stagger delay
+                        animDelay={0}
                       />
                     );
                   }
 
                   const item = entry.item as MediaItem & { transcoding?: boolean; transcodeWarning?: string; transcodeError?: string };
+                  const isSelected = selectedIds.has(item.id);
                   const cardContent = (
                     <MediaContextMenu item={item} disabled={selectMode}>
-                    <motion.div
-                      initial={{ opacity: 0, y: 12 }}
-                      animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: 0.3, delay: 0, ease: 'easeOut' as const }}
                       className={`group relative ${selectMode ? 'cursor-pointer' : ''} h-full flex flex-col`}
                       onClick={selectMode ? () => toggleSelect(item.id) : undefined}
@@ -1354,44 +1359,7 @@ export default function LibraryPage() {
                           </div>
                         )}
 
-                        {/* Actions overlay */}
-                        {!item.transcoding && !item.transcodeError && (
-                          <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-black/20 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col items-center justify-center gap-2 p-2">
-                            <div className="flex items-center gap-2">
-                              <motion.button
-                                whileHover={{ scale: 1.1 }}
-                                whileTap={{ scale: 0.95 }}
-                                onClick={e => { e.stopPropagation(); navigate(`/player/${item.id}`); }}
-                                className="w-11 h-11 rounded-full bg-primary flex items-center justify-center shadow-[0_0_20px_hsl(var(--primary)/0.5)] hover:bg-primary/90 transition-colors"
-                                title="Play"
-                              >
-                                <Play className="w-5 h-5 text-white fill-white ml-0.5" />
-                              </motion.button>
-                              <TrailerButton
-                                title={item.title}
-                                year={item.year}
-                                type={item.type === 'series' ? 'series' : 'movie'}
-                                className="w-9 h-9 rounded-full bg-red-600/80 hover:bg-red-600 flex items-center justify-center transition-colors disabled:opacity-40"
-                              />
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <button
-                                onClick={e => { e.stopPropagation(); startEdit(item); }}
-                                className="p-1.5 bg-white/15 hover:bg-white/25 rounded-full transition-colors backdrop-blur-sm"
-                                title="Edit"
-                              >
-                                <Edit2 className="w-3.5 h-3.5 text-white" />
-                              </button>
-                              <button
-                                onClick={e => { e.stopPropagation(); setDeleteId(item.id); }}
-                                className="p-1.5 bg-destructive/70 hover:bg-destructive rounded-full transition-colors"
-                                title="Delete"
-                              >
-                                <Trash2 className="w-3.5 h-3.5 text-white" />
-                              </button>
-                            </div>
-                          </div>
-                        )}
+
 
                         {/* Error delete button */}
                         {item.transcodeError && !item.transcoding && (
@@ -1405,10 +1373,31 @@ export default function LibraryPage() {
                             </button>
                           </div>
                         )}
-                      </div>
+                      </button>
 
                       <div className="mt-2 px-0.5 flex-1 flex flex-col">
-                        <p className="text-xs font-semibold text-foreground truncate leading-snug">{item.title}</p>
+                        <div className="flex items-start justify-between gap-1">
+                          <p className="text-xs font-semibold text-foreground truncate leading-snug pt-0.5">{item.title}</p>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <button className="p-0.5 hover:bg-white/10 rounded-full text-muted-foreground hover:text-foreground transition-colors outline-none" onClick={e => e.stopPropagation()}>
+                                <MoreVertical className="w-3.5 h-3.5" />
+                              </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-40 bg-black/90 border-border/40 backdrop-blur-md">
+                              <DropdownMenuItem onClick={e => { e.stopPropagation(); navigate(`/player/${item.id}`); }}>
+                                <Play className="w-4 h-4 mr-2" /> Play
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={e => { e.stopPropagation(); startEdit(item); }}>
+                                <Edit2 className="w-4 h-4 mr-2" /> Edit Metadata
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator className="bg-white/10" />
+                              <DropdownMenuItem onClick={e => { e.stopPropagation(); setDeleteId(item.id); }} className="text-destructive focus:text-destructive focus:bg-destructive/20">
+                                <Trash2 className="w-4 h-4 mr-2" /> Remove from Library
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
                         <div className="flex items-center justify-between mt-0.5">
                           <p className="text-[10px] text-muted-foreground">{item.year}</p>
                           {item.imdbRating !== 'N/A' && !item.transcodeError && (

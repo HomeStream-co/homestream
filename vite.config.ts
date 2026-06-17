@@ -101,7 +101,9 @@ export default defineConfig(({ mode, isSsrBuild }) => ({
     alias: {
       nothing: "/src/fallbacks/missingModule.ts",
       "@/api": path.resolve(__dirname, "./src/server/api"),
-      "@": path.resolve(__dirname, "./src")
+      "@": path.resolve(__dirname, "./src"),
+      "bufferutil": path.resolve(__dirname, "./src/server/dummy-ws-native.js"),
+      "utf-8-validate": path.resolve(__dirname, "./src/server/dummy-ws-native.js")
     }
   },
 
@@ -125,8 +127,7 @@ export default defineConfig(({ mode, isSsrBuild }) => ({
     // correctly. noExternal still applies for the prod Rollup build.
     ...(process.env.NODE_ENV === 'production'
       ? { 
-          noExternal: /^(?!node:).+/,
-          external: ['bufferutil', 'utf-8-validate']
+          noExternal: /^(?!node:).+/
         }
       : {
           // Keep CJS-only packages external in dev so Vite doesn't try to

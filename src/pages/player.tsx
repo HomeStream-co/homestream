@@ -561,14 +561,17 @@ export default function PlayerPage() {
 
   // ── PiP toggle ────────────────────────────────────────────────────────────
   const togglePiP = useCallback(async () => {
-    const video = ps.videoRef.current;
-    if (!video) return;
-    try {
-      if (document.pictureInPictureElement) await document.exitPictureInPicture();
-      else await video.requestPictureInPicture();
-    } catch { // non-fatal — ignore (PiP not supported in this browser/context)
+    if (document.pictureInPictureElement) {
+      document.exitPictureInPicture().catch(() => {});
+    } else if (ps.videoRef.current) {
+      try {
+        await ps.videoRef.current.requestPictureInPicture();
+        navigate('/library');
+      } catch (err) {
+        // Ignore PiP errors
+      }
     }
-  }, [ps.videoRef]);
+  }, [ps.videoRef, navigate]);
 
   // ── Seek hover thumbnail ──────────────────────────────────────────────────
   const handleSeekHover = useCallback((e: React.MouseEvent<HTMLInputElement>) => {
@@ -1038,10 +1041,11 @@ export default function PlayerPage() {
 
         {/* Pause recommendations overlay */}
         <AnimatePresence>
-          {!ps.isPlaying && !ps.showEndOverlay && item && (
+          {/* ── Overlay: Pause Recommendations ── */}
+          {!ps.playing && !ps.showEndOverlay && item && (
             <PlayerPauseRecommendations
               mediaId={item.id}
-              isPaused={!ps.isPlaying}
+              isPaused={!ps.playing}
               playerAccent={playerAccent}
             />
           )}

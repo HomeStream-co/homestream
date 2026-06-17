@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
 import { Play, Download } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import type { LibraryItem } from '@/types';
+import type { MediaItem as LibraryItem } from '@/types/media';
 
 interface Props {
   mediaId: string;
