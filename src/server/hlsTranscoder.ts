@@ -194,7 +194,7 @@ export async function probeCodec(filePath: string): Promise<CodecInfo> {
 
 // ── HW Video Args Builder ─────────────────────────────────────────────────────
 
-function buildHwVideoArgs(encoder: string): string[] {
+export function buildHwVideoArgs(encoder: string): string[] {
   switch (encoder) {
     case 'h264_vaapi':
       return ['-vaapi_device', '/dev/dri/renderD128', '-vf', 'format=nv12,hwupload', '-c:v', 'h264_vaapi', '-qp', '22'];
@@ -266,16 +266,14 @@ async function runTranscode(job: HlsJob, sourceFilePath: string, useHw: boolean)
   const outputDir = job.outputDir;
   const playlistPath = path.join(outputDir, 'index.m3u8');
 
-  const hw = await detectHwEncoder();
-  const videoArgs = useHw && hw.encoder
-    ? buildHwVideoArgs(hw.encoder)
-    : ['-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23'];
+  // TEMPORARY: Force software encoding for debugging
+  const videoArgs = ['-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23'];
 
-  job.encoderLabel = useHw && hw.encoder ? hw.label : 'Software (libx264)';
+  job.encoderLabel = 'Software (libx264) - Debug Mode';
 
   const args = [
     '-i', sourceFilePath,
-    '-pix_fmt', 'yuv420p',           // Force 8-bit output color format compatibility
+    '-pix_fmt', 'yuv420p',
     ...videoArgs,
     '-c:a', 'aac',
     '-b:a', '192k',
@@ -290,8 +288,18 @@ async function runTranscode(job: HlsJob, sourceFilePath: string, useHw: boolean)
     playlistPath,
   ];
 
+  console.log(`[hls] 🚀 DEBUG MODE - Starting software transcode for ${job.mediaId}`);
+  console.log(`[hls] Full command: ${FFMPEG()} ${args.join(' ')}`);
+
   const ff = spawn(FFMPEG(), ['-y', ...args], { stdio: ['ignore', 'ignore', 'pipe'] });
   job.process = ff;
+
+  ff.stderr.on('data', (data: Buffer) => {
+    const log = data.toString().trim();
+    if (log) {
+      console.log(`[hls][${job.mediaId}] ${log}`);
+    }
+  });
 
   let checkInterval: ReturnType<typeof setInterval>;
   let timeoutTimer: ReturnType<typeof setTimeout>;
@@ -305,6 +313,7 @@ async function runTranscode(job: HlsJob, sourceFilePath: string, useHw: boolean)
       clearInterval(checkInterval);
       clearTimeout(timeoutTimer);
       if (!val) {
+        console.error(`[hls] ❌ FAILED to generate manifest for ${job.mediaId}`);
         // Kill the process if we are resolving with failure (e.g. timeout) to release lock on output files
         try { ff.kill('SIGKILL'); } catch {}
       }
@@ -317,7 +326,7 @@ async function runTranscode(job: HlsJob, sourceFilePath: string, useHw: boolean)
           const content = fs.readFileSync(playlistPath, 'utf8');
           if (content.includes('.ts')) {
             job.ready = true;
-            console.log(`[hls] ✅ Manifest ready for ${job.mediaId} (${job.encoderLabel})`);
+            console.log(`[hls] ✅ Manifest ready for ${job.mediaId}`);
             
             // Unblock any waiters on the job object
             job.waiters.forEach(r => r());
@@ -325,21 +334,22 @@ async function runTranscode(job: HlsJob, sourceFilePath: string, useHw: boolean)
             
             doResolve(true);
           }
-        } catch { /* wait */ }
+        } catch (e) {}
       }
-    }, 400);
+    }, 500);
 
     ff.on('close', (code) => {
-      const success = job.ready || code === 0;
-      doResolve(success);
+      clearInterval(checkInterval);
+      console.log(`[hls] FFmpeg exited with code ${code} for ${job.mediaId}`);
+      doResolve(job.ready || code === 0);
     });
 
     timeoutTimer = setTimeout(() => {
       if (!job.ready) {
-        console.warn(`[hls] Timeout reached before manifest ready for ${job.mediaId}`);
+        console.error(`[hls] Timeout waiting for manifest: ${job.mediaId}`);
         doResolve(false);
       }
-    }, 28000);
+    }, 40000);
   });
 }
 
