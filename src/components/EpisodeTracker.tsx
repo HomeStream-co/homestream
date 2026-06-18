@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
-import { CheckCircle2, Circle, ChevronDown, ChevronRight, Loader2, Plus, Trash2 } from 'lucide-react';
+import { CheckCircle2, Circle, ChevronDown, ChevronRight, Loader2, Plus, Trash2, Download } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'sonner';
 import type { Episode, Season, MediaItem } from '@/types/media';
 import { Progress } from '@/components/ui/progress';
+import BatchDownloadModal from '@/components/BatchDownloadModal';
 
 interface EpisodeTrackerProps {
   show: MediaItem;
@@ -34,6 +35,7 @@ export default function EpisodeTracker({ show, onUpdate }: EpisodeTrackerProps) 
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [addForm, setAddForm] = useState({ season: 1, episodeCount: 10, startEpisode: 1, titlePrefix: 'Episode' });
+  const [downloadSeason, setDownloadSeason] = useState<number | null>(null);
 
   useEffect(() => {
     setSeasons(groupIntoSeasons(episodes));
@@ -220,6 +222,12 @@ export default function EpisodeTracker({ show, onUpdate }: EpisodeTrackerProps) 
                       {season.watchedCount}/{season.totalCount}
                     </span>
                     <button
+                      onClick={e => { e.stopPropagation(); setDownloadSeason(season.number); }}
+                      className="text-xs px-2 py-0.5 rounded-full border border-border text-muted-foreground hover:border-primary/50 hover:text-primary transition-colors whitespace-nowrap flex items-center gap-1"
+                    >
+                      <Download className="w-3 h-3" /> Download
+                    </button>
+                    <button
                       onClick={e => { e.stopPropagation(); markSeasonWatched(season, !allWatched); }}
                       className={`text-xs px-2 py-0.5 rounded-full border transition-colors whitespace-nowrap ${
                         allWatched
@@ -371,6 +379,16 @@ export default function EpisodeTracker({ show, onUpdate }: EpisodeTrackerProps) 
           </motion.div>
         )}
       </AnimatePresence>
+      {/* Batch Download Modal */}
+      {downloadSeason !== null && (
+        <BatchDownloadModal
+          open={downloadSeason !== null}
+          onOpenChange={(open) => { if (!open) setDownloadSeason(null); }}
+          imdbId={show.imdbId || ''}
+          title={show.title}
+          season={downloadSeason}
+        />
+      )}
     </div>
   );
 }

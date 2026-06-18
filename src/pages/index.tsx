@@ -815,11 +815,6 @@ export default function HomePage() {
 
                     <div className="relative overflow-x-auto scrollbar-hide px-4 sm:px-6 lg:px-8 flex gap-4 pb-3">
                       {upNextItems.map(({ show, nextEpisode }) => {
-                        const syntheticItem = {
-                          ...show,
-                          id: nextEpisode.id,
-                          title: `${show.title} - S${nextEpisode.season}E${nextEpisode.episode}: ${nextEpisode.title}`,
-                        };
                         return (
                             <div
                               onClick={() => navigate(`/player/${nextEpisode.id}`)}

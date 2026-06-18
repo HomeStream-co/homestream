@@ -28,7 +28,7 @@ import fs from 'fs';
 import { randomUUID } from 'crypto';
 import { readLibrary, writeLibrary } from './libraryStore.js';
 import { transcodeFile } from './transcodeWorker.js';
-import { fetchOMDB, findExistingMediaIndex } from './mediaUtils.js';
+import { fetchMetadata, findExistingMediaIndex } from './mediaUtils.js';
 import { runEnrichmentInBackground, runCaptionFetchInBackground } from './mediaUtils.js';
 import { upsertJob, getPersistedJob } from './downloadJobStore.js';
 import { readConfig } from './configStore.js';
@@ -233,11 +233,11 @@ export async function runPostDownloadPipeline(params: PostDownloadParams): Promi
     }
   }
 
-  // ── 2. Fetch OMDB metadata ──
+  // ── 2. Fetch OMDB/TMDB metadata ──
   const lookupTitle = type === 'series'
     ? title.replace(/\s+S\d{2}E\d{2}$/i, '').trim()
     : title;
-  const omdb = await fetchOMDB(lookupTitle, year);
+  const omdb = await fetchMetadata(lookupTitle, year, imdbId, type);
 
   const genres: string[] = omdb?.Genre
     ? omdb.Genre.split(',').map((g: string) => g.trim()).filter(Boolean)
@@ -296,6 +296,7 @@ export async function runPostDownloadPipeline(params: PostDownloadParams): Promi
       actors: omdb?.Actors || '',
       imdbRating: omdb?.imdbRating || 'N/A',
       poster: (omdb?.Poster && omdb.Poster !== 'N/A') ? omdb.Poster : (poster || ''),
+      collection: omdb?.Collection,
       type,
       runtime: omdb?.Runtime || 'Unknown',
       rated: omdb?.Rated && omdb.Rated !== 'N/A' ? omdb.Rated.trim() : 'NR',

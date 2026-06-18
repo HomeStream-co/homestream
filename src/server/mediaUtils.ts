@@ -83,7 +83,8 @@ export interface OMDBData {
   Runtime?: string;
   Rated?: string;
   Response?: string;
-  [key: string]: string | undefined;
+  Collection?: any;
+  [key: string]: any;
 }
 
 /**
@@ -119,6 +120,12 @@ export async function fetchMetadata(title: string, year?: string | number, imdbI
     metadata = await fetchOMDB(title, year ? String(year) : undefined, imdbId);
     if (metadata && metadata.Response !== 'False') {
       console.log(`[metadata] ✅ OMDB success for ${title}`);
+      if (type === 'movie') {
+        try {
+          const coll = await fetchTMDBCollectionForMovie(metadata.imdbID || imdbId, title, year ? String(year) : undefined);
+          if (coll) metadata.Collection = coll;
+        } catch(e) { console.warn(`[metadata] Failed to fetch collection for ${title}`, e); }
+      }
       return metadata;
     }
   } catch (e) {
@@ -130,13 +137,68 @@ export async function fetchMetadata(title: string, year?: string | number, imdbI
     const tmdbData = await fallbackTMDB(title, type, year);
     if (tmdbData) {
       console.log(`[metadata] ✅ TMDB fallback success for ${title}`);
-      return mapTMDBToOMDB(tmdbData, type);
+      const mapped = mapTMDBToOMDB(tmdbData, type);
+      if (type === 'movie' && tmdbData.id) {
+        try {
+          const coll = await fetchTMDBCollectionById(tmdbData.id);
+          if (coll) mapped.Collection = coll;
+        } catch(e) {}
+      }
+      return mapped;
     }
   } catch (e) {
     console.warn(`[metadata] TMDB fallback failed`);
   }
 
   console.warn(`[metadata] ❌ No metadata found for "${title}"`);
+  return null;
+}
+
+async function fetchTMDBCollectionForMovie(imdbId?: string, title?: string, year?: string) {
+  const { readConfig } = await import('./configStore.js');
+  const apiKey = readConfig().tmdbApiKey;
+  if (!apiKey) return null;
+
+  let tmdbId = null;
+  if (imdbId && imdbId.startsWith('tt')) {
+    const res = await fetch(`https://api.themoviedb.org/3/find/${imdbId}?api_key=${apiKey}&external_source=imdb_id`);
+    if (res.ok) {
+      const data = await res.json();
+      tmdbId = data.movie_results?.[0]?.id;
+    }
+  }
+
+  if (!tmdbId && title) {
+    const searchRes = await fetch(`https://api.themoviedb.org/3/search/movie?api_key=${apiKey}&query=${encodeURIComponent(title)}${year ? `&year=${year}` : ''}`);
+    if (searchRes.ok) {
+      const data = await searchRes.json();
+      tmdbId = data.results?.[0]?.id;
+    }
+  }
+
+  if (tmdbId) {
+    return fetchTMDBCollectionById(tmdbId);
+  }
+  return null;
+}
+
+async function fetchTMDBCollectionById(tmdbId: number) {
+  const { readConfig } = await import('./configStore.js');
+  const apiKey = readConfig().tmdbApiKey;
+  if (!apiKey) return null;
+
+  const res = await fetch(`https://api.themoviedb.org/3/movie/${tmdbId}?api_key=${apiKey}`);
+  if (res.ok) {
+    const data = await res.json();
+    if (data.belongs_to_collection) {
+      return {
+        id: data.belongs_to_collection.id,
+        name: data.belongs_to_collection.name,
+        poster: data.belongs_to_collection.poster_path ? `https://image.tmdb.org/t/p/w500${data.belongs_to_collection.poster_path}` : undefined,
+        backdrop: data.belongs_to_collection.backdrop_path ? `https://image.tmdb.org/t/p/w1280${data.belongs_to_collection.backdrop_path}` : undefined,
+      };
+    }
+  }
   return null;
 }
 
@@ -218,6 +280,7 @@ export interface MediaItem {
   importedFrom: string;
   ccStatus: 'none' | 'fetching' | 'available' | 'failed';
   enriching?: boolean;
+  collection?: any;
 }
 
 export function normalizePath(p: string): string {
@@ -257,6 +320,7 @@ export function buildMediaItem(input: MediaItemInput): MediaItem {
     actors: omdb?.Actors || '',
     imdbRating: omdb?.imdbRating || 'N/A',
     poster: omdb?.Poster && omdb.Poster !== 'N/A' ? omdb.Poster : '',
+    collection: omdb?.Collection,
     type: omdb?.Type === 'series' ? 'series' : 'movie',
     runtime: omdb?.Runtime || 'Unknown',
     rated,

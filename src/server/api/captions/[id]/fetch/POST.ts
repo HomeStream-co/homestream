@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { createRequire } from 'module';
 import zlib from 'zlib';
-import { readLibrary } from '../../../../libraryStore.js';
+import { readLibrary, writeLibrary } from '../../../../libraryStore.js';
 import { requireAuth } from '../../../../authMiddleware.js';
 import { captionsDir } from '../../../../dataDir.js';
 import { checkRateLimit } from '../../../../rateLimiter.js';
@@ -196,10 +196,20 @@ export default async function handler(req: Request, res: Response) {
     }
   }
 
+  const isAvailable = Object.values(langs).some(s => s === 'downloaded' || s === 'exists');
+  
+  await writeLibrary((lib: any[]) => {
+    const idx = lib.findIndex(m => m.id === id);
+    if (idx >= 0) {
+      lib[idx] = { ...lib[idx], ccStatus: isAvailable ? 'available' : 'failed' };
+    }
+    return lib;
+  });
+
   res.json({
     success: true,
     langs,
-    message: Object.values(langs).some(s => s === 'downloaded')
+    message: isAvailable
       ? 'Subtitles downloaded and saved for offline use'
       : 'No subtitles found — stubs saved (CC button will show but no text)',
   });

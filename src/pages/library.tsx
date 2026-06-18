@@ -18,6 +18,7 @@ import EnrichmentRevealModal from '@/components/EnrichmentRevealModal';
 import CaptionManager from '@/components/CaptionManager';
 import MediaContextMenu from '@/components/MediaContextMenu';
 import ShowCard from '@/components/ShowCard';
+import CollectionCard from '@/components/CollectionCard';
 import type { MediaEnrichment } from '@/types/media';
 import {
   DropdownMenu,
@@ -1247,6 +1248,8 @@ export default function LibraryPage() {
 
             // Group series by title — all episodes of the same show share one card
             const showGroups = new Map<string, MediaItem[]>();
+            // Group movies by collection.id
+            const collectionGroups = new Map<number, MediaItem[]>();
             const movieItems: MediaItem[] = [];
 
             for (const item of filtered) {
@@ -1255,26 +1258,40 @@ export default function LibraryPage() {
                 if (!showGroups.has(key)) showGroups.set(key, []);
                 showGroups.get(key)!.push(item);
               } else {
-                movieItems.push(item);
+                if (item.collection?.id) {
+                  const key = item.collection.id;
+                  if (!collectionGroups.has(key)) collectionGroups.set(key, []);
+                  collectionGroups.get(key)!.push(item);
+                } else {
+                  movieItems.push(item);
+                }
               }
             }
 
             // Build a flat render list: movies stay as-is, shows become one entry per group
             type RenderEntry =
               | { kind: 'movie'; item: MediaItem; idx: number }
-              | { kind: 'show'; items: MediaItem[]; idx: number };
+              | { kind: 'show'; items: MediaItem[]; idx: number }
+              | { kind: 'collection'; items: MediaItem[]; idx: number };
 
             const entries: RenderEntry[] = [];
             let idx = 0;
 
             // Shows first (or interleaved — keep original order by first occurrence)
             const seen = new Set<string>();
+            const seenCollections = new Set<number>();
             for (const item of filtered) {
               if (item.type === 'series') {
                 const key = item.title.trim().toLowerCase();
                 if (!seen.has(key)) {
                   seen.add(key);
                   entries.push({ kind: 'show', items: showGroups.get(key)!, idx: idx++ });
+                }
+              } else if (item.collection?.id) {
+                const key = item.collection.id;
+                if (!seenCollections.has(key)) {
+                  seenCollections.add(key);
+                  entries.push({ kind: 'collection', items: collectionGroups.get(key)!, idx: idx++ });
                 }
               } else {
                 entries.push({ kind: 'movie', item, idx: idx++ });
@@ -1301,8 +1318,22 @@ export default function LibraryPage() {
                       />
                     );
                   }
+                  if (entry.kind === 'collection') {
+                    return (
+                      <CollectionCard
+                        key={entry.items[0].id}
+                        items={entry.items}
+                        selectMode={selectMode}
+                        selectedIds={selectedIds}
+                        onToggleSelect={toggleSelect}
+                        onDelete={setDeleteId}
+                        onEdit={startEdit}
+                        animDelay={0}
+                      />
+                    );
+                  }
 
-                  const item = entry.item as MediaItem & { transcoding?: boolean; transcodeWarning?: string; transcodeError?: string };
+                  const item = (entry as { kind: 'movie'; item: MediaItem }).item as MediaItem & { transcoding?: boolean; transcodeWarning?: string; transcodeError?: string };
                   const cardContent = (
                     <MediaContextMenu item={item} disabled={selectMode}>
                     <motion.div

@@ -13,6 +13,13 @@ export interface MediaEnrichment {
   enrichmentVersion: number;    // bump when schema changes
 }
 
+export interface CollectionInfo {
+  id: number;
+  name: string;
+  poster?: string;
+  backdrop?: string;
+}
+
 export interface ProfileProgressEntry {
   progress: number;
   watchedSeconds?: number;
@@ -76,6 +83,8 @@ export interface MediaItem {
   // is stored directly on the item (populated by postDownloadPipeline)
   season?: number;
   episode?: number;
+  // Movie collection info
+  collection?: CollectionInfo;
 }
 
 export interface Episode {

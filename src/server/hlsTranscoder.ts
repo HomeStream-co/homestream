@@ -12,9 +12,9 @@
  * Seeking works because HLS segments are pre-generated — the browser
  * requests the segment containing the desired timestamp directly.
  *
- * Segment duration: 4 seconds — good balance of seek latency vs. file count.
+ * Segment duration: 6 seconds — good balance of seek latency vs. file count.
  * Preset: veryfast — prioritises low startup latency over compression ratio.
- * CRF: 22 — good quality, reasonable file size.
+ * CRF: 23 — good quality, reasonable file size.
  */
 
 import { spawn, type ChildProcess } from 'child_process';
@@ -25,13 +25,6 @@ import os from 'os';
 import { detectHwEncoder } from './hwEncoderDetect.js';
 
 // ── Binary resolution (lazy, cached) ─────────────────────────────────────────
-//
-// IMPORTANT: resolveFfmpeg / resolveFfprobe are called LAZILY on first use,
-// NOT at module load time. Running createRequire + fs.existsSync synchronously
-// at module load caused the "slow Start Server" symptom — the module import
-// blocked the entire server startup while Node resolved the ffmpeg-static path.
-// Caching the result after the first call keeps subsequent calls O(1).
-
 let _ffmpeg: string | null = null;
 let _ffprobe: string | null = null;
 
@@ -39,8 +32,6 @@ function resolveFfmpeg(): string {
   if (_ffmpeg) return _ffmpeg;
   if (process.env.FFMPEG_PATH) { _ffmpeg = process.env.FFMPEG_PATH; return _ffmpeg; }
   try {
-    // Use createRequire so this ESM file can load the CJS ffmpeg-static package
-    // without triggering the no-require-imports lint rule.
     const req = createRequire(import.meta.url);
     const p = req('ffmpeg-static') as string | null;
     if (p) { _ffmpeg = p; return _ffmpeg; }
@@ -51,17 +42,13 @@ function resolveFfmpeg(): string {
 
 function resolveFfprobe(): string {
   if (_ffprobe) return _ffprobe;
-  // Electron sets FFMPEG_PATH to the bundled ffmpeg binary.
-  // ffprobe lives in the same directory with the same naming convention.
   if (process.env.FFMPEG_PATH) {
     const dir = path.dirname(process.env.FFMPEG_PATH);
     const ext = process.platform === 'win32' ? '.exe' : '';
     const platform = process.platform;
     const arch = process.arch;
-    // Check local package directory layout first
     const candidate2 = path.join(dir, '..', 'ffprobe-bin', platform, arch, `ffprobe${ext}`);
     if (fs.existsSync(candidate2)) { _ffprobe = candidate2; return _ffprobe; }
-    // Fallback to same folder
     const candidate = path.join(dir, `ffprobe${ext}`);
     if (fs.existsSync(candidate)) { _ffprobe = candidate; return _ffprobe; }
   }
@@ -75,7 +62,6 @@ function resolveFfprobe(): string {
   } catch { /* not installed */ }
   try {
     const req = createRequire(import.meta.url);
-    // ffmpeg-static exports the ffmpeg path; ffprobe is in the same dir
     const ffmpegPath = req('ffmpeg-static') as string | null;
     if (ffmpegPath) {
       const dir = path.dirname(ffmpegPath);
@@ -88,14 +74,13 @@ function resolveFfprobe(): string {
   return _ffprobe;
 }
 
-// Accessors — resolved lazily on first probe/transcode call, not at import time
 const FFMPEG  = () => resolveFfmpeg();
 const FFPROBE = () => resolveFfprobe();
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
 const HLS_BASE_DIR = path.join(os.tmpdir(), 'homestream-hls');
-const SEGMENT_DURATION = 4;       // seconds per .ts segment
+const SEGMENT_DURATION = 6;       // seconds per .ts segment
 const CLEANUP_IDLE_MS  = 30 * 60 * 1000; // 30 min inactivity → cleanup
 
 // ── State ─────────────────────────────────────────────────────────────────────
@@ -104,14 +89,11 @@ interface HlsJob {
   mediaId: string;
   outputDir: string;
   process: ChildProcess | null;
-  /** true once the first segment + playlist are ready */
   ready: boolean;
-  /** resolve callbacks waiting for readiness */
   waiters: Array<() => void>;
   lastAccess: number;
   cleanupTimer: ReturnType<typeof setTimeout> | null;
-  /** Human-readable encoder label for the player overlay */
-  encoderLabel?: string;
+  encoderLabel: string;
 }
 
 const jobs = new Map<string, HlsJob>();
@@ -149,7 +131,6 @@ export interface CodecInfo {
   needsTranscode: boolean;
 }
 
-/** Codecs natively supported by all modern browsers — do NOT include hevc here */
 const BROWSER_SAFE_CODECS = new Set(['h264', 'avc1', 'vp8', 'vp9', 'av1', 'theora']);
 
 export async function probeCodec(filePath: string): Promise<CodecInfo> {
@@ -192,7 +173,6 @@ export async function probeCodec(filePath: string): Promise<CodecInfo> {
     return ffprobeResult;
   }
 
-  // Fallback to ffmpeg -i parsing
   console.log(`[hls] ffprobe failed for ${path.basename(filePath)} — trying ffmpeg fallback`);
   return new Promise(resolve => {
     const proc = spawn(FFMPEG(), ['-i', filePath]);
@@ -212,27 +192,38 @@ export async function probeCodec(filePath: string): Promise<CodecInfo> {
   });
 }
 
+// ── HW Video Args Builder ─────────────────────────────────────────────────────
+
+function buildHwVideoArgs(encoder: string): string[] {
+  switch (encoder) {
+    case 'h264_vaapi':
+      return ['-vaapi_device', '/dev/dri/renderD128', '-vf', 'format=nv12,hwupload', '-c:v', 'h264_vaapi', '-qp', '22'];
+    case 'h264_nvenc':
+      return ['-c:v', 'h264_nvenc', '-preset', 'p4', '-cq', '23'];
+    case 'h264_videotoolbox':
+      return ['-c:v', 'h264_videotoolbox', '-q:v', '65'];
+    case 'h264_qsv':
+      return ['-c:v', 'h264_qsv', '-global_quality', '23', '-preset', 'medium'];
+    case 'h264_amf':
+      return ['-c:v', 'h264_amf', '-quality', 'balanced', '-qp_i', '22', '-qp_p', '22'];
+    default:
+      return ['-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23'];
+  }
+}
+
 // ── HLS job management ────────────────────────────────────────────────────────
 
-/**
- * Start (or reuse) an HLS transcode job for the given media item.
- * Returns the output directory path.
- */
 export async function startHlsJob(mediaId: string, sourceFilePath: string): Promise<string> {
-  // Reuse existing job if already running
   const existing = jobs.get(mediaId);
   if (existing) {
     touchJob(mediaId);
     if (existing.ready) return existing.outputDir;
-    // Wait for readiness
     await new Promise<void>(resolve => existing.waiters.push(resolve));
     return existing.outputDir;
   }
 
   const outputDir = jobDir(mediaId);
   fs.mkdirSync(outputDir, { recursive: true });
-
-  const playlistPath = path.join(outputDir, 'index.m3u8');
 
   const job: HlsJob = {
     mediaId,
@@ -242,155 +233,116 @@ export async function startHlsJob(mediaId: string, sourceFilePath: string): Prom
     waiters: [],
     lastAccess: Date.now(),
     cleanupTimer: null,
+    encoderLabel: 'Software (libx264)',
   };
   jobs.set(mediaId, job);
 
-  // Detect hardware encoder (cached after first call — no repeated probing)
   const hw = await detectHwEncoder();
 
-  // Build video encoder args
-  // Hardware path: use detected GPU encoder (much faster, lower CPU load)
-  // Software path: libx264 veryfast CRF 22 (original behaviour)
-  let videoArgs: string[];
-  if (hw.encoder) {
-    console.log(`[hls] Using hardware encoder: ${hw.label} for ${mediaId}`);
-    if (hw.encoder === 'h264_vaapi') {
-      // VAAPI requires device init + pixel format conversion before -c:v
-      videoArgs = [
-        '-vaapi_device', '/dev/dri/renderD128',
-        '-vf', 'format=nv12,hwupload',
-        '-c:v', 'h264_vaapi',
-        '-qp', '22',
-      ];
-    } else if (hw.encoder === 'h264_nvenc') {
-      videoArgs = [
-        '-c:v', 'h264_nvenc',
-        '-preset', 'p4',       // balanced speed/quality (NVENC SDK preset)
-        '-cq', '22',           // constant quality mode
-        '-profile:v', 'high',
-      ];
-    } else if (hw.encoder === 'h264_videotoolbox') {
-      videoArgs = [
-        '-c:v', 'h264_videotoolbox',
-        '-q:v', '65',          // 0–100, higher = better quality
-        '-profile:v', 'high',
-      ];
-    } else if (hw.encoder === 'h264_qsv') {
-      videoArgs = [
-        '-c:v', 'h264_qsv',
-        '-global_quality', '22',
-        '-preset', 'medium',
-      ];
-    } else {
-      // h264_amf (AMD)
-      videoArgs = [
-        '-c:v', 'h264_amf',
-        '-quality', 'balanced',
-        '-qp_i', '22',
-        '-qp_p', '22',
-      ];
-    }
-  } else {
-    // Software fallback
-    videoArgs = [
-      '-c:v', 'libx264',
-      '-preset', 'veryfast',
-      '-crf', '22',
-    ];
+  // Try hardware first, fallback to software if it fails
+  let success = await runTranscode(job, sourceFilePath, hw.encoder !== null);
+
+  if (!success) {
+    console.warn(`[hls] Hardware failed for ${mediaId}. Falling back to software...`);
+    try { fs.rmSync(outputDir, { recursive: true, force: true }); } catch {}
+    fs.mkdirSync(outputDir, { recursive: true });
+    success = await runTranscode(job, sourceFilePath, false);
   }
 
-  job.encoderLabel = hw.label;
+  if (success) {
+    touchJob(mediaId);
+  } else {
+    // If BOTH failed, delete the job from the map so the next play attempt can start fresh
+    jobs.delete(mediaId);
+    // Unblock any waiters with failure (they will try direct stream or show error)
+    job.waiters.forEach(r => r());
+    job.waiters = [];
+  }
 
-  // FFmpeg HLS transcode command
-  // -c:a aac -b:a 128k                    — AAC audio
-  // -hls_time 4                           — 4s segments
-  // -hls_list_size 0                      — keep all segments in playlist
-  // -hls_segment_type mpegts              — .ts segments (universal browser support)
-  // -start_number 0                       — segments start at 0000.ts
+  return outputDir;
+}
+
+async function runTranscode(job: HlsJob, sourceFilePath: string, useHw: boolean): Promise<boolean> {
+  const outputDir = job.outputDir;
+  const playlistPath = path.join(outputDir, 'index.m3u8');
+
+  const hw = await detectHwEncoder();
+  const videoArgs = useHw && hw.encoder
+    ? buildHwVideoArgs(hw.encoder)
+    : ['-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23'];
+
+  job.encoderLabel = useHw && hw.encoder ? hw.label : 'Software (libx264)';
+
   const args = [
     '-i', sourceFilePath,
+    '-pix_fmt', 'yuv420p',           // Force 8-bit output color format compatibility
     ...videoArgs,
     '-c:a', 'aac',
-    '-b:a', '128k',
-    '-ac', '2',                   // stereo (handles 5.1 downmix)
+    '-b:a', '192k',
+    '-ac', '2',
     '-hls_time', String(SEGMENT_DURATION),
     '-hls_list_size', '0',
+    '-hls_playlist_type', 'event',
     '-hls_segment_type', 'mpegts',
-    '-hls_segment_filename', path.join(outputDir, '%04d.ts'),
+    '-hls_segment_filename', path.join(outputDir, 'segment_%05d.ts'),
     '-start_number', '0',
     '-f', 'hls',
     playlistPath,
   ];
 
-  console.log(`[hls] Starting transcode for ${mediaId}: ${path.basename(sourceFilePath)}`);
-
-  const ff = spawn(FFMPEG(), args, { stdio: ['ignore', 'ignore', 'pipe'] });
+  const ff = spawn(FFMPEG(), ['-y', ...args], { stdio: ['ignore', 'ignore', 'pipe'] });
   job.process = ff;
 
-  // Watch for the playlist file to appear — that means the first segment is ready
-  const watchInterval = setInterval(() => {
-    if (fs.existsSync(playlistPath) && !job.ready) {
-      // Check playlist has at least one segment listed
-      try {
-        const content = fs.readFileSync(playlistPath, 'utf8');
-        if (content.includes('.ts')) {
-          job.ready = true;
-          clearInterval(watchInterval);
-          console.log(`[hls] First segment ready for ${mediaId}`);
-          for (const resolve of job.waiters) resolve();
-          job.waiters = [];
-          touchJob(mediaId);
-        }
-      } catch { /* not ready yet */ }
-    }
-  }, 200);
+  let checkInterval: ReturnType<typeof setInterval>;
+  let timeoutTimer: ReturnType<typeof setTimeout>;
 
-  ff.on('close', (code) => {
-    clearInterval(watchInterval);
-    if (!job.ready) {
-      // FFmpeg failed before producing any output — resolve waiters so they
-      // don't hang, but mark the job as FAILED so startHlsJob removes it from
-      // the map. The next call will start a fresh job rather than reusing a
-      // broken one.
-      job.ready = true;
-      for (const resolve of job.waiters) resolve();
-      job.waiters = [];
-      // Remove from map so the next play attempt starts a fresh transcode
-      jobs.delete(mediaId);
-    }
-    if (code !== 0 && code !== null) {
-      console.warn(`[hls] FFmpeg exited with code ${code} for ${mediaId}`);
-    } else {
-      console.log(`[hls] Transcode complete for ${mediaId}`);
-    }
-    job.process = null;
-  });
+  return new Promise<boolean>(resolve => {
+    let resolved = false;
 
-  ff.stderr?.on('data', (d: Buffer) => {
-    // Uncomment for debugging:
-    // process.stderr.write(`[hls:${mediaId}] ${d.toString()}`);
-    void d; // suppress unused warning
-  });
-
-  // Wait for readiness before returning
-  await new Promise<void>(resolve => {
-    if (job.ready) { resolve(); return; }
-    job.waiters.push(resolve);
-    // Timeout after 30s — if FFmpeg hasn't produced output, something is wrong
-    setTimeout(() => {
-      if (!job.ready) {
-        job.ready = true;
-        resolve();
+    const doResolve = (val: boolean) => {
+      if (resolved) return;
+      resolved = true;
+      clearInterval(checkInterval);
+      clearTimeout(timeoutTimer);
+      if (!val) {
+        // Kill the process if we are resolving with failure (e.g. timeout) to release lock on output files
+        try { ff.kill('SIGKILL'); } catch {}
       }
-    }, 30_000);
-  });
+      resolve(val);
+    };
 
-  return outputDir;
+    checkInterval = setInterval(() => {
+      if (fs.existsSync(playlistPath) && !job.ready) {
+        try {
+          const content = fs.readFileSync(playlistPath, 'utf8');
+          if (content.includes('.ts')) {
+            job.ready = true;
+            console.log(`[hls] ✅ Manifest ready for ${job.mediaId} (${job.encoderLabel})`);
+            
+            // Unblock any waiters on the job object
+            job.waiters.forEach(r => r());
+            job.waiters = [];
+            
+            doResolve(true);
+          }
+        } catch { /* wait */ }
+      }
+    }, 400);
+
+    ff.on('close', (code) => {
+      const success = job.ready || code === 0;
+      doResolve(success);
+    });
+
+    timeoutTimer = setTimeout(() => {
+      if (!job.ready) {
+        console.warn(`[hls] Timeout reached before manifest ready for ${job.mediaId}`);
+        doResolve(false);
+      }
+    }, 28000);
+  });
 }
 
-/**
- * Get the output directory for an existing job (no-op if not running).
- */
 export function getHlsJobDir(mediaId: string): string | null {
   const job = jobs.get(mediaId);
   if (!job) return null;
@@ -398,34 +350,18 @@ export function getHlsJobDir(mediaId: string): string | null {
   return job.outputDir;
 }
 
-/**
- * Get the encoder label for an active job (e.g. "NVIDIA NVENC").
- * Returns null if no job exists for this mediaId.
- */
 export function getHlsEncoderLabel(mediaId: string): string | null {
   return jobs.get(mediaId)?.encoderLabel ?? null;
 }
 
-/**
- * Check if a job is running and ready.
- */
 export function isHlsJobReady(mediaId: string): boolean {
   return jobs.get(mediaId)?.ready ?? false;
 }
 
-/**
- * Stop all HLS jobs — called on server shutdown.
- */
 export function stopAllHlsJobs(): void {
   for (const mediaId of jobs.keys()) cleanupJob(mediaId);
 }
 
-// ── Ensure base dir exists ────────────────────────────────────────────────────
-
 fs.mkdirSync(HLS_BASE_DIR, { recursive: true });
 
-/**
- * Exported so startupCleanup can reference the same path without duplicating
- * the constant. Never changes at runtime.
- */
 export { HLS_BASE_DIR };
