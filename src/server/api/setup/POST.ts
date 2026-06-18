@@ -117,6 +117,7 @@ export default async function handler(req: Request, res: Response) {
           'aiApiKey', 'openaiApiKey', 'anthropicApiKey',
           'aiProvider', 'ollamaUrl', 'ollamaModel', 'openaiModel', 'anthropicModel',
           'preferredQuality', 'watchFolderEnabled', 'autoTranscode',
+          'enableHwTranscode',
           'transcodePreset',
           // VPN fields
           'vpnEnabled', 'vpnProtocol', 'vpnProvider',
@@ -156,6 +157,7 @@ export default async function handler(req: Request, res: Response) {
         // Boolean coercion
         if (fields.watchFolderEnabled !== undefined) updates.watchFolderEnabled = fields.watchFolderEnabled === 'true';
         if (fields.autoTranscode !== undefined) updates.autoTranscode = fields.autoTranscode === 'true';
+        if (fields.enableHwTranscode !== undefined) updates.enableHwTranscode = String(fields.enableHwTranscode) === 'true';
         if (fields.vpnEnabled !== undefined) updates.vpnEnabled = fields.vpnEnabled === 'true';
         if (fields.vpnAutoConnect !== undefined) updates.vpnAutoConnect = fields.vpnAutoConnect === 'true';
 

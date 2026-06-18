@@ -18,7 +18,7 @@
  */
 import { useEffect, useState, useCallback } from 'react';
 import { Cpu, RefreshCw, Check, Loader2, Zap } from 'lucide-react';
-import { SectionHeader } from './shared';
+import { SectionHeader, Toggle } from './shared';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -69,6 +69,7 @@ export default function SettingsTranscode() {
   const [detecting, setDetecting] = useState(false);
 
   const [preset, setPreset]     = useState<TranscodePreset>('balanced');
+  const [hwEnabled, setHwEnabled] = useState(false);
   const [presetLoaded, setPresetLoaded] = useState(false);
   const [saving, setSaving]     = useState(false);
   const [saved, setSaved]       = useState(false);
@@ -89,12 +90,13 @@ export default function SettingsTranscode() {
     setDetecting(false);
   }, []);
 
-  // ── Load preset from config ──────────────────────────────────────────────
+  // ── Load config ──────────────────────────────────────────────────────────
   useEffect(() => {
     fetch('/api/setup', { credentials: 'include' })
       .then(r => r.json())
-      .then((data: { config?: { transcodePreset?: TranscodePreset } }) => {
+      .then((data: { config?: { transcodePreset?: TranscodePreset; enableHwTranscode?: boolean } }) => {
         if (data.config?.transcodePreset) setPreset(data.config.transcodePreset);
+        if (data.config?.enableHwTranscode !== undefined) setHwEnabled(data.config.enableHwTranscode);
         setPresetLoaded(true);
       })
       .catch(() => setPresetLoaded(true));
@@ -120,6 +122,24 @@ export default function SettingsTranscode() {
     } catch { /* non-fatal */ }
     setSaving(false);
   }, [preset, saving]);
+
+  // ── Save HW Toggle ───────────────────────────────────────────────────────
+  const handleHwToggle = useCallback(async (checked: boolean) => {
+    setHwEnabled(checked);
+    setSaving(true);
+    setSaved(false);
+    try {
+      await fetch('/api/setup', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'save', enableHwTranscode: checked }),
+      });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch { /* non-fatal */ }
+    setSaving(false);
+  }, []);
 
   // ── Encoder badge colour ─────────────────────────────────────────────────
   const isHw = encoder?.detected ?? false;
@@ -177,6 +197,17 @@ export default function SettingsTranscode() {
               No GPU encoder found. Install NVIDIA, AMD, or Intel GPU drivers to enable hardware acceleration.
             </p>
           )}
+        </div>
+
+        {/* ── Hardware Acceleration Switch ── */}
+        <div className="border-t border-border/20 pt-1">
+          <Toggle
+            checked={hwEnabled}
+            onChange={handleHwToggle}
+            label="Hardware Acceleration (GPU)"
+            description="Use GPU to speed up transcoding. Keep disabled if you see playback issues on 10-bit files."
+            icon={Zap}
+          />
         </div>
 
         {/* ── Quality preset ── */}

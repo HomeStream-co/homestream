@@ -74,6 +74,7 @@ export interface AppConfig {
   anthropicModel: string;     // e.g. claude-sonnet-4-6
   watchFolderEnabled: boolean;
   autoTranscode: boolean;
+  enableHwTranscode: boolean;
   preferredQuality: '720p' | '1080p' | '4k' | 'best';
   /** Transcode quality preset — controls CRF offset applied during re-encode */
   transcodePreset: 'fast' | 'balanced' | 'quality' | 'lossless';
@@ -150,6 +151,7 @@ const DEFAULTS: AppConfig = {
   anthropicModel: process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6',
   watchFolderEnabled: true,
   autoTranscode: true,
+  enableHwTranscode: false,
   preferredQuality: '1080p',
   transcodePreset: 'balanced',
   virusTotalApiKey: process.env.VIRUSTOTAL_API_KEY || '',

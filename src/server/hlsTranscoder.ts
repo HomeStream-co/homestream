@@ -24,6 +24,7 @@ import path from 'path';
 import os from 'os';
 import { detectHwEncoder } from './hwEncoderDetect.js';
 import { logCrash } from './crashLogger.js';
+import { readConfig } from './configStore.js';
 
 // ── Binary resolution (lazy, cached) ─────────────────────────────────────────
 let _ffmpeg: string | null = null;
@@ -130,6 +131,7 @@ function touchJob(mediaId: string): void {
 export interface CodecInfo {
   codec: string;
   needsTranscode: boolean;
+  is10Bit?: boolean;
 }
 
 const BROWSER_SAFE_CODECS = new Set(['h264', 'avc1', 'vp8', 'vp9', 'av1', 'theora']);
@@ -156,10 +158,22 @@ export async function probeCodec(filePath: string): Promise<CodecInfo> {
       clearTimeout(timer);
       if (code !== 0) { resolve(null); return; }
       try {
-        const json = JSON.parse(out) as { streams?: Array<{ codec_name?: string }> };
-        const codec = json.streams?.[0]?.codec_name ?? 'unknown';
+        const json = JSON.parse(out) as {
+          streams?: Array<{
+            codec_name?: string;
+            pix_fmt?: string;
+            profile?: string;
+            bits_per_raw_sample?: string;
+          }>;
+        };
+        const stream = json.streams?.[0];
+        const codec = stream?.codec_name ?? 'unknown';
+        const pixFmt = stream?.pix_fmt ?? '';
+        const profile = stream?.profile ?? '';
+        const bits = stream?.bits_per_raw_sample ?? '';
+        const is10Bit = pixFmt.includes('10') || pixFmt.includes('12') || profile.includes('10') || bits === '10' || bits === '12';
         const needsTranscode = !BROWSER_SAFE_CODECS.has(codec);
-        resolve({ codec, needsTranscode });
+        resolve({ codec, needsTranscode, is10Bit });
       } catch {
         resolve(null);
       }
@@ -184,11 +198,12 @@ export async function probeCodec(filePath: string): Promise<CodecInfo> {
       const videoStreamMatch = stderr.match(/Stream #\d+:\d+.*Video:\s*([a-zA-Z0-9_-]+)/);
       const codec = videoStreamMatch ? videoStreamMatch[1].toLowerCase() : 'unknown';
       const needsTranscode = !BROWSER_SAFE_CODECS.has(codec);
-      resolve({ codec, needsTranscode });
+      const is10Bit = stderr.includes('10bit') || stderr.includes('yuv420p10') || stderr.includes('yuv422p10') || stderr.includes('yuv444p10') || stderr.includes('yuv420p12') || stderr.includes('yuv422p12');
+      resolve({ codec, needsTranscode, is10Bit });
     });
 
     proc.on('error', () => {
-      resolve({ codec: 'unknown', needsTranscode: true });
+      resolve({ codec: 'unknown', needsTranscode: true, is10Bit: false });
     });
   });
 }
@@ -237,17 +252,30 @@ export async function startHlsJob(mediaId: string, sourceFilePath: string): Prom
     encoderLabel: 'Software (libx264)',
   };
   jobs.set(mediaId, job);
+  const config = readConfig();
+  const hwEnabled = config.enableHwTranscode ?? false;
   const hw = await detectHwEncoder();
   console.log(`[hls] Hardware detection results: ${JSON.stringify(hw)}`);
 
-  // Try hardware first, fallback to software if it fails
-  let success = await runTranscode(job, sourceFilePath, hw.encoder !== null);
+  // Probe codec to detect high-bit-depth (10-bit / 12-bit)
+  const codecInfo = await probeCodec(sourceFilePath);
+  const is10Bit = codecInfo.is10Bit ?? false;
 
-  if (!success) {
-    console.warn(`[hls] Hardware transcode failed or was unavailable for ${mediaId}. Falling back to software...`);
-    try { fs.rmSync(outputDir, { recursive: true, force: true }); } catch {}
-    fs.mkdirSync(outputDir, { recursive: true });
+  let success = false;
+  if (is10Bit) {
+    console.log(`[hls] Media ${mediaId} is 10-bit/high-bit-depth — forcing software fallback (libx264) for stability`);
     success = await runTranscode(job, sourceFilePath, false);
+  } else {
+    // Try hardware first if enabled in settings, fallback to software if it fails
+    const useHw = hwEnabled && hw.encoder !== null;
+    success = await runTranscode(job, sourceFilePath, useHw);
+
+    if (useHw && !success) {
+      console.warn(`[hls] Hardware transcode failed for ${mediaId}. Falling back to software...`);
+      try { fs.rmSync(outputDir, { recursive: true, force: true }); } catch {}
+      fs.mkdirSync(outputDir, { recursive: true });
+      success = await runTranscode(job, sourceFilePath, false);
+    }
   }
 
   if (success) {

@@ -65,6 +65,35 @@ export default function PlayerPage() {
   // ── All player state + refs ───────────────────────────────────────────────
   const ps = usePlayerState();
 
+  // ── HLS setup (HEVC / H.265) ─────────────────────────────────────────────
+  const { hlsUrl, hlsCodec, probeError } = useHlsSetup(id, ps.videoRef);
+
+  // HLS transcode status polling
+  const [hlsStatus, setHlsStatus] = useState<{ active: boolean; ready: boolean; percentTranscoded: number; encoderLabel: string } | null>(null);
+
+  useEffect(() => {
+    if (!id || !hlsUrl) {
+      setHlsStatus(null);
+      return;
+    }
+
+    const fetchStatus = () => {
+      fetch(`/api/hls/${id}/status`, { credentials: 'include' })
+        .then(r => r.ok ? r.json() : null)
+        .then(data => {
+          if (data && data.active) {
+            setHlsStatus(data);
+          }
+        })
+        .catch(() => {});
+    };
+
+    fetchStatus();
+    const interval = setInterval(fetchStatus, 1500);
+
+    return () => clearInterval(interval);
+  }, [id, hlsUrl]);
+
   // Live Transcoding badge auto-hide after 8 seconds of playing
   const [showHlsBadge, setShowHlsBadge] = useState(true);
   const hlsBadgeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -91,9 +120,6 @@ export default function PlayerPage() {
       }
     };
   }, [id]);
-
-  // ── HLS setup (HEVC / H.265) ─────────────────────────────────────────────
-  const { hlsUrl, hlsCodec, probeError } = useHlsSetup(id, ps.videoRef);
 
   // Surface fatal HLS errors into the player error overlay
   useEffect(() => {
@@ -901,12 +927,28 @@ export default function PlayerPage() {
           </div>
         )}
 
-        {/* Loading spinner */}
+        {/* Loading spinner / HLS Transcode Progress Overlay */}
         <AnimatePresence>
           {ps.videoLoading && !ps.videoError && !isTranscoding && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}
-              className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <div className="w-14 h-14 rounded-full border-4 border-white/20 border-t-white animate-spin" />
+              className="absolute inset-0 flex flex-col items-center justify-center bg-black/65 backdrop-blur-sm pointer-events-none z-15">
+              <div className="w-14 h-14 rounded-full border-4 border-white/20 border-t-white animate-spin mb-4" />
+              {hlsUrl && hlsStatus ? (
+                <div className="text-center text-white px-4">
+                  <p className="font-heading text-lg font-semibold tracking-wide animate-pulse">Transcoding video...</p>
+                  <p className="text-white/60 text-xs mt-1">{hlsStatus.encoderLabel}</p>
+                  <div className="mt-3 flex items-center justify-center gap-2">
+                    <div className="w-32 h-1.5 bg-white/20 rounded-full overflow-hidden">
+                      <div className="h-full bg-primary rounded-full transition-all duration-500" style={{ width: `${hlsStatus.percentTranscoded}%` }} />
+                    </div>
+                    <span className="text-white/80 text-xs font-semibold">{hlsStatus.percentTranscoded}% ready</span>
+                  </div>
+                </div>
+              ) : hlsUrl ? (
+                <div className="text-center text-white px-4">
+                  <p className="font-heading text-base font-semibold animate-pulse">Preparing transcode...</p>
+                </div>
+              ) : null}
             </motion.div>
           )}
 
