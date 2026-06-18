@@ -240,8 +240,15 @@ export async function startHlsJob(mediaId: string, sourceFilePath: string): Prom
   const hw = await detectHwEncoder();
   console.log(`[hls] Hardware detection results: ${JSON.stringify(hw)}`);
 
-  // DEBUG MODE: Temporarily force software transcode to isolate HW encoder issues
-  let success = await runTranscode(job, sourceFilePath, false);
+  // Try hardware first, fallback to software if it fails
+  let success = await runTranscode(job, sourceFilePath, hw.encoder !== null);
+
+  if (!success) {
+    console.warn(`[hls] Hardware transcode failed or was unavailable for ${mediaId}. Falling back to software...`);
+    try { fs.rmSync(outputDir, { recursive: true, force: true }); } catch {}
+    fs.mkdirSync(outputDir, { recursive: true });
+    success = await runTranscode(job, sourceFilePath, false);
+  }
 
   if (success) {
     touchJob(mediaId);
@@ -260,15 +267,20 @@ async function runTranscode(job: HlsJob, sourceFilePath: string, useHw: boolean)
   const outputDir = job.outputDir;
   const playlistPath = path.join(outputDir, 'index.m3u8');
 
-  const videoArgs = [
-    '-c:v', 'libx264',
-    '-preset', 'ultrafast',        // Force ultrafast for low CPU usage & speed
-    '-crf', '23',
-    '-threads', '4',               // Cap CPU usage
-    '-vf', "scale=w='min(1920,iw)':h=-2" // Cap resolution to 1080p max to prevent 4K CPU chokes
-  ];
+  const hw = await detectHwEncoder();
+  const isHwAvailable = useHw && hw.encoder !== null;
 
-  job.encoderLabel = 'Software (libx264) - Debug Mode';
+  const videoArgs = isHwAvailable && hw.encoder
+    ? buildHwVideoArgs(hw.encoder)
+    : [
+        '-c:v', 'libx264',
+        '-preset', 'ultrafast',        // Force ultrafast for low CPU usage & speed
+        '-crf', '23',
+        '-threads', '4',               // Cap CPU usage
+        '-vf', "scale=w='min(1920,iw)':h=-2" // Cap resolution to 1080p max to prevent 4K CPU chokes
+      ];
+
+  job.encoderLabel = isHwAvailable && hw.encoder ? `${hw.label} (Hardware)` : 'Software (libx264)';
 
   const args = [
     '-loglevel', 'verbose',           // Verbose logs for troubleshooting

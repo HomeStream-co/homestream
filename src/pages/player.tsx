@@ -7,7 +7,7 @@
  * File budget: ~350 lines (down from 2,350).
  */
 
-import { useEffect, useCallback, useRef, useMemo } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { AnimatePresence, motion } from 'motion/react';
 import { Cpu, FastForward, Rewind, RotateCcw, SkipForward, X as XIcon } from 'lucide-react';
@@ -64,6 +64,33 @@ export default function PlayerPage() {
 
   // ── All player state + refs ───────────────────────────────────────────────
   const ps = usePlayerState();
+
+  // Live Transcoding badge auto-hide after 8 seconds of playing
+  const [showHlsBadge, setShowHlsBadge] = useState(true);
+  const hlsBadgeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (ps.playing && showHlsBadge) {
+      if (!hlsBadgeTimerRef.current) {
+        hlsBadgeTimerRef.current = setTimeout(() => {
+          setShowHlsBadge(false);
+        }, 8000);
+      }
+    }
+  }, [ps.playing, showHlsBadge]);
+
+  useEffect(() => {
+    setShowHlsBadge(true);
+    if (hlsBadgeTimerRef.current) {
+      clearTimeout(hlsBadgeTimerRef.current);
+      hlsBadgeTimerRef.current = null;
+    }
+    return () => {
+      if (hlsBadgeTimerRef.current) {
+        clearTimeout(hlsBadgeTimerRef.current);
+      }
+    };
+  }, [id]);
 
   // ── HLS setup (HEVC / H.265) ─────────────────────────────────────────────
   const { hlsUrl, hlsCodec, probeError } = useHlsSetup(id, ps.videoRef);
@@ -867,7 +894,7 @@ export default function PlayerPage() {
         {isTranscoding && transcodeJob && <TranscodeProgressOverlay job={transcodeJob} />}
 
         {/* HLS badge */}
-        {hlsUrl && hlsCodec && (
+        {hlsUrl && hlsCodec && showHlsBadge && (
           <div className="absolute top-3 right-3 z-20 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/60 border border-white/20 text-white text-[11px] font-semibold backdrop-blur-sm pointer-events-none">
             <Cpu className="w-3 h-3 text-yellow-400 animate-pulse" />
             Live transcoding {hlsCodec.toUpperCase()} → H.264

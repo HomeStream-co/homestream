@@ -1,7 +1,7 @@
 {
   "name": "homestream",
   "private": true,
-  "version": "2.3.8",
+  "version": "2.3.9",
   "type": "module",
   "imports": {
     "#airo/secrets": "./airo-secrets/src/index.ts"
