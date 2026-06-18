@@ -13,7 +13,7 @@
  * requests the segment containing the desired timestamp directly.
  *
  * Segment duration: 6 seconds — good balance of seek latency vs. file count.
- * Preset: veryfast — prioritises low startup latency over compression ratio.
+ * Preset: ultrafast — prioritises low startup latency over compression ratio.
  * CRF: 23 — good quality, reasonable file size.
  */
 
@@ -208,7 +208,7 @@ export function buildHwVideoArgs(encoder: string): string[] {
     case 'h264_amf':
       return ['-c:v', 'h264_amf', '-quality', 'balanced', '-qp_i', '22', '-qp_p', '22'];
     default:
-      return ['-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23'];
+      return ['-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '23', '-threads', '4', '-vf', "scale=w='min(1920,iw)':h=-2"];
   }
 }
 
@@ -237,23 +237,16 @@ export async function startHlsJob(mediaId: string, sourceFilePath: string): Prom
     encoderLabel: 'Software (libx264)',
   };
   jobs.set(mediaId, job);
-
   const hw = await detectHwEncoder();
+  console.log(`[hls] Hardware detection results: ${JSON.stringify(hw)}`);
 
-  // Try hardware first, fallback to software if it fails
-  let success = await runTranscode(job, sourceFilePath, hw.encoder !== null);
-
-  if (!success) {
-    console.warn(`[hls] Hardware failed for ${mediaId}. Falling back to software...`);
-    try { fs.rmSync(outputDir, { recursive: true, force: true }); } catch {}
-    fs.mkdirSync(outputDir, { recursive: true });
-    success = await runTranscode(job, sourceFilePath, false);
-  }
+  // DEBUG MODE: Temporarily force software transcode to isolate HW encoder issues
+  let success = await runTranscode(job, sourceFilePath, false);
 
   if (success) {
     touchJob(mediaId);
   } else {
-    // If BOTH failed, delete the job from the map so the next play attempt can start fresh
+    // If failed, delete the job from the map so the next play attempt can start fresh
     jobs.delete(mediaId);
     // Unblock any waiters with failure (they will try direct stream or show error)
     job.waiters.forEach(r => r());
@@ -267,15 +260,24 @@ async function runTranscode(job: HlsJob, sourceFilePath: string, useHw: boolean)
   const outputDir = job.outputDir;
   const playlistPath = path.join(outputDir, 'index.m3u8');
 
-  const hw = await detectHwEncoder();
-  const videoArgs = useHw && hw.encoder
-    ? buildHwVideoArgs(hw.encoder)
-    : ['-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23'];
+  const videoArgs = [
+    '-c:v', 'libx264',
+    '-preset', 'ultrafast',        // Force ultrafast for low CPU usage & speed
+    '-crf', '23',
+    '-threads', '4',               // Cap CPU usage
+    '-vf', "scale=w='min(1920,iw)':h=-2" // Cap resolution to 1080p max to prevent 4K CPU chokes
+  ];
 
-  job.encoderLabel = useHw && hw.encoder ? `${hw.label} (Hardware)` : 'Software (libx264)';
+  job.encoderLabel = 'Software (libx264) - Debug Mode';
 
   const args = [
+    '-loglevel', 'verbose',           // Verbose logs for troubleshooting
+    '-y',
     '-i', sourceFilePath,
+    '-map', '0:v:0',                 // Map first video track only
+    '-map', '0:a:0',                 // Map first audio track only
+    '-sn',                           // Disable subtitle stream mapping in HLS container (fixes crash on custom subs)
+    '-dn',                           // Disable data stream mapping (fixes DV metadata crash)
     '-pix_fmt', 'yuv420p',           // Force 8-bit output color format compatibility
     ...videoArgs,
     '-c:a', 'aac',
@@ -291,10 +293,10 @@ async function runTranscode(job: HlsJob, sourceFilePath: string, useHw: boolean)
     playlistPath,
   ];
 
-  console.log(`[hls] 🚀 Starting ${job.encoderLabel} transcode for ${job.mediaId}`);
+  console.log(`[hls] 🚀 DEBUG MODE - Starting software transcode for ${job.mediaId}`);
   console.log(`[hls] Command: ffmpeg ${args.join(' ')}`);
 
-  const ff = spawn(FFMPEG(), ['-y', ...args], { stdio: ['ignore', 'ignore', 'pipe'] });
+  const ff = spawn(FFMPEG(), args, { stdio: ['ignore', 'ignore', 'pipe'] });
   job.process = ff;
 
   const stderrBuffer: string[] = [];
