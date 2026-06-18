@@ -23,6 +23,7 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import { detectHwEncoder } from './hwEncoderDetect.js';
+import { logCrash } from './crashLogger.js';
 
 // ── Binary resolution (lazy, cached) ─────────────────────────────────────────
 let _ffmpeg: string | null = null;
@@ -266,14 +267,16 @@ async function runTranscode(job: HlsJob, sourceFilePath: string, useHw: boolean)
   const outputDir = job.outputDir;
   const playlistPath = path.join(outputDir, 'index.m3u8');
 
-  // TEMPORARY: Force software encoding for debugging
-  const videoArgs = ['-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23'];
+  const hw = await detectHwEncoder();
+  const videoArgs = useHw && hw.encoder
+    ? buildHwVideoArgs(hw.encoder)
+    : ['-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23'];
 
-  job.encoderLabel = 'Software (libx264) - Debug Mode';
+  job.encoderLabel = useHw && hw.encoder ? `${hw.label} (Hardware)` : 'Software (libx264)';
 
   const args = [
     '-i', sourceFilePath,
-    '-pix_fmt', 'yuv420p',
+    '-pix_fmt', 'yuv420p',           // Force 8-bit output color format compatibility
     ...videoArgs,
     '-c:a', 'aac',
     '-b:a', '192k',
@@ -288,16 +291,22 @@ async function runTranscode(job: HlsJob, sourceFilePath: string, useHw: boolean)
     playlistPath,
   ];
 
-  console.log(`[hls] 🚀 DEBUG MODE - Starting software transcode for ${job.mediaId}`);
-  console.log(`[hls] Full command: ${FFMPEG()} ${args.join(' ')}`);
+  console.log(`[hls] 🚀 Starting ${job.encoderLabel} transcode for ${job.mediaId}`);
+  console.log(`[hls] Command: ffmpeg ${args.join(' ')}`);
 
   const ff = spawn(FFMPEG(), ['-y', ...args], { stdio: ['ignore', 'ignore', 'pipe'] });
   job.process = ff;
+
+  const stderrBuffer: string[] = [];
 
   ff.stderr.on('data', (data: Buffer) => {
     const log = data.toString().trim();
     if (log) {
       console.log(`[hls][${job.mediaId}] ${log}`);
+      stderrBuffer.push(log);
+      if (stderrBuffer.length > 50) {
+        stderrBuffer.shift();
+      }
     }
   });
 
@@ -314,6 +323,12 @@ async function runTranscode(job: HlsJob, sourceFilePath: string, useHw: boolean)
       clearTimeout(timeoutTimer);
       if (!val) {
         console.error(`[hls] ❌ FAILED to generate manifest for ${job.mediaId}`);
+        const logContent = stderrBuffer.join('\n');
+        logCrash(
+          'manual',
+          new Error(`FFmpeg exited or timed out without HLS manifest.\nEncoder: ${job.encoderLabel}\nLast logs:\n${logContent}`),
+          `HLS Transcode: ${job.mediaId}`
+        );
         // Kill the process if we are resolving with failure (e.g. timeout) to release lock on output files
         try { ff.kill('SIGKILL'); } catch {}
       }
@@ -326,7 +341,7 @@ async function runTranscode(job: HlsJob, sourceFilePath: string, useHw: boolean)
           const content = fs.readFileSync(playlistPath, 'utf8');
           if (content.includes('.ts')) {
             job.ready = true;
-            console.log(`[hls] ✅ Manifest ready for ${job.mediaId}`);
+            console.log(`[hls] ✅ SUCCESS: Manifest ready for ${job.mediaId}`);
             
             // Unblock any waiters on the job object
             job.waiters.forEach(r => r());
@@ -349,7 +364,7 @@ async function runTranscode(job: HlsJob, sourceFilePath: string, useHw: boolean)
         console.error(`[hls] Timeout waiting for manifest: ${job.mediaId}`);
         doResolve(false);
       }
-    }, 40000);
+    }, 35000);
   });
 }
 
