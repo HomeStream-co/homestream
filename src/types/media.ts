@@ -50,6 +50,7 @@ export interface MediaItem {
   watchProgress: number;         // 0–100 percentage
   watchedSeconds?: number;       // raw seconds for precision resume
   totalSeconds?: number;         // total duration in seconds
+  duration?: number;             // total duration in seconds (from scan)
   lastWatchedAt?: string;        // ISO — used to sort Continue Watching row
   watchedAt?: string;            // ISO — set when progress reaches 95%+
   fileSize?: number;

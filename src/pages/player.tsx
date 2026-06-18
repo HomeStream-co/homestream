@@ -307,12 +307,13 @@ export default function PlayerPage() {
     const video = ps.videoRef.current;
     if (!video || !id) return;
     lastRemoteSendRef.current = Date.now();
+    const resolvedDuration = (hlsUrl && item?.duration && item.duration > 0) ? item.duration : (video.duration || 0);
     sendState({
       mediaId: id,
       title: item?.title ?? '',
       poster: item?.poster,
       currentTime: video.currentTime,
-      duration: video.duration || 0,
+      duration: resolvedDuration,
       paused: video.paused,
       volume: video.volume,
       speed: video.playbackRate,
@@ -322,7 +323,7 @@ export default function PlayerPage() {
       cast: ps.castInfo ?? undefined,
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, item, nextItem, ps.ccLang, ps.castInfo, sendState]);
+  }, [id, item, nextItem, ps.ccLang, ps.castInfo, sendState, hlsUrl]);
 
   // Keep the ref in sync so onOpen always calls the latest sendRemoteStateNow
   useEffect(() => { sendRemoteStateNowRef.current = sendRemoteStateNow; }, [sendRemoteStateNow]);
@@ -352,6 +353,11 @@ export default function PlayerPage() {
       activeSubtitle: ps.ccLang === 'off' ? -1 : ps.ccLang === 'en' ? 0 : 1,
       cast: ps.castInfo ?? undefined,
     }), [id, item, nextItem, ps.ccLang, ps.castInfo]),
+    getDuration: useCallback(() => {
+      const video = ps.videoRef.current;
+      if (!video) return 0;
+      return (hlsUrl && item?.duration && item.duration > 0) ? item.duration : video.duration;
+    }, [hlsUrl, item]),
   });
 
   // ── Kids profile block — handled by RestrictedContentGuard wrapper ──────────
@@ -455,14 +461,66 @@ export default function PlayerPage() {
   useEffect(() => {
     return () => {
       const video = ps.videoRef.current;
-      if (id && video && video.duration > 0) {
-        const payload = JSON.stringify({ progress: (video.currentTime / video.duration) * 100, currentTime: video.currentTime, duration: video.duration, profileId: profileIdRef.current });
-        // Use keepalive fetch — unlike sendBeacon, it sends cookies so requireAuth passes.
-        fetch(`/api/media/${id}/progress`, { method: 'PATCH', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: payload, keepalive: true }).catch(() => {}); // non-fatal — ignore
+      if (id && video) {
+        const resolvedDuration = (hlsUrl && item?.duration && item.duration > 0) ? item.duration : video.duration;
+        if (resolvedDuration > 0) {
+          const payload = JSON.stringify({
+            progress: (video.currentTime / resolvedDuration) * 100,
+            currentTime: video.currentTime,
+            duration: resolvedDuration,
+            profileId: profileIdRef.current
+          });
+          // Use keepalive fetch — unlike sendBeacon, it sends cookies so requireAuth passes.
+          fetch(`/api/media/${id}/progress`, { method: 'PATCH', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: payload, keepalive: true }).catch(() => {}); // non-fatal — ignore
+        }
       }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, hlsUrl, item]);
+
+  // ── Clean up video + stop HLS transcode on unmount ─────────────────────────
+  const idRef = useRef(id);
+  useEffect(() => {
+    idRef.current = id;
   }, [id]);
+
+  // Stop the previous HLS transcode job when navigating to a new video
+  const prevIdRef = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    const prevId = prevIdRef.current;
+    prevIdRef.current = id;
+    if (prevId && prevId !== id) {
+      console.log(`[player] Stopping previous HLS transcode job for ${prevId}`);
+      fetch(`/api/hls/${prevId}/stop`, { method: 'POST', credentials: 'include' })
+        .catch(err => console.warn('[player] Failed to send stop HLS transcode request:', err));
+    }
+  }, [id]);
+
+  useEffect(() => {
+    return () => {
+      const video = ps.videoRef.current;
+      if (video) {
+        try {
+          video.pause();
+          video.src = '';
+          video.load();
+        } catch (err) {
+          console.warn('[player] Failed to clean up video element:', err);
+        }
+      }
+      
+      const lastId = idRef.current;
+      if (lastId) {
+        fetch(`/api/hls/${lastId}/stop`, { method: 'POST', credentials: 'include' })
+          .catch(err => console.warn('[player] Failed to send stop HLS transcode request:', err));
+      }
+      
+      try {
+        localStorage.setItem('homestream-now-playing', JSON.stringify({ paused: true, title: '' }));
+      } catch {}
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ── Watch-complete + Skip-intro: poll refs on an interval ────────────────
   // Previously these were effects on ps.currentTime (state), which caused
@@ -680,20 +738,20 @@ export default function PlayerPage() {
     if (ps.doubleTapCountRef.current.side === side) ps.doubleTapCountRef.current.count += 1;
     else ps.doubleTapCountRef.current = { side, count: 1 };
     const seekSeconds = ps.doubleTapCountRef.current.count * 10;
-    if (side === 'forward') video.currentTime = Math.min(video.currentTime + 10, video.duration);
+    const resolvedDuration = (hlsUrl && item?.duration && item.duration > 0) ? item.duration : video.duration;
+    if (side === 'forward') video.currentTime = Math.min(video.currentTime + 10, resolvedDuration);
     else video.currentTime = Math.max(video.currentTime - 10, 0);
     ps.setSeekFlash(side);
     ps.setSeekFlashCount(seekSeconds);
     clearTimeout(ps.doubleTapTimerRef.current);
     ps.doubleTapTimerRef.current = setTimeout(() => { ps.doubleTapCountRef.current = { side: 'forward', count: 0 }; ps.setSeekFlash(null); ps.setSeekFlashCount(0); }, 700);
-  }, [ps]);
+  }, [ps, hlsUrl, item]);
 
-  // ── Back navigation — respects ?from=tv, otherwise goes to detail page ────
+  // ── Back navigation — respects ?from=tv, otherwise goes to Home screen ────
   const backPath = useMemo(() => {
     if (fromParam === 'tv') return '/tv';
-    if (!item) return '/';
-    return item.type === 'series' ? `/show/${item.id}` : `/movie/${item.id}`;
-  }, [item, fromParam]);
+    return '/';
+  }, [fromParam]);
 
   // ── Keyboard shortcuts ────────────────────────────────────────────────────
   usePlayerKeyboard({
@@ -1113,6 +1171,7 @@ export default function PlayerPage() {
               resumeBannerTimer={ps.resumeBannerTimer}
               showActionToast={ps.showActionToast}
               fadeAndNavigate={fadeAndNavigate}
+              backPath={backPath}
               setCastInfo={ps.setCastInfo}
               isScrubbingRef={isScrubbingRef}
             />

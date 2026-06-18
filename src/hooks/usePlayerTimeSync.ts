@@ -59,6 +59,8 @@ interface UsePlayerTimeSyncOptions {
   /** Stable getter for the current remote-state payload fields that change
    *  infrequently (mediaId, title, poster, ccLang, castInfo, nextItem). */
   getRemoteContext: () => Omit<PlayerStatePayload, 'currentTime' | 'duration' | 'paused' | 'volume' | 'speed'>;
+  /** Stable getter for the resolved duration. */
+  getDuration: () => number;
 }
 
 export function usePlayerTimeSync({
@@ -73,6 +75,7 @@ export function usePlayerTimeSync({
   isScrubbingRef,
   sendState,
   getRemoteContext,
+  getDuration,
 }: UsePlayerTimeSyncOptions) {
   // Keep a ref to playerAccent so the rAF loop never needs to be recreated.
   const accentRef = useRef(playerAccent);
@@ -81,6 +84,10 @@ export function usePlayerTimeSync({
   // Keep a ref to getRemoteContext for the same reason.
   const getRemoteContextRef = useRef(getRemoteContext);
   getRemoteContextRef.current = getRemoteContext;
+
+  // Keep a ref to getDuration for the same reason.
+  const getDurationRef = useRef(getDuration);
+  getDurationRef.current = getDuration;
 
   // Keep a ref to sendState (stable from useRemoteControl, but defensive).
   const sendStateRef = useRef(sendState);
@@ -103,7 +110,7 @@ export function usePlayerTimeSync({
       const seekBar = seekBarRef.current;
 
       if (video && seekBar && !isScrubbingRef.current) {
-        const dur = video.duration;
+        const dur = getDurationRef.current();
         if (dur > 0 && isFinite(dur)) {
           const ct = video.currentTime;
           const pct = (ct / dur) * 100;
@@ -145,7 +152,7 @@ export function usePlayerTimeSync({
     // ── 1. Update refs ────────────────────────────────────────────────────
     currentTimeRef.current = video.currentTime;
     const buf = video.buffered;
-    const dur = video.duration || 0;
+    const dur = getDurationRef.current() || 0;
     if (buf.length > 0) bufferedRef.current = buf.end(buf.length - 1);
 
     // ── 2. Buffered bar: width ────────────────────────────────────────────

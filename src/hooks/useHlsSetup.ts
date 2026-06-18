@@ -81,6 +81,14 @@ export function useHlsSetup(
         hlsInstanceRef.current.destroy();
         hlsInstanceRef.current = null;
       }
+      const video = videoRef.current;
+      if (video) {
+        try {
+          video.pause();
+          video.removeAttribute('src');
+          video.load();
+        } catch {}
+      }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);

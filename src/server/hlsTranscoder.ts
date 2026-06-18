@@ -425,6 +425,10 @@ export function isHlsJobReady(mediaId: string): boolean {
   return jobs.get(mediaId)?.ready ?? false;
 }
 
+export function stopHlsJob(mediaId: string): void {
+  cleanupJob(mediaId);
+}
+
 export function stopAllHlsJobs(): void {
   for (const mediaId of jobs.keys()) cleanupJob(mediaId);
 }

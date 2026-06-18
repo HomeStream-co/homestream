@@ -60,6 +60,7 @@ import hlsProbeGet from "./api/hls/[id]/probe/GET";
 import hlsPlaylistGet from "./api/hls/[id]/index.m3u8/GET";
 import hlsSegmentGet from "./api/hls/[id]/[segment]/GET";
 import hlsStatusGet from "./api/hls/[id]/status/GET";
+import hlsStopPost from "./api/hls/[id]/stop/POST";
 // jellyfin
 import jellyfinItemsGet from "./api/jellyfin/Items/GET";
 import jellyfinItemByIdGet from "./api/jellyfin/Items/[id]/GET";
@@ -80,6 +81,7 @@ import libraryScanPost from "./api/library/scan/POST";
 import libraryStorageGet from "./api/library/storage/GET";
 import libraryStoragePatch from "./api/library/storage/PATCH";
 import libraryStorageDrivePatch from "./api/library/storage/drive/PATCH";
+import libraryOptimizePost from "./api/library/optimize/POST";
 // media
 import mediaGet from "./api/media/GET";
 import demoGet from "./api/demo/GET";
@@ -301,6 +303,7 @@ app.get("/api/hls/:id/probe", hlsProbeGet);
 app.get("/api/hls/:id/index.m3u8", hlsPlaylistGet);
 app.get("/api/hls/:id/status", hlsStatusGet);
 app.get("/api/hls/:id/:segment", hlsSegmentGet);
+app.post("/api/hls/:id/stop", hlsStopPost);
 // jellyfin
 app.get("/api/jellyfin/Items", jellyfinItemsGet);
 app.get("/api/jellyfin/Items/:id", jellyfinItemByIdGet);
@@ -318,6 +321,7 @@ app.get("/api/jellyfin/Videos", jellyfinVideosGet);
 app.get("/api/jellyfin/Videos/:id/stream", jellyfinVideoStreamGet);
 // library
 app.post("/api/library/scan", libraryScanPost);
+app.post("/api/library/optimize", libraryOptimizePost);
 app.post("/api/library/rescan", async (req, res) => {
   const { requireAuth } = await import("./authMiddleware.js");
   if (!requireAuth(req as import('express').Request, res as import('express').Response)) return;

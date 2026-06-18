@@ -57,6 +57,7 @@ interface MediaItem {
 
 interface Props {
   item: MediaItem;
+  backPath: string;
   // Playback state — only values that legitimately trigger re-renders
   playing: boolean;
   duration: number;
@@ -142,6 +143,7 @@ function PlayerControlsOverlayInner({
   setShowInfo, setShowSpeedMenu, setShowCcMenu, setShowAudioMenu,
   setShowShortcuts, setSeekHover, setSeekFlash, setSeekFlashCount,
   setShowResumeBanner, resumeBannerTimer, showActionToast, fadeAndNavigate,
+  backPath,
   setCastInfo, isScrubbingRef,
 }: Props) {
   const tvRing = (ctrl: TvControl | null) =>
@@ -162,9 +164,7 @@ function PlayerControlsOverlayInner({
       <div className="bg-gradient-to-b from-black/70 to-transparent px-4 pt-4 pb-8 flex items-center gap-3">
         <button
           onClick={() => {
-            // Navigate to the detail page (movie or show), not always home
-            const backTo = item.type === 'series' ? `/show/${item.id}` : `/movie/${item.id}`;
-            fadeAndNavigate(backTo);
+            fadeAndNavigate(backPath);
           }}
           className="p-2 hover:bg-white/10 rounded-full transition-colors"
         >
@@ -589,6 +589,9 @@ function arePropsEqual(prev: Props, next: Props): boolean {
 
   // Accent colour (changes when theme switches)
   if (prev.playerAccent !== next.playerAccent) return false;
+
+  // Back path navigation
+  if (prev.backPath !== next.backPath) return false;
 
   // Seek hover thumbnail (null | object — compare by reference)
   if (prev.seekHover !== next.seekHover) return false;
