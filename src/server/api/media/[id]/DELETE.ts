@@ -79,7 +79,7 @@ export default async function handler(req: Request, res: Response) {
 
           if (matchName || matchContent || matchSave) {
             console.log(`[delete] Found matching torrent in qBittorrent: ${t.name} (${t.hash}). Deleting...`);
-            await deleteTorrent(t.hash, true);
+            await deleteTorrent(t.hash, false);
 
             // Delete corresponding job by infoHash
             const jobs = getAllPersistedJobs();

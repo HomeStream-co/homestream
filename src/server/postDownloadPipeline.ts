@@ -274,7 +274,7 @@ export async function runPostDownloadPipeline(params: PostDownloadParams): Promi
     const doneJob = getPersistedJob(jobId);
     if (doneJob) upsertJob({ ...doneJob, status: 'done', progress: 100, completedAt: new Date().toISOString() });
     if (backend === 'qbittorrent' && doneJob?.infoHash) {
-      deleteTorrent(doneJob.infoHash, true).catch(() => {});
+      deleteTorrent(doneJob.infoHash, false).catch(() => {});
     }
     return;
   }
@@ -347,7 +347,7 @@ export async function runPostDownloadPipeline(params: PostDownloadParams): Promi
     if (doneJob) upsertJob({ ...doneJob, status: 'done', progress: 100, completedAt: new Date().toISOString() });
 
     if (backend === 'qbittorrent' && doneJob?.infoHash) {
-      await deleteTorrent(doneJob.infoHash, true).catch(err =>
+      await deleteTorrent(doneJob.infoHash, false).catch(err =>
         console.error(`[pipeline] Failed to remove torrent ${doneJob.infoHash}:`, err));
     }
 
@@ -460,7 +460,7 @@ export async function runPostDownloadPipeline(params: PostDownloadParams): Promi
 
   // ── 10. Remove torrent from qBittorrent ──
   if (backend === 'qbittorrent' && doneJob?.infoHash) {
-    await deleteTorrent(doneJob.infoHash, true).catch(err =>
+    await deleteTorrent(doneJob.infoHash, false).catch(err =>
       console.error(`[pipeline] Failed to remove torrent ${doneJob.infoHash}:`, err));
   }
 

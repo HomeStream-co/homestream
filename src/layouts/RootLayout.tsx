@@ -57,10 +57,10 @@ function AppShell({ children }: { children: ReactElement }) {
       <>
         <FirstRunGuard />
         {!hideChrome && <Header />}
-        <AnimatePresence mode="wait">
+        <AnimatePresence mode="wait" initial={false}>
           <motion.div
             key={location.pathname}
-            initial={{ opacity: 0.3 }}
+            initial={{ opacity: 1 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0.3 }}
             transition={{ duration: 0.18, ease: 'easeInOut' }}
