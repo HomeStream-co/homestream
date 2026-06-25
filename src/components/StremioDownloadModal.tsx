@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import ImageWithFallback from '@/components/ImageWithFallback';
 
 export interface DownloadTarget {
+  id?: number;
   title: string;
   posterUrl?: string;
   release_date?: string;
@@ -54,6 +55,36 @@ export default function StremioDownloadModal({ target, onClose }: StremioDownloa
   const [selectedSeason, setSelectedSeason] = useState<string>('all');
   const [episodesPerSeason, setEpisodesPerSeason] = useState(12);
   const [bulkDownloading, setBulkDownloading] = useState(false);
+
+  // Show metadata states
+  const [seasonsData, setSeasonsData] = useState<any[]>([]);
+  const [loadingMetadata, setLoadingMetadata] = useState(false);
+
+  // Fetch show metadata if it's a TV series to get season/episode counts
+  useEffect(() => {
+    if (target.type === 'series' && target.id) {
+      setLoadingMetadata(true);
+      fetch(`/api/tmdb/tv/${target.id}`, { credentials: 'include' })
+        .then(res => {
+          if (!res.ok) throw new Error('Failed to fetch TMDB details');
+          return res.json();
+        })
+        .then(data => {
+          const validSeasons = (data.seasons ?? []).filter((s: any) => s.season_number > 0 && s.episode_count > 0);
+          setSeasonsData(validSeasons);
+          if (validSeasons.length > 0) {
+            setSeason(validSeasons[0].season_number);
+            setEpisode(1);
+          }
+        })
+        .catch(err => {
+          console.error('Error fetching show metadata:', err);
+        })
+        .finally(() => {
+          setLoadingMetadata(false);
+        });
+    }
+  }, [target]);
 
   // Auto-search for movies on mount
   useEffect(() => {
@@ -342,13 +373,28 @@ export default function StremioDownloadModal({ target, onClose }: StremioDownloa
                       <label className="text-xs text-zinc-400">Season</label>
                       <select
                         value={selectedSeason}
-                        onChange={e => setSelectedSeason(e.target.value)}
+                        onChange={e => {
+                          const val = e.target.value;
+                          setSelectedSeason(val);
+                          if (val !== 'all' && seasonsData.length > 0) {
+                            const sObj = seasonsData.find(s => s.season_number.toString() === val);
+                            if (sObj) setEpisodesPerSeason(sObj.episode_count);
+                          }
+                        }}
                         className="bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-primary"
                       >
                         <option value="all">All seasons</option>
-                        {Array.from({ length: 15 }, (_, i) => i + 1).map(s => (
-                          <option key={s} value={s.toString()}>Season {s}</option>
-                        ))}
+                        {seasonsData.length > 0 ? (
+                          seasonsData.map((s: any) => (
+                            <option key={s.season_number} value={s.season_number.toString()}>
+                              Season {s.season_number} ({s.episode_count} Ep)
+                            </option>
+                          ))
+                        ) : (
+                          Array.from({ length: 15 }, (_, i) => i + 1).map(s => (
+                            <option key={s} value={s.toString()}>Season {s}</option>
+                          ))
+                        )}
                       </select>
                     </div>
 
@@ -357,9 +403,9 @@ export default function StremioDownloadModal({ target, onClose }: StremioDownloa
                       <input
                         type="number"
                         min={1}
-                        max={50}
+                        max={100}
                         value={episodesPerSeason}
-                        onChange={e => setEpisodesPerSeason(Math.max(1, Math.min(50, parseInt(e.target.value) || 12)))}
+                        onChange={e => setEpisodesPerSeason(Math.max(1, Math.min(100, parseInt(e.target.value) || 12)))}
                         className="w-14 bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-primary text-center"
                       />
                     </div>
@@ -387,30 +433,73 @@ export default function StremioDownloadModal({ target, onClose }: StremioDownloa
 
               {subMode === 'episode' && (
                 <div className="bg-zinc-900 border border-zinc-700/60 rounded-xl p-4 space-y-3">
-                  <div className="flex items-center gap-2">
-                    <ListVideo className="w-4 h-4 text-primary" />
-                    <span className="text-sm font-semibold text-foreground">Select Episode to Search</span>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <ListVideo className="w-4 h-4 text-primary" />
+                      <span className="text-sm font-semibold text-foreground">Select Episode to Search</span>
+                    </div>
+                    {loadingMetadata && (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />
+                    )}
                   </div>
                   <div className="flex items-center gap-3">
                     <div className="flex items-center gap-1.5">
                       <label className="text-xs text-zinc-400 font-semibold">Season</label>
-                      <input
-                        type="number"
-                        min={1}
-                        value={season}
-                        onChange={e => setSeason(Math.max(1, parseInt(e.target.value) || 1))}
-                        className="w-16 bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-primary text-center"
-                      />
+                      {seasonsData.length > 0 ? (
+                        <select
+                          value={season}
+                          onChange={e => {
+                            const sNum = parseInt(e.target.value);
+                            setSeason(sNum);
+                            setEpisode(1);
+                          }}
+                          className="bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-primary"
+                        >
+                          {seasonsData.map((s: any) => (
+                            <option key={s.season_number} value={s.season_number}>
+                              Season {s.season_number}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <input
+                          type="number"
+                          min={1}
+                          value={season}
+                          onChange={e => {
+                            setSeason(Math.max(1, parseInt(e.target.value) || 1));
+                            setEpisode(1);
+                          }}
+                          className="w-16 bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-primary text-center"
+                        />
+                      )}
                     </div>
                     <div className="flex items-center gap-1.5">
                       <label className="text-xs text-zinc-400 font-semibold">Episode</label>
-                      <input
-                        type="number"
-                        min={1}
-                        value={episode}
-                        onChange={e => setEpisode(Math.max(1, parseInt(e.target.value) || 1))}
-                        className="w-16 bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-primary text-center"
-                      />
+                      {seasonsData.length > 0 ? (
+                        <select
+                          value={episode}
+                          onChange={e => setEpisode(parseInt(e.target.value))}
+                          className="bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-primary"
+                        >
+                          {Array.from(
+                            { length: seasonsData.find(s => s.season_number === season)?.episode_count ?? 12 },
+                            (_, i) => i + 1
+                          ).map(epNum => (
+                            <option key={epNum} value={epNum}>
+                              Episode {epNum}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <input
+                          type="number"
+                          min={1}
+                          value={episode}
+                          onChange={e => setEpisode(Math.max(1, parseInt(e.target.value) || 1))}
+                          className="w-16 bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-primary text-center"
+                        />
+                      )}
                     </div>
                     <button
                       onClick={() => searchTorrents(season, episode)}

@@ -402,6 +402,7 @@ export default function GenreBrowser() {
 
   const handleDownload = useCallback((movie: TMDBMovie) => {
     setDownloadTarget({
+      id: movie.id,
       title: movie.title,
       posterUrl: movie.posterUrl,
       release_date: movie.release_date,

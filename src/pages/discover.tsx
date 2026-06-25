@@ -768,7 +768,7 @@ export default function DiscoverPage() {
   const filteredPopularShows = useMemo(() => filterMovies(popularShows), [popularShows, filterMovies]);
 
   const handleTMDBDownload = useCallback((movie: TMDBMovie, type: 'movie' | 'series' = 'movie') => {
-    setDownloadTarget({ title: movie.title, posterUrl: movie.posterUrl, release_date: movie.release_date, type });
+    setDownloadTarget({ id: movie.id, title: movie.title, posterUrl: movie.posterUrl, release_date: movie.release_date, type });
   }, []);
 
   const handleDirectDownload = useCallback((result: CinemetaResult) => {
