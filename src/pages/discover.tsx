@@ -22,15 +22,14 @@ import {
   Loader2, WifiOff, RefreshCw, Film, TrendingUp, Sparkles,
   ChevronDown, Search, X, Tv2, Clapperboard, Play, Volume2, VolumeX, Layers,
   AlertCircle, MonitorPlay, ChevronLeft, ChevronRight, SlidersHorizontal,
-  HardDrive,
 } from 'lucide-react';
-import { toast } from 'sonner';
 import { useMedia } from '@/context/MediaContext';
 import { useTMDBContext } from '@/context/TMDBContext';
 import type { TMDBMovie } from '@/server/tmdbCache';
 import { fetchTrailerKey } from '@/lib/trailerCache';
 import GenreBrowser from '@/components/GenreBrowser';
 import ImageWithFallback from '@/components/ImageWithFallback';
+import StremioDownloadModal, { DownloadTarget } from '@/components/StremioDownloadModal';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -471,366 +470,7 @@ function Section({
   );
 }
 
-// ── Stremio download modal ────────────────────────────────────────────────────
 
-interface DownloadTarget {
-  title: string;
-  posterUrl?: string;
-  release_date?: string;
-  imdbId?: string;       // from direct search results
-  tmdbId?: number;       // from TMDB cards
-  type: 'movie' | 'series';
-}
-
-function DownloadModal({ target, onClose }: { target: DownloadTarget; onClose: () => void }) {
-  const [searching, setSearching] = useState(false);
-  // Full stream data preserved so the download call can send real magnet URIs with trackers
-  const [streams, setStreams] = useState<{
-    name: string;
-    title: string;
-    url: string;
-    imdbId: string;
-    quality: string;
-    size: string;
-    seeds: string;
-    magnet: string;
-    source: string;
-  }[]>([]);
-  const [error, setError] = useState('');
-  const [downloading, setDownloading] = useState<string | null>(null);
-
-  const [selectedSeason, setSelectedSeason] = useState<string>('all');
-  const [episodesPerSeason, setEpisodesPerSeason] = useState(12);
-  const [bulkDownloading, setBulkDownloading] = useState(false);
-
-  const handleBulkSeriesDownload = async () => {
-    setBulkDownloading(true);
-    try {
-      const body: Record<string, any> = {
-        imdbId: target.imdbId || null,
-        type: 'series',
-        title: target.title,
-        poster: target.posterUrl,
-        allEpisodes: true,
-        totalEpisodes: episodesPerSeason,
-        totalSeasons: 10,
-      };
-      if (selectedSeason !== 'all') {
-        body.season = parseInt(selectedSeason);
-      }
-      
-      const res = await fetch('/api/stremio/download', {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-
-      if (res.status === 503) {
-        toast.error('Configure qBittorrent or Real-Debrid first.');
-        setBulkDownloading(false);
-        return;
-      }
-
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({})) as { error?: string; message?: string };
-        throw new Error(errData.message ?? errData.error ?? `Server error ${res.status}`);
-      }
-
-      const data = await res.json() as { queued?: number; message?: string; vpnUsed?: boolean };
-      const count = data.queued ?? 1;
-      const vpnText = data.vpnUsed ? ' (Protected by VPN)' : '';
-      toast.success(`Queued ${count} episode${count !== 1 ? 's' : ''} of "${target.title}"${vpnText}`);
-      onClose();
-    } catch (err) {
-      toast.error(`Bulk download failed: ${err instanceof Error ? err.message : String(err)}`);
-    } finally {
-      setBulkDownloading(false);
-    }
-  };
-
-  const search = async () => {
-    setSearching(true);
-    setError('');
-    try {
-      // Route through the backend proxy — avoids CORS and works in all environments.
-      // /api/stremio/stream handles Torrentio + Prowlarr + Nyaa server-side.
-      const res = await fetch('/api/stremio/stream', {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          imdbId: target.imdbId ?? null,
-          title: target.title,
-          type: target.type,
-        }),
-      });
-
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({})) as { error?: string; message?: string };
-        throw new Error(data.error ?? data.message ?? `Server error ${res.status}`);
-      }
-
-      const data = await res.json() as { streams?: { name: string; quality: string; size: string; seeds: string; magnet: string; infoHash: string; source: string }[]; imdbId?: string };
-      const resolvedImdbId = data.imdbId ?? target.imdbId ?? '';
-      const found = (data.streams ?? []).slice(0, 15).map(s => ({
-        name: s.name,
-        // Human-readable label shown in the picker
-        title: `${s.quality}${s.size ? ` · ${s.size}` : ''}${s.seeds ? ` · 👤 ${s.seeds}` : ''}`,
-        url: s.infoHash,
-        imdbId: resolvedImdbId,
-        // Preserve full stream data so the download call gets real magnet URIs + tracker list
-        quality: s.quality,
-        size: s.size,
-        seeds: s.seeds,
-        magnet: s.magnet,
-        source: s.source,
-      }));
-      if (found.length === 0) throw new Error('No streams found — try a different title or check your Prowlarr config');
-      setStreams(found);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      // "Failed to fetch" means the browser couldn't reach the server at all
-      setError(msg === 'Failed to fetch'
-        ? 'Could not reach the HomeStream server. Make sure the app is running.'
-        : msg);
-    } finally {
-      setSearching(false);
-    }
-  };
-
-  const startDownload = async (stream: { name: string; title: string; url: string; imdbId: string; quality: string; size: string; seeds: string; magnet: string; source: string }) => {
-    setDownloading(stream.url);
-    try {
-      const res = await fetch('/api/stremio/download', {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          imdbId: stream.imdbId,
-          infoHash: stream.url,
-          title: target.title,
-          type: target.type,
-          quality: stream.quality,
-          poster: target.posterUrl,
-          // Pass the full stream object so the server uses the real magnet URI
-          // (with tracker announce URLs) instead of reconstructing a bare magnet.
-          streams: [{
-            infoHash: stream.url,
-            magnet: stream.magnet || `magnet:?xt=urn:btih:${stream.url}`,
-            quality: stream.quality,
-            name: stream.name,
-            size: stream.size,
-            seeds: stream.seeds,
-            source: (stream.source as 'torrentio' | 'prowlarr' | 'nyaa') ?? 'torrentio',
-          }],
-        }),
-      });
-
-      if (res.status === 409) {
-        // Duplicate — already queued or downloading
-        const data = await res.json() as { jobId?: string; message?: string };
-        toast.custom(() => (
-          <div className="flex items-start gap-3 bg-card border border-yellow-500/30 rounded-xl px-4 py-3 shadow-xl max-w-sm">
-            <AlertCircle className="w-4 h-4 text-yellow-400 flex-shrink-0 mt-0.5" />
-            <div>
-              <p className="text-sm font-semibold text-foreground">Already in queue</p>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                <span className="font-medium text-foreground">{target.title}</span> is already being downloaded
-                {data.jobId ? ` (job ${data.jobId.slice(0, 8)}…)` : ''}.
-                Check the Downloads page.
-              </p>
-            </div>
-          </div>
-        ), { duration: 5000 });
-        onClose();
-        return;
-      }
-
-      if (res.status === 503) {
-        // No download backend — qBit offline, WebTorrent not available, and no RD key configured
-        toast.custom(() => (
-          <div className="flex items-start gap-3 bg-card border border-red-500/30 rounded-xl px-4 py-3 shadow-xl max-w-sm">
-            <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
-            <div>
-              <p className="text-sm font-semibold text-foreground">No download backend available</p>
-              <p className="text-xs text-muted-foreground mt-0.5 mb-2">
-                Downloads require qBittorrent or a Real-Debrid API key. Add one in Settings to enable downloads.
-              </p>
-              <a
-                href="https://www.qbittorrent.org/download"
-                target="_blank"
-                rel="noreferrer"
-                className="text-xs text-primary underline"
-              >
-                Download qBittorrent →
-              </a>
-            </div>
-          </div>
-        ), { duration: 10000 });
-        setDownloading(null);
-        return;
-      }
-
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({})) as { error?: string; message?: string };
-        throw new Error(errData.message ?? errData.error ?? `Server error ${res.status}`);
-      }
-
-      toast.success(`Download queued — ${target.title}`, {
-        description: stream.name,
-        duration: 4000,
-      });
-      onClose();
-    } catch (err) {
-      toast.error(`Download failed: ${err instanceof Error ? err.message : String(err)}`);
-      setDownloading(null);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        exit={{ opacity: 0, scale: 0.95 }}
-        className="bg-card border border-border rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden"
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-          <div className="flex items-center gap-3">
-            <ImageWithFallback
-              src={target.posterUrl}
-              alt={target.title}
-              className="w-8 h-12 rounded object-cover"
-              fallbackClassName="w-8 h-12 rounded bg-muted"
-            />
-            <div>
-              <p className="text-sm font-semibold text-foreground">{target.title}</p>
-              <p className="text-xs text-muted-foreground capitalize">{target.type} · {target.release_date ? formatDate(target.release_date) : ''}</p>
-            </div>
-          </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-
-        <div className="p-5 max-h-[75vh] overflow-y-auto space-y-4">
-          {/* Bulk download options for series */}
-          {target.type === 'series' && (
-            <div className="bg-zinc-900 border border-zinc-700 rounded-xl p-4 mb-2 space-y-3">
-              <div className="flex items-center gap-2">
-                <HardDrive className="w-4 h-4 text-primary" />
-                <span className="text-sm font-semibold text-foreground">Download Series / Season</span>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Downloads the best quality ≥720p stream for each episode. Already downloaded episodes are skipped.
-              </p>
-              
-              <div className="flex items-center gap-3 flex-wrap">
-                <div className="flex items-center gap-1.5">
-                  <label className="text-xs text-zinc-400">Season</label>
-                  <select
-                    value={selectedSeason}
-                    onChange={e => setSelectedSeason(e.target.value)}
-                    className="bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-primary"
-                  >
-                    <option value="all">All seasons</option>
-                    {Array.from({ length: 15 }, (_, i) => i + 1).map(s => (
-                      <option key={s} value={s.toString()}>Season {s}</option>
-                    ))}
-                  </select>
-                </div>
-                
-                <div className="flex items-center gap-1.5">
-                  <label className="text-xs text-zinc-400">Episodes/season</label>
-                  <input
-                    type="number"
-                    min={1}
-                    max={50}
-                    value={episodesPerSeason}
-                    onChange={e => setEpisodesPerSeason(Math.max(1, Math.min(50, parseInt(e.target.value) || 12)))}
-                    className="w-14 bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-primary text-center"
-                  />
-                </div>
-              </div>
-
-              <button
-                disabled={bulkDownloading}
-                onClick={handleBulkSeriesDownload}
-                className="w-full flex items-center justify-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground py-2 rounded-lg text-sm font-semibold transition-colors disabled:opacity-50"
-              >
-                {bulkDownloading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Queueing episodes…
-                  </>
-                ) : (
-                  <>
-                    <Download className="w-4 h-4" />
-                    Download {selectedSeason === 'all' ? 'All Seasons' : `Season ${selectedSeason}`}
-                  </>
-                )}
-              </button>
-            </div>
-          )}
-          {streams.length === 0 && !searching && !error && (
-            <div className="text-center py-4">
-              <p className="text-sm text-muted-foreground mb-4">
-                Search for available torrents to download to your HomeStream server.
-              </p>
-              <button
-                onClick={search}
-                className="flex items-center gap-2 bg-primary hover:bg-primary/80 text-primary-foreground px-5 py-2.5 rounded-lg font-semibold text-sm mx-auto transition-colors"
-              >
-                <Search className="w-4 h-4" />
-                Search Torrents
-              </button>
-            </div>
-          )}
-
-          {searching && (
-            <div className="flex flex-col items-center py-6 gap-3">
-              <Loader2 className="w-6 h-6 animate-spin text-primary" />
-              <p className="text-sm text-muted-foreground">Searching for streams…</p>
-            </div>
-          )}
-
-          {error && (
-            <div className="text-center py-4">
-              <p className="text-sm text-red-400 mb-3">{error}</p>
-              <button onClick={search} className="text-xs text-primary hover:text-primary/80">Try again</button>
-            </div>
-          )}
-
-          {streams.length > 0 && (
-            <div className="space-y-2">
-              <p className="text-xs text-muted-foreground mb-3">Select a quality to download:</p>
-              {streams.map(s => (
-                <button
-                  key={s.url}
-                  onClick={() => startDownload(s)}
-                  disabled={!!downloading}
-                  className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg border border-border hover:border-primary/40 hover:bg-primary/5 transition-colors text-left group"
-                >
-                  <div>
-                    <p className="text-xs font-semibold text-foreground group-hover:text-primary transition-colors">{s.name}</p>
-                    <p className="text-[10px] text-muted-foreground line-clamp-1 mt-0.5">{s.title}</p>
-                  </div>
-                  {downloading === s.url ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin text-primary flex-shrink-0" />
-                  ) : (
-                    <Download className="w-3.5 h-3.5 text-muted-foreground group-hover:text-primary flex-shrink-0 transition-colors" />
-                  )}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      </motion.div>
-    </div>
-  );
-}
 
 // ── Direct search (Cinemeta) ──────────────────────────────────────────────────
 
@@ -925,7 +565,7 @@ interface CatalogMovie extends TMDBMovie {
 }
 
 function StreamingTab({ onDownload, libraryTitles, watchlist, onAddToWatchlist, onRemoveFromWatchlist }: {
-  onDownload: (movie: TMDBMovie) => void;
+  onDownload: (movie: TMDBMovie, type?: 'movie' | 'series') => void;
   libraryTitles: Set<string>;
   watchlist: string[];
   onAddToWatchlist: (id: string) => void;
@@ -1058,7 +698,7 @@ function StreamingTab({ onDownload, libraryTitles, watchlist, onAddToWatchlist, 
                 alreadyInLibrary={libraryTitles.has(movie.title.toLowerCase())}
                 onAddToWatchlist={() => onAddToWatchlist(`tmdb-${movie.id}`)}
                 onRemoveFromWatchlist={() => onRemoveFromWatchlist(`tmdb-${movie.id}`)}
-                onDownload={onDownload}
+                onDownload={m => onDownload(m, mediaType === 'tv' ? 'series' : 'movie')}
               />
             ))}
           </div>
@@ -1127,8 +767,8 @@ export default function DiscoverPage() {
   const filteredTopRatedShows = useMemo(() => filterMovies(topRatedShows), [topRatedShows, filterMovies]);
   const filteredPopularShows = useMemo(() => filterMovies(popularShows), [popularShows, filterMovies]);
 
-  const handleTMDBDownload = useCallback((movie: TMDBMovie) => {
-    setDownloadTarget({ title: movie.title, posterUrl: movie.posterUrl, release_date: movie.release_date, type: 'movie' });
+  const handleTMDBDownload = useCallback((movie: TMDBMovie, type: 'movie' | 'series' = 'movie') => {
+    setDownloadTarget({ title: movie.title, posterUrl: movie.posterUrl, release_date: movie.release_date, type });
   }, []);
 
   const handleDirectDownload = useCallback((result: CinemetaResult) => {
@@ -1320,13 +960,13 @@ export default function DiscoverPage() {
                 ) : (
                   <>
                     {filteredShows.length > 0 && (
-                      <Section key={`shows-trending-${searchQuery}`} title="Trending This Week" icon={TrendingUp} movies={filteredShows} libraryTitles={libraryTitles} watchlist={watchlist} onAddToWatchlist={addToWatchlist} onRemoveFromWatchlist={removeFromWatchlist} onDownload={handleTMDBDownload} />
+                      <Section key={`shows-trending-${searchQuery}`} title="Trending This Week" icon={TrendingUp} movies={filteredShows} libraryTitles={libraryTitles} watchlist={watchlist} onAddToWatchlist={addToWatchlist} onRemoveFromWatchlist={removeFromWatchlist} onDownload={movie => handleTMDBDownload(movie, 'series')} />
                     )}
                     {filteredPopularShows.length > 0 && (
-                      <Section key={`shows-popular-${searchQuery}`} title="Popular Right Now" icon={Sparkles} movies={filteredPopularShows} libraryTitles={libraryTitles} watchlist={watchlist} onAddToWatchlist={addToWatchlist} onRemoveFromWatchlist={removeFromWatchlist} onDownload={handleTMDBDownload} />
+                      <Section key={`shows-popular-${searchQuery}`} title="Popular Right Now" icon={Sparkles} movies={filteredPopularShows} libraryTitles={libraryTitles} watchlist={watchlist} onAddToWatchlist={addToWatchlist} onRemoveFromWatchlist={removeFromWatchlist} onDownload={movie => handleTMDBDownload(movie, 'series')} />
                     )}
                     {filteredTopRatedShows.length > 0 && (
-                      <Section key={`shows-toprated-${searchQuery}`} title="All-Time Top Rated" icon={Star} movies={filteredTopRatedShows} libraryTitles={libraryTitles} watchlist={watchlist} onAddToWatchlist={addToWatchlist} onRemoveFromWatchlist={removeFromWatchlist} onDownload={handleTMDBDownload} />
+                      <Section key={`shows-toprated-${searchQuery}`} title="All-Time Top Rated" icon={Star} movies={filteredTopRatedShows} libraryTitles={libraryTitles} watchlist={watchlist} onAddToWatchlist={addToWatchlist} onRemoveFromWatchlist={removeFromWatchlist} onDownload={movie => handleTMDBDownload(movie, 'series')} />
                     )}
                     {filteredShows.length === 0 && filteredPopularShows.length === 0 && filteredTopRatedShows.length === 0 && searchQuery && (
                       <div className="text-center py-20 text-muted-foreground text-sm">No TV shows match "{searchQuery}"</div>
@@ -1340,7 +980,7 @@ export default function DiscoverPage() {
             {activeTab === 'streaming' && (
               <motion.div key="streaming" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
                 <StreamingTab
-                  onDownload={handleTMDBDownload}
+                  onDownload={(movie, type) => handleTMDBDownload(movie, type)}
                   libraryTitles={libraryTitles}
                   watchlist={watchlist}
                   onAddToWatchlist={addToWatchlist}
@@ -1463,7 +1103,7 @@ export default function DiscoverPage() {
       {/* ── Download modal ── */}
       <AnimatePresence>
         {downloadTarget && (
-          <DownloadModal
+          <StremioDownloadModal
             target={downloadTarget}
             onClose={() => setDownloadTarget(null)}
           />

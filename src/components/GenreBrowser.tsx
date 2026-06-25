@@ -14,7 +14,6 @@
  */
 
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Star, Download, Bookmark, BookmarkCheck, Play,
@@ -25,6 +24,7 @@ import type { TMDBMovie } from '@/server/tmdbCache';
 import { useMedia } from '@/context/MediaContext';
 import { fetchTrailerKey } from '@/lib/trailerCache';
 import ImageWithFallback from '@/components/ImageWithFallback';
+import StremioDownloadModal, { DownloadTarget } from '@/components/StremioDownloadModal';
 
 // ── Genre definitions ─────────────────────────────────────────────────────────
 
@@ -81,13 +81,6 @@ interface GenreData {
   topRated: TMDBMovie[];
 }
 
-interface DownloadTarget {
-  title: string;
-  posterUrl?: string;
-  release_date?: string;
-  imdbId?: string;
-  type: 'movie' | 'series';
-}
 
 // ── Trailer modal (inline, reused from discover page pattern) ─────────────────
 
@@ -187,147 +180,6 @@ function TrailerModal({
         </motion.div>
       </motion.div>
     </AnimatePresence>
-  );
-}
-
-// ── Download modal (same pattern as discover page) ────────────────────────────
-
-function DownloadModal({ target, onClose }: { target: DownloadTarget; onClose: () => void }) {
-  const [searching, setSearching] = useState(false);
-  const [streams, setStreams] = useState<{ name: string; title: string; url: string; imdbId: string }[]>([]);
-  const [error, setError] = useState('');
-  const [downloading, setDownloading] = useState<string | null>(null);
-
-  const search = async () => {
-    setSearching(true);
-    setError('');
-    try {
-      // Route through backend proxy — direct browser fetches to Cinemeta/Torrentio
-      // are blocked by CORS in the packaged Electron app and in cloud preview.
-      const res = await fetch('/api/stremio/stream', {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: target.title,
-          type: target.type,
-          imdbId: target.imdbId ?? undefined,
-        }),
-      });
-      const data = await res.json() as { streams?: { name: string; title: string; infoHash: string; imdbId?: string }[]; error?: string };
-      if (!res.ok || data.error) throw new Error(data.error ?? 'No streams found');
-      const found = (data.streams ?? []).slice(0, 10).map(s => ({
-        name: s.name, title: s.title, url: s.infoHash, imdbId: s.imdbId ?? target.imdbId ?? '',
-      }));
-      if (found.length === 0) throw new Error('No streams found — try again later or check your network');
-      setStreams(found);
-    } catch (err) {
-      setError(String(err));
-    } finally {
-      setSearching(false);
-    }
-  };
-
-  const startDownload = async (stream: { name: string; title: string; url: string; imdbId: string }) => {
-    setDownloading(stream.url);
-    try {
-      const res = await fetch('/api/stremio/download', {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          imdbId: stream.imdbId,
-          infoHash: stream.url,
-          title: target.title,
-          type: target.type,
-          quality: stream.name,
-          poster: target.posterUrl,
-          streams: [{ infoHash: stream.url, magnet: `magnet:?xt=urn:btih:${stream.url}`, quality: stream.name, name: stream.name, size: '', seeds: '' }],
-        }),
-      });
-      if (!res.ok) throw new Error('Failed to start download');
-      onClose();
-    } catch {
-      setDownloading(null);
-      toast.error('Failed to queue download — check your connection');
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="bg-card border border-border rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden"
-      >
-        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-          <div className="flex items-center gap-3">
-            <ImageWithFallback
-              src={target.posterUrl}
-              alt={target.title}
-              className="w-8 h-12 rounded object-cover"
-              fallbackClassName="w-8 h-12 rounded bg-muted"
-            />
-            <div>
-              <p className="text-sm font-semibold text-foreground">{target.title}</p>
-              <p className="text-xs text-muted-foreground capitalize">{target.type}</p>
-            </div>
-          </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-
-        <div className="p-5">
-          {streams.length === 0 && !searching && !error && (
-            <div className="text-center py-4">
-              <p className="text-sm text-muted-foreground mb-4">Search for available torrents to download.</p>
-              <button
-                onClick={search}
-                className="flex items-center gap-2 bg-primary hover:bg-primary/80 text-primary-foreground px-5 py-2.5 rounded-lg font-semibold text-sm mx-auto transition-colors"
-              >
-                <Download className="w-4 h-4" />
-                Search Torrents
-              </button>
-            </div>
-          )}
-          {searching && (
-            <div className="flex flex-col items-center py-6 gap-3">
-              <Loader2 className="w-6 h-6 animate-spin text-primary" />
-              <p className="text-sm text-muted-foreground">Searching for streams…</p>
-            </div>
-          )}
-          {error && (
-            <div className="text-center py-4">
-              <p className="text-sm text-red-400 mb-3">{error}</p>
-              <button onClick={search} className="text-xs text-primary hover:text-primary/80">Try again</button>
-            </div>
-          )}
-          {streams.length > 0 && (
-            <div className="space-y-2">
-              <p className="text-xs text-muted-foreground mb-3">Select a quality to download:</p>
-              {streams.map(s => (
-                <button
-                  key={s.url}
-                  onClick={() => startDownload(s)}
-                  disabled={!!downloading}
-                  className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg border border-border hover:border-primary/40 hover:bg-primary/5 transition-colors text-left group"
-                >
-                  <div>
-                    <p className="text-xs font-semibold text-foreground group-hover:text-primary transition-colors">{s.name}</p>
-                    <p className="text-[10px] text-muted-foreground line-clamp-1 mt-0.5">{s.title}</p>
-                  </div>
-                  {downloading === s.url
-                    ? <Loader2 className="w-3.5 h-3.5 animate-spin text-primary flex-shrink-0" />
-                    : <Download className="w-3.5 h-3.5 text-muted-foreground group-hover:text-primary flex-shrink-0 transition-colors" />
-                  }
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      </motion.div>
-    </div>
   );
 }
 
@@ -685,7 +537,7 @@ export default function GenreBrowser() {
       {/* Download modal */}
       <AnimatePresence>
         {downloadTarget && (
-          <DownloadModal
+          <StremioDownloadModal
             target={downloadTarget}
             onClose={() => setDownloadTarget(null)}
           />
